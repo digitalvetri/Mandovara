@@ -1,0 +1,77 @@
+"use server";
+
+// Attendance actions. Owner/manager can mark punches for any employee for
+// today or a past date (subject to attendance.edit permission for past days).
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { scoped } from "@/kernel/db/scoped";
+import { requirePermission } from "@/kernel/rbac/guard";
+import { devContext } from "@/lib/dev-context";
+
+export interface ActionResult<T = unknown> {
+  ok: boolean; data?: T; error?: string; fieldErrors?: Record<string, string>;
+}
+
+const markPunchSchema = z.object({
+  employeeId: z.string().cuid(),
+  date:       z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+  status:     z.enum(["PRESENT", "LATE", "ABSENT", "LEAVE"]),
+  inTime:     z.string().optional().or(z.literal("")),
+  outTime:    z.string().optional().or(z.literal("")),
+});
+
+export async function markPunch(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "attendance.punch");
+  const parsed = markPunchSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const d = parsed.data;
+
+  const day = new Date(`${d.date}T00:00:00Z`);
+  const inTime = d.inTime && d.inTime.trim() !== ""
+    ? new Date(`${d.date}T${padHM(d.inTime)}:00Z`) : null;
+  const outTime = d.outTime && d.outTime.trim() !== ""
+    ? new Date(`${d.date}T${padHM(d.outTime)}:00Z`) : null;
+
+  const db = scoped(ctx);
+  const worked = inTime && outTime
+    ? (outTime.getTime() - inTime.getTime()) / 3_600_000
+    : null;
+
+  const created = await db.attendance.upsert({
+    where: { employeeId_date: { employeeId: d.employeeId, date: day } },
+    create: {
+      orgId:      ctx.orgId,
+      employeeId: d.employeeId,
+      date:       day,
+      status:     d.status,
+      inTime, outTime,
+      ...(worked != null && { workedHours: worked }),
+    },
+    update: {
+      status:  d.status,
+      inTime, outTime,
+      ...(worked != null && { workedHours: worked }),
+    },
+    select: { id: true },
+  });
+  revalidatePath("/attendance");
+  return { ok: true, data: created };
+}
+
+function padHM(s: string): string {
+  // Accept "9:00", "09:00", "9" — normalise to "HH:MM"
+  const parts = s.split(":");
+  const h = String(parts[0] ?? "0").padStart(2, "0");
+  const m = String(parts[1] ?? "0").padStart(2, "0");
+  return `${h}:${m}`;
+}
+function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
+  const fieldErrors: Record<string, string> = {};
+  for (const iss of err.issues) {
+    const p = iss.path.filter((s): s is string | number => typeof s === "string" || typeof s === "number").join(".");
+    if (!fieldErrors[p]) fieldErrors[p] = iss.message;
+  }
+  return { ok: false, error: "Validation failed", fieldErrors };
+}
