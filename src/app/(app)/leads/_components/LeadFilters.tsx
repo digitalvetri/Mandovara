@@ -9,7 +9,6 @@ import { Search } from "lucide-react";
 import { LEAD_STATUSES } from "@/modules/leads/schema";
 
 const STATUS_TABS: { key: string; label: string }[] = [
-  { key: "OPEN", label: "Open" },
   { key: "ALL", label: "All" },
   ...LEAD_STATUSES.map((s) => ({ key: s, label: humanise(s) })),
 ];
@@ -19,7 +18,7 @@ export function LeadFilters() {
   const params = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const currentStatus = params.get("status") ?? "OPEN";
+  const currentStatus = params.get("status") ?? "ALL";
   const currentSearch = params.get("q") ?? "";
   const [search, setSearch] = useState(currentSearch);
 
@@ -34,7 +33,7 @@ export function LeadFilters() {
 
   function onStatus(key: string) {
     const next = new URLSearchParams(params.toString());
-    if (key === "OPEN") next.delete("status");
+    if (key === "ALL") next.delete("status");
     else next.set("status", key);
     next.delete("page");
     push(next);

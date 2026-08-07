@@ -53,10 +53,10 @@ export default async function LeadsPage({
 }
 
 function normaliseStatus(v: string | undefined): LeadStatus | "OPEN" | "ALL" {
-  if (v == null || v === "") return "OPEN";
+  if (v == null || v === "") return "ALL";
   if (v === "OPEN" || v === "ALL") return v;
   if ((LEAD_STATUSES as readonly string[]).includes(v)) return v as LeadStatus;
-  return "OPEN";
+  return "ALL";
 }
 
 function parsePositiveInt(v: string | undefined): number | null {

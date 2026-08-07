@@ -61,9 +61,9 @@ export function LeadForm({ mode, branches, initial }: LeadFormProps) {
         setServerError(result.error ?? "Something went wrong");
         return;
       }
-      const targetId = result.data?.id ?? initial?.id;
+      const targetId = mode === "create" ? result.data?.id : initial?.id;
       const target = (targetId ? `/leads/${targetId}` : "/leads") as Route;
-      router.push(target);
+      router.push(mode === "edit" ? ("/leads" as Route) : target);
       router.refresh();
     });
   }
@@ -90,13 +90,17 @@ export function LeadForm({ mode, branches, initial }: LeadFormProps) {
             ))}
           </select>
         </Field>
-        <Field label="Branch" error={errors.branchId?.message} required>
-          <select {...register("branchId")} className={fieldCls}>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </Field>
+        {branches.length > 1 ? (
+          <Field label="Branch" error={errors.branchId?.message} required>
+            <select {...register("branchId")} className={fieldCls}>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <input type="hidden" {...register("branchId")} />
+        )}
         <Field label="Expected value" error={errors.expectedValue?.message} hint="e.g. 250000, 2.5L, 25 lakh">
           <input {...register("expectedValue")} className={`${fieldCls} tabular`} inputMode="decimal" />
         </Field>

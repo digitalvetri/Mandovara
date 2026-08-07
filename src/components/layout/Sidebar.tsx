@@ -93,20 +93,20 @@ export function Sidebar() {
   return (
     <aside className="h-full w-full bg-sidebar text-sidebar-text flex flex-col">
       {/* Brand */}
-      <div className="px-6 pt-7 pb-8">
-        <div className="font-display text-[22px] tracking-[0.18em] font-semibold leading-none">
+      <div className="px-6 pt-5 pb-5">
+        <div className="font-display text-[20px] tracking-[0.18em] font-semibold leading-none">
           MANDOVARA
         </div>
-        <div className="mt-2 text-[9.5px] tracking-[0.28em] text-sidebar-dim uppercase">
+        <div className="mt-1.5 text-[9.5px] tracking-[0.28em] text-sidebar-dim uppercase">
           Studio Console
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 pb-6">
+      <nav className="flex-1 overflow-y-auto px-3 pb-3">
         {NAV.map((section) => (
-          <div key={section.section} className="mb-5">
-            <div className="px-3 mb-1.5 text-[9.5px] uppercase tracking-[0.22em] text-sidebar-dim">
+          <div key={section.section} className="mb-3">
+            <div className="px-3 mb-1 mt-2 text-[9.5px] uppercase tracking-[0.22em] text-sidebar-dim">
               {section.section}
             </div>
             {section.items.map((item) => {
@@ -126,8 +126,8 @@ export function Sidebar() {
       </nav>
 
       {/* Profile block */}
-      <div className="border-t border-white/[0.08] px-4 py-4 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-full bg-accent/85 text-white flex items-center justify-center text-[11.5px] font-medium tracking-wider">
+      <div className="border-t border-white/[0.08] px-4 py-3 flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full bg-accent/85 text-white flex items-center justify-center text-[11px] font-medium tracking-wider">
           AK
         </div>
         <div className="flex-1 min-w-0">

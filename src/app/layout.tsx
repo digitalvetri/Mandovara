@@ -18,6 +18,14 @@ export default function RootLayout({
   // hidden.
   return (
     <html lang="en" className={fontClassNames} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}",
+          }}
+        />
+      </head>
       <body className="bg-bg text-text font-body">{children}</body>
     </html>
   );

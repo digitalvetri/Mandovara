@@ -1,7 +1,6 @@
-import { Fraunces, Inter, JetBrains_Mono, Noto_Sans_Tamil } from "next/font/google";
+import { Fraunces, Inter, Geist_Mono, Noto_Sans_Tamil } from "next/font/google";
 
-// Display — Fraunces variable. Used ONLY for login wordmark, page titles,
-// dashboard hero numbers. Nowhere else.
+// Display — Fraunces. Login wordmark, page titles, KPI hero numbers.
 export const fontDisplay = Fraunces({
   subsets: ["latin"],
   axes: ["opsz", "SOFT"],
@@ -9,21 +8,21 @@ export const fontDisplay = Fraunces({
   variable: "--font-display",
 });
 
-// Body — Inter. Warm, soft sans-serif matching the approved reference.
+// Body — Inter. UI at 13px base.
 export const fontBody = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-body",
 });
 
-// Data — JetBrains Mono. Every numeral in tables and technical fields.
-export const fontData = JetBrains_Mono({
+// Data — Geist Mono. Every numeral, tabular-nums.
+export const fontData = Geist_Mono({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-data",
 });
 
-// Tamil — Noto Sans Tamil. Bilingual labels, WhatsApp template previews, payslips.
+// Tamil — Noto Sans Tamil. Field surfaces, payslips, WA previews.
 export const fontTamil = Noto_Sans_Tamil({
   subsets: ["tamil"],
   display: "swap",

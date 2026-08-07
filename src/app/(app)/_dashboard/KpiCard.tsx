@@ -14,8 +14,8 @@ const toneClass: Record<KpiCardProps["trendTone"], string> = {
 
 export function KpiCard({ label, value, subtitle, trend, trendTone }: KpiCardProps) {
   return (
-    <div className="rounded-[14px] bg-surface border border-rule p-5">
-      <div className="flex items-start justify-between">
+    <div className="rounded-[12px] bg-surface border border-rule px-4 py-3.5">
+      <div className="flex items-center justify-between">
         <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
           {label}
         </div>
@@ -25,10 +25,10 @@ export function KpiCard({ label, value, subtitle, trend, trendTone }: KpiCardPro
           {trend}
         </span>
       </div>
-      <div className="mt-3 font-display text-[32px] leading-none font-semibold text-text tabular-nums">
+      <div className="mt-2 font-display text-[26px] leading-none font-semibold text-text tabular-nums">
         {value}
       </div>
-      <div className="mt-2 text-[11.5px] text-text-dim">{subtitle}</div>
+      <div className="mt-1.5 text-[11.5px] text-text-dim truncate">{subtitle}</div>
     </div>
   );
 }

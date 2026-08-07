@@ -4,20 +4,20 @@ export function RevenueChart({ months }: { months: RevenueMonth[] }) {
   const max = months.reduce((m, x) => (x.lakhs > m ? x.lakhs : m), 0);
 
   return (
-    <div className="rounded-[14px] bg-surface border border-rule p-6">
-      <div className="flex items-baseline justify-between mb-6">
+    <div className="rounded-[12px] bg-surface border border-rule p-5">
+      <div className="flex items-baseline justify-between mb-4">
         <div>
           <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
             Revenue
           </div>
-          <div className="mt-1 font-display text-[18px] font-semibold text-text">
+          <div className="mt-0.5 font-display text-[17px] font-semibold text-text">
             Last 8 months
           </div>
         </div>
         <div className="text-[10.5px] text-text-dim tabular">₹ in lakhs</div>
       </div>
 
-      <div className="flex items-end justify-between gap-3 h-[180px]">
+      <div className="flex items-end justify-between gap-3 h-[160px]">
         {months.map((m) => {
           const heightPct = max === 0 ? 0 : (m.lakhs / max) * 100;
           return (

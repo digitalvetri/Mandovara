@@ -7,6 +7,7 @@ import { getClient } from "@/modules/clients/queries";
 import { ClientForm } from "../_components/ClientForm";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
+import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,8 @@ export default async function ClientDetailPage({
               </ul>
             )}
           </div>
+
+          <ClientFollowUpForm clientId={client.id} />
 
           <div className="rounded-[14px] bg-surface border border-rule p-6">
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">

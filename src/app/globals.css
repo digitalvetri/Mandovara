@@ -1,81 +1,125 @@
-/* ── Fonts (must come before any other @import per CSS spec) ────── */
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;500;600&display=swap");
-
 @import "tailwindcss";
 
-/* ── Design tokens — "Warm" (see docs/BUILD-SPEC.md; deviates from
-      the Sovereign dark theme to match the user's approved reference
-      screenshot: cream ground, dark sidebar, rust-orange accent). ─── */
+/* ── Design tokens — Sovereign / Midnight Court (dark by default)
+      Per master spec §6.2. Light "Porcelain" via [data-theme="light"] or .light */
 @theme {
-  /* Ground */
-  --color-bg:            oklch(0.94 0.028 82);   /* #F1E5CD  warm cream           */
-  --color-surface:       oklch(1.00 0.005 82);   /* #FFFFFE  card / panel         */
-  --color-surface-hover: oklch(0.97 0.020 82);   /* #F7ECD8  row hover            */
-  --color-rule:          oklch(0.86 0.030 82);   /* #E5D5B4  hairline             */
-  --color-rule-strong:   oklch(0.75 0.035 82);   /* #C6B48C  emphasized divider   */
+  /* Ink surfaces */
+  --color-ink:           oklch(0.18 0.045 265);   /* #0B1020 ground        */
+  --color-surface:       oklch(0.24 0.042 265);   /* #131A2E card/panel    */
+  --color-surface-2:     oklch(0.28 0.045 265);   /* #1A2340 raised        */
+  --color-surface-hover: oklch(0.28 0.045 265);
+  --color-border:        oklch(0.36 0.038 265);   /* #26314F rule          */
+  --color-rule:          oklch(0.36 0.038 265);
+  --color-rule-strong:   oklch(0.45 0.038 265);
 
-  /* Sidebar — dark warm brown-black */
-  --color-sidebar:       oklch(0.18 0.015 60);   /* #1F1712  sidebar bg           */
-  --color-sidebar-hover: oklch(0.24 0.018 60);   /* #2C231C  hover                */
-  --color-sidebar-text:  oklch(0.88 0.028 82);   /* #E8DDC7  primary text on dark */
-  --color-sidebar-dim:   oklch(0.65 0.025 82);   /* #A69880  secondary            */
+  /* Ground alias */
+  --color-bg:            oklch(0.18 0.045 265);
 
-  /* Accent — rust orange, used sparingly (primary CTA + chart bars) */
-  --color-accent:        oklch(0.60 0.155 40);   /* #C05121  rust                 */
-  --color-accent-hover:  oklch(0.55 0.155 40);   /* #A5471E  hover                */
-  --color-accent-dim:    oklch(0.72 0.100 40);   /* #D68465  softened variant     */
+  /* Text */
+  --color-text:          oklch(0.94 0.008 265);   /* #EDEFF5 primary       */
+  --color-text-muted:    oklch(0.68 0.028 265);   /* #8792AC secondary     */
+  --color-text-dim:      oklch(0.68 0.028 265);
+  --color-text-subtle:   oklch(0.50 0.030 265);
+  --color-text-faint:    oklch(0.50 0.030 265);
 
-  /* Text on cream ground */
-  --color-text:          oklch(0.24 0.020 60);   /* #2A2018  primary text         */
-  --color-text-dim:      oklch(0.55 0.020 60);   /* #7C6E5D  labels               */
-  --color-text-faint:    oklch(0.68 0.020 60);   /* #A0917E  disabled             */
+  /* Sidebar (aligned to ink, slightly darker) */
+  --color-sidebar:       oklch(0.14 0.040 265);
+  --color-sidebar-hover: oklch(0.20 0.042 265);
+  --color-sidebar-text:  oklch(0.94 0.008 265);
+  --color-sidebar-dim:   oklch(0.68 0.028 265);
 
-  /* Status */
-  --color-good:          oklch(0.68 0.100 145);  /* #7CA872  success / positive   */
-  --color-warn:          oklch(0.75 0.130 75);   /* #D8A24C  pending              */
-  --color-bad:           oklch(0.60 0.170 25);   /* #C55130  overdue / alarm      */
-
-  /* Sovereign (dark) — kept so the /styleguide page still works. Prefer
-     the Warm tokens above for any new UI. */
-  --color-ink:           oklch(0.18 0.045 265);
-  --color-ink-raised:    oklch(0.24 0.042 265);
-  --color-ink-hover:     oklch(0.28 0.045 265);
-  --color-ink-sunken:    oklch(0.14 0.040 265);
-  --color-gold:          oklch(0.72 0.115 85);
+  /* Antique gold — used ONCE per screen (§6.1) */
+  --color-gold:          oklch(0.72 0.115 85);    /* #C9A227 */
+  --color-gold-strong:   oklch(0.83 0.105 85);    /* #E5C55C */
   --color-gold-lit:      oklch(0.83 0.105 85);
   --color-gold-dim:      oklch(0.55 0.090 85);
-  --color-paper:         oklch(0.94 0.008 265);
-  --color-paper-dim:     oklch(0.68 0.028 265);
-  --color-paper-faint:   oklch(0.50 0.030 265);
+  --color-gold-tint:     oklch(0.72 0.115 85 / 0.13);
+
+  /* Accent alias — points at gold, so bg-accent = the gold CTA */
+  --color-accent:        oklch(0.72 0.115 85);
+  --color-accent-hover:  oklch(0.83 0.105 85);
+  --color-accent-dim:    oklch(0.55 0.090 85);
+
+  /* Status (spec: solid/heat/fault/info) */
+  --color-solid:         oklch(0.78 0.145 165);   /* ready, paid, installed */
+  --color-heat:          oklch(0.78 0.130 75);    /* in progress, pending   */
+  --color-fault:         oklch(0.66 0.190 20);    /* overdue, snag, lot mismatch */
+  --color-info:          oklch(0.62 0.140 255);
+  --color-good:          oklch(0.78 0.145 165);
+  --color-warn:          oklch(0.78 0.130 75);
+  --color-bad:           oklch(0.66 0.190 20);
   --color-signal:        oklch(0.78 0.145 165);
   --color-alarm:         oklch(0.66 0.190 20);
   --color-caution:       oklch(0.78 0.130 75);
   --color-neutral:       oklch(0.68 0.028 265);
 
-  /* Type */
+  /* Paper aliases used by the /styleguide page */
+  --color-paper:         oklch(0.94 0.008 265);
+  --color-paper-dim:     oklch(0.68 0.028 265);
+  --color-paper-faint:   oklch(0.50 0.030 265);
+  --color-ink-raised:    oklch(0.24 0.042 265);
+  --color-ink-hover:     oklch(0.28 0.045 265);
+  --color-ink-sunken:    oklch(0.14 0.040 265);
+
+  /* Type — Fraunces / Inter / Geist Mono / Noto Sans Tamil */
   --font-display: var(--font-display), "Fraunces", Georgia, serif;
-  --font-body:    var(--font-body),    "Geist", system-ui, sans-serif;
+  --font-body:    var(--font-body),    "Inter", system-ui, sans-serif;
   --font-data:    var(--font-data),    "Geist Mono", "SF Mono", monospace;
   --font-tamil:   var(--font-tamil),   "Noto Sans Tamil", sans-serif;
 
-  /* Radius */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 14px;
 }
 
+/* ── Light theme — "Porcelain" (§6.2). Toggled by `.light` on <html>. */
+:root.light {
+  --color-ink:           oklch(0.985 0.005 85);   /* #F8F7F4 */
+  --color-bg:            oklch(0.985 0.005 85);
+  --color-surface:       oklch(1.000 0.000 0);    /* #FFFFFF */
+  --color-surface-2:     oklch(0.975 0.005 85);
+  --color-surface-hover: oklch(0.955 0.006 85);
+  --color-border:        oklch(0.895 0.008 85);   /* #E4E1D8 */
+  --color-rule:          oklch(0.895 0.008 85);
+  --color-rule-strong:   oklch(0.800 0.010 85);
+
+  --color-text:          oklch(0.180 0.010 260);  /* #141B22 */
+  --color-text-muted:    oklch(0.450 0.010 260);
+  --color-text-dim:      oklch(0.450 0.010 260);
+  --color-text-subtle:   oklch(0.600 0.010 260);
+  --color-text-faint:    oklch(0.600 0.010 260);
+
+  --color-sidebar:       oklch(0.965 0.006 85);
+  --color-sidebar-hover: oklch(0.935 0.008 85);
+  --color-sidebar-text:  oklch(0.180 0.010 260);
+  --color-sidebar-dim:   oklch(0.450 0.010 260);
+
+  --color-gold:          oklch(0.65 0.115 85);    /* #B8912F */
+  --color-gold-strong:   oklch(0.72 0.115 85);
+  --color-gold-lit:      oklch(0.72 0.115 85);
+  --color-gold-tint:     oklch(0.65 0.115 85 / 0.13);
+  --color-accent:        oklch(0.65 0.115 85);
+  --color-accent-hover:  oklch(0.72 0.115 85);
+}
+
 /* ── Base ──────────────────────────────────────────────────────── */
 html, body {
+  font-family: var(--font-body);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 560;
+  letter-spacing: -0.015em;
+  font-optical-sizing: auto;
+}
 
 .tabular {
   font-family: var(--font-data);
@@ -84,22 +128,21 @@ html, body {
 
 .hairline {
   height: 1px;
-  background: var(--color-accent);
+  background: var(--color-gold);
   opacity: 0.55;
   width: 100%;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-gold);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-/* Skeleton shimmer */
 .skeleton {
   background: linear-gradient(90deg,
     var(--color-surface) 0%,
-    var(--color-surface-hover) 50%,
+    var(--color-surface-2) 50%,
     var(--color-surface) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;

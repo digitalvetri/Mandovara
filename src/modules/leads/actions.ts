@@ -17,10 +17,11 @@ import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { withEvents } from "@/kernel/events/bus";
+import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { parseINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import {
-  createLeadSchema, updateLeadSchema, statusChangeSchema,
+  createLeadSchema, updateLeadSchema, statusChangeSchema, convertLeadSchema,
 } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -140,6 +141,63 @@ export async function changeLeadStatus(input: unknown): Promise<ActionResult<{ i
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   return { ok: true, data: { id } };
+}
+
+export async function convertLead(input: unknown): Promise<ActionResult<{ clientId: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "lead.convert");
+
+  const parsed = convertLeadSchema.safeParse(input);
+  if (!parsed.success) return zodError<{ clientId: string }>(parsed.error);
+  const { id } = parsed.data;
+
+  const db = scoped(ctx);
+  const lead = await db.lead.findUniqueOrThrow({
+    where: { id },
+    select: {
+      id: true, name: true, mobile: true, email: true, companyName: true,
+      status: true, convertedClientId: true, branchId: true,
+    },
+  });
+
+  if (lead.convertedClientId != null) {
+    return { ok: true, data: { clientId: lead.convertedClientId } };
+  }
+  if (lead.status === "LOST") {
+    return { ok: false, error: "This lead is marked lost and cannot be converted." };
+  }
+
+  const branch = await db.branch.findUniqueOrThrow({
+    where: { id: lead.branchId },
+    select: { stateCode: true },
+  });
+
+  const clientId = await withTransaction(async (tx: TxClient) => {
+    const client = await tx.client.create({
+      data: {
+        orgId:         ctx.orgId,
+        name:          lead.companyName ?? lead.name,
+        type:          "RETAIL",
+        status:        "ACTIVE",
+        primaryMobile: lead.mobile,
+        primaryEmail:  lead.email,
+        stateCode:     branch.stateCode,
+        paymentTerms:  30,
+        createdById:   ctx.userId,
+      },
+      select: { id: true },
+    });
+    await tx.lead.update({
+      where: { id: lead.id },
+      data: { status: "WON", convertedClientId: client.id },
+    });
+    return client.id;
+  });
+
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${id}`);
+  revalidatePath("/clients");
+  return { ok: true, data: { clientId } };
 }
 
 // ── helpers ──────────────────────────────────────────────────────

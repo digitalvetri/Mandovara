@@ -49,6 +49,11 @@ export const statusChangeSchema = z
     { path: ["lostReason"], message: "Lost reason is required when moving to LOST" },
   );
 
+export const convertLeadSchema = z.object({
+  id: z.string().cuid(),
+});
+
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 export type StatusChangeInput = z.infer<typeof statusChangeSchema>;
+export type ConvertLeadInput = z.infer<typeof convertLeadSchema>;

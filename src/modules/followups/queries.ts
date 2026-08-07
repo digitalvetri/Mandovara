@@ -185,6 +185,32 @@ async function loadCounts(
   return { open, today, overdue, completed };
 }
 
+export interface LeadFollowUpRow {
+  id: string;
+  dueAt: Date;
+  status: string;
+  outcome: string | null;
+  note: string | null;
+  completedAt: Date | null;
+}
+
+export async function listFollowUpsForLead(
+  ctx: RequestContext,
+  leadId: string,
+): Promise<LeadFollowUpRow[]> {
+  requirePermission(ctx, "followup.view");
+  const db = scoped(ctx);
+  return db.followUp.findMany({
+    where: { leadId },
+    orderBy: [{ status: "asc" }, { dueAt: "asc" }],
+    take: 50,
+    select: {
+      id: true, dueAt: true, status: true, outcome: true, note: true,
+      completedAt: true,
+    },
+  });
+}
+
 export interface FollowUpPickerLead {
   id: string; name: string; mobile: string;
 }

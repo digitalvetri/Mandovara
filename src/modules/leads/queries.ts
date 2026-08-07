@@ -28,6 +28,10 @@ export interface LeadRow {
   updatedAt: Date;
 }
 
+export interface LeadDetail extends LeadRow {
+  convertedClientId: string | null;
+}
+
 export interface ListLeadsResult {
   rows: LeadRow[];
   total: number;
@@ -70,7 +74,7 @@ export async function listLeads(
   return { rows, total, page, pageSize };
 }
 
-export async function getLead(ctx: RequestContext, id: string): Promise<LeadRow | null> {
+export async function getLead(ctx: RequestContext, id: string): Promise<LeadDetail | null> {
   requirePermission(ctx, "lead.view");
   const db = scoped(ctx);
   return db.lead.findUnique({
@@ -79,6 +83,7 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadRow 
       id: true, name: true, mobile: true, email: true, companyName: true,
       source: true, status: true, expectedValue: true, requirement: true,
       ownerId: true, createdAt: true, updatedAt: true,
+      convertedClientId: true,
     },
   });
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Search, Plus } from "lucide-react";
 import { ScheduleMenu } from "./ScheduleMenu";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface TopbarProps {
   title: string;
@@ -17,17 +18,18 @@ interface TopbarProps {
 
 export function Topbar({ title, eyebrow, actions, showSchedule }: TopbarProps) {
   return (
-    <header className="pt-6 lg:pt-8 pb-4 lg:pb-6 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 lg:gap-8">
+    <header className="pt-5 pb-4 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 lg:gap-8">
       <div className="min-w-0">
-        <h1 className="font-display text-[24px] sm:text-[28px] lg:text-[34px] xl:text-[38px] leading-tight lg:leading-[1.05] font-semibold text-text break-words">
+        <h1 className="font-display text-[22px] sm:text-[26px] lg:text-[30px] xl:text-[32px] leading-tight lg:leading-[1.05] font-semibold text-text break-words">
           {title}
         </h1>
         {eyebrow && (
-          <div className="mt-1 lg:mt-2 text-[12px] text-text-dim">{eyebrow}</div>
+          <div className="mt-1 text-[12px] text-text-dim">{eyebrow}</div>
         )}
       </div>
       <div className="flex items-center gap-2 md:gap-3 flex-wrap">
         <SearchBox />
+        <ThemeToggle />
         {showSchedule && <ScheduleMenu />}
         {actions}
       </div>
