@@ -18,7 +18,7 @@ export function ThemeToggle() {
   function toggle() {
     const next: Mode = mode === "light" ? "dark" : "light";
     document.documentElement.classList.toggle("light", next === "light");
-    try { localStorage.setItem("theme", next); } catch {}
+    try { localStorage.setItem("theme", next); } catch { /* storage disabled — ignore */ }
     setMode(next);
   }
 
