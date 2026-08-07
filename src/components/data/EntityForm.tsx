@@ -35,7 +35,7 @@ export interface EntityFormProps {
   cancelLabel?:  string;
   children:      React.ReactNode;
   /** Number of columns for the field grid at ≥sm. Defaults to 2. */
-  columns?:      1 | 2;
+  columns?:      1 | 2 | 3;
 }
 
 function EntityFormImpl(props: EntityFormProps) {
@@ -43,6 +43,8 @@ function EntityFormImpl(props: EntityFormProps) {
   const gridCls =
     cols === 1
       ? "grid grid-cols-1 gap-x-6 gap-y-4"
+      : cols === 3
+      ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
       : "grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4";
   return (
     <form
@@ -85,13 +87,17 @@ export interface FieldProps {
   error?:    string;
   required?: boolean;
   hint?:     string;
-  span?:     1 | 2;
+  span?:     1 | 2 | 3;
   children:  React.ReactNode;
 }
 
 function Field(props: FieldProps) {
+  const spanCls =
+    props.span === 3 ? "sm:col-span-2 lg:col-span-3"
+    : props.span === 2 ? "sm:col-span-2"
+    : undefined;
   return (
-    <div className={props.span === 2 ? "sm:col-span-2" : undefined}>
+    <div className={spanCls}>
       <div className="mb-1 text-[11px] tracking-[0.06em] uppercase text-text-dim">
         {props.label}
         {props.required && <span className="text-accent"> *</span>}
