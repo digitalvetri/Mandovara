@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   UserPlus,
   Users,
-  Bell,
   FileText,
   Package,
   Truck,
@@ -44,7 +43,6 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Lead Management",  href: "/leads",      icon: UserPlus },
       { label: "Client 360",       href: "/clients",    icon: Users },
-      { label: "Follow-ups",       href: "/followups",  icon: Bell },
       { label: "Quotations (BOQ)", href: "/quotations", icon: FileText },
     ],
   },

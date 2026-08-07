@@ -6,8 +6,6 @@
 // they also appear on /followups.
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import Link from "next/link";
-import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { Calendar as CalIcon, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { createFollowUp } from "@/modules/followups/actions";
@@ -234,10 +232,6 @@ export function ScheduleMenu() {
               </label>
               {error && <div className="text-[11px] text-bad">{error}</div>}
               <div className="flex items-center justify-end gap-2 pt-1">
-                <Link href={"/followups/new" as Route} onClick={() => setOpen(false)}
-                      className="mr-auto text-[10.5px] text-accent hover:underline">
-                  Attach to lead / client →
-                </Link>
                 <button type="button" onClick={() => setScheduling(false)}
                         className="h-[28px] px-2 text-[11px] text-text-dim hover:text-text">
                   Cancel
@@ -254,10 +248,6 @@ export function ScheduleMenu() {
                       className="inline-flex items-center gap-1 h-[30px] px-3 rounded-[6px] bg-accent text-white text-[11.5px] font-medium hover:bg-accent-hover transition-colors">
                 <Plus size={12} /> New meeting
               </button>
-              <Link href={"/followups" as Route} onClick={() => setOpen(false)}
-                    className="text-[11px] text-text-dim hover:text-accent">
-                Full list →
-              </Link>
             </div>
           )}
         </div>
