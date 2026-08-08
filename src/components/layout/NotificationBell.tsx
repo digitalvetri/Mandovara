@@ -11,6 +11,7 @@
 //   (server-side) and navigates to the target.
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Bell, CheckCheck } from "lucide-react";
@@ -145,6 +146,7 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-[420px] overflow-y-auto">
+            {/* body */}
             {loading && items.length === 0 ? (
               <div className="py-10 text-center text-[12px] text-text-dim">Loading…</div>
             ) : items.length === 0 ? (
@@ -192,6 +194,17 @@ export function NotificationBell() {
                 })}
               </ul>
             )}
+          </div>
+
+          {/* Footer link to the full inbox */}
+          <div className="px-4 py-2 border-t border-rule flex items-center justify-end">
+            <Link
+              href={"/notifications" as Route}
+              onClick={() => setOpen(false)}
+              className="text-[11px] text-text-dim hover:text-accent"
+            >
+              Open inbox →
+            </Link>
           </div>
         </div>
       )}
