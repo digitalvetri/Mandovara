@@ -12,7 +12,8 @@
 // the current draft so the numbers move as you type (§6.4 test 5).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Trash2, Pencil, X, ImagePlus, AlertTriangle } from "lucide-react";
+import { Trash2, Pencil, X, ImagePlus, AlertTriangle, Pen } from "lucide-react";
+import { SketchOverlay } from "./SketchOverlay";
 import {
   calcWallpaper, WALLPAPER_ENGINE_VERSION,
   type PatternMatch as WallpaperPatternMatch,
@@ -565,6 +566,7 @@ function PhotoPicker({
   value, onChange,
 }: { value: string | undefined; onChange: (data: string | undefined) => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [sketching, setSketching] = useState(false);
 
   const compress = useCallback(async (file: File) => {
     const bitmap = await createImageBitmap(file);
@@ -605,6 +607,15 @@ function PhotoPicker({
           {value && (
             <button
               type="button"
+              onClick={() => setSketching(true)}
+              className="inline-flex items-center gap-1 h-[30px] px-3 rounded-[6px] bg-accent/10 border border-accent/40 text-accent text-[11.5px] hover:bg-accent/20 transition-colors"
+            >
+              <Pen size={11} /> Sketch on photo
+            </button>
+          )}
+          {value && (
+            <button
+              type="button"
               onClick={() => onChange(undefined)}
               className="h-[26px] px-3 rounded-[6px] text-[11px] text-text-dim hover:text-bad text-left"
             >
@@ -625,6 +636,16 @@ function PhotoPicker({
           }}
         />
       </div>
+      {sketching && value && (
+        <SketchOverlay
+          photoDataUrl={value}
+          onSave={(dataUrl) => {
+            onChange(dataUrl);
+            setSketching(false);
+          }}
+          onCancel={() => setSketching(false)}
+        />
+      )}
     </div>
   );
 }
