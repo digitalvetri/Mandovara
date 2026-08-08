@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import type { Route } from "next";
+import { Ruler } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
@@ -32,13 +35,22 @@ export default async function ProjectDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between">
+          <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Status</div>
               <ProjectStatusPill status={p.status} />
             </div>
-            <div className="text-[11.5px] text-text-dim tabular">
-              {completedMs}/{p.milestones.length} milestones · {completedBilling}% billable
+            <div className="flex items-center gap-4">
+              <div className="text-[11.5px] text-text-dim tabular">
+                {completedMs}/{p.milestones.length} milestones · {completedBilling}% billable
+              </div>
+              <Link
+                href={`/projects/${p.id}/measurements` as Route}
+                className="inline-flex items-center gap-1.5 h-[30px] px-3 rounded-[6px] bg-accent/12 text-accent text-[11.5px] font-medium hover:bg-accent/20 transition-colors"
+              >
+                <Ruler size={12} />
+                Site measurements →
+              </Link>
             </div>
           </div>
 
