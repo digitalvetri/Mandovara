@@ -1,7 +1,10 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { Search, Plus } from "lucide-react";
 import { ScheduleMenu } from "./ScheduleMenu";
 import { ThemeToggle } from "./ThemeToggle";
+import { NotificationBell } from "./NotificationBell";
 
 interface TopbarProps {
   title: string;
@@ -28,7 +31,8 @@ export function Topbar({ title, eyebrow, actions, showSchedule }: TopbarProps) {
         )}
       </div>
       <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-        <SearchBox />
+        <SearchTrigger />
+        <NotificationBell />
         <ThemeToggle />
         {showSchedule && <ScheduleMenu />}
         {actions}
@@ -37,16 +41,32 @@ export function Topbar({ title, eyebrow, actions, showSchedule }: TopbarProps) {
   );
 }
 
-function SearchBox() {
+/** Fires the global "open command palette" event on click. The palette
+ *  itself lives in the app layout (§6.3.1). This is a discoverability
+ *  affordance for users who don't know the ⌘K shortcut. */
+function SearchTrigger() {
+  function open() {
+    // Simulate a Ctrl+K press — the palette listens for this globally
+    // and re-emitting the same shortcut keeps a single code path there.
+    const evt = new KeyboardEvent("keydown", {
+      key: "k", code: "KeyK", ctrlKey: true, bubbles: true,
+    });
+    window.dispatchEvent(evt);
+  }
   return (
-    <label className="flex items-center gap-2 h-[38px] w-full sm:w-[200px] xl:w-[280px] px-3 bg-surface border border-rule rounded-[8px]">
-      <Search size={14} strokeWidth={1.75} className="text-text-faint" />
-      <input
-        type="text"
-        placeholder="Search…"
-        className="flex-1 min-w-0 bg-transparent text-[12.5px] outline-none placeholder:text-text-faint"
-      />
-    </label>
+    <button
+      type="button"
+      onClick={open}
+      title="Search — Ctrl K"
+      aria-label="Open command palette"
+      className="flex items-center gap-2 h-[38px] w-full sm:w-[200px] xl:w-[280px] px-3 bg-surface border border-rule rounded-[8px] text-left hover:bg-surface-hover transition-colors"
+    >
+      <Search size={14} strokeWidth={1.75} className="text-text-faint shrink-0" />
+      <span className="flex-1 min-w-0 text-[12.5px] text-text-faint truncate">Search…</span>
+      <kbd className="hidden sm:inline text-[10px] tabular text-text-faint border border-rule rounded-[4px] px-1.5 py-0.5">
+        Ctrl K
+      </kbd>
+    </button>
   );
 }
 
