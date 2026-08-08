@@ -79,6 +79,11 @@ export interface ProjectExpenseRow {
   status: string;
 }
 
+export interface ProjectHandover {
+  handedOverAt: Date;
+  checklist: Record<string, { checked: boolean; note?: string }>;
+}
+
 export interface ProjectDetail {
   id: string;
   number: string;
@@ -101,6 +106,7 @@ export interface ProjectDetail {
   siteLogs: ProjectSiteLog[];
   snags: ProjectSnag[];
   expenses: ProjectExpenseRow[];
+  handover: ProjectHandover | null;
 }
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -204,6 +210,9 @@ export async function getProject(ctx: RequestContext, id: string): Promise<Proje
           spentAt: true, status: true,
         },
       },
+      handover: {
+        select: { handedOverAt: true, checklist: true },
+      },
     },
   });
   if (!row) return null;
@@ -240,6 +249,15 @@ export async function getProject(ctx: RequestContext, id: string): Promise<Proje
       id: e.id, category: e.category, amount: e.amount,
       description: e.description, spentAt: e.spentAt, status: e.status,
     })),
+    handover: row.handover
+      ? {
+          handedOverAt: row.handover.handedOverAt,
+          checklist: (row.handover.checklist ?? {}) as Record<
+            string,
+            { checked: boolean; note?: string }
+          >,
+        }
+      : null,
   };
 }
 

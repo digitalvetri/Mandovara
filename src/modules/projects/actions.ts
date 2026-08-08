@@ -19,6 +19,7 @@ import {
   addSiteLogSchema,
   addSnagSchema, setSnagStatusSchema,
   addProjectExpenseSchema, setProjectExpenseStatusSchema,
+  saveHandoverSchema, HANDOVER_CHECKLIST_TEMPLATE,
 } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -291,6 +292,53 @@ export async function setProjectExpenseStatus(input: unknown): Promise<ActionRes
   await db.projectExpense.update({ where: { id }, data: { status } });
   revalidatePath(`/projects/${before.projectId}`);
   return { ok: true, data: { id } };
+}
+
+// ── Handover ─────────────────────────────────────────────────────
+
+export async function saveHandover(input: unknown): Promise<ActionResult<{ id: string; complete: boolean }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "project.handover");
+  const parsed = saveHandoverSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { projectId, checklist } = parsed.data;
+
+  // Strip unknown keys — only accept keys defined in the template.
+  const known = new Set(HANDOVER_CHECKLIST_TEMPLATE.map((i) => i.key));
+  const cleanChecklist: Record<string, { checked: boolean; note?: string }> = {};
+  for (const [k, v] of Object.entries(checklist)) {
+    if (!known.has(k as never)) continue;
+    cleanChecklist[k] = {
+      checked: v.checked,
+      ...(v.note != null && v.note !== "" && { note: v.note }),
+    };
+  }
+
+  const complete = HANDOVER_CHECKLIST_TEMPLATE.every(
+    (i) => cleanChecklist[i.key]?.checked === true,
+  );
+
+  const db = scoped(ctx);
+  const row = await db.handover.upsert({
+    where: { projectId },
+    // handedOverAt is required by schema; treat "save" as the latest touch time.
+    // Consumers can read `checklist` to determine full completion.
+    create: {
+      projectId,
+      handedOverAt:   new Date(),
+      handedOverById: ctx.userId,
+      checklist:      cleanChecklist,
+    },
+    update: {
+      handedOverAt:   new Date(),
+      handedOverById: ctx.userId,
+      checklist:      cleanChecklist,
+    },
+    select: { id: true },
+  });
+
+  revalidatePath(`/projects/${projectId}`);
+  return { ok: true, data: { id: row.id, complete } };
 }
 
 // ── helpers ──────────────────────────────────────────────────────

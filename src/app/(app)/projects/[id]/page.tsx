@@ -49,6 +49,7 @@ export default async function ProjectDetailPage({
             siteLogs={p.siteLogs}
             snags={p.snags}
             expenses={p.expenses}
+            handover={p.handover}
           />
         </div>
 

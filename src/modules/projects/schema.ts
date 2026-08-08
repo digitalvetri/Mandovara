@@ -98,9 +98,41 @@ export const setProjectExpenseStatusSchema = z.object({
   status: z.enum(EXPENSE_STATUSES),
 });
 
+// ── Handover ─────────────────────────────────────────────────────
+// Fixed template of handover checklist items. Every project starts from
+// this list; the JSON stored on Handover.checklist records checked/note
+// per item. Keys are stable — never rename in place, only add.
+export const HANDOVER_CHECKLIST_TEMPLATE = [
+  { key: "walkthrough",   label: "Walkthrough with client completed"    },
+  { key: "snags_closed",  label: "All snags closed and verified"        },
+  { key: "warranty_docs", label: "Warranty & maintenance docs handed over" },
+  { key: "remotes",       label: "Remote controls handed over (motorised items)" },
+  { key: "power_tested",  label: "Motorised items — power point tested" },
+  { key: "samples_back",  label: "Sample books returned to library"     },
+  { key: "site_clean",    label: "Site cleaned up"                      },
+  { key: "final_invoice", label: "Final invoice raised"                 },
+  { key: "client_sign",   label: "Client sign-off collected"            },
+] as const;
+
+// Zod shape for one item in the stored checklist JSON.
+const checklistItemSchema = z.object({
+  checked: z.boolean(),
+  note:    z.string().trim().max(300).optional().or(z.literal("")),
+});
+
+export const saveHandoverSchema = z.object({
+  projectId: z.string().cuid(),
+  // Object keyed by item key — validated as a plain map so future keys
+  // don't need a schema bump. Unknown keys are dropped in the action.
+  checklist: z.record(z.string(), checklistItemSchema),
+});
+
 export type CreateProjectInput      = z.infer<typeof createProjectSchema>;
 export type AddMilestoneInput       = z.infer<typeof addMilestoneSchema>;
 export type AddTaskInput            = z.infer<typeof addTaskSchema>;
 export type AddSiteLogInput         = z.infer<typeof addSiteLogSchema>;
 export type AddSnagInput            = z.infer<typeof addSnagSchema>;
 export type AddProjectExpenseInput  = z.infer<typeof addProjectExpenseSchema>;
+export type SaveHandoverInput       = z.infer<typeof saveHandoverSchema>;
+export type HandoverChecklistItem   = z.infer<typeof checklistItemSchema>;
+export type HandoverChecklistKey    = (typeof HANDOVER_CHECKLIST_TEMPLATE)[number]["key"];

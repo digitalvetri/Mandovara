@@ -10,15 +10,17 @@ import { Plus, Check, AlertCircle } from "lucide-react";
 import {
   addMilestone, setMilestoneStatus, addTask, setTaskStatus, addSiteLog,
   addSnag, setSnagStatus, addProjectExpense, setProjectExpenseStatus,
+  saveHandover,
 } from "@/modules/projects/actions";
 import {
   TASK_PRIORITIES, TASK_STATUSES,
   SNAG_STATUSES, EXPENSE_STATUSES, EXPENSE_CATEGORIES,
+  HANDOVER_CHECKLIST_TEMPLATE,
 } from "@/modules/projects/schema";
 import { formatINR } from "@/kernel/money/format";
 import type {
   ProjectMilestone, ProjectTask, ProjectSiteLog,
-  ProjectSnag, ProjectExpenseRow,
+  ProjectSnag, ProjectExpenseRow, ProjectHandover,
 } from "@/modules/projects/queries";
 
 interface Props {
@@ -28,6 +30,7 @@ interface Props {
   siteLogs: ProjectSiteLog[];
   snags: ProjectSnag[];
   expenses: ProjectExpenseRow[];
+  handover: ProjectHandover | null;
 }
 
 export function ProjectPanels(p: Props) {
@@ -38,6 +41,7 @@ export function ProjectPanels(p: Props) {
       <SiteLogs projectId={p.projectId} logs={p.siteLogs} />
       <Snags projectId={p.projectId} snags={p.snags} />
       <Expenses projectId={p.projectId} expenses={p.expenses} />
+      <HandoverPanel projectId={p.projectId} handover={p.handover} />
     </div>
   );
 }
@@ -570,6 +574,133 @@ function Expenses({ projectId, expenses }: { projectId: string; expenses: Projec
       )}
     </div>
   );
+}
+
+// ── Handover ────────────────────────────────────────────────────
+
+type ChecklistState = Record<string, { checked: boolean; note?: string }>;
+
+function HandoverPanel({
+  projectId, handover,
+}: { projectId: string; handover: ProjectHandover | null }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  // Local draft — hydrated from the server row (if any) plus the template.
+  const [draft, setDraft] = useState<ChecklistState>(() => hydrate(handover?.checklist));
+
+  const totalItems   = HANDOVER_CHECKLIST_TEMPLATE.length;
+  const checkedItems = HANDOVER_CHECKLIST_TEMPLATE.filter((i) => draft[i.key]?.checked).length;
+  const complete     = checkedItems === totalItems;
+  const percent      = Math.round((checkedItems / totalItems) * 100);
+
+  function toggle(key: string) {
+    setDraft((d) => ({
+      ...d,
+      [key]: { ...(d[key] ?? { checked: false }), checked: !d[key]?.checked },
+    }));
+  }
+  function setNote(key: string, note: string) {
+    setDraft((d) => ({
+      ...d,
+      [key]: { ...(d[key] ?? { checked: false }), note },
+    }));
+  }
+  function save() {
+    setError(null);
+    startTransition(async () => {
+      const res = await saveHandover({ projectId, checklist: draft });
+      if (!res.ok) { setError(res.error ?? "Could not save handover"); return; }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="rounded-[14px] bg-surface border border-rule">
+      <div className="px-4 py-3 border-b border-rule flex items-center justify-between">
+        <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+          Handover
+          <span className="ml-2 text-text-faint normal-case tracking-normal">
+            <span className="tabular text-text-dim">{checkedItems}/{totalItems}</span> · {percent}%
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {complete && (
+            <span className="px-2 py-0.5 rounded-[10px] text-[10.5px] uppercase tracking-[0.06em] bg-good/18 text-good">
+              Complete
+            </span>
+          )}
+          {handover && (
+            <span className="text-[10.5px] text-text-dim tabular">
+              Last saved {fmt(handover.handedOverAt)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Progress hairline — matches the gold-underline motif in §6.1 */}
+      <div className="h-[2px] w-full bg-rule/40 relative">
+        <div
+          className={`absolute inset-y-0 left-0 transition-all ${complete ? "bg-good" : "bg-accent"}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      {error && (
+        <div className="px-4 py-2 text-[11.5px] text-bad bg-bad/6 border-b border-bad/20">{error}</div>
+      )}
+
+      <ul className="divide-y divide-rule/60">
+        {HANDOVER_CHECKLIST_TEMPLATE.map((item) => {
+          const st = draft[item.key] ?? { checked: false };
+          return (
+            <li key={item.key} className="px-4 py-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={st.checked}
+                  onChange={() => toggle(item.key)}
+                  className="mt-[3px] h-[16px] w-[16px] accent-accent"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className={st.checked ? "text-[12.5px] text-text-dim line-through" : "text-[12.5px] text-text"}>
+                    {item.label}
+                  </div>
+                  <input
+                    type="text"
+                    value={st.note ?? ""}
+                    onChange={(e) => setNote(item.key, e.target.value)}
+                    placeholder="Note (optional)"
+                    className="mt-1 w-full h-[26px] px-2 bg-white/60 border border-rule rounded-[6px] text-[11.5px] outline-none focus:border-accent"
+                  />
+                </div>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="px-4 py-3 border-t border-rule flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending}
+          className="h-[30px] px-3 rounded-[6px] bg-accent text-white text-[11.5px] font-medium hover:bg-accent-hover disabled:opacity-60 transition-colors"
+        >
+          {pending ? "Saving…" : complete ? "Save & mark complete" : "Save progress"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function hydrate(existing?: ChecklistState): ChecklistState {
+  const out: ChecklistState = {};
+  for (const item of HANDOVER_CHECKLIST_TEMPLATE) {
+    out[item.key] = existing?.[item.key] ?? { checked: false };
+  }
+  return out;
 }
 
 // ── helpers ────────────────────────────────────────────────────
