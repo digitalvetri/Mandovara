@@ -61,6 +61,24 @@ export interface ProjectSiteLog {
   manpowerCount: number | null;
 }
 
+export interface ProjectSnag {
+  id: string;
+  location: string;
+  description: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProjectExpenseRow {
+  id: string;
+  category: string;
+  amount: bigint;
+  description: string | null;
+  spentAt: Date;
+  status: string;
+}
+
 export interface ProjectDetail {
   id: string;
   number: string;
@@ -81,6 +99,8 @@ export interface ProjectDetail {
   milestones: ProjectMilestone[];
   tasks: ProjectTask[];
   siteLogs: ProjectSiteLog[];
+  snags: ProjectSnag[];
+  expenses: ProjectExpenseRow[];
 }
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -168,6 +188,22 @@ export async function getProject(ctx: RequestContext, id: string): Promise<Proje
           id: true, loggedAt: true, summary: true, weather: true, manpowerCount: true,
         },
       },
+      snags: {
+        // OPEN first (asc: OPEN < IN_PROGRESS < RESOLVED < VERIFIED), then newest first.
+        orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+        select: {
+          id: true, location: true, description: true, status: true,
+          createdAt: true, updatedAt: true,
+        },
+      },
+      expenses: {
+        orderBy: { spentAt: "desc" },
+        take: 60,
+        select: {
+          id: true, category: true, amount: true, description: true,
+          spentAt: true, status: true,
+        },
+      },
     },
   });
   if (!row) return null;
@@ -195,6 +231,14 @@ export async function getProject(ctx: RequestContext, id: string): Promise<Proje
     siteLogs: row.siteLogs.map((s) => ({
       id: s.id, loggedAt: s.loggedAt, summary: s.summary,
       weather: s.weather, manpowerCount: s.manpowerCount,
+    })),
+    snags: row.snags.map((s) => ({
+      id: s.id, location: s.location, description: s.description,
+      status: s.status, createdAt: s.createdAt, updatedAt: s.updatedAt,
+    })),
+    expenses: row.expenses.map((e) => ({
+      id: e.id, category: e.category, amount: e.amount,
+      description: e.description, spentAt: e.spentAt, status: e.status,
     })),
   };
 }

@@ -47,6 +47,8 @@ export default async function ProjectDetailPage({
             milestones={p.milestones}
             tasks={p.tasks}
             siteLogs={p.siteLogs}
+            snags={p.snags}
+            expenses={p.expenses}
           />
         </div>
 

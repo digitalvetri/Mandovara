@@ -63,7 +63,44 @@ export const addSiteLogSchema = z.object({
   loggedAt:      isoDate,
 });
 
+export const SNAG_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED"] as const;
+export type SnagStatus = (typeof SNAG_STATUSES)[number];
+
+export const addSnagSchema = z.object({
+  projectId:   z.string().cuid(),
+  location:    z.string().trim().min(1, "Where is it?").max(120),
+  description: z.string().trim().min(1, "What's wrong?").max(1000),
+});
+
+export const setSnagStatusSchema = z.object({
+  id:     z.string().cuid(),
+  status: z.enum(SNAG_STATUSES),
+});
+
+export const EXPENSE_STATUSES = ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"] as const;
+export type ExpenseStatus = (typeof EXPENSE_STATUSES)[number];
+
+// Common project-expense categories — used as datalist suggestions, not a hard enum.
+export const EXPENSE_CATEGORIES = [
+  "TRANSPORT", "LABOUR", "SITE_MISC", "SCAFFOLD", "FOOD", "TOOLS", "PERMITS",
+] as const;
+
+export const addProjectExpenseSchema = z.object({
+  projectId:   z.string().cuid(),
+  category:    z.string().trim().min(1, "Category is required").max(60),
+  amount:      z.string().trim().min(1, "Amount is required"),
+  description: z.string().trim().max(500).optional().or(z.literal("")),
+  spentAt:     isoDate,
+});
+
+export const setProjectExpenseStatusSchema = z.object({
+  id:     z.string().cuid(),
+  status: z.enum(EXPENSE_STATUSES),
+});
+
 export type CreateProjectInput      = z.infer<typeof createProjectSchema>;
 export type AddMilestoneInput       = z.infer<typeof addMilestoneSchema>;
 export type AddTaskInput            = z.infer<typeof addTaskSchema>;
 export type AddSiteLogInput         = z.infer<typeof addSiteLogSchema>;
+export type AddSnagInput            = z.infer<typeof addSnagSchema>;
+export type AddProjectExpenseInput  = z.infer<typeof addProjectExpenseSchema>;

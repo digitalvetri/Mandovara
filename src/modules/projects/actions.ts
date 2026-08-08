@@ -17,6 +17,8 @@ import {
   addMilestoneSchema, setMilestoneStatusSchema,
   addTaskSchema, setTaskStatusSchema,
   addSiteLogSchema,
+  addSnagSchema, setSnagStatusSchema,
+  addProjectExpenseSchema, setProjectExpenseStatusSchema,
 } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -201,6 +203,94 @@ export async function addSiteLog(input: unknown): Promise<ActionResult<{ id: str
   });
   revalidatePath(`/projects/${d.projectId}`);
   return { ok: true, data: created };
+}
+
+// ── Snags ────────────────────────────────────────────────────────
+
+export async function addSnag(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  // Raising a snag is a project-scoped write; closing/verifying gates via project.closeSnag below.
+  requirePermission(ctx, "project.update");
+  const parsed = addSnagSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const d = parsed.data;
+  const db = scoped(ctx);
+  const created = await db.snagItem.create({
+    data: {
+      projectId:   d.projectId,
+      location:    d.location,
+      description: d.description,
+      status:      "OPEN",
+    },
+    select: { id: true },
+  });
+  revalidatePath(`/projects/${d.projectId}`);
+  return { ok: true, data: created };
+}
+
+export async function setSnagStatus(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "project.closeSnag");
+  const parsed = setSnagStatusSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { id, status } = parsed.data;
+  const db = scoped(ctx);
+  const before = await db.snagItem.findUniqueOrThrow({
+    where: { id }, select: { projectId: true },
+  });
+  await db.snagItem.update({ where: { id }, data: { status } });
+  revalidatePath(`/projects/${before.projectId}`);
+  return { ok: true, data: { id } };
+}
+
+// ── Project expenses ─────────────────────────────────────────────
+
+export async function addProjectExpense(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "expense.create");
+  const parsed = addProjectExpenseSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const d = parsed.data;
+
+  const amountPaise = tryParsePaise(d.amount);
+  if (amountPaise == null) {
+    return { ok: false, error: "Validation failed",
+             fieldErrors: { amount: "Could not parse amount" } };
+  }
+
+  const db = scoped(ctx);
+  const created = await db.projectExpense.create({
+    data: {
+      orgId:       ctx.orgId,
+      projectId:   d.projectId,
+      category:    d.category.toUpperCase(),
+      amount:      amountPaise,
+      description: emptyToNull(d.description),
+      spentAt:     new Date(d.spentAt),
+      status:      "SUBMITTED",
+      createdById: ctx.userId,
+    },
+    select: { id: true },
+  });
+  revalidatePath(`/projects/${d.projectId}`);
+  return { ok: true, data: created };
+}
+
+export async function setProjectExpenseStatus(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  // Approve/Reject requires the approve permission; other transitions use approve too
+  // (kernel doesn't currently expose expense.reject as a separate scope).
+  requirePermission(ctx, "expense.approve");
+  const parsed = setProjectExpenseStatusSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { id, status } = parsed.data;
+  const db = scoped(ctx);
+  const before = await db.projectExpense.findUniqueOrThrow({
+    where: { id }, select: { projectId: true },
+  });
+  await db.projectExpense.update({ where: { id }, data: { status } });
+  revalidatePath(`/projects/${before.projectId}`);
+  return { ok: true, data: { id } };
 }
 
 // ── helpers ──────────────────────────────────────────────────────
