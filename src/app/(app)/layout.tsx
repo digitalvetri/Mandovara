@@ -1,4 +1,5 @@
 import { SidebarShell } from "@/components/layout/SidebarShell";
+import { CommandPalette } from "@/components/search/CommandPalette";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,6 +8,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="md:pl-[240px] pt-[52px] md:pt-0">
         <div className="w-full px-4 sm:px-6 md:px-8 xl:px-10">{children}</div>
       </main>
+      <CommandPalette />
     </div>
   );
 }

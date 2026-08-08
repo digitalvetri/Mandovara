@@ -125,8 +125,16 @@ export function Sidebar() {
         ))}
       </nav>
 
+      {/* ⌘K discovery hint — the palette itself is mounted globally in the app layout */}
+      <div className="px-4 pt-3 pb-1 border-t border-white/[0.08] flex items-center justify-between text-[10.5px] text-sidebar-dim">
+        <span>Jump to anything</span>
+        <kbd className="tabular text-[10px] px-1.5 py-0.5 rounded-[4px] bg-white/[0.06] border border-white/[0.08]">
+          Ctrl K
+        </kbd>
+      </div>
+
       {/* Profile block */}
-      <div className="border-t border-white/[0.08] px-4 py-3 flex items-center gap-3">
+      <div className="px-4 py-3 flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-accent/85 text-white flex items-center justify-center text-[11px] font-medium tracking-wider">
           AK
         </div>
