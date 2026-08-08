@@ -21,6 +21,7 @@ import {
   IndianRupee,
   MessageSquare,
   ShieldCheck,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -81,6 +82,7 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "System",
     items: [
+      { label: "Reports",             href: "/reports",  icon: BarChart3 },
       { label: "WhatsApp Automation", href: "/whatsapp", icon: MessageSquare },
       { label: "Admin & Roles",       href: "/admin",    icon: ShieldCheck },
     ],
