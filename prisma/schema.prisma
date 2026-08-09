@@ -1467,6 +1467,7 @@ model Project {
   expenses       ProjectExpense[]
   snags          SnagItem[]
   handover       Handover?
+  measurements   MeasurementItem[]
 
   @@unique([orgId, number])
   @@index([orgId, status])
@@ -1583,6 +1584,66 @@ model Handover {
   documents   Json?
 
   project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// =================================================================
+// MEASUREMENT — site captures + calc engine outputs (§7, Phase 2 gate)
+// =================================================================
+//
+// One row per item measured on site (a window, a wall, a floor).
+// `inputs` is a family-specific JSON payload validated by a zod
+// discriminated union in modules/measurement/schema.ts.  Every write
+// produces one CalcResult; edits supersede (delete + insert) so a
+// sent quotation can freeze the row it was priced from and stay
+// traceable even if the engine is later revised.
+
+enum MeasurementFamily {
+  WALLPAPER
+  FLOORING
+  CURTAIN
+}
+
+model MeasurementItem {
+  id           String            @id @default(cuid())
+  orgId        String
+  projectId    String
+  roomLabel    String                              // free text for now; a Room table can wrap later
+  label        String                              // "Living — East window"
+  family       MeasurementFamily
+  inputs       Json                                // shape depends on family
+  photoKey     String?                             // Supabase storage key when we get there
+  notes        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  calcResult   CalcResult?
+
+  @@index([orgId, projectId])
+  @@index([orgId, family])
+}
+
+// Immutable output of the /lib/calc engine for one MeasurementItem.
+// 1:1 with MeasurementItem — on edit the old row is deleted and a
+// fresh one inserted.  engineVersion is copied from the calculator
+// (e.g. "curtain@1.0.0") so downstream artefacts (cut list, quote
+// snapshot) can prove which formula produced them.
+model CalcResult {
+  id                String            @id @default(cuid())
+  orgId             String
+  measurementItemId String            @unique
+  engineVersion     String
+  family            MeasurementFamily
+  inputs            Json                            // exact inputs used
+  outputs           Json                            // family-specific: panels, cutLengthMm, rollsRequired, ...
+  warnings          String[]                        // plain-English, rendered live and in quotes
+  computedAt        DateTime          @default(now())
+
+  item              MeasurementItem   @relation(fields: [measurementItemId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, family])
 }
 
 // =================================================================
