@@ -64,3 +64,21 @@ export async function listEmployees(
     activeCount, totalCount,
   };
 }
+
+// Small picker for the /m/attendance PWA — active employees only.
+export interface EmployeePickerRow {
+  id: string; code: string; name: string; department: string | null;
+}
+export async function listEmployeesForPicker(
+  ctx: RequestContext,
+): Promise<EmployeePickerRow[]> {
+  requirePermission(ctx, "employee.view");
+  const db = scoped(ctx);
+  const rows = await db.employee.findMany({
+    where:   { status: { in: ["ACTIVE", "ON_LEAVE"] } },
+    orderBy: { name: "asc" },
+    take:    500,
+    select:  { id: true, code: true, name: true, department: true },
+  });
+  return rows;
+}

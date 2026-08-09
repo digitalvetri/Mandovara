@@ -13,17 +13,19 @@
 //   __peekOutbox() → debug hook exposed on window for the Playwright
 //                verifier to assert queue state offline.
 //
-// Kinds this session:
+// Kinds:
 //   "completeInstallLine"    → payload: CompleteInstallLineInput
 //   "signAndCompleteVisit"   → payload: SignAndCompleteVisitInput
+//   "markPunch"              → payload: MarkPunchInput (Phase 7b)
 
 import {
   completeInstallLine, signAndCompleteVisit,
 } from "@/modules/install/actions";
+import { markPunch } from "@/modules/attendance/actions";
 
 // ── Types ────────────────────────────────────────────────────────
 
-export type OutboxKind = "completeInstallLine" | "signAndCompleteVisit";
+export type OutboxKind = "completeInstallLine" | "signAndCompleteVisit" | "markPunch";
 
 export interface OutboxRecord {
   id:        string;             // uuid-lite, monotonic-enough for FIFO
@@ -152,6 +154,8 @@ async function dispatch(rec: OutboxRecord): Promise<ActionRes> {
       return (await completeInstallLine(rec.payload)) as ActionRes;
     case "signAndCompleteVisit":
       return (await signAndCompleteVisit(rec.payload)) as ActionRes;
+    case "markPunch":
+      return (await markPunch(rec.payload)) as ActionRes;
   }
 }
 

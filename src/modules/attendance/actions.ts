@@ -22,9 +22,15 @@ export interface ActionResult<T = unknown> {
 const markPunchSchema = z.object({
   employeeId: z.string().cuid(),
   date:       z.string().regex(/^\d{4}-\d{2}-\d{2}/),
-  status:     z.enum(["PRESENT", "LATE", "ABSENT", "LEAVE"]),
+  status:     z.enum(["PRESENT", "LATE", "HALF_DAY", "ABSENT", "LEAVE"]),
   inTime:     z.string().optional().or(z.literal("")),
   outTime:    z.string().optional().or(z.literal("")),
+  // Phase 7b — GPS location captured by the /m/attendance PWA.
+  // Nullable so the office punch form (no browser API) still works.
+  location:   z.object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+  }).optional(),
 });
 
 export async function markPunch(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -83,11 +89,18 @@ export async function markPunch(input: unknown): Promise<ActionResult<{ id: stri
       status:     d.status,
       inTime, outTime,
       ...(worked != null && { workedHours: worked }),
+      ...(d.location && { location: d.location }),
+      // A punch that came through the outbox from a mobile client
+      // sets this flag so operations knows the row wasn't typed by
+      // the office. (Location alone is a strong-enough signal too,
+      // but the flag reads faster in the ledger.)
+      ...(d.location && { syncedFromOffline: true }),
     },
     update: {
       status:  d.status,
       inTime, outTime,
       ...(worked != null && { workedHours: worked }),
+      ...(d.location && { location: d.location, syncedFromOffline: true }),
     },
     select: { id: true },
   });
