@@ -42,6 +42,12 @@ export const PERMISSIONS = {
   // escape hatch — only supervisors should hold it.
   allocation: ["view", "create", "release", "overrideMixedLot"],
 
+  // ── Make (§5.2 cut & stitch, Phase 5) ─────────────────────
+  // create = mint a MakeJob from a confirmed SalesOrder. viewCutList
+  // is separated so a floor-only role can print the sheet without
+  // seeing status transitions.
+  make: ["view", "create", "advanceStatus", "issueMaterial", "recordUsage", "qcPass"],
+
   // ── Projects ───────────────────────────────────────────────
   project:    ["view", "create", "update", "materialIssue", "milestoneBill", "closeSnag", "handover"],
   sitelog:    ["view", "create"],

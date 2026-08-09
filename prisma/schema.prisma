@@ -226,6 +226,18 @@ enum DispatchStatus {
   DELIVERED
 }
 
+// §5.2 — the make (cut & stitch) lifecycle. Kanban swim-lanes on /make
+// follow this order; readiness for install requires QC.
+enum MakeJobStatus {
+  QUEUED
+  CUTTING
+  STITCHING
+  FINISHING
+  QC
+  READY
+  DELIVERED
+}
+
 enum ProjectStatus {
   PLANNING
   ACTIVE
@@ -1251,6 +1263,7 @@ model SalesOrder {
   lines        OrderLine[]
   dispatches   Dispatch[]
   reservations Reservation[]
+  makeJobs     MakeJob[]
 
   @@unique([orgId, branchId, number])
   @@index([orgId, clientId, status])
@@ -1268,12 +1281,21 @@ model OrderLine {
   rate         BigInt
   gstRate      Decimal @db.Decimal(5, 2)
   amount       BigInt
+  // §15 rule 6 — the make cut list is generated FROM the frozen quote
+  // snapshot, not re-derived. We copy measurementItemId + calcSnapshot
+  // across on createOrderFromQuotation so a make job cuts to exactly
+  // what the client agreed to, even if the engine bumps mid-project.
+  measurementItemId String?
+  calcSnapshot      Json?
 
   salesOrder   SalesOrder      @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
   product      Product         @relation(fields: [productId], references: [id])
+  measurement  MeasurementItem? @relation(fields: [measurementItemId], references: [id], onDelete: SetNull)
   lotAllocations LotAllocation[]
+  makeJobLines MakeJobLine[]
 
   @@index([salesOrderId])
+  @@index([measurementItemId])
 }
 
 model Reservation {
@@ -1632,6 +1654,7 @@ model MeasurementItem {
   project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   calcResult     CalcResult?
   quotationLines QuotationLine[]
+  orderLines     OrderLine[]
 
   @@index([orgId, projectId])
   @@index([orgId, family])
@@ -1656,6 +1679,69 @@ model CalcResult {
   item              MeasurementItem   @relation(fields: [measurementItemId], references: [id], onDelete: Cascade)
 
   @@index([orgId, family])
+}
+
+// =================================================================
+// MAKE — cut & stitch jobs (§5.2, Phase 5)
+// =================================================================
+//
+// The cut list is generated FROM the frozen OrderLine.calcSnapshot,
+// never re-derived from the engine (§15 rule 6). One MakeJob per
+// SalesOrder for now — the vendor split (in-house vs jobbing) is a
+// future concern; the current shape leaves vendorId nullable so
+// that door is left open.
+
+model MakeJob {
+  id            String        @id @default(cuid())
+  orgId         String
+  number        String                        // MDV/MJ-YYMM-NNNN, race-safe via NumberingSeries
+  salesOrderId  String
+  vendorId      String?                       // null = in-house
+  status        MakeJobStatus @default(QUEUED)
+  assignedToId  String?
+  targetDate    DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  createdById   String?
+
+  salesOrder    SalesOrder    @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  lines         MakeJobLine[]
+
+  @@unique([orgId, number])
+  // One make job per order — enforce the "no re-cutting" rule at the
+  // DB so a race between two parallel createMakeJobFromOrder calls
+  // can't both pass the app-level check and stack jobs.
+  @@unique([salesOrderId])
+  @@index([orgId, status])
+}
+
+model MakeJobLine {
+  id                String   @id @default(cuid())
+  makeJobId         String
+  orderLineId       String
+  measurementItemId String?
+  roomLabel         String                    // free-text; no Room table yet
+  // Materialised at job-create time from OrderLine.calcSnapshot.outputs.
+  // Never edited by an engine change; that would defeat §15 rule 6.
+  panels            Int?
+  cutLengthMm       Decimal? @db.Decimal(10, 2)
+  fabricIssuedM     Decimal? @db.Decimal(12, 3)
+  liningIssuedM     Decimal? @db.Decimal(12, 3)
+  actualUsedM       Decimal? @db.Decimal(12, 3)
+  wastageM          Decimal? @db.Decimal(12, 3)
+  headingType       String?
+  eyeletCount       Int?
+  stitchSpec        String?
+  qcPassed          Boolean  @default(false)
+  qcNotes           String?
+
+  makeJob           MakeJob   @relation(fields: [makeJobId], references: [id], onDelete: Cascade)
+  orderLine         OrderLine @relation(fields: [orderLineId], references: [id])
+
+  @@index([makeJobId])
+  @@index([orderLineId])
 }
 
 // =================================================================

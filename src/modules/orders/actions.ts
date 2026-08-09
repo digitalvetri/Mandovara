@@ -17,6 +17,16 @@
 
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
+
+// revalidatePath throws "static generation store missing" when the
+// action is invoked outside a Next request context (smoke scripts,
+// integration tests). Swallowing it there keeps the same action
+// callable from both surfaces. Mirrors the safeRevalidate in
+// modules/quotations/actions.ts and modules/allocation/actions.ts.
+function safeRevalidate(path: string): void {
+  try { revalidatePath(path); } catch { /* not in a Next request */ }
+}
+
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -56,6 +66,11 @@ export async function createOrderFromQuotation(
         select: {
           lineNo: true, productId: true, description: true, quantity: true,
           rate: true, gstRate: true, amount: true,
+          // §15 rule 6 (Phase 5): the frozen quote snapshot must ride
+          // through order conversion so the make cut list can be
+          // materialised from what the client agreed to, not from a
+          // (possibly newer) live CalcResult.
+          measurementItemId: true, calcSnapshot: true,
         },
       },
     },
@@ -98,14 +113,21 @@ export async function createOrderFromQuotation(
     });
     await tx.orderLine.createMany({
       data: q.lines.map((l) => ({
-        salesOrderId: order.id,
-        lineNo:       l.lineNo,
-        productId:    l.productId,
-        description:  l.description,
-        orderedQty:   l.quantity,
-        rate:         l.rate,
-        gstRate:      l.gstRate,
-        amount:       l.amount,
+        salesOrderId:      order.id,
+        lineNo:            l.lineNo,
+        productId:         l.productId,
+        description:       l.description,
+        orderedQty:        l.quantity,
+        rate:              l.rate,
+        gstRate:           l.gstRate,
+        amount:            l.amount,
+        // Freeze propagation — see the pre-tx select comment. Null on
+        // non-M2M lines and passes through unchanged; the Prisma type
+        // for JSON columns needs an cast when reused from another row.
+        measurementItemId: l.measurementItemId,
+        ...(l.calcSnapshot != null && {
+          calcSnapshot: l.calcSnapshot as Prisma.InputJsonValue,
+        }),
       })),
     });
     await tx.quotation.update({
@@ -115,9 +137,9 @@ export async function createOrderFromQuotation(
     return order;
   });
 
-  revalidatePath("/orders");
-  revalidatePath("/quotations");
-  revalidatePath(`/quotations/${q.id}`);
+  safeRevalidate("/orders");
+  safeRevalidate("/quotations");
+  safeRevalidate(`/quotations/${q.id}`);
   return { ok: true, data: created };
 }
 
@@ -228,8 +250,8 @@ export async function createDispatch(
     return dispatch;
   });
 
-  revalidatePath("/orders");
-  revalidatePath(`/orders/${order.id}`);
+  safeRevalidate("/orders");
+  safeRevalidate(`/orders/${order.id}`);
   return { ok: true, data: created };
 }
 
@@ -243,8 +265,8 @@ export async function setOrderStatus(input: unknown): Promise<ActionResult<{ id:
   const db = scoped(ctx);
   await db.salesOrder.update({ where: { id }, data: { status } });
 
-  revalidatePath("/orders");
-  revalidatePath(`/orders/${id}`);
+  safeRevalidate("/orders");
+  safeRevalidate(`/orders/${id}`);
   return { ok: true, data: { id } };
 }
 
