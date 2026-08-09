@@ -48,6 +48,16 @@ export const PERMISSIONS = {
   // seeing status transitions.
   make: ["view", "create", "advanceStatus", "issueMaterial", "recordUsage", "qcPass"],
 
+  // ── Install (§5.2 installation, Phase 5c) ─────────────────
+  install: [
+    "view", "createVisit", "assignCrew",
+    "startVisit", "completeLine", "captureSignature", "completeVisit",
+    "manageCrew",
+  ],
+  // Snag lifecycle beyond project.closeSnag — Phase 5c splits so an
+  // installer can raise/assign without holding project-close rights.
+  snag: ["view", "create", "assign", "resolve", "close"],
+
   // ── Projects ───────────────────────────────────────────────
   project:    ["view", "create", "update", "materialIssue", "milestoneBill", "closeSnag", "handover"],
   sitelog:    ["view", "create"],

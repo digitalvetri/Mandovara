@@ -65,8 +65,9 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Sales Orders & Dispatch", href: "/orders",        icon: Send },
       { label: "Make (Cut & Stitch)",     href: "/make",          icon: Scissors },
+      { label: "Install Visits",          href: "/install",       icon: Wrench },
       { label: "Project Pipeline",        href: "/projects",      icon: Briefcase },
-      { label: "Installations",           href: "/installations", icon: Wrench },
+      { label: "Site Schedule",           href: "/installations", icon: CalendarCheck },
     ],
   },
   {

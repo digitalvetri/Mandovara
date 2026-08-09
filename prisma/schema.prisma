@@ -238,6 +238,19 @@ enum MakeJobStatus {
   DELIVERED
 }
 
+// §5.2 — installation-visit lifecycle. SCHEDULED → IN_PROGRESS on
+// startVisit → COMPLETED on completeVisit. PARTIAL for visits that
+// installed some lines but not all; RESCHEDULED if the client cancelled
+// on the day and we're moving the visit to another date.
+enum InstallStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  PARTIAL
+  RESCHEDULED
+  CANCELLED
+}
+
 enum ProjectStatus {
   PLANNING
   ACTIVE
@@ -266,6 +279,10 @@ enum SnagStatus {
   OPEN
   IN_PROGRESS
   RESOLVED
+  CLOSED
+  // §5.2 aligns to OPEN/IN_PROGRESS/RESOLVED/CLOSED. VERIFIED lives
+  // on for now because Postgres cannot drop an enum value in a single
+  // migration. Application code must not emit VERIFIED going forward.
   VERIFIED
 }
 
@@ -1264,6 +1281,7 @@ model SalesOrder {
   dispatches   Dispatch[]
   reservations Reservation[]
   makeJobs     MakeJob[]
+  installVisits InstallVisit[]
 
   @@unique([orgId, branchId, number])
   @@index([orgId, clientId, status])
@@ -1278,6 +1296,10 @@ model OrderLine {
   orderedQty   Decimal @db.Decimal(18, 4)
   reservedQty  Decimal @db.Decimal(18, 4) @default(0)
   dispatchedQty Decimal @db.Decimal(18, 4) @default(0)
+  // §5.2 / Phase 5c — cumulative across all InstallVisits for this
+  // line. Materialised (not derived) so /orders/[id] can show progress
+  // without a per-load aggregate; maintained inside completeInstallLine.
+  installedQty Decimal @db.Decimal(18, 4) @default(0)
   rate         BigInt
   gstRate      Decimal @db.Decimal(5, 2)
   amount       BigInt
@@ -1293,6 +1315,7 @@ model OrderLine {
   measurement  MeasurementItem? @relation(fields: [measurementItemId], references: [id], onDelete: SetNull)
   lotAllocations LotAllocation[]
   makeJobLines MakeJobLine[]
+  installLines InstallLine[]
 
   @@index([salesOrderId])
   @@index([measurementItemId])
@@ -1594,16 +1617,22 @@ model ProjectExpense {
 }
 
 model SnagItem {
-  id         String     @id @default(cuid())
-  projectId  String
-  location   String
-  description String
-  status     SnagStatus @default(OPEN)
-  photos     Json?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id             String     @id @default(cuid())
+  projectId      String
+  location       String                          // maps to §5.2 roomLabel
+  description    String
+  status         SnagStatus @default(OPEN)
+  photos         Json?                           // JSON of {fileKey, caption}[]
+  // §5.2 raised/assigned/resolved metadata (added Phase 5c).
+  raisedById     String?
+  raisedAt       DateTime?
+  assignedToId   String?
+  resolvedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, status])
 }
@@ -1741,6 +1770,87 @@ model MakeJobLine {
   orderLine         OrderLine @relation(fields: [orderLineId], references: [id])
 
   @@index([makeJobId])
+  @@index([orderLineId])
+}
+
+// =================================================================
+// INSTALLATION — crews, per-site visits, per-line completion (§5.2, Phase 5c)
+// =================================================================
+//
+// The visit is the operational unit — one InstallVisit per (order,
+// scheduled day). A single order can have many visits (partial
+// installs across multiple days). Signature and photos are captured
+// at the visit level; per-line captures record installed quantity,
+// which dye lot ended up on which wall, and any issue text the
+// installer flags on the floor.
+//
+// InstallLine references OrderLine (not MakeJobLine) because a visit
+// can install non-M2M items too — hardware, films, curtain rods —
+// which never had a make step but do get physically installed.
+
+model InstallCrew {
+  id                 String   @id @default(cuid())
+  orgId              String
+  name               String                    // "RS Puram Crew A"
+  leadEmployeeId     String?
+  memberEmployeeIds  String[]                  // free-form until we tie to Employee
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  visits             InstallVisit[]
+
+  @@unique([orgId, name])
+  @@index([orgId, isActive])
+}
+
+model InstallVisit {
+  id                 String        @id @default(cuid())
+  orgId              String
+  number             String                        // MDV/INS-YYMM-NNNN
+  salesOrderId       String
+  crewId             String?
+  scheduledAt        DateTime
+  status             InstallStatus @default(SCHEDULED)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  rescheduleReason   String?
+  // Signature capture — Supabase storage key; nullable so the office
+  // can also render "signature pending" for in-progress visits.
+  clientSignatureKey String?
+  photoKeys          String[]                       // whole-visit photos
+  notes              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  createdById        String?
+
+  salesOrder         SalesOrder    @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  crew               InstallCrew?  @relation(fields: [crewId], references: [id])
+  lines              InstallLine[]
+
+  @@unique([orgId, number])
+  @@index([orgId, scheduledAt, status])
+  @@index([salesOrderId])
+  @@index([crewId, scheduledAt])
+}
+
+model InstallLine {
+  id             String   @id @default(cuid())
+  installVisitId String
+  orderLineId    String
+  roomLabel      String
+  plannedQty     Decimal  @db.Decimal(12, 3)
+  installedQty   Decimal  @db.Decimal(12, 3) @default(0)
+  // §0.6 tie-back — which dye lot actually made it onto this wall.
+  // Populated by the installer at completion time.
+  dyeLotUsed     String?
+  remoteSerials  String[]                       // motorized: remote serial numbers
+  photoKeys      String[]
+  issue          String?
+
+  visit          InstallVisit @relation(fields: [installVisitId], references: [id], onDelete: Cascade)
+  orderLine      OrderLine    @relation(fields: [orderLineId], references: [id])
+
+  @@index([installVisitId])
   @@index([orderLineId])
 }
 
