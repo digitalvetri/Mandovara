@@ -2253,6 +2253,10 @@ model MessageLog {
   entityType     String?                            // LEAD | CLIENT | INVOICE | QUOTATION
   entityId       String?
   conversationId String?
+  // §15 rule 10 (§0.8): caller-supplied key that makes retries a
+  // no-op. Nullable so system-internal messages that don't need
+  // dedup can skip it; unique-per-org so a caller can't collide.
+  idempotencyKey String?
   sentAt         DateTime?
   deliveredAt    DateTime?
   readAt         DateTime?
@@ -2261,6 +2265,7 @@ model MessageLog {
   template       MessageTemplate?     @relation(fields: [templateId], references: [id])
   conversation   WhatsAppConversation? @relation(fields: [conversationId], references: [id])
 
+  @@unique([orgId, idempotencyKey])
   @@index([orgId, entityType, entityId])
   @@index([orgId, toNumber, createdAt])
 }

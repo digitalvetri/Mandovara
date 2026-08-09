@@ -70,7 +70,7 @@ export async function createInvoiceFromOrder(
   }
   const client = await db.client.findUniqueOrThrow({
     where: { id: order.clientId },
-    select: { stateCode: true, paymentTerms: true },
+    select: { stateCode: true, paymentTerms: true, primaryMobile: true },
   });
   const branch = await db.branch.findUniqueOrThrow({
     where: { id: order.branchId },
@@ -246,6 +246,25 @@ export async function createInvoiceFromOrder(
   safeRevalidate("/invoicing");
   safeRevalidate(`/orders/${order.id}`);
   safeRevalidate("/accounts");
+
+  // §14 Phase 8 — fire-and-forget WhatsApp notification. Best-
+  // effort; a WhatsApp failure here must never rollback the invoice
+  // write, so it's outside the tx and its throw is swallowed. The
+  // idempotencyKey means a re-send (e.g. cache retry) doesn't cost
+  // another 12 paise per Meta message.
+  try {
+    const { sendWhatsAppMessage } = await import("@/modules/whatsapp/actions");
+    await sendWhatsAppMessage({
+      templateName:   "invoice_issued",
+      language:       "en",
+      toMobile:       client.primaryMobile,
+      params:         { "1": created.number },
+      idempotencyKey: `invoice:${created.id}:issued`,
+      entityType:     "INVOICE",
+      entityId:       created.id,
+    });
+  } catch { /* ignore — WhatsApp is best-effort */ }
+
   return { ok: true, data: created };
 }
 

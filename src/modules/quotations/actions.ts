@@ -278,6 +278,31 @@ export async function setQuotationStatus(input: unknown): Promise<ActionResult<{
 
   safeRevalidate("/quotations");
   safeRevalidate(`/quotations/${id}`);
+
+  // §14 Phase 8 — fire-and-forget WhatsApp on SEND. Best-effort,
+  // outside any tx, throw swallowed so a WhatsApp failure never
+  // stops the client from receiving the PDF via other channels.
+  if (status === "SENT") {
+    try {
+      const [{ sendWhatsAppMessage }, quote] = await Promise.all([
+        import("@/modules/whatsapp/actions"),
+        db.quotation.findUniqueOrThrow({
+          where: { id },
+          select: { number: true, client: { select: { primaryMobile: true } } },
+        }),
+      ]);
+      await sendWhatsAppMessage({
+        templateName:   "quotation_sent",
+        language:       "en",
+        toMobile:       quote.client.primaryMobile,
+        params:         { "1": quote.number },
+        idempotencyKey: `quotation:${id}:sent`,
+        entityType:     "QUOTATION",
+        entityId:       id,
+      });
+    } catch { /* best-effort */ }
+  }
+
   return { ok: true, data: { id } };
 }
 
