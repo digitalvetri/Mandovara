@@ -62,6 +62,12 @@ export default async function PayrollRunDetailPage({ params }: Props) {
                   className="h-[30px] px-3 rounded-[6px] text-[11.5px] font-medium bg-surface border border-rule text-text-dim hover:text-text hover:bg-surface-hover">
               ← All runs
             </Link>
+            {finalized && (
+              <a href={`/api/payroll/${run.id}/bank-file`}
+                 className="h-[30px] px-3 rounded-[6px] text-[11.5px] font-medium bg-surface border border-rule text-text-dim hover:text-text hover:bg-surface-hover">
+                Download bank file
+              </a>
+            )}
             {!finalized && <FinalizeButton payrollRunId={run.id} />}
           </div>
         }
@@ -96,6 +102,7 @@ export default async function PayrollRunDetailPage({ params }: Props) {
                 <Th align="right">ESI</Th>
                 <Th align="right">PT</Th>
                 <Th align="right">Net pay</Th>
+                <Th> </Th>
               </tr>
             </thead>
             <tbody>
@@ -114,6 +121,12 @@ export default async function PayrollRunDetailPage({ params }: Props) {
                     <Td align="right"><span className="tabular text-text-dim">{b["ESI"] ? formatINR(BigInt(b["ESI"])) : "—"}</span></Td>
                     <Td align="right"><span className="tabular text-text-dim">{b["PT"]  ? formatINR(BigInt(b["PT"]))  : "—"}</span></Td>
                     <Td align="right"><span className="tabular text-text font-medium">{formatINR(p.net)}</span></Td>
+                    <Td align="right">
+                      <Link href={`/payroll/${run.id}/payslip/${p.id}/print` as Route}
+                            className="text-[11px] text-accent hover:underline">
+                        Payslip
+                      </Link>
+                    </Td>
                   </tr>
                 );
               })}

@@ -145,19 +145,24 @@ export async function seedMasters(db: PrismaClient, seed = 42): Promise<SeedIds>
     });
     employeeIds.push(emp.id);
 
-    const ctc = BigInt((rng.int(20, 80) * 100000) * 100); // ₹2L–8L / month × 100 for paise
+    // CTC is annual (₹2L–8L). Component amounts are stored MONTHLY
+    // (Payroll runner treats SalaryComponent.amount as monthly paise
+    // — that's the runner's stated convention). Split monthly gross
+    // 50/25/25 across BASIC/HRA/SPECIAL. PF is not a stored
+    // component — the runner computes it from StatutorySlab.
+    const ctc = BigInt((rng.int(20, 80) * 100000) * 100);   // annual paise
+    const monthly = ctc / 12n;
     const structure = await db.salaryStructure.create({
       data: { orgId: org.id, employeeId: emp.id, effectiveFrom: emp.joinDate, ctc },
     });
-    const basic = ctc / 2n;
-    const hra   = ctc / 4n;
-    const spec  = ctc - basic - hra;
+    const basic = monthly / 2n;
+    const hra   = monthly / 4n;
+    const spec  = monthly - basic - hra;
     await db.salaryComponent.createMany({
       data: [
         { salaryStructureId: structure.id, name: "BASIC",   amount: basic, isEarning: true,  ordering: 1 },
         { salaryStructureId: structure.id, name: "HRA",     amount: hra,   isEarning: true,  ordering: 2 },
         { salaryStructureId: structure.id, name: "SPECIAL", amount: spec,  isEarning: true,  ordering: 3 },
-        { salaryStructureId: structure.id, name: "PF_EMPLOYEE", amount: 1800n * 100n, isEarning: false, isTaxable: false, ordering: 10 },
       ],
     });
   }
