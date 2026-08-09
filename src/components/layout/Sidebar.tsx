@@ -11,6 +11,7 @@ import {
   FileText,
   Package,
   Truck,
+  Layers,
   Boxes,
   Send,
   Briefcase,
@@ -54,6 +55,7 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Product Catalog",    href: "/products",  icon: Package },
       { label: "Purchase & Vendors", href: "/purchase",  icon: Truck },
+      { label: "Dye-lot Allocation", href: "/purchase/allocation", icon: Layers },
       { label: "Inventory & Stock",  href: "/inventory", icon: Boxes },
     ],
   },

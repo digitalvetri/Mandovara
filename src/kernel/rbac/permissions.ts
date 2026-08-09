@@ -38,6 +38,9 @@ export const PERMISSIONS = {
   inventory:  ["view", "adjust", "transfer", "stockTake", "valuationChange", "overrideNegative"],
   batch:      ["view", "create", "update"],
   serial:     ["view", "assign"],
+  // §0.6: dye-lot allocation console. overrideMixedLot is the audited
+  // escape hatch — only supervisors should hold it.
+  allocation: ["view", "create", "release", "overrideMixedLot"],
 
   // ── Projects ───────────────────────────────────────────────
   project:    ["view", "create", "update", "materialIssue", "milestoneBill", "closeSnag", "handover"],
