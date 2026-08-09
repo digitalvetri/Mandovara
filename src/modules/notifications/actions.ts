@@ -1,12 +1,8 @@
-// @ts-nocheck — remote module, schema reconciliation pending
 "use server";
 
-// Notifications server actions. Every mutation goes through
-// db.scoped(ctx) + user filter — a user can only ever mark their own
-// notifications read.
-//
-// Also re-exports the query functions the client bell needs so a
-// single "use server" surface serves both directions.
+// Notifications server actions — mark follow-ups read/unread.
+// The "notification" surface in this app is derived from FollowUp records
+// owned by the current user (no separate Notification model in the schema).
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -33,9 +29,9 @@ export async function markNotificationRead(input: unknown): Promise<ActionResult
   if (!parsed.success) return { ok: false, error: "Bad id" };
 
   const db = scoped(ctx);
-  await db.notification.updateMany({
-    where: { id: parsed.data.id, userId: ctx.userId, readAt: null },
-    data:  { readAt: new Date() },
+  await db.followUp.updateMany({
+    where: { id: parsed.data.id, ownerId: ctx.userId, completedAt: null },
+    data:  { completedAt: new Date() },
   });
 
   revalidatePath("/");
@@ -45,9 +41,9 @@ export async function markNotificationRead(input: unknown): Promise<ActionResult
 export async function markAllNotificationsRead(): Promise<ActionResult<{ count: number }>> {
   const ctx = await devContext();
   const db = scoped(ctx);
-  const res = await db.notification.updateMany({
-    where: { userId: ctx.userId, readAt: null },
-    data:  { readAt: new Date() },
+  const res = await db.followUp.updateMany({
+    where: { ownerId: ctx.userId, completedAt: null },
+    data:  { completedAt: new Date() },
   });
   revalidatePath("/");
   return { ok: true, data: { count: res.count } };

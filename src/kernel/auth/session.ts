@@ -1,8 +1,11 @@
 // Session — placeholder until Phase 7 wires real auth (mobile-number-first
 // login, Argon2id, httpOnly cookies, rotation on privilege change).
 //
-// New User model (CLAUDE.md §5): direct `role AppRole` field, no userRoles
-// join table. Permissions are derived from the role using PERMISSIONS registry.
+// Permission resolution:
+//   1. If User.roleId is set, load RolePermission rows for that Role.
+//      isOwnerRole=true → allPermissions(); otherwise the explicit key set.
+//   2. If User.roleId is null (legacy / not yet backfilled), fall back to
+//      allPermissions() so no one loses access during migration.
 //
 // Phase 7 will add:
 //   - createSession / destroySession / rotateSession
@@ -12,7 +15,7 @@
 import { prisma } from "@/kernel/db/client";
 import type { RequestContext } from "./context";
 import type { PermissionKey } from "@/kernel/rbac/permissions";
-import { PERMISSIONS } from "@/kernel/rbac/permissions";
+import { PERMISSIONS, isPermissionKey } from "@/kernel/rbac/permissions";
 
 export interface Session {
   readonly userId: string;
@@ -33,17 +36,39 @@ export async function resolveContext(session: Session, opts?: { ip?: string }): 
     where: { id: session.userId },
     select: {
       id: true, organizationId: true, branchIds: true, role: true,
+      dynamicRole: {
+        select: {
+          isOwnerRole: true,
+          permissions: { select: { key: true, scope: true } },
+        },
+      },
     },
   });
 
   const roles = [user.role as string];
 
-  // OWNER sees all branches; all other roles are branch-filtered.
+  // OWNER sees all branches; other roles are branch-filtered.
   const branchScope: RequestContext["branchScope"] =
     user.role === "OWNER" ? "ALL" : "MEMBERS";
 
-  // Phase 7: derive permissions from role table. For now, OWNER gets all keys.
-  const permissions: ReadonlySet<PermissionKey> = allPermissions();
+  let permissions: ReadonlySet<PermissionKey>;
+
+  if (user.dynamicRole) {
+    if (user.dynamicRole.isOwnerRole) {
+      permissions = allPermissions();
+    } else {
+      const s = new Set<PermissionKey>();
+      for (const p of user.dynamicRole.permissions) {
+        if (p.scope !== "NONE" && isPermissionKey(p.key)) {
+          s.add(p.key);
+        }
+      }
+      permissions = s;
+    }
+  } else {
+    // Legacy fallback: dynamicRole not assigned yet — grant all during transition
+    permissions = allPermissions();
+  }
 
   return {
     userId: user.id,

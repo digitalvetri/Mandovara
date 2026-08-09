@@ -1,6 +1,6 @@
 "use server";
 
-import type { z } from "zod";
+import { z } from "zod";
 import type { ProductFamily } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { revalidatePath } from "next/cache";
@@ -220,7 +220,14 @@ export async function setQuotationStatus(
   if (!parsed.success) return zodError<{ id: string }>(parsed.error);
   const { id, status } = parsed.data;
 
-  requirePermission(ctx, status === "SENT" ? "quotation.send" : "quotation.update");
+  // Permission depends on the target state
+  if (status === "SENT") {
+    requirePermission(ctx, "quotation.send");
+  } else if (status === "APPROVED") {
+    requirePermission(ctx, "quotation.approve");
+  } else {
+    requirePermission(ctx, "quotation.update");
+  }
 
   const db = scoped(ctx);
   const q = await db.quotation.findUnique({
@@ -229,8 +236,21 @@ export async function setQuotationStatus(
   });
   if (!q) return { ok: false, error: "Quotation not found" };
 
-  if (status === "SENT" && q.status !== "DRAFT" && q.status !== "REVISED") {
-    return { ok: false, error: `Cannot send a quotation in ${q.status} status` };
+  // Valid from → to transitions
+  const VALID_TRANSITIONS: Record<string, string[]> = {
+    DRAFT:            ["PENDING_APPROVAL", "SENT"],
+    PENDING_APPROVAL: ["APPROVED", "DRAFT"],
+    APPROVED:         ["SENT"],
+    SENT:             ["VIEWED", "ACCEPTED", "REJECTED"],
+    VIEWED:           ["ACCEPTED", "REJECTED"],
+    ACCEPTED:         [],
+    REJECTED:         [],
+    REVISED:          ["PENDING_APPROVAL", "SENT"],
+    EXPIRED:          [],
+  };
+  const allowed = VALID_TRANSITIONS[q.status] ?? [];
+  if (!allowed.includes(status)) {
+    return { ok: false, error: `Cannot move from ${q.status} to ${status}` };
   }
 
   // When sending, freeze CalcResult snapshots onto each line (§7.7 rule 4 / §15.3)
@@ -281,8 +301,41 @@ export async function setQuotationStatus(
     where: { id },
     data: {
       status,
-      ...(status === "SENT" ? { sentAt: new Date() } : {}),
+      ...(status === "SENT"             ? { sentAt: new Date() }                                                  : {}),
+      ...(status === "PENDING_APPROVAL" ? { submittedById: ctx.userId, submittedAt: new Date() }                 : {}),
+      ...(status === "APPROVED"         ? { approvedById: ctx.userId, approvedAt: new Date(), rejectionReason: null } : {}),
+      ...(status === "DRAFT" && q.status === "PENDING_APPROVAL"
+                                        ? { rejectionReason: "Returned to draft by approver" }                   : {}),
     },
+  });
+
+  revalidatePath("/quotations");
+  revalidatePath(`/quotations/${id}`);
+  return { ok: true, data: { id } };
+}
+
+export async function rejectQuotation(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "quotation.approve");
+
+  const parsed = z
+    .object({ id: z.string().cuid(), reason: z.string().trim().min(1).max(500) })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Reason is required" };
+  const { id, reason } = parsed.data;
+
+  const db = scoped(ctx);
+  const q = await db.quotation.findUnique({ where: { id }, select: { status: true } });
+  if (!q) return { ok: false, error: "Quotation not found" };
+  if (q.status !== "PENDING_APPROVAL") {
+    return { ok: false, error: "Only pending-approval quotations can be rejected" };
+  }
+
+  await db.quotation.update({
+    where: { id },
+    data: { status: "DRAFT", rejectionReason: reason },
   });
 
   revalidatePath("/quotations");

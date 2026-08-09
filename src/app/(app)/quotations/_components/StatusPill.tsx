@@ -1,20 +1,24 @@
 import type { QuotationStatus } from "@/modules/quotations/schema";
 
 const TONE: Record<QuotationStatus, string> = {
-  DRAFT:    "bg-text-dim/12 text-text-dim",
-  SENT:     "bg-heat/15 text-heat",
-  REVISED:  "bg-heat/15 text-heat",
-  ACCEPTED: "bg-solid/12 text-solid",
-  REJECTED: "bg-fault/12 text-fault",
-  EXPIRED:  "bg-fault/12 text-fault",
+  DRAFT:            "bg-text-dim/12 text-text-dim",
+  PENDING_APPROVAL: "bg-info/12 text-info",
+  APPROVED:         "bg-solid/12 text-solid",
+  SENT:             "bg-heat/15 text-heat",
+  REVISED:          "bg-heat/15 text-heat",
+  ACCEPTED:         "bg-solid/12 text-solid",
+  REJECTED:         "bg-fault/12 text-fault",
+  EXPIRED:          "bg-fault/12 text-fault",
 };
 const LABEL: Record<QuotationStatus, string> = {
-  DRAFT:    "Draft",
-  SENT:     "Sent",
-  REVISED:  "Revised",
-  ACCEPTED: "Accepted",
-  REJECTED: "Rejected",
-  EXPIRED:  "Expired",
+  DRAFT:            "Draft",
+  PENDING_APPROVAL: "Pending Approval",
+  APPROVED:         "Approved",
+  SENT:             "Sent",
+  REVISED:          "Revised",
+  ACCEPTED:         "Accepted",
+  REJECTED:         "Rejected",
+  EXPIRED:          "Expired",
 };
 
 export function StatusPill({ status }: { status: string }) {

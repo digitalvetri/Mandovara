@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const QUOTATION_STATUSES = [
-  "DRAFT", "SENT", "REVISED", "ACCEPTED", "REJECTED", "EXPIRED",
+  "DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "REVISED", "ACCEPTED", "REJECTED", "EXPIRED",
 ] as const;
 export type QuotationStatus = (typeof QUOTATION_STATUSES)[number];
 

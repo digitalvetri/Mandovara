@@ -1,19 +1,15 @@
-// @ts-nocheck — remote module, schema reconciliation pending
 "use server";
 
 // Global search — one server action that fans out to every module the
 // command palette can jump to. Kept intentionally shallow (5 hits per
 // kind) so the round-trip stays under 100ms across the seeded fixtures.
-//
-// TRACK-B-CRAFT.md §6.3.1: "⌘K command palette everywhere — jump to
-// any project, client, design code, quote or invoice; create anything."
 
 import { scoped } from "@/kernel/db/scoped";
 import { devContext } from "@/lib/dev-context";
 
 export type SearchKind =
   | "client" | "project" | "quotation" | "order" | "invoice"
-  | "lead"   | "product" | "vendor";
+  | "lead"   | "design"  | "vendor";
 
 export interface SearchHit {
   kind:      SearchKind;
@@ -34,16 +30,16 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
 
   const contains = { contains: query, mode: "insensitive" as const };
 
-  const [clients, projects, quotes, orders, invoices, leads, products, vendors] =
+  const [clients, projects, quotes, orders, invoices, leads, designs, vendors] =
     await Promise.all([
       db.client.findMany({
         where: { OR: [
-          { name:          contains },
-          { primaryMobile: { contains: query } },
-          { gstin:         { contains: query, mode: "insensitive" } },
+          { name:   contains },
+          { mobile: { contains: query } },
+          { gstin:  { contains: query, mode: "insensitive" } },
         ] },
         take: LIMIT_PER_KIND,
-        select: { id: true, name: true, primaryMobile: true, gstin: true },
+        select: { id: true, name: true, mobile: true, gstin: true },
       }),
       db.project.findMany({
         where: { OR: [
@@ -59,53 +55,49 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
       db.quotation.findMany({
         where: { OR: [
           { number: { contains: query, mode: "insensitive" } },
-          { client: { name: contains } },
+          { project: { client: { name: contains } } },
         ] },
         take: LIMIT_PER_KIND,
         select: {
           id: true, number: true, total: true, status: true,
-          client: { select: { name: true } },
+          project: { select: { client: { select: { name: true } } } },
         },
       }),
-      db.salesOrder.findMany({
+      db.order.findMany({
         where: { OR: [
           { number: { contains: query, mode: "insensitive" } },
-          { client: { name: contains } },
+          { project: { client: { name: contains } } },
         ] },
         take: LIMIT_PER_KIND,
         select: {
           id: true, number: true, status: true,
-          client: { select: { name: true } },
+          project: { select: { client: { select: { name: true } } } },
         },
       }),
       db.invoice.findMany({
-        where: { OR: [
-          { number: { contains: query, mode: "insensitive" } },
-          { client: { name: contains } },
-        ] },
+        where: { number: { contains: query, mode: "insensitive" } },
         take: LIMIT_PER_KIND,
-        select: {
-          id: true, number: true, status: true,
-          client: { select: { name: true } },
-        },
+        select: { id: true, number: true, status: true },
       }),
       db.lead.findMany({
         where: { OR: [
-          { name:        contains },
-          { mobile:      { contains: query } },
-          { companyName: contains },
+          { name:   contains },
+          { mobile: { contains: query } },
         ] },
         take: LIMIT_PER_KIND,
-        select: { id: true, name: true, mobile: true, companyName: true },
+        select: { id: true, name: true, mobile: true, stage: true },
       }),
-      db.product.findMany({
+      db.design.findMany({
         where: { OR: [
           { name: contains },
           { code: { contains: query, mode: "insensitive" } },
           { hsn:  { contains: query } },
         ] },
         take: LIMIT_PER_KIND,
-        select: { id: true, name: true, code: true },
+        select: {
+          id: true, name: true, code: true,
+          collection: { select: { brand: { select: { name: true } } } },
+        },
       }),
       db.vendor.findMany({
         where: { OR: [
@@ -121,7 +113,7 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
   const hits: SearchHit[] = [
     ...clients.map((c): SearchHit => ({
       kind: "client", id: c.id, title: c.name,
-      subtitle: [c.primaryMobile, c.gstin].filter(Boolean).join(" · "),
+      subtitle: [c.mobile, c.gstin].filter(Boolean).join(" · "),
       href: `/clients/${c.id}`,
     })),
     ...projects.map((p): SearchHit => ({
@@ -131,28 +123,28 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
     })),
     ...quotes.map((q): SearchHit => ({
       kind: "quotation", id: q.id, title: q.number,
-      subtitle: `${q.client.name} · ${q.status.toLowerCase()}`,
+      subtitle: `${q.project.client.name} · ${q.status.toLowerCase()}`,
       href: `/quotations/${q.id}`,
     })),
     ...orders.map((o): SearchHit => ({
       kind: "order", id: o.id, title: o.number,
-      subtitle: `${o.client.name} · ${o.status.toLowerCase()}`,
+      subtitle: `${o.project.client.name} · ${o.status.toLowerCase()}`,
       href: `/orders/${o.id}`,
     })),
     ...invoices.map((i): SearchHit => ({
       kind: "invoice", id: i.id, title: i.number,
-      subtitle: `${i.client.name} · ${i.status.toLowerCase()}`,
+      subtitle: i.status.toLowerCase(),
       href: `/invoicing/${i.id}`,
     })),
     ...leads.map((l): SearchHit => ({
       kind: "lead", id: l.id, title: l.name,
-      subtitle: [l.mobile, l.companyName ?? undefined].filter(Boolean).join(" · "),
+      subtitle: [l.mobile, l.stage.toLowerCase()].filter(Boolean).join(" · "),
       href: `/leads/${l.id}`,
     })),
-    ...products.map((p): SearchHit => ({
-      kind: "product", id: p.id, title: p.name,
-      subtitle: p.code,
-      href: `/products/${p.id}`,
+    ...designs.map((d): SearchHit => ({
+      kind: "design", id: d.id, title: d.name,
+      subtitle: `${d.collection.brand.name} · ${d.code}`,
+      href: `/catalog/design/${d.id}`,
     })),
     ...vendors.map((v): SearchHit => ({
       kind: "vendor", id: v.id, title: v.name,

@@ -1,10 +1,19 @@
-// @ts-nocheck — remote module, schema reconciliation pending
 // Measurement repository — read side for /projects/[id]/measurements.
+// Items are stored in the Measurement→Room→MeasurementItem hierarchy.
+// CalcResult.inputs stores the full JSON input blob; output fields are typed.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { MeasurementFamily } from "./schema";
+
+// Map canonical ProductFamily back to the simplified family string the UI uses.
+const FAMILY_MAP: Record<string, MeasurementFamily | undefined> = {
+  WALLPAPER:       "WALLPAPER",
+  FLOORING:        "FLOORING",
+  CURTAIN_FABRIC:  "CURTAIN",
+  SHEER:           "CURTAIN",
+};
 
 export interface MeasurementItemRow {
   id:            string;
@@ -12,7 +21,7 @@ export interface MeasurementItemRow {
   roomLabel:     string;
   label:         string;
   family:        MeasurementFamily;
-  inputs:        unknown;              // family-specific — client narrows
+  inputs:        unknown;              // family-specific JSON blob (stored in CalcResult.inputs)
   photoKey:      string | null;
   notes:         string | null;
   createdAt:     Date;
@@ -31,33 +40,50 @@ export async function listMeasurementsForProject(
 ): Promise<MeasurementItemRow[]> {
   requirePermission(ctx, "project.view");
   const db = scoped(ctx);
-  const rows = await db.measurementItem.findMany({
-    where:   { projectId },
-    orderBy: [{ roomLabel: "asc" }, { createdAt: "asc" }],
+
+  const items = await db.measurementItem.findMany({
+    where:   { measurement: { projectId } },
+    orderBy: [{ room: { name: "asc" } }, { label: "asc" }],
     select: {
-      id: true, projectId: true, roomLabel: true, label: true,
-      family: true, inputs: true, photoKey: true, notes: true,
-      createdAt: true, updatedAt: true,
-      calcResult: {
+      id: true, label: true, family: true, photoKeys: true, notes: true,
+      room:        { select: { name: true } },
+      measurement: { select: { projectId: true, visitedAt: true } },
+      calc: {
         select: {
-          engineVersion: true, outputs: true, warnings: true, computedAt: true,
+          engineVersion: true, inputs: true, warnings: true, computedAt: true,
+          materialQty: true, materialUnit: true,
+          rollsRequired: true, boxesRequired: true, areaSqft: true,
+          cutLengthMm: true, widthsRequired: true,
         },
       },
     },
   });
-  return rows.map((r) => ({
-    id: r.id, projectId: r.projectId,
-    roomLabel: r.roomLabel, label: r.label,
-    family: r.family as MeasurementFamily,
-    inputs: r.inputs,
-    photoKey: r.photoKey, notes: r.notes,
-    createdAt: r.createdAt, updatedAt: r.updatedAt,
-    calc: r.calcResult
+
+  return items.map((r): MeasurementItemRow => ({
+    id:        r.id,
+    projectId: r.measurement.projectId,
+    roomLabel: r.room.name,
+    label:     r.label,
+    family:    FAMILY_MAP[r.family] ?? "WALLPAPER",
+    inputs:    r.calc?.inputs ?? {},
+    photoKey:  r.photoKeys[0] ?? null,
+    notes:     r.notes,
+    createdAt: r.measurement.visitedAt,
+    updatedAt: r.measurement.visitedAt,
+    calc:      r.calc
       ? {
-          engineVersion: r.calcResult.engineVersion,
-          outputs:       r.calcResult.outputs,
-          warnings:      r.calcResult.warnings,
-          computedAt:    r.calcResult.computedAt,
+          engineVersion: r.calc.engineVersion,
+          outputs: {
+            materialQty:    Number(r.calc.materialQty),
+            materialUnit:   r.calc.materialUnit,
+            rollsRequired:  r.calc.rollsRequired,
+            boxesRequired:  r.calc.boxesRequired,
+            areaSqft:       r.calc.areaSqft ? Number(r.calc.areaSqft) : null,
+            cutLengthMm:    r.calc.cutLengthMm ? Number(r.calc.cutLengthMm) : null,
+            widthsRequired: r.calc.widthsRequired,
+          },
+          warnings:   r.calc.warnings,
+          computedAt: r.calc.computedAt,
         }
       : null,
   }));

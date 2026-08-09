@@ -1,6 +1,5 @@
-// @ts-nocheck — remote module, schema reconciliation pending
-// Notifications — read side. Scoped to the current user; org-scope
-// is handled by db.scoped(ctx) plus a userId filter.
+// Notifications — read side. Derived from FollowUp records owned by the
+// current user. completedAt = null → unread; completedAt set → read.
 
 import { scoped } from "@/kernel/db/scoped";
 import type { RequestContext } from "@/kernel/auth/context";
@@ -32,31 +31,44 @@ export interface ListNotificationsResult {
   counts:   { all: number; unread: number; read: number };
 }
 
-const DEFAULT_LIMIT     = 20;
 const DEFAULT_PAGE_SIZE = 30;
 const MAX_PAGE_SIZE     = 100;
 
+function toRow(f: {
+  id: string; note: string; outcome: string | null;
+  refType: string; refId: string; dueAt: Date; completedAt: Date | null;
+}): NotificationRow {
+  const now = new Date();
+  const level = !f.completedAt && f.dueAt < now ? "WARN" : "INFO";
+  return {
+    id:         f.id,
+    level,
+    title:      f.note,
+    body:       f.outcome,
+    entityType: f.refType || null,
+    entityId:   f.refId   || null,
+    readAt:     f.completedAt,
+    createdAt:  f.dueAt,
+  };
+}
+
 export async function listRecentNotifications(
   ctx: RequestContext,
-  limit: number = DEFAULT_LIMIT,
+  limit = 20,
 ): Promise<NotificationRow[]> {
   const db = scoped(ctx);
-  return db.notification.findMany({
-    where:   { userId: ctx.userId },
-    orderBy: { createdAt: "desc" },
+  const rows = await db.followUp.findMany({
+    where:   { ownerId: ctx.userId },
+    orderBy: { dueAt: "desc" },
     take:    Math.min(limit, 50),
-    select: {
-      id: true, level: true, title: true, body: true,
-      entityType: true, entityId: true, readAt: true, createdAt: true,
-    },
+    select:  { id: true, note: true, outcome: true, refType: true, refId: true, dueAt: true, completedAt: true },
   });
+  return rows.map(toRow);
 }
 
 export async function countUnreadNotifications(ctx: RequestContext): Promise<number> {
   const db = scoped(ctx);
-  return db.notification.count({
-    where: { userId: ctx.userId, readAt: null },
-  });
+  return db.followUp.count({ where: { ownerId: ctx.userId, completedAt: null } });
 }
 
 export async function listNotifications(
@@ -68,25 +80,24 @@ export async function listNotifications(
   const page     = Math.max(1, q.page ?? 1);
   const skip     = (page - 1) * pageSize;
 
-  const where: Record<string, unknown> = { userId: ctx.userId };
-  if (q.filter === "UNREAD") where["readAt"] = null;
-  if (q.filter === "READ")   where["readAt"] = { not: null };
+  const baseWhere = { ownerId: ctx.userId };
+  const where =
+    q.filter === "UNREAD" ? { ...baseWhere, completedAt: null }
+    : q.filter === "READ" ? { ...baseWhere, completedAt: { not: null } }
+    : baseWhere;
 
   const [rows, total, unread, read] = await Promise.all([
-    db.notification.findMany({
-      where, orderBy: { createdAt: "desc" }, skip, take: pageSize,
-      select: {
-        id: true, level: true, title: true, body: true,
-        entityType: true, entityId: true, readAt: true, createdAt: true,
-      },
+    db.followUp.findMany({
+      where, orderBy: { dueAt: "desc" }, skip, take: pageSize,
+      select: { id: true, note: true, outcome: true, refType: true, refId: true, dueAt: true, completedAt: true },
     }),
-    db.notification.count({ where }),
-    db.notification.count({ where: { userId: ctx.userId, readAt: null } }),
-    db.notification.count({ where: { userId: ctx.userId, readAt: { not: null } } }),
+    db.followUp.count({ where }),
+    db.followUp.count({ where: { ownerId: ctx.userId, completedAt: null } }),
+    db.followUp.count({ where: { ownerId: ctx.userId, completedAt: { not: null } } }),
   ]);
 
   return {
-    rows, total, page, pageSize,
+    rows: rows.map(toRow), total, page, pageSize,
     counts: { all: unread + read, unread, read },
   };
 }

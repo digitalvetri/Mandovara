@@ -2,6 +2,7 @@
 // No @ts-nocheck — this file must typecheck cleanly against the actual schema.
 import { Prisma, PrismaClient } from "@prisma/client";
 import { makeGstin, makeRng, makePan } from "./rng";
+import { seedRoles } from "./roles";
 
 export interface SeedMasterIds {
   orgId: string;
@@ -111,7 +112,7 @@ function salaryStructure(dept: string): { basic: string; hra: string; conveyance
 
 // ── Number series list ────────────────────────────────────────────────────────
 
-const ALL_SERIES = ["ENQ", "PRJ", "MEA", "QT", "SO", "PO", "GRN", "MJ", "INS", "INV", "RCT", "SMP", "CN"] as const;
+const ALL_SERIES = ["ENQ", "PRJ", "MEA", "QT", "SO", "PO", "GRN", "MJ", "INS", "INV", "RCT", "SMP", "CN", "SV", "REQ"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main export
@@ -200,6 +201,9 @@ export async function seedMasters(db: PrismaClient, seed?: number): Promise<Seed
   const userByRole: Record<string, string> = Object.fromEntries(
     createdUsers.map((u) => [u.role as string, u.id]),
   );
+
+  // ── Roles + Permissions (dynamic RBAC) ────────────────────────────────────
+  await seedRoles(db, org.id, userByRole);
 
   // ── Employees (18) ─────────────────────────────────────────────────────────
   // 9 user-linked (EMP-001..009) + 9 standalone (EMP-010..018)

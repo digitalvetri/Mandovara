@@ -1,58 +1,57 @@
-// @ts-nocheck — remote module, schema reconciliation pending
 // Allocation console repository. Read-side helpers for /purchase/allocation.
 //
-// The console shows:
-//   - open order lines that still need material (orderedQty − reservedQty > 0)
-//   - available dye-lot batches for the selected line's product/warehouse
-//   - the existing lot allocations on that line (so the mixed-lot risk is visible)
+// Models used: Order (not SalesOrder), OrderLine.colourwayId (not productId),
+// StockBalance (not Batch), Allocation (not LotAllocation).
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
 export interface OpenOrderLineRow {
-  id: string;
-  salesOrderId: string;
-  salesOrderNumber: string;
-  clientName: string;
-  productId: string;
-  productCode: string;
-  productName: string;
-  trackBatch: boolean;
-  uom: string;
-  orderedQty: string;
-  reservedQty: string;
-  neededQty: string;
+  id:               string;
+  orderId:          string;
+  orderNumber:      string;
+  clientName:       string;
+  colourwayId:      string;
+  colourCode:       string;
+  colourName:       string;
+  unit:             string;
+  orderedQty:       string;
+  allocatedQty:     string;
+  neededQty:        string;
   existingLotCount: number;
-  existingLots: string[]; // dye-lot codes already on this line
+  existingLots:     string[];
+  // UI compat aliases
+  salesOrderNumber: string;
+  productName:      string;
+  uom:              string;
+  reservedQty:      string;   // alias for allocatedQty
+  trackBatch:       boolean;  // always true for colourway lines
 }
 
 export interface AvailableLotRow {
-  batchId: string;
-  productId: string;
-  dyeLot: string;
-  warehouseId: string;
+  batchId:      string;   // StockBalance.id
+  colourwayId:  string;
+  dyeLot:       string;
+  onHand:       string;
+  allocated:    string;   // StockBalance.reserved
+  available:    string;
+  binLocation:  string | null;
   warehouseName: string;
-  onHand: string;
-  allocated: string;
-  available: string;
-  binLocation: string | null;
-  rollCount: number | null;
-  createdAt: Date;
+  createdAt:    Date;
 }
 
 export interface AllocationRow {
-  id: string;
-  orderLineId: string;
-  batchId: string;
-  dyeLot: string;
-  quantity: string;
+  id:               string;
+  orderLineId:      string;
+  dyeLot:           string | null;
+  quantity:         string;
   mixedLotOverride: boolean;
-  overrideReason: string | null;
-  createdAt: Date;
+  overrideReason:   string | null;
+  createdAt:        Date;
 }
 
-const OPEN_ORDER_STATUSES = ["CONFIRMED", "PARTIAL_DISPATCH"] as const;
+const OPEN_ORDER_STATUSES = ["CONFIRMED", "PROCUREMENT", "MAKE"] as const;
 
 export async function listOpenOrderLines(
   ctx: RequestContext,
@@ -60,20 +59,24 @@ export async function listOpenOrderLines(
   requirePermission(ctx, "allocation.view");
   const db = scoped(ctx);
 
-  const orders = await db.salesOrder.findMany({
-    where: { status: { in: OPEN_ORDER_STATUSES as unknown as string[] } as never },
+  const orders = await db.order.findMany({
+    where:   { status: { in: [...OPEN_ORDER_STATUSES] } },
     orderBy: { date: "desc" },
-    take: 200,
+    take:    200,
     select: {
       id: true, number: true,
-      client: { select: { name: true } },
+      project: { select: { client: { select: { name: true } } } },
       lines: {
+        where:  { colourwayId: { not: null } },
         select: {
-          id: true, productId: true, orderedQty: true, reservedQty: true,
-          product: { select: { code: true, name: true, trackBatch: true, uom: true } },
-          lotAllocations: {
-            where: { releasedAt: null },
-            select: { batch: { select: { batchNumber: true } } },
+          id: true, colourwayId: true, quantity: true, unit: true,
+          colourway: {
+            select: {
+              code: true, colourName: true,
+            },
+          },
+          allocations: {
+            select: { quantity: true, dyeLot: true },
           },
         },
       },
@@ -83,28 +86,32 @@ export async function listOpenOrderLines(
   const rows: OpenOrderLineRow[] = [];
   for (const o of orders) {
     for (const line of o.lines) {
-      const ordered = Number(line.orderedQty);
-      const reserved = Number(line.reservedQty);
-      const needed = ordered - reserved;
-      if (needed <= 0) continue;
-      const dyeLots = line.lotAllocations
-        .map((a) => a.batch.batchNumber)
-        .filter((v, i, arr) => arr.indexOf(v) === i);
+      if (!line.colourwayId || !line.colourway) continue;
+      const ordered   = Number(line.quantity);
+      const allocated = line.allocations.reduce((s, a) => s + Number(a.quantity), 0);
+      const needed    = ordered - allocated;
+      if (needed <= 0.001) continue;
+      const lots = [...new Set(line.allocations.map((a) => a.dyeLot).filter(Boolean) as string[])];
       rows.push({
         id:               line.id,
-        salesOrderId:     o.id,
-        salesOrderNumber: o.number,
-        clientName:       o.client.name,
-        productId:        line.productId,
-        productCode:      line.product.code,
-        productName:      line.product.name,
-        trackBatch:       line.product.trackBatch,
-        uom:              line.product.uom,
-        orderedQty:       line.orderedQty.toString(),
-        reservedQty:      line.reservedQty.toString(),
+        orderId:          o.id,
+        orderNumber:      o.number,
+        clientName:       o.project.client.name,
+        colourwayId:      line.colourwayId,
+        colourCode:       line.colourway.code,
+        colourName:       line.colourway.colourName,
+        unit:             line.unit,
+        orderedQty:       ordered.toString(),
+        allocatedQty:     allocated.toString(),
         neededQty:        needed.toString(),
-        existingLotCount: dyeLots.length,
-        existingLots:     dyeLots,
+        existingLotCount: lots.length,
+        existingLots:     lots,
+        // UI compat aliases
+        salesOrderNumber: o.number,
+        productName:      `${line.colourway.colourName} (${line.colourway.code})`,
+        uom:              line.unit,
+        reservedQty:      allocated.toString(),
+        trackBatch:       true,
       });
     }
   }
@@ -113,44 +120,38 @@ export async function listOpenOrderLines(
 
 export async function listAvailableLotsForProduct(
   ctx: RequestContext,
-  productId: string,
+  colourwayId: string,
 ): Promise<AvailableLotRow[]> {
   requirePermission(ctx, "allocation.view");
   const db = scoped(ctx);
 
-  const batches = await db.batch.findMany({
-    where: { productId },
-    orderBy: [{ createdAt: "asc" }],
+  const balances = await db.stockBalance.findMany({
+    where:   { colourwayId },
+    orderBy: { updatedAt: "asc" },
     select: {
-      id: true, productId: true, batchNumber: true,
-      warehouseId: true, quantity: true, binLocation: true,
-      rollCount: true, createdAt: true,
-      warehouse:   { select: { name: true } },
-      allocations: {
-        where: { releasedAt: null },
-        select: { quantity: true },
-      },
+      id: true, colourwayId: true, dyeLot: true,
+      quantity: true, reserved: true, binLocation: true, updatedAt: true,
     },
   });
 
-  return batches.map((b) => {
-    const onHand = Number(b.quantity);
-    const allocated = b.allocations.reduce((s, a) => s + Number(a.quantity), 0);
-    const available = onHand - allocated;
-    return {
-      batchId:       b.id,
-      productId:     b.productId,
-      dyeLot:        b.batchNumber,
-      warehouseId:   b.warehouseId,
-      warehouseName: b.warehouse.name,
-      onHand:        onHand.toString(),
-      allocated:     allocated.toString(),
-      available:     available.toString(),
-      binLocation:   b.binLocation,
-      rollCount:     b.rollCount,
-      createdAt:     b.createdAt,
-    };
-  }).filter((r) => Number(r.available) > 0);
+  return balances
+    .map((b) => {
+      const onHand    = Number(b.quantity);
+      const allocated = Number(b.reserved);
+      const available = onHand - allocated;
+      return {
+        batchId:      b.id,
+        colourwayId:  b.colourwayId,
+        dyeLot:       b.dyeLot ?? "(no lot)",
+        onHand:       onHand.toString(),
+        allocated:    allocated.toString(),
+        available:    available.toString(),
+        binLocation:  b.binLocation,
+        warehouseName: b.binLocation ?? "Stock",
+        createdAt:    b.updatedAt,
+      };
+    })
+    .filter((r) => Number(r.available) > 0.001);
 }
 
 export async function listAllocationsForOrderLine(
@@ -159,21 +160,19 @@ export async function listAllocationsForOrderLine(
 ): Promise<AllocationRow[]> {
   requirePermission(ctx, "allocation.view");
   const db = scoped(ctx);
-  const rows = await db.lotAllocation.findMany({
-    where: { orderLineId, releasedAt: null },
+  const rows = await db.allocation.findMany({
+    where:   { orderLineId },
     orderBy: { createdAt: "asc" },
     select: {
-      id: true, orderLineId: true, batchId: true, quantity: true,
+      id: true, orderLineId: true, dyeLot: true, quantity: true,
       mixedLotOverride: true, overrideReason: true, createdAt: true,
-      batch: { select: { batchNumber: true } },
     },
   });
   return rows.map((r) => ({
     id:               r.id,
     orderLineId:      r.orderLineId,
-    batchId:          r.batchId,
-    dyeLot:           r.batch.batchNumber,
-    quantity:         r.quantity.toString(),
+    dyeLot:           r.dyeLot,
+    quantity:         Number(r.quantity).toString(),
     mixedLotOverride: r.mixedLotOverride,
     overrideReason:   r.overrideReason,
     createdAt:        r.createdAt,

@@ -43,18 +43,18 @@ const QUICK_ACTIONS: readonly QuickAction[] = [
 const KIND_LABEL: Record<SearchKind, string> = {
   client: "Clients", project: "Projects", quotation: "Quotations",
   order: "Orders",   invoice: "Invoices", lead: "Leads",
-  product: "Products", vendor: "Vendors",
+  design: "Designs", vendor: "Vendors",
 };
 
 const KIND_ICON: Record<SearchKind, typeof Users> = {
   client: Users, project: Briefcase, quotation: FileText,
   order:  Send,  invoice: Receipt,   lead: UserPlus,
-  product: Package, vendor: Truck,
+  design: Package, vendor: Truck,
 };
 
 // Order the sections show up in — most-jumped-to first.
 const KIND_ORDER: readonly SearchKind[] = [
-  "project", "client", "lead", "quotation", "order", "invoice", "product", "vendor",
+  "project", "client", "lead", "quotation", "order", "invoice", "design", "vendor",
 ];
 
 type Row = QuickAction | (SearchHit & { kind: SearchKind });

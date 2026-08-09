@@ -1,0 +1,135 @@
+// SiteVisit module — read side.
+// SiteVisit separates scheduled field visits from Measurement records.
+// A visit can trigger one or more measurements, or just be a survey/supervision.
+
+import { scoped } from "@/kernel/db/scoped";
+import { requirePermission } from "@/kernel/rbac/guard";
+import type { RequestContext } from "@/kernel/auth/context";
+
+export interface SiteVisitRow {
+  id:           string;
+  number:       string;
+  purpose:      string;
+  scheduledAt:  Date;
+  status:       string;
+  assignedTo:   string;   // user name
+  projectName:  string | null;
+  clientName:   string | null;
+  leadName:     string | null;
+  observations: string | null;
+}
+
+export interface SiteVisitDetail extends SiteVisitRow {
+  checkInLat:    string | null;
+  checkInLng:    string | null;
+  customerNotes: string | null;
+  photoKeys:     string[];
+  startedAt:     Date | null;
+  completedAt:   Date | null;
+}
+
+const PURPOSE_LABEL: Record<string, string> = {
+  INITIAL_SURVEY: "Initial Survey",
+  MEASUREMENT:    "Measurement",
+  SAMPLE_SHOWING: "Sample Showing",
+  SUPERVISION:    "Supervision",
+  SNAG_FIX:       "Snag Fix",
+  HANDOVER:       "Handover",
+};
+
+export function purposeLabel(purpose: string): string {
+  return PURPOSE_LABEL[purpose] ?? purpose;
+}
+
+export async function listSiteVisits(
+  ctx: RequestContext,
+  opts?: { assignedToMe?: boolean; projectId?: string; limit?: number },
+): Promise<SiteVisitRow[]> {
+  requirePermission(ctx, "sitelog.view");
+  const db = scoped(ctx);
+
+  const visits = await db.siteVisit.findMany({
+    where: {
+      ...(opts?.assignedToMe ? { assignedToId: ctx.userId } : {}),
+      ...(opts?.projectId    ? { projectId: opts.projectId } : {}),
+    },
+    orderBy: { scheduledAt: "desc" },
+    take: opts?.limit ?? 100,
+    select: {
+      id: true, number: true, purpose: true, scheduledAt: true, status: true,
+      assignedToId: true, observations: true,
+      project: {
+        select: {
+          name: true,
+          client: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  // Resolve assignee names in one round-trip
+  const userIds = [...new Set(visits.map((v) => v.assignedToId))];
+  const userNames = await db.user.findMany({
+    where:  { id: { in: userIds } },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(userNames.map((u) => [u.id, u.name]));
+
+  return visits.map((v) => ({
+    id:           v.id,
+    number:       v.number,
+    purpose:      purposeLabel(v.purpose),
+    scheduledAt:  v.scheduledAt,
+    status:       v.status,
+    assignedTo:   nameById.get(v.assignedToId) ?? "—",
+    projectName:  v.project?.name ?? null,
+    clientName:   v.project?.client?.name ?? null,
+    leadName:     null,
+    observations: v.observations,
+  }));
+}
+
+export async function getSiteVisit(
+  ctx: RequestContext,
+  id: string,
+): Promise<SiteVisitDetail | null> {
+  requirePermission(ctx, "sitelog.view");
+  const db = scoped(ctx);
+
+  const v = await db.siteVisit.findUnique({
+    where: { id },
+    select: {
+      id: true, number: true, purpose: true, scheduledAt: true, status: true,
+      assignedToId: true, observations: true, checkInLat: true, checkInLng: true,
+      customerNotes: true, photoKeys: true, startedAt: true, completedAt: true,
+      project: {
+        select: {
+          name: true,
+          client: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!v) return null;
+
+  const assignee = await db.user.findUnique({ where: { id: v.assignedToId }, select: { name: true } });
+
+  return {
+    id:           v.id,
+    number:       v.number,
+    purpose:      purposeLabel(v.purpose),
+    scheduledAt:  v.scheduledAt,
+    status:       v.status,
+    assignedTo:   assignee?.name ?? "—",
+    projectName:  v.project?.name ?? null,
+    clientName:   v.project?.client?.name ?? null,
+    leadName:     null,
+    observations: v.observations,
+    checkInLat:   v.checkInLat?.toString() ?? null,
+    checkInLng:   v.checkInLng?.toString() ?? null,
+    customerNotes: v.customerNotes,
+    photoKeys:    v.photoKeys,
+    startedAt:    v.startedAt,
+    completedAt:  v.completedAt,
+  };
+}

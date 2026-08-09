@@ -86,6 +86,19 @@ export default async function AdminPage() {
           </div>
 
           <CompanySettingsForm initial={a.company} />
+
+          <div className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6">
+            <div className="font-display text-[18px] font-semibold mb-1">Role permissions</div>
+            <p className="text-[12px] text-text-dim mb-4">
+              Fine-grained permission matrix — grant or revoke actions per role.
+            </p>
+            <a
+              href="/admin/roles"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] bg-gold/10 border border-gold/30 text-[12px] text-gold font-medium hover:bg-gold/20 transition-colors"
+            >
+              Open permission matrix →
+            </a>
+          </div>
         </aside>
       </div>
     </>

@@ -9,7 +9,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { parseINR } from "@/kernel/money/format";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
-import { createPOSchema, setPOStatusSchema } from "./schema";
+import { createPOSchema, setPOStatusSchema, rejectPOSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -109,7 +109,13 @@ export async function setPOStatus(
   if (!parsed.success) return zodError(parsed.error);
   const { id, status } = parsed.data;
 
-  requirePermission(ctx, status === "CANCELLED" ? "po.cancel" : "po.approve");
+  if (status === "CANCELLED") {
+    requirePermission(ctx, "po.cancel");
+  } else if (status === "APPROVED") {
+    requirePermission(ctx, "po.approve");
+  } else {
+    requirePermission(ctx, "po.create");
+  }
 
   const db = scoped(ctx);
   const po = await db.purchaseOrder.findUniqueOrThrow({
@@ -117,15 +123,48 @@ export async function setPOStatus(
     select: { status: true },
   });
 
-  // Guard valid transitions: only DRAFT→SENT (approve); only non-RECEIVED→CANCELLED
-  if (status === "SENT" && po.status !== "DRAFT") {
-    return { ok: false, error: `Cannot approve a PO in ${po.status} status` };
-  }
-  if (status === "CANCELLED" && po.status === "RECEIVED") {
-    return { ok: false, error: "Cannot cancel a fully received PO" };
+  const VALID_TRANSITIONS: Record<string, string[]> = {
+    DRAFT:            ["PENDING_APPROVAL", "SENT"],
+    PENDING_APPROVAL: ["APPROVED"],
+    APPROVED:         ["SENT"],
+    SENT:             ["PARTIAL", "RECEIVED", "CANCELLED"],
+    PARTIAL:          ["RECEIVED", "CANCELLED"],
+    RECEIVED:         [],
+    CANCELLED:        [],
+  };
+  const allowed = VALID_TRANSITIONS[po.status] ?? [];
+  if (!allowed.includes(status)) {
+    return { ok: false, error: `Cannot move PO from ${po.status} to ${status}` };
   }
 
-  await db.purchaseOrder.update({ where: { id }, data: { status } });
+  await db.purchaseOrder.update({
+    where: { id },
+    data: {
+      status,
+      ...(status === "APPROVED" ? { approvedById: ctx.userId, approvedAt: new Date() } : {}),
+    },
+  });
+  revalidatePath("/purchase");
+  revalidatePath(`/purchase/${id}`);
+  return { ok: true, data: { id } };
+}
+
+export async function rejectPO(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "po.approve");
+  const parsed = rejectPOSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { id } = parsed.data;
+
+  const db = scoped(ctx);
+  const po = await db.purchaseOrder.findUniqueOrThrow({ where: { id }, select: { status: true } });
+  if (po.status !== "PENDING_APPROVAL") {
+    return { ok: false, error: "Only pending-approval POs can be rejected" };
+  }
+
+  await db.purchaseOrder.update({ where: { id }, data: { status: "DRAFT" } });
   revalidatePath("/purchase");
   revalidatePath(`/purchase/${id}`);
   return { ok: true, data: { id } };

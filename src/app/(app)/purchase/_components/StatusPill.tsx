@@ -1,15 +1,22 @@
 import type { POStatus } from "@/modules/purchase/schema";
 
 const TONE: Record<POStatus, string> = {
-  DRAFT:     "bg-text-dim/12 text-text-dim",
-  SENT:      "bg-warn/15 text-warn",
-  PARTIAL:   "bg-warn/15 text-warn",
-  RECEIVED:  "bg-good/12 text-good",
-  CANCELLED: "bg-bad/12 text-bad line-through",
+  DRAFT:            "bg-text-dim/12 text-text-dim",
+  PENDING_APPROVAL: "bg-info/12 text-info",
+  APPROVED:         "bg-solid/12 text-solid",
+  SENT:             "bg-warn/15 text-warn",
+  PARTIAL:          "bg-warn/15 text-warn",
+  RECEIVED:         "bg-good/12 text-good",
+  CANCELLED:        "bg-bad/12 text-bad line-through",
 };
 const LABEL: Record<POStatus, string> = {
-  DRAFT: "Draft", SENT: "Sent", PARTIAL: "Partial",
-  RECEIVED: "Received", CANCELLED: "Cancelled",
+  DRAFT:            "Draft",
+  PENDING_APPROVAL: "Pending Approval",
+  APPROVED:         "Approved",
+  SENT:             "Sent",
+  PARTIAL:          "Partial",
+  RECEIVED:         "Received",
+  CANCELLED:        "Cancelled",
 };
 
 export function POStatusPill({ status }: { status: string }) {

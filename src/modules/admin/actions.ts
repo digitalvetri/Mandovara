@@ -46,6 +46,19 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
 
   const db = scoped(ctx);
   const mobile = d.mobile.startsWith("+91") ? d.mobile : `+91${d.mobile}`;
+
+  // Resolve dynamic Role row matching this AppRole (for the new RBAC system)
+  const ROLE_NAME_MAP: Record<string, string> = {
+    OWNER: "Owner", DESIGNER: "Designer", SALES: "Sales",
+    MEASURE_EXEC: "Measure Executive", STORE: "Store",
+    MAKE_SUPERVISOR: "Make Supervisor", INSTALLER: "Installer",
+    ACCOUNTS: "Accounts", HR: "HR",
+  };
+  const dynamicRole = await db.role.findFirst({
+    where: { organizationId: ctx.orgId, name: ROLE_NAME_MAP[d.roleId] },
+    select: { id: true },
+  });
+
   const created = await db.user.create({
     data: {
       organizationId: ctx.orgId,
@@ -56,6 +69,7 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
       locale:         d.locale,
       branchIds:      d.branchIds,
       role:           d.roleId,
+      roleId:         dynamicRole?.id ?? null,
     },
     select: { id: true },
   });

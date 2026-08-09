@@ -9,6 +9,7 @@ datasource db {
 
 // ─── ENUMS ──────────────────────────────────────────────────────────────────
 
+// Legacy — kept during RBAC migration; removed once User.roleId fully backfilled
 enum AppRole {
   OWNER
   DESIGNER
@@ -19,6 +20,14 @@ enum AppRole {
   INSTALLER
   ACCOUNTS
   HR
+}
+
+// Dynamic permission scope (Phase 1 — RBAC overhaul)
+enum PermScope {
+  NONE
+  VIEW
+  OWN
+  FULL
 }
 
 enum UserStatus {
@@ -103,6 +112,12 @@ enum SurfaceType {
   GLASS
 }
 
+enum LayPattern {
+  STRAIGHT
+  DIAGONAL
+  HERRINGBONE
+}
+
 enum LeadSource {
   WALK_IN
   PHONE
@@ -119,6 +134,7 @@ enum LeadStage {
   NEW
   CONTACTED
   MEASUREMENT_SCHEDULED
+  VISIT_SCHEDULED
   MEASURED
   QUOTED
   NEGOTIATION
@@ -138,6 +154,7 @@ enum ClientType {
 
 enum ProjectStage {
   ENQUIRY
+  SITE_VISIT
   MEASUREMENT
   QUOTATION
   ORDERED
@@ -158,6 +175,8 @@ enum MeasurementStatus {
 
 enum QuotationStatus {
   DRAFT
+  PENDING_APPROVAL
+  APPROVED
   SENT
   REVISED
   ACCEPTED
@@ -178,15 +197,28 @@ enum OrderStatus {
 
 enum POStatus {
   DRAFT
+  PENDING_APPROVAL
+  APPROVED
   SENT
   PARTIAL
   RECEIVED
   CANCELLED
 }
 
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  ORDERED
+  FULFILLED
+}
+
 enum StockMoveType {
   GRN_IN
   ALLOCATE
+  RESERVE
+  UNRESERVE
   ISSUE_TO_MAKE
   ISSUE_TO_SITE
   RETURN_TO_STOCK
@@ -260,6 +292,11 @@ enum ChequeStatus {
   BOUNCED
 }
 
+enum PayDirection {
+  INBOUND
+  OUTBOUND
+}
+
 enum SampleStatus {
   IN_LIBRARY
   ISSUED
@@ -275,6 +312,14 @@ enum AttendanceStatus {
   LEAVE
   HOLIDAY
   WEEK_OFF
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  EARNED
+  COMP_OFF
+  UNPAID
 }
 
 enum PayrollStatus {
@@ -304,7 +349,64 @@ enum ApprovalState {
   REJECTED
 }
 
-// ─── ORG & PEOPLE ───────────────────────────────────────────────────────────
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ChannelKind {
+  DIRECT
+  PROJECT
+  DEPARTMENT
+  ANNOUNCEMENT
+}
+
+enum NotifyChannel {
+  IN_APP
+  WHATSAPP
+  EMAIL
+  PUSH
+}
+
+enum EventKind {
+  SITE_VISIT
+  INSTALLATION
+  FOLLOW_UP
+  MEETING
+  DEADLINE
+  LEAVE
+  HOLIDAY
+}
+
+enum VisitPurpose {
+  INITIAL_SURVEY
+  MEASUREMENT
+  SAMPLE_SHOWING
+  SUPERVISION
+  SNAG_FIX
+  HANDOVER
+}
+
+enum VisitStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+  NO_SHOW
+}
+
+// ─── ORG, ROLES & PEOPLE ────────────────────────────────────────────────────
 
 model Organization {
   id            String   @id @default(cuid())
@@ -326,8 +428,10 @@ model Organization {
   settings      Json
   createdAt     DateTime @default(now())
 
-  branches      Branch[]
-  users         User[]
+  branches    Branch[]
+  users       User[]
+  roles       Role[]
+  departments Department[]
 }
 
 model Branch {
@@ -344,36 +448,91 @@ model Branch {
   @@index([organizationId])
 }
 
-model User {
-  id             String     @id @default(cuid())
+// ─── RBAC: dynamic role matrix ───────────────────────────────────────────────
+
+model Department {
+  id             String       @id @default(cuid())
   organizationId String
-  mobile         String
-  email          String?
   name           String
-  passwordHash   String?
-  role           AppRole
-  branchIds      String[]
-  locale         String     @default("en")
-  status         UserStatus @default(ACTIVE)
-  createdAt      DateTime   @default(now())
+  headEmployeeId String?
 
   org            Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, name])
+}
+
+model Role {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  isOwnerRole    Boolean  @default(false)
+  isSystem       Boolean  @default(false)
+
+  permissions    RolePermission[]
+  users          User[]
+
+  org            Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, name])
+}
+
+model RolePermission {
+  id     String    @id @default(cuid())
+  roleId String
+  key    String
+  scope  PermScope @default(NONE)
+
+  role   Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, key])
+}
+
+// ─── USERS & EMPLOYEES ───────────────────────────────────────────────────────
+
+model User {
+  id                 String     @id @default(cuid())
+  organizationId     String
+  mobile             String
+  email              String?
+  name               String
+  passwordHash       String?
+  role               AppRole                     // legacy — kept until RBAC migration complete
+  roleId             String?                     // new dynamic role (nullable during transition)
+  branchIds          String[]
+  locale             String     @default("en")
+  status             UserStatus @default(ACTIVE)
+  avatarKey          String?
+  mustChangePassword Boolean    @default(false)
+  lastLoginAt        DateTime?
+  notifyPrefs        Json?
+  departmentId       String?
+  createdAt          DateTime   @default(now())
+
+  org         Organization @relation(fields: [organizationId], references: [id])
+  dynamicRole Role?        @relation(fields: [roleId], references: [id])
 
   @@unique([organizationId, mobile])
 }
 
 model Employee {
-  id              String     @id @default(cuid())
-  organizationId  String
-  userId          String?    @unique
-  code            String
-  name            String
-  mobile          String
-  designation     String
-  department      String
-  doj             DateTime
-  salaryStructure Json?
-  status          UserStatus @default(ACTIVE)
+  id               String     @id @default(cuid())
+  organizationId   String
+  userId           String?    @unique
+  code             String
+  name             String
+  mobile           String
+  designation      String
+  department       String
+  departmentId     String?
+  reportsToId      String?
+  doj              DateTime
+  dob              DateTime?
+  emergencyContact Json?
+  bankDetails      Json?
+  salaryStructure  Json?
+  wageType         String     @default("MONTHLY")
+  status           UserStatus @default(ACTIVE)
 
   @@unique([organizationId, code])
 }
@@ -381,16 +540,16 @@ model Employee {
 // ─── CATALOG: Brand → Collection → Design → Colourway ───────────────────────
 
 model Brand {
-  id             String       @id @default(cuid())
+  id           String       @id @default(cuid())
   organizationId String
-  name           String
-  country        String?
-  leadTimeDays   Int          @default(14)
-  vendorId       String?
-  logoKey        String?
-  isActive       Boolean      @default(true)
+  name         String
+  country      String?
+  leadTimeDays Int          @default(14)
+  vendorId     String?
+  logoKey      String?
+  isActive     Boolean      @default(true)
 
-  collections    Collection[]
+  collections  Collection[]
 
   @@unique([organizationId, name])
 }
@@ -405,9 +564,9 @@ model Collection {
   catalogPdfKey  String?
   isActive       Boolean       @default(true)
 
-  brand          Brand         @relation(fields: [brandId], references: [id])
-  designs        Design[]
-  sampleBooks    SampleBook[]
+  brand       Brand        @relation(fields: [brandId], references: [id])
+  designs     Design[]
+  sampleBooks SampleBook[]
 
   @@unique([organizationId, brandId, name])
   @@index([organizationId, family])
@@ -436,15 +595,15 @@ model Design {
   isActive        Boolean       @default(true)
   searchVector    Unsupported("tsvector")?
 
-  collection      Collection    @relation(fields: [collectionId], references: [id])
-  colourways      Colourway[]
+  collection Collection  @relation(fields: [collectionId], references: [id])
+  colourways Colourway[]
 
   @@unique([organizationId, collectionId, code])
   @@index([organizationId, family])
 }
 
 model Colourway {
-  id             String         @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   designId       String
   code           String
@@ -452,29 +611,31 @@ model Colourway {
   hex            String?
   imageKey       String?
   sellUnit       SellUnit
-  moq            Decimal?       @db.Decimal(10, 3)
-  isActive       Boolean        @default(true)
+  moq            Decimal?  @db.Decimal(10, 3)
+  reorderLevel   Decimal?  @db.Decimal(10, 3)
+  isActive       Boolean   @default(true)
 
-  design         Design         @relation(fields: [designId], references: [id])
-  prices         Price[]
-  stock          StockBalance[]
+  design     Design       @relation(fields: [designId], references: [id])
+  prices     Price[]
+  stock      StockBalance[]
+  orderLines OrderLine[]  @relation("OrderLineColourway")
 
   @@unique([organizationId, code])
   @@index([organizationId, designId])
 }
 
 model Price {
-  id             String    @id @default(cuid())
+  id            String    @id @default(cuid())
   organizationId String
-  colourwayId    String
-  tier           String
-  clientId       String?
-  amount         BigInt
-  minChargeSqft  Decimal?  @db.Decimal(10, 3)
-  effectiveFrom  DateTime
-  effectiveTo    DateTime?
+  colourwayId   String
+  tier          String
+  clientId      String?
+  amount        BigInt
+  minChargeSqft Decimal?  @db.Decimal(10, 3)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
 
-  colourway      Colourway @relation(fields: [colourwayId], references: [id])
+  colourway Colourway @relation(fields: [colourwayId], references: [id])
 
   @@index([colourwayId, tier, effectiveFrom])
 }
@@ -492,63 +653,64 @@ model ServiceRate {
   @@unique([organizationId, code, effectiveFrom])
 }
 
-// ─── SAMPLE LIBRARY ─────────────────────────────────────────────────────────
+// ─── SAMPLE LIBRARY ──────────────────────────────────────────────────────────
 
 model SampleBook {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   collectionId   String
   barcode        String
   costValue      BigInt
-  status         SampleStatus  @default(IN_LIBRARY)
+  status         SampleStatus @default(IN_LIBRARY)
 
-  collection     Collection    @relation(fields: [collectionId], references: [id])
-  issues         SampleIssue[]
+  collection Collection    @relation(fields: [collectionId], references: [id])
+  issues     SampleIssue[]
 
   @@unique([organizationId, barcode])
 }
 
 model SampleIssue {
-  id             String     @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   sampleBookId   String
   issuedToType   String
   clientId       String?
   architectId    String?
   userId         String?
-  issuedAt       DateTime   @default(now())
+  issuedAt       DateTime  @default(now())
   dueAt          DateTime
   returnedAt     DateTime?
-  depositAmount  BigInt     @default(0)
+  depositAmount  BigInt    @default(0)
   notes          String?
 
-  book           SampleBook @relation(fields: [sampleBookId], references: [id])
+  book SampleBook @relation(fields: [sampleBookId], references: [id])
 
   @@index([organizationId, dueAt])
 }
 
-// ─── CRM ────────────────────────────────────────────────────────────────────
+// ─── CRM ─────────────────────────────────────────────────────────────────────
 
 model Lead {
-  id                 String          @id @default(cuid())
-  organizationId     String
-  number             String
-  name               String
-  mobile             String
-  email              String?
-  source             LeadSource
-  architectId        String?
-  stage              LeadStage       @default(NEW)
-  siteAddress        Json?
-  requirement        String?
+  id                String          @id @default(cuid())
+  organizationId    String
+  number            String
+  name              String
+  mobile            String
+  email             String?
+  source            LeadSource
+  architectId       String?
+  stage             LeadStage       @default(NEW)
+  siteAddress       Json?
+  requirement       String?
   familiesInterested ProductFamily[]
-  budgetMin          BigInt?
-  budgetMax          BigInt?
-  ownerId            String
-  lostReason         String?
-  nextActionAt       DateTime?
-  convertedClientId  String?
-  createdAt          DateTime        @default(now())
+  budgetMin         BigInt?
+  budgetMax         BigInt?
+  score             Int?
+  ownerId           String
+  lostReason        String?
+  nextActionAt      DateTime?
+  convertedClientId String?
+  createdAt         DateTime        @default(now())
 
   @@unique([organizationId, number])
   @@index([organizationId, stage, ownerId])
@@ -570,42 +732,43 @@ model Client {
   priceTier      String     @default("RETAIL")
   creditLimit    BigInt     @default(0)
   architectId    String?
+  ownerId        String?
   notes          String?
   createdAt      DateTime   @default(now())
 
-  contacts       ContactPerson[]
-  projects       Project[]
+  contacts ContactPerson[]
+  projects Project[]
 
   @@unique([organizationId, code])
   @@index([organizationId, mobile])
 }
 
 model ContactPerson {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   clientId       String
   name           String
   designation    String?
   mobile         String
   email          String?
-  whatsappOptIn  Boolean  @default(true)
+  whatsappOptIn  Boolean @default(true)
 
-  client         Client   @relation(fields: [clientId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
 }
 
 model Architect {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   code           String
   firmName       String
   contactName    String
   mobile         String
   email          String?
-  commissionPct  Decimal  @db.Decimal(5, 2) @default(0)
+  commissionPct  Decimal @db.Decimal(5, 2) @default(0)
   address        Json?
-  isActive       Boolean  @default(true)
+  isActive       Boolean @default(true)
 
-  commissions    ArchitectCommission[]
+  commissions ArchitectCommission[]
 
   @@unique([organizationId, code])
 }
@@ -621,12 +784,12 @@ model ArchitectCommission {
   paidAt         DateTime?
   paymentRef     String?
 
-  architect      Architect @relation(fields: [architectId], references: [id])
+  architect Architect @relation(fields: [architectId], references: [id])
 
   @@index([organizationId, architectId, paidAt])
 }
 
-// ─── PROJECT · ROOM · MEASUREMENT ───────────────────────────────────────────
+// ─── PROJECT · ROOM · SITE VISIT · MEASUREMENT ──────────────────────────────
 
 model Project {
   id                String       @id @default(cuid())
@@ -645,19 +808,33 @@ model Project {
   orderValue        BigInt       @default(0)
   createdAt         DateTime     @default(now())
 
-  client            Client           @relation(fields: [clientId], references: [id])
-  rooms             Room[]
-  measurements      Measurement[]
-  quotations        Quotation[]
-  orders            Order[]
-  installVisits     InstallVisit[]
-  expenses          ProjectExpense[]
-  snags             Snag[]
-  documents         ProjectDocument[]
+  client       Client           @relation(fields: [clientId], references: [id])
+  members      ProjectMember[]
+  rooms        Room[]
+  siteVisits   SiteVisit[]
+  measurements Measurement[]
+  quotations   Quotation[]
+  orders       Order[]
+  installVisits InstallVisit[]
+  expenses     ProjectExpense[]
+  snags        Snag[]
+  documents    ProjectDocument[]
 
   @@unique([organizationId, number])
   @@index([organizationId, stage])
   @@index([organizationId, clientId])
+}
+
+model ProjectMember {
+  id             String  @id @default(cuid())
+  organizationId String
+  projectId      String
+  userId         String
+  roleOnProject  String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
 }
 
 model Room {
@@ -668,10 +845,36 @@ model Room {
   floorLabel     String?
   sortOrder      Int      @default(0)
 
-  project        Project           @relation(fields: [projectId], references: [id])
-  items          MeasurementItem[]
+  project Project           @relation(fields: [projectId], references: [id])
+  items   MeasurementItem[]
 
   @@index([projectId])
+}
+
+model SiteVisit {
+  id                String      @id @default(cuid())
+  organizationId    String
+  number            String
+  projectId         String?
+  leadId            String?
+  purpose           VisitPurpose
+  scheduledAt       DateTime
+  assignedToId      String
+  status            VisitStatus @default(SCHEDULED)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  checkInLat        Decimal?    @db.Decimal(10, 7)
+  checkInLng        Decimal?    @db.Decimal(10, 7)
+  observations      String?
+  customerNotes     String?
+  photoKeys         String[]
+  rescheduleReason  String?
+  reportPdfKey      String?
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@unique([organizationId, number])
+  @@index([organizationId, assignedToId, scheduledAt])
 }
 
 model Measurement {
@@ -679,6 +882,8 @@ model Measurement {
   organizationId String
   projectId      String
   number         String
+  siteVisitId    String?
+  revision       Int               @default(0)
   visitedAt      DateTime
   measuredById   String
   status         MeasurementStatus @default(DRAFT)
@@ -687,8 +892,8 @@ model Measurement {
   supersedesId   String?
   notes          String?
 
-  project        Project           @relation(fields: [projectId], references: [id])
-  items          MeasurementItem[]
+  project Project           @relation(fields: [projectId], references: [id])
+  items   MeasurementItem[]
 
   @@unique([organizationId, number])
   @@index([projectId, status])
@@ -710,17 +915,19 @@ model MeasurementItem {
   family             ProductFamily
   headingType        HeadingType?
   fullness           Decimal?      @db.Decimal(4, 2)
+  layPattern         LayPattern?
   mountType          MountType?
   trackTypeNote      String?
   requiresPowerPoint Boolean       @default(false)
   floorLevelDiffMm   Decimal?      @db.Decimal(10, 2)
   photoKeys          String[]
+  sketchKey          String?
   notes              String?
 
-  measurement        Measurement      @relation(fields: [measurementId], references: [id])
-  room               Room             @relation(fields: [roomId], references: [id])
-  calc               CalcResult?
-  quotationLines     QuotationLine[]
+  measurement Measurement      @relation(fields: [measurementId], references: [id])
+  room        Room             @relation(fields: [roomId], references: [id])
+  calc        CalcResult?
+  quotationLines QuotationLine[]
 
   @@index([measurementId, roomId])
 }
@@ -744,13 +951,14 @@ model CalcResult {
   fabricRun         FabricRun?
   seamCount         Int?
   liningQty         Decimal?   @db.Decimal(12, 3)
+  adhesiveQty       Decimal?   @db.Decimal(12, 3)
   warnings          String[]
   computedAt        DateTime   @default(now())
 
-  item              MeasurementItem @relation(fields: [measurementItemId], references: [id])
+  item MeasurementItem @relation(fields: [measurementItemId], references: [id])
 }
 
-// ─── QUOTATION ───────────────────────────────────────────────────────────────
+// ─── QUOTATION ────────────────────────────────────────────────────────────────
 
 model Quotation {
   id             String          @id @default(cuid())
@@ -773,10 +981,16 @@ model Quotation {
   discountPct    Decimal         @db.Decimal(5, 2) @default(0)
   termsText      String?
   ownerId        String
+  submittedById  String?
+  submittedAt    DateTime?
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectionReason String?
   sentAt         DateTime?
+  pdfKey         String?
 
-  project        Project         @relation(fields: [projectId], references: [id])
-  lines          QuotationLine[]
+  project Project         @relation(fields: [projectId], references: [id])
+  lines   QuotationLine[]
 
   @@unique([organizationId, number, revision])
   @@index([organizationId, projectId, status])
@@ -805,13 +1019,13 @@ model QuotationLine {
   isOptional        Boolean  @default(false)
   calcSnapshot      Json?
 
-  quotation         Quotation        @relation(fields: [quotationId], references: [id])
-  item              MeasurementItem? @relation(fields: [measurementItemId], references: [id])
+  quotation Quotation        @relation(fields: [quotationId], references: [id])
+  item      MeasurementItem? @relation(fields: [measurementItemId], references: [id])
 
   @@index([quotationId])
 }
 
-// ─── ORDER ───────────────────────────────────────────────────────────────────
+// ─── ORDER ────────────────────────────────────────────────────────────────────
 
 model Order {
   id                String      @id @default(cuid())
@@ -828,8 +1042,8 @@ model Order {
   advanceReceived   BigInt      @default(0)
   promisedInstallAt DateTime?
 
-  project           Project     @relation(fields: [projectId], references: [id])
-  lines             OrderLine[]
+  project Project     @relation(fields: [projectId], references: [id])
+  lines   OrderLine[]
 
   @@unique([organizationId, number])
   @@index([organizationId, status])
@@ -852,7 +1066,9 @@ model OrderLine {
   madeQty           Decimal  @db.Decimal(12, 3) @default(0)
   installedQty      Decimal  @db.Decimal(12, 3) @default(0)
 
-  order             Order    @relation(fields: [orderId], references: [id])
+  order     Order        @relation(fields: [orderId], references: [id])
+  colourway Colourway?   @relation("OrderLineColourway", fields: [colourwayId], references: [id])
+  allocations Allocation[]
 
   @@index([orderId])
 }
@@ -872,8 +1088,40 @@ model Vendor {
   leadTimeDays     Int      @default(14)
   brandIds         String[]
   rating           Int?
+  isActive         Boolean  @default(true)
 
   @@unique([organizationId, code])
+}
+
+model PurchaseRequest {
+  id               String        @id @default(cuid())
+  organizationId   String
+  number           String
+  projectId        String?
+  raisedById       String
+  reason           String
+  neededBy         DateTime?
+  status           RequestStatus @default(DRAFT)
+  approvedById     String?
+  approvedAt       DateTime?
+  rejectionReason  String?
+
+  lines PurchaseRequestLine[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+}
+
+model PurchaseRequestLine {
+  id             String   @id @default(cuid())
+  organizationId String
+  requestId      String
+  colourwayId    String?
+  freeTextItem   String?
+  quantity       Decimal  @db.Decimal(12, 3)
+  unit           SellUnit
+
+  request PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 }
 
 model PurchaseOrder {
@@ -882,13 +1130,17 @@ model PurchaseOrder {
   number         String
   vendorId       String
   projectId      String?
+  requestId      String?
   date           DateTime
   expectedAt     DateTime?
   status         POStatus  @default(DRAFT)
   totalValue     BigInt
+  approvedById   String?
+  approvedAt     DateTime?
+  pdfKey         String?
 
-  lines          POLine[]
-  grns           GRN[]
+  lines POLine[]
+  grns  GRN[]
 
   @@unique([organizationId, number])
 }
@@ -903,7 +1155,7 @@ model POLine {
   rate            BigInt
   receivedQty     Decimal       @db.Decimal(12, 3) @default(0)
 
-  po              PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  po PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
 }
 
 model GRN {
@@ -914,9 +1166,10 @@ model GRN {
   vendorId        String
   receivedAt      DateTime
   invoiceRef      String?
+  receivedById    String?
 
-  lines           GRNLine[]
-  po              PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  lines GRNLine[]
+  po    PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
 
   @@unique([organizationId, number])
 }
@@ -934,7 +1187,7 @@ model GRNLine {
   rollLengthsM   Json?
   binLocation    String?
 
-  grn            GRN      @relation(fields: [grnId], references: [id])
+  grn GRN @relation(fields: [grnId], references: [id])
 
   @@index([organizationId, colourwayId, dyeLot])
 }
@@ -950,7 +1203,7 @@ model StockBalance {
   binLocation    String?
   updatedAt      DateTime  @updatedAt
 
-  colourway      Colourway @relation(fields: [colourwayId], references: [id])
+  colourway Colourway @relation(fields: [colourwayId], references: [id])
 
   @@unique([colourwayId, dyeLot])
 }
@@ -986,10 +1239,12 @@ model Allocation {
   overrideById     String?
   createdAt        DateTime @default(now())
 
+  orderLine OrderLine @relation(fields: [orderLineId], references: [id])
+
   @@index([organizationId, orderLineId])
 }
 
-// ─── MAKE ────────────────────────────────────────────────────────────────────
+// ─── MAKE ─────────────────────────────────────────────────────────────────────
 
 model MakeJob {
   id             String        @id @default(cuid())
@@ -1004,7 +1259,7 @@ model MakeJob {
   startedAt      DateTime?
   completedAt    DateTime?
 
-  lines          MakeJobLine[]
+  lines MakeJobLine[]
 
   @@unique([organizationId, number])
   @@index([organizationId, status])
@@ -1029,12 +1284,12 @@ model MakeJobLine {
   qcPassed          Boolean      @default(false)
   qcNotes           String?
 
-  job               MakeJob      @relation(fields: [makeJobId], references: [id])
+  job MakeJob @relation(fields: [makeJobId], references: [id])
 
   @@index([makeJobId])
 }
 
-// ─── INSTALLATION ────────────────────────────────────────────────────────────
+// ─── INSTALLATION ─────────────────────────────────────────────────────────────
 
 model InstallCrew {
   id                String        @id @default(cuid())
@@ -1047,23 +1302,26 @@ model InstallCrew {
 }
 
 model InstallVisit {
-  id                 String        @id @default(cuid())
-  organizationId     String
-  number             String
-  projectId          String
-  orderId            String
-  crewId             String?
-  scheduledAt        DateTime
-  status             InstallStatus @default(SCHEDULED)
-  startedAt          DateTime?
-  completedAt        DateTime?
-  rescheduleReason   String?
-  clientSignatureKey String?
-  photoKeys          String[]
-  notes              String?
+  id                   String        @id @default(cuid())
+  organizationId       String
+  number               String
+  projectId            String
+  orderId              String
+  crewId               String?
+  assignedToId         String?
+  scheduledAt          DateTime
+  status               InstallStatus @default(SCHEDULED)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  checklist            Json?
+  clientSignatureKey   String?
+  clientFeedbackRating Int?
+  photoKeys            String[]
+  rescheduleReason     String?
+  notes                String?
 
-  project            Project       @relation(fields: [projectId], references: [id])
-  lines              InstallLine[]
+  project Project       @relation(fields: [projectId], references: [id])
+  lines   InstallLine[]
 
   @@unique([organizationId, number])
   @@index([organizationId, scheduledAt, status])
@@ -1082,7 +1340,7 @@ model InstallLine {
   photoKeys      String[]
   issue          String?
 
-  visit          InstallVisit @relation(fields: [installVisitId], references: [id])
+  visit InstallVisit @relation(fields: [installVisitId], references: [id])
 
   @@index([installVisitId])
 }
@@ -1101,7 +1359,7 @@ model Snag {
   resolvedAt     DateTime?
   resolutionNote String?
 
-  project        Project    @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 
   @@index([organizationId, status])
 }
@@ -1139,7 +1397,7 @@ model Invoice {
   cancelledAt       DateTime?
   cancelReason      String?
 
-  lines             InvoiceLine[]
+  lines InvoiceLine[]
 
   @@unique([organizationId, branchId, number])
   @@index([organizationId, clientId, status])
@@ -1163,7 +1421,7 @@ model InvoiceLine {
   igst           BigInt
   amount         BigInt
 
-  invoice        Invoice  @relation(fields: [invoiceId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
 
   @@index([invoiceId])
 }
@@ -1182,6 +1440,7 @@ model Advance {
   @@index([organizationId, projectId])
 }
 
+// Kept for W20-gate backward compat — Payment model is additive alongside this
 model Receipt {
   id             String        @id @default(cuid())
   organizationId String
@@ -1196,19 +1455,55 @@ model Receipt {
   amount         BigInt
   unallocated    BigInt        @default(0)
 
-  allocations    ReceiptAllocation[]
+  allocations ReceiptAllocation[]
 
   @@unique([organizationId, number])
 }
 
 model ReceiptAllocation {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   receiptId      String
   invoiceId      String
   amount         BigInt
 
-  receipt        Receipt  @relation(fields: [receiptId], references: [id])
+  receipt Receipt @relation(fields: [receiptId], references: [id])
+
+  @@index([invoiceId])
+}
+
+// Unified payment model (replaces Receipt/ReceiptAllocation in a future cutover)
+model Payment {
+  id             String       @id @default(cuid())
+  organizationId String
+  number         String
+  direction      PayDirection
+  clientId       String?
+  vendorId       String?
+  projectId      String?
+  date           DateTime
+  mode           PaymentMode
+  reference      String?
+  chequeStatus   ChequeStatus?
+  chequeDate     DateTime?
+  amount         BigInt
+  unallocated    BigInt       @default(0)
+
+  allocations PaymentAllocation[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, direction, date])
+}
+
+model PaymentAllocation {
+  id              String  @id @default(cuid())
+  organizationId  String
+  paymentId       String
+  invoiceId       String?
+  purchaseOrderId String?
+  amount          BigInt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
 }
@@ -1222,10 +1517,11 @@ model ProjectExpense {
   amount         BigInt
   billKey        String?
   incurredAt     DateTime
+  raisedById     String?
   approvalState  ApprovalState @default(PENDING)
   approvedById   String?
 
-  project        Project       @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 
   @@index([organizationId, projectId])
 }
@@ -1257,7 +1553,12 @@ model Attendance {
   outAt          DateTime?
   inLat          Decimal?         @db.Decimal(10, 7)
   inLng          Decimal?         @db.Decimal(10, 7)
+  outLat         Decimal?         @db.Decimal(10, 7)
+  outLng         Decimal?         @db.Decimal(10, 7)
   selfieKey      String?
+  workedMinutes  Int?
+  otMinutes      Int              @default(0)
+  lateMinutes    Int              @default(0)
   projectId      String?
   otHours        Decimal?         @db.Decimal(5, 2)
   lockedAt       DateTime?
@@ -1266,17 +1567,40 @@ model Attendance {
   @@index([organizationId, date])
 }
 
+model Holiday {
+  id             String   @id @default(cuid())
+  organizationId String
+  date           DateTime @db.Date
+  name           String
+
+  @@unique([organizationId, date])
+}
+
 model Leave {
-  id             String        @id @default(cuid())
+  id              String        @id @default(cuid())
+  organizationId  String
+  employeeId      String
+  type            String
+  fromDate        DateTime      @db.Date
+  toDate          DateTime      @db.Date
+  days            Decimal       @db.Decimal(4, 1)
+  reason          String?
+  state           ApprovalState @default(PENDING)
+  approvedById    String?
+  decidedAt       DateTime?
+  rejectionReason String?
+}
+
+model LeaveBalance {
+  id             String    @id @default(cuid())
   organizationId String
   employeeId     String
-  type           String
-  fromDate       DateTime      @db.Date
-  toDate         DateTime      @db.Date
-  days           Decimal       @db.Decimal(4, 1)
-  reason         String?
-  state          ApprovalState @default(PENDING)
-  approvedById   String?
+  year           Int
+  type           LeaveType
+  entitled       Decimal   @db.Decimal(4, 1)
+  used           Decimal   @db.Decimal(4, 1) @default(0)
+
+  @@unique([employeeId, year, type])
 }
 
 model StatutorySlab {
@@ -1302,8 +1626,9 @@ model PayrollRun {
   status         PayrollStatus @default(DRAFT)
   approvedById   String?
   approvedAt     DateTime?
+  paidAt         DateTime?
 
-  payslips       Payslip[]
+  payslips Payslip[]
 
   @@unique([organizationId, month, year])
 }
@@ -1318,30 +1643,194 @@ model Payslip {
   otHours        Decimal    @db.Decimal(6, 2) @default(0)
   earnings       Json
   deductions     Json
+  reimbursements BigInt     @default(0)
   netPay         BigInt
   pdfKey         String?
 
-  run            PayrollRun @relation(fields: [payrollRunId], references: [id])
+  run PayrollRun @relation(fields: [payrollRunId], references: [id])
 
   @@unique([payrollRunId, employeeId])
+}
+
+// ─── COLLABORATION ───────────────────────────────────────────────────────────
+
+model Task {
+  id             String       @id @default(cuid())
+  organizationId String
+  number         String
+  title          String
+  description    String?
+  projectId      String?
+  refType        String?
+  refId          String?
+  assignedToId   String
+  createdById    String
+  dueAt          DateTime?
+  priority       TaskPriority @default(NORMAL)
+  status         TaskStatus   @default(TODO)
+  completedAt    DateTime?
+
+  comments TaskComment[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, assignedToId, status])
+}
+
+model TaskComment {
+  id             String   @id @default(cuid())
+  organizationId String
+  taskId         String
+  authorId       String
+  body           String
+  fileKeys       String[]
+  createdAt      DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model ChatChannel {
+  id             String      @id @default(cuid())
+  organizationId String
+  kind           ChannelKind
+  name           String?
+  projectId      String?
+  departmentId   String?
+  createdById    String
+  createdAt      DateTime    @default(now())
+
+  members  ChatMember[]
+  messages ChatMessage[]
+
+  @@index([organizationId, kind])
+}
+
+model ChatMember {
+  id             String    @id @default(cuid())
+  organizationId String
+  channelId      String
+  userId         String
+  lastReadAt     DateTime?
+  isMuted        Boolean   @default(false)
+
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+model ChatMessage {
+  id             String    @id @default(cuid())
+  organizationId String
+  channelId      String
+  authorId       String
+  body           String?
+  fileKeys       String[]
+  replyToId      String?
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
+}
+
+model CalendarEvent {
+  id               String    @id @default(cuid())
+  organizationId   String
+  kind             EventKind
+  title            String
+  refType          String?
+  refId            String?
+  startAt          DateTime
+  endAt            DateTime?
+  allDay           Boolean   @default(false)
+  attendeeUserIds  String[]
+  location         String?
+
+  @@index([organizationId, startAt])
+}
+
+// Unified document model — ownerType: PROJECT LEAD CLIENT MEASUREMENT QUOTATION INSTALL EMPLOYEE
+model Document {
+  id             String   @id @default(cuid())
+  organizationId String
+  ownerType      String
+  ownerId        String
+  projectId      String?
+  leadId         String?
+  category       String
+  fileKey        String
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  uploadedById   String
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, ownerType, ownerId])
+}
+
+model Notification {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String
+  title          String
+  body           String
+  refType        String?
+  refId          String?
+  channels       NotifyChannel[]
+  readAt         DateTime?
+  createdAt      DateTime       @default(now())
+
+  @@index([organizationId, userId, readAt])
+}
+
+// Unified comms log — covers both WhatsApp and Email, IN and OUT
+model CommunicationLog {
+  id               String         @id @default(cuid())
+  organizationId   String
+  idempotencyKey   String         @unique
+  channel          NotifyChannel
+  templateId       String?
+  category         MsgCategory?
+  toMobile         String?
+  toEmail          String?
+  clientId         String?
+  leadId           String?
+  projectId        String?
+  direction        String         @default("OUT")
+  body             String?
+  status           MsgStatus      @default(QUEUED)
+  providerMessageId String?
+  costPaise        BigInt         @default(0)
+  error            String?
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, clientId])
 }
 
 // ─── AUTOMATION & PLATFORM ───────────────────────────────────────────────────
 
 model MessageTemplate {
-  id               String      @id @default(cuid())
+  id               String        @id @default(cuid())
   organizationId   String
+  channel          NotifyChannel @default(WHATSAPP)
   name             String
-  metaTemplateName String
-  category         MsgCategory
-  language         String
+  metaTemplateName String?
+  category         MsgCategory   @default(UTILITY)
+  language         String        @default("en")
+  subject          String?
   bodyText         String
   variables        String[]
-  metaStatus       String      @default("DRAFT")
+  metaStatus       String        @default("DRAFT")
 
-  @@unique([organizationId, metaTemplateName, language])
+  @@unique([organizationId, name, language])
 }
 
+// Kept for backward compat alongside CommunicationLog
 model AutomationLog {
   id             String      @id @default(cuid())
   organizationId String
@@ -1403,6 +1892,7 @@ model FollowUp {
   @@index([organizationId, ownerId, dueAt])
 }
 
+// Kept alongside Document model for backward compat
 model ProjectDocument {
   id             String   @id @default(cuid())
   organizationId String
@@ -1413,7 +1903,7 @@ model ProjectDocument {
   uploadedById   String
   createdAt      DateTime @default(now())
 
-  project        Project  @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 }
 
 // ─── PLATFORM ────────────────────────────────────────────────────────────────
@@ -1438,9 +1928,11 @@ model AuditLog {
   before         Json?
   after          Json?
   ip             String?
+  userAgent      String?
   createdAt      DateTime @default(now())
 
   @@index([organizationId, entityType, entityId])
+  @@index([organizationId, actorId, createdAt])
 }
 
 model SavedView {
@@ -1448,6 +1940,7 @@ model SavedView {
   organizationId String
   userId         String?
   role           AppRole?
+  roleId         String?
   tableKey       String
   name           String
   config         Json

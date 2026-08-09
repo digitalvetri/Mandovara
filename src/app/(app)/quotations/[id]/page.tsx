@@ -3,6 +3,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
+import { can } from "@/kernel/rbac/guard";
 import { getQuotation } from "@/modules/quotations/queries";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
@@ -16,6 +17,7 @@ export default async function QuotationDetailPage({
   const ctx = await devContext();
   const q = await getQuotation(ctx, id);
   if (!q) notFound();
+  const canApprove = can(ctx, "quotation.approve");
 
   // igst > 0 means inter-state; otherwise intra-state (CGST+SGST)
   const isIntraState = q.igst === 0n;
@@ -37,7 +39,7 @@ export default async function QuotationDetailPage({
                 <span className="text-[11px] text-text-dim tabular">R{q.revision}</span>
               )}
             </div>
-            <StatusChanger id={q.id} current={q.status} />
+            <StatusChanger id={q.id} current={q.status} canApprove={canApprove} />
           </div>
 
           <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">

@@ -25,6 +25,7 @@ export const TENANT_SCOPED = new Set<string>([
   "Quotation", "Order",
   // procurement & stock
   "Vendor", "PurchaseOrder", "GRN", "StockBalance", "StockMove", "Allocation",
+  "PurchaseRequest", "PurchaseRequestLine",
   // make
   "MakeJob", "InstallCrew",
   // install

@@ -1,12 +1,6 @@
-// @ts-nocheck — remote module, schema reconciliation pending
 // Core dye-lot allocation primitive — the concurrency-critical bit.
-// Kept as a pure kernel function taking (tx, params) so the Phase-4 gate
-// test can drive it against a real Postgres without going through the
-// server-action's ctx / audit / revalidate machinery.
-//
-// The action layer (./actions.ts) wraps this with permission checks,
-// audit-log writes, and cache invalidation. It never touches the
-// SELECT FOR UPDATE dance — that lives here, once.
+// Uses StockBalance (not Batch) and Allocation (not LotAllocation).
+// SELECT ... FOR UPDATE on StockBalance ensures no over-allocation under concurrency.
 
 import { Prisma } from "@/kernel/numbering/series";
 import type { TxClient } from "@/kernel/db/transaction";
@@ -21,9 +15,9 @@ export class AllocationError extends Error {
 }
 
 export interface AllocateParams {
-  orgId:            string;
+  organizationId:   string;
   orderLineId:      string;
-  batchId:          string;
+  stockBalanceId:   string;   // StockBalance.id — was batchId
   quantity:         number | string | Prisma.Decimal;
   mixedLotOverride: boolean;
   overrideReason:   string | null;
@@ -32,31 +26,11 @@ export interface AllocateParams {
 }
 
 export interface AllocationResult {
-  id: string;
+  id:           string;
   wouldBeMixed: boolean;
-  dyeLot: string;
+  dyeLot:       string | null;
 }
 
-/**
- * The single, race-safe path for reserving material from a dye-lot to
- * an order line. Called from allocateLots (server action) and directly
- * from the concurrency test.
- *
- * Contract:
- *   - Locks the target Batch row with SELECT ... FOR UPDATE — concurrent
- *     callers serialise on this row.
- *   - Fails with AllocationError("Only N available …") when the requested
- *     quantity would over-allocate. Prisma retries are safe because the
- *     row is re-read under lock every attempt.
- *   - Fails with AllocationError("Order line already has a different …")
- *     unless mixedLotOverride=true, actorCanOverride=true, and a ≥4-char
- *     overrideReason is provided (§0.6).
- *   - Bumps OrderLine.reservedQty by the allocated quantity in the same tx.
- *
- * The caller MUST run this inside withTransaction(). The primitives used
- * (raw SELECT FOR UPDATE, Prisma create/update) all participate in the
- * caller's tx via the shared TxClient.
- */
 export async function allocateInTx(
   tx: TxClient,
   p: AllocateParams,
@@ -66,54 +40,47 @@ export async function allocateInTx(
     throw new AllocationError("Quantity must be > 0", "quantity");
   }
 
-  // (1) SELECT FOR UPDATE the target Batch row. Peer transactions
-  // wait behind us until commit/rollback — no lost updates possible.
+  // (1) SELECT FOR UPDATE the StockBalance row — concurrent callers serialise.
   const [locked] = await tx.$queryRaw<
-    { id: string; quantity: string; batchNumber: string; productId: string }[]
+    { id: string; quantity: string; reserved: string; dye_lot: string | null; colourway_id: string }[]
   >(Prisma.sql`
-    SELECT id, quantity::text AS quantity, "batchNumber", "productId"
-    FROM "Batch"
-    WHERE id = ${p.batchId}
+    SELECT id, quantity::text AS quantity, reserved::text AS reserved,
+           "dyeLot" AS dye_lot, "colourwayId" AS colourway_id
+    FROM "StockBalance"
+    WHERE id = ${p.stockBalanceId}
     FOR UPDATE
   `);
-  if (!locked) throw new AllocationError("Batch not found", "batchId");
+  if (!locked) throw new AllocationError("Stock lot not found", "batchId");
 
-  // (2) Verify the order-line product matches the batch product.
+  // (2) Verify the order-line colourway matches the stock balance colourway.
   const line = await tx.orderLine.findUnique({
     where:  { id: p.orderLineId },
-    select: { id: true, productId: true },
+    select: { id: true, colourwayId: true },
   });
   if (!line) throw new AllocationError("Order line not found", "orderLineId");
-  if (line.productId !== locked.productId) {
+  if (line.colourwayId !== locked.colourway_id) {
     throw new AllocationError(
-      "Batch product does not match order-line product",
+      "Lot colourway does not match order-line colourway",
       "batchId",
     );
   }
 
-  // (3) Available = on-hand − Σ(open allocations).
-  const openAllocs = await tx.lotAllocation.findMany({
-    where:  { batchId: p.batchId, releasedAt: null },
-    select: { quantity: true },
-  });
-  const allocated = openAllocs.reduce(
-    (s, a) => s.plus(a.quantity),
-    new Prisma.Decimal(0),
-  );
-  const available = new Prisma.Decimal(locked.quantity).minus(allocated);
+  // (3) Available = on-hand − reserved (StockBalance.reserved tracks active allocations).
+  const available = new Prisma.Decimal(locked.quantity).minus(locked.reserved);
   if (available.lt(requested)) {
+    const lotLabel = locked.dye_lot ?? "(no lot)";
     throw new AllocationError(
-      `Only ${available.toString()} available on lot ${locked.batchNumber} — requested ${requested.toString()}`,
+      `Only ${available.toString()} available on lot ${lotLabel} — requested ${requested.toString()}`,
       "quantity",
     );
   }
 
-  // (4) Mixed-lot gate.
-  const existingOnLine = await tx.lotAllocation.findMany({
-    where:  { orderLineId: p.orderLineId, releasedAt: null },
-    select: { batchId: true },
+  // (4) Mixed-lot gate — check existing allocations for this line.
+  const existingOnLine = await tx.allocation.findMany({
+    where:  { orderLineId: p.orderLineId },
+    select: { dyeLot: true },
   });
-  const wouldBeMixed = existingOnLine.some((a) => a.batchId !== p.batchId);
+  const wouldBeMixed = existingOnLine.some((a) => a.dyeLot !== locked.dye_lot);
   if (wouldBeMixed) {
     if (!p.mixedLotOverride) {
       throw new AllocationError(
@@ -136,26 +103,27 @@ export async function allocateInTx(
     }
   }
 
-  // (5) Persist. Insert allocation + ratchet reservedQty.
-  const alloc = await tx.lotAllocation.create({
+  // (5) Persist — create Allocation + increment StockBalance.reserved.
+  const alloc = await tx.allocation.create({
     data: {
-      orgId:            p.orgId,
+      organizationId:   p.organizationId,
       orderLineId:      p.orderLineId,
-      batchId:          p.batchId,
+      colourwayId:      locked.colourway_id,
+      dyeLot:           locked.dye_lot,
       quantity:         requested,
       mixedLotOverride: wouldBeMixed,
       ...(wouldBeMixed && p.overrideReason && {
         overrideReason: p.overrideReason.trim(),
         overrideById:   p.actorId,
       }),
-      createdById: p.actorId,
     },
     select: { id: true },
   });
-  await tx.orderLine.update({
-    where: { id: p.orderLineId },
-    data:  { reservedQty: { increment: requested } },
+
+  await tx.stockBalance.update({
+    where: { id: p.stockBalanceId },
+    data:  { reserved: { increment: requested } },
   });
 
-  return { id: alloc.id, wouldBeMixed, dyeLot: locked.batchNumber };
+  return { id: alloc.id, wouldBeMixed, dyeLot: locked.dye_lot };
 }

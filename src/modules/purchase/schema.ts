@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-// Matches frozen schema POStatus enum: DRAFT SENT PARTIAL RECEIVED CANCELLED
-export const PO_STATUSES = ["DRAFT", "SENT", "PARTIAL", "RECEIVED", "CANCELLED"] as const;
+// Matches frozen schema POStatus enum: DRAFT PENDING_APPROVAL APPROVED SENT PARTIAL RECEIVED CANCELLED
+export const PO_STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "PARTIAL", "RECEIVED", "CANCELLED"] as const;
 export type POStatus = (typeof PO_STATUSES)[number];
 
 // SellUnit enum values (subset used in POs)
@@ -30,7 +30,12 @@ export const createPOSchema = z.object({
 
 export const setPOStatusSchema = z.object({
   id:     z.string().cuid(),
-  status: z.enum(["SENT", "CANCELLED"]),  // DRAFT→SENT (approve); any→CANCELLED
+  status: z.enum(["PENDING_APPROVAL", "APPROVED", "SENT", "CANCELLED"]),
+});
+
+export const rejectPOSchema = z.object({
+  id:     z.string().cuid(),
+  reason: z.string().trim().min(1).max(500).optional(),
 });
 
 // ── GRN posting ───────────────────────────────────────────────────────────────

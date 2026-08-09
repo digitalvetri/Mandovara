@@ -1,4 +1,3 @@
-// @ts-nocheck — remote module, schema reconciliation pending
 // Reports — aggregation queries.
 // All go through db.scoped(ctx). Return shapes are plain objects so the
 // pages can render without additional client-side transforms.
@@ -19,14 +18,14 @@ export async function leadsBySource(ctx: RequestContext): Promise<LeadsBySourceR
   requirePermission(ctx, "report.view.sales");
   const db = scoped(ctx);
   const rows = await db.lead.groupBy({
-    by: ["source", "status"],
+    by: ["source", "stage"],
     _count: { _all: true },
   });
   const map = new Map<string, { total: number; won: number }>();
   for (const r of rows) {
     const s = map.get(r.source) ?? { total: 0, won: 0 };
     s.total += r._count._all;
-    if (r.status === "WON") s.won += r._count._all;
+    if (r.stage === "WON") s.won += r._count._all;
     map.set(r.source, s);
   }
   return [...map.entries()]
@@ -58,7 +57,7 @@ export async function invoiceAgeing(ctx: RequestContext): Promise<AgeingBucket[]
   requirePermission(ctx, "report.view.accounts");
   const db = scoped(ctx);
   const rows = await db.invoice.findMany({
-    where:  { status: { in: ["ISSUED", "PARTIALLY_PAID", "OVERDUE"] } },
+    where:  { status: { in: ["ISSUED", "PARTIALLY_PAID"] } },
     select: { total: true, dueDate: true },
     take:   5000,   // hard cap so a runaway page can't OOM
   });
@@ -133,14 +132,14 @@ export async function projectMarginTop(
   requirePermission(ctx, "report.view.projects");
   const db = scoped(ctx);
   const projects = await db.project.findMany({
-    where: { status: { not: "CANCELLED" } },
+    where: { stage: { not: "CANCELLED" } },
     orderBy: { orderValue: "desc" },
     take: limit,
     select: {
       id: true, number: true, name: true, orderValue: true,
       client:   { select: { name: true } },
       expenses: {
-        where: { status: { in: ["APPROVED", "PAID"] } },
+        where: { approvalState: "APPROVED" },
         select: { amount: true },
       },
     },

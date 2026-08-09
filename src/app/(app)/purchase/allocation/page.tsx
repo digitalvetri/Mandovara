@@ -39,7 +39,7 @@ export default async function AllocationConsolePage({
     : null;
   const [lots, allocations] = active
     ? await Promise.all([
-        listAvailableLotsForProduct(ctx, active.productId),
+        listAvailableLotsForProduct(ctx, active.colourwayId),
         listAllocationsForOrderLine(ctx, active.id),
       ])
     : [[], []];
