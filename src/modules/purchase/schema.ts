@@ -32,6 +32,12 @@ export const setPOStatusSchema = z.object({
 export const grnLineInput = z.object({
   poLineId:    z.string().cuid(),
   quantity:    z.number().positive("Quantity must be > 0"),
+  // Dye-lot on receipt (§0.6). Optional at the schema level; the action
+  // enforces "required for roll-goods products" based on product.trackBatch.
+  dyeLot:       z.string().trim().min(1).max(60).optional(),
+  rollCount:    z.number().int().nonnegative().optional(),
+  rollLengthsM: z.array(z.number().positive()).optional(),
+  binLocation:  z.string().trim().max(60).optional().or(z.literal("")),
 });
 
 export const postGRNSchema = z.object({

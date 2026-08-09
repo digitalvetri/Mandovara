@@ -4,7 +4,7 @@
 // per pending line + warehouse. Server posts to the stock ledger, ratchets
 // receivedQty, and updates PO status.
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { postGRN } from "@/modules/purchase/actions";
 import type { POLineRow } from "@/modules/purchase/queries";
@@ -25,25 +25,47 @@ export function GRNForm({ purchaseOrderId, warehouses, lines }: Props) {
   const [vehicleNumber, setVehicleNumber] = useState<string>("");
   const [invoiceRef, setInvoiceRef] = useState<string>("");
   const [qtyByLine, setQtyByLine] = useState<Record<string, string>>({});
+  // Per-line dye-lot capture. §0.6: batch-tracked products require a dye-lot.
+  const [dyeLotByLine, setDyeLotByLine] = useState<Record<string, string>>({});
+  const [rollCountByLine, setRollCountByLine] = useState<Record<string, string>>({});
+  const [binByLine, setBinByLine] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const pendingLines = lines.filter((l) => parseFloat(l.pendingQty) > 0);
   if (pendingLines.length === 0) return null;
 
   function commit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setError(null); setFieldErrors({});
     const linesPayload = pendingLines
-      .map((l) => ({ poLineId: l.id, quantity: Number(qtyByLine[l.id] ?? 0) }))
-      .filter((l) => l.quantity > 0);
+      .map((l) => {
+        const quantity = Number(qtyByLine[l.id] ?? 0);
+        if (quantity <= 0) return null;
+        const dyeLot = (dyeLotByLine[l.id] ?? "").trim();
+        const rollCountRaw = (rollCountByLine[l.id] ?? "").trim();
+        const rollCount = rollCountRaw !== "" ? Number(rollCountRaw) : undefined;
+        const binLocation = (binByLine[l.id] ?? "").trim();
+        return {
+          poLineId: l.id, quantity,
+          ...(dyeLot !== "" && { dyeLot }),
+          ...(rollCount != null && Number.isFinite(rollCount) && { rollCount }),
+          ...(binLocation !== "" && { binLocation }),
+        };
+      })
+      .filter((l): l is NonNullable<typeof l> => l !== null);
     if (linesPayload.length === 0) { setError("Enter a quantity on at least one line."); return; }
     startTransition(async () => {
       const res = await postGRN({
         purchaseOrderId, warehouseId, receivedAt,
         vehicleNumber, invoiceRef, lines: linesPayload,
       });
-      if (!res.ok) { setError(res.error ?? "Could not post GRN"); return; }
+      if (!res.ok) {
+        setError(res.error ?? "Could not post GRN");
+        setFieldErrors(res.fieldErrors ?? {});
+        return;
+      }
       setOpen(false);
-      setQtyByLine({});
+      setQtyByLine({}); setDyeLotByLine({}); setRollCountByLine({}); setBinByLine({});
       setVehicleNumber(""); setInvoiceRef("");
       router.refresh();
     });
@@ -99,23 +121,63 @@ export function GRNForm({ purchaseOrderId, warehouses, lines }: Props) {
             </tr>
           </thead>
           <tbody>
-            {pendingLines.map((l) => (
-              <tr key={l.id} className="border-b border-rule/60 last:border-0">
-                <Td>
-                  <div className="tabular text-text-dim text-[11.5px]">{l.productCode}</div>
-                  <div className="text-text">{l.description}</div>
-                </Td>
-                <Td align="right"><span className="tabular text-text-dim">{l.orderedQty} <span className="text-text-faint">{l.uom}</span></span></Td>
-                <Td align="right"><span className="tabular text-text-dim">{l.receivedQty}</span></Td>
-                <Td align="right"><span className="tabular text-text">{l.pendingQty}</span></Td>
-                <Td align="right">
-                  <input inputMode="decimal" value={qtyByLine[l.id] ?? ""}
-                         onChange={(e) => setQtyByLine((q) => ({ ...q, [l.id]: e.target.value }))}
-                         placeholder="0"
-                         className={`${cellCls} tabular text-right`} />
-                </Td>
-              </tr>
-            ))}
+            {pendingLines.map((l) => {
+              const dyeLotErr = fieldErrors[`lines.${l.id}.dyeLot`];
+              return (
+                <Fragment key={l.id}>
+                  <tr className={`border-b ${l.trackBatch ? "border-transparent" : "border-rule/60"} last:border-0`}>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <div className="tabular text-text-dim text-[11.5px]">{l.productCode}</div>
+                          <div className="text-text">{l.description}</div>
+                        </div>
+                        {l.trackBatch && (
+                          <span className="tabular text-[10.5px] px-1.5 h-[18px] inline-flex items-center rounded bg-accent-tint text-accent">
+                            dye-lot
+                          </span>
+                        )}
+                      </div>
+                    </Td>
+                    <Td align="right"><span className="tabular text-text-dim">{l.orderedQty} <span className="text-text-faint">{l.uom}</span></span></Td>
+                    <Td align="right"><span className="tabular text-text-dim">{l.receivedQty}</span></Td>
+                    <Td align="right"><span className="tabular text-text">{l.pendingQty}</span></Td>
+                    <Td align="right">
+                      <input inputMode="decimal" value={qtyByLine[l.id] ?? ""}
+                             onChange={(e) => setQtyByLine((q) => ({ ...q, [l.id]: e.target.value }))}
+                             placeholder="0"
+                             className={`${cellCls} tabular text-right`} />
+                    </Td>
+                  </tr>
+                  {l.trackBatch && (
+                    <tr className="border-b border-rule/60 last:border-0 bg-surface-2/40">
+                      <td colSpan={5} className="px-3 pb-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
+                          <LotField label="Dye-lot code" required error={dyeLotErr}>
+                            <input value={dyeLotByLine[l.id] ?? ""}
+                                   onChange={(e) => setDyeLotByLine((v) => ({ ...v, [l.id]: e.target.value }))}
+                                   placeholder="e.g. LOT-2624-A"
+                                   className={`${cellCls} tabular uppercase`} />
+                          </LotField>
+                          <LotField label="Roll count">
+                            <input inputMode="numeric" value={rollCountByLine[l.id] ?? ""}
+                                   onChange={(e) => setRollCountByLine((v) => ({ ...v, [l.id]: e.target.value }))}
+                                   placeholder="3"
+                                   className={`${cellCls} tabular text-right`} />
+                          </LotField>
+                          <LotField label="Bin location">
+                            <input value={binByLine[l.id] ?? ""}
+                                   onChange={(e) => setBinByLine((v) => ({ ...v, [l.id]: e.target.value }))}
+                                   placeholder="e.g. R2-B4"
+                                   className={`${cellCls} tabular uppercase`} />
+                          </LotField>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -162,4 +224,17 @@ function Th({ children, align = "left", width }: { children: React.ReactNode; al
 }
 function Td({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
   return <td className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"} align-top`}>{children}</td>;
+}
+function LotField({
+  label, required, error, children,
+}: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-0.5 text-[10.5px] tracking-[0.06em] uppercase text-text-dim">
+        {label}{required && <span className="text-accent"> *</span>}
+      </div>
+      {children}
+      {error && <div className="mt-0.5 text-[11px] text-bad">{error}</div>}
+    </div>
+  );
 }

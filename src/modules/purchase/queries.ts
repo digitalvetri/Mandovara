@@ -38,6 +38,7 @@ export interface POLineRow {
   productCode: string;
   productName: string;
   uom: string;
+  trackBatch: boolean;
   description: string;
   orderedQty: string;
   receivedQty: string;
@@ -141,7 +142,7 @@ export async function getPO(ctx: RequestContext, id: string): Promise<PODetail |
         select: {
           id: true, lineNo: true, description: true, quantity: true, receivedQty: true,
           rate: true, gstRate: true, amount: true, productId: true,
-          product: { select: { code: true, name: true, uom: true } },
+          product: { select: { code: true, name: true, uom: true, trackBatch: true } },
         },
       },
       grns: {
@@ -172,6 +173,7 @@ export async function getPO(ctx: RequestContext, id: string): Promise<PODetail |
       return {
         id: l.id, lineNo: l.lineNo, productId: l.productId,
         productCode: l.product.code, productName: l.product.name, uom: l.product.uom,
+        trackBatch: l.product.trackBatch,
         description: l.description,
         orderedQty: ordered, receivedQty: received, pendingQty: pending,
         rate: l.rate, gstRate: l.gstRate.toString(), amount: l.amount,

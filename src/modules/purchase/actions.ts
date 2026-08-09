@@ -158,8 +158,11 @@ export async function postGRN(
     select: {
       id: true, branchId: true, vendorId: true, status: true,
       lines: {
-        select: { id: true, productId: true, lineNo: true,
-                  quantity: true, receivedQty: true, rate: true },
+        select: {
+          id: true, productId: true, lineNo: true,
+          quantity: true, receivedQty: true, rate: true,
+          product: { select: { trackBatch: true, name: true } },
+        },
       },
     },
   });
@@ -174,6 +177,22 @@ export async function postGRN(
   });
 
   const linesByLineId = new Map(po.lines.map((l) => [l.id, l]));
+
+  // §0.6: for batch-tracked products, dye-lot is mandatory at GRN.
+  // For non-batch products (hardware, fittings, accessories) it stays optional.
+  for (const req of d.lines) {
+    const line = linesByLineId.get(req.poLineId);
+    if (!line) continue;
+    if (line.product.trackBatch && (req.dyeLot == null || req.dyeLot.trim() === "")) {
+      return {
+        ok: false, error: "Dye-lot required",
+        fieldErrors: {
+          [`lines.${req.poLineId}.dyeLot`]:
+            `${line.product.name} is batch-tracked — capture the dye-lot code from the roll label`,
+        },
+      };
+    }
+  }
 
   // Over-receive guard
   for (const req of d.lines) {
@@ -233,6 +252,42 @@ export async function postGRN(
       const line = linesByLineId.get(req.poLineId)!;
       const qty = new Prisma.Decimal(req.quantity);
       const amount = BigInt(Math.round(req.quantity * Number(line.rate)));
+      const dyeLot = req.dyeLot?.trim();
+      const binLocation = (req.binLocation ?? "").trim() || null;
+      const rollLengthsM = req.rollLengthsM && req.rollLengthsM.length > 0
+        ? req.rollLengthsM
+        : null;
+
+      // Upsert the dye-lot Batch row and pull its id for the ledger.
+      // Non-batch products skip this — no dyeLot means no Batch record.
+      let batchId: string | null = null;
+      if (dyeLot != null) {
+        const batch = await tx.batch.upsert({
+          where: {
+            orgId_productId_batchNumber: {
+              orgId: ctx.orgId, productId: line.productId, batchNumber: dyeLot,
+            },
+          },
+          create: {
+            orgId:        ctx.orgId,
+            productId:    line.productId,
+            warehouseId:  warehouse.id,
+            batchNumber:  dyeLot,
+            quantity:     qty,
+            ...(req.rollCount != null && { rollCount: req.rollCount }),
+            ...(rollLengthsM != null && { rollLengthsM }),
+            ...(binLocation != null && { binLocation }),
+          },
+          update: {
+            quantity: { increment: qty },
+            // Additional rolls: append to the list, sum the count.
+            ...(req.rollCount != null && { rollCount: { increment: req.rollCount } }),
+            ...(binLocation != null && { binLocation }),
+          },
+          select: { id: true },
+        });
+        batchId = batch.id;
+      }
 
       await tx.gRNLine.create({
         data: {
@@ -243,6 +298,10 @@ export async function postGRN(
           rate:        line.rate,
           amount,
           warehouseId: warehouse.id,
+          ...(dyeLot != null && { batchNumber: dyeLot }),
+          ...(req.rollCount != null && { rollCount: req.rollCount }),
+          ...(rollLengthsM != null && { rollLengthsM }),
+          ...(binLocation != null && { binLocation }),
         },
       });
       await tx.pOLine.update({
@@ -250,11 +309,14 @@ export async function postGRN(
         data:  { receivedQty: { increment: qty } },
       });
       // Append to stock ledger — same path as Inventory adjustments (Rule 3).
+      // batchId threads dye-lot through the ledger so per-lot balances
+      // aggregate correctly downstream.
       await tx.stockLedgerEntry.create({
         data: {
           orgId:       ctx.orgId,
           warehouseId: warehouse.id,
           productId:   line.productId,
+          ...(batchId != null && { batchId }),
           direction:   "IN",
           quantity:    qty,
           rate:        line.rate,
