@@ -48,7 +48,7 @@ async function main() {
     where: { orgId: project.orgId, requiresMeasurement: true, status: "ACTIVE" },
     select: { id: true, name: true },
   });
-  await bumpSoCounter(project.orgId, branch.id);
+  // Seed reserves NumberingSeries counters post-seed — no bump needed.
   console.log(`fixture: project ${project.number}`);
 
   // Fixture: measurement + CalcResult + quote → order → make → DELIVERED.
@@ -206,28 +206,6 @@ async function main() {
 
   console.log("");
   console.log(`PASS — Phase 5c install-visit spine holds end-to-end`);
-}
-
-async function bumpSoCounter(orgId: string, branchId: string) {
-  const now = new Date();
-  const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-  const fy = `${String(y).slice(-2)}-${String(y + 1).slice(-2)}`;
-  const rows = await prisma.salesOrder.findMany({
-    where: { orgId, branchId }, select: { number: true },
-  });
-  const seqs = rows.map((r) => Number(r.number.split("/").pop())).filter((n) => Number.isFinite(n) && n > 0);
-  const maxSeq = seqs.length === 0 ? 0 : Math.max(...seqs);
-  if (maxSeq === 0) return;
-  await prisma.numberingSeries.upsert({
-    where: { orgId_branchId_docType_financialYear: {
-      orgId, branchId, docType: "SALES_ORDER", financialYear: fy,
-    }},
-    update: { currentValue: BigInt(maxSeq) },
-    create: {
-      orgId, branchId, docType: "SALES_ORDER", financialYear: fy,
-      prefix: "MDV/CBE/SO", padding: 5, currentValue: BigInt(maxSeq),
-    },
-  });
 }
 
 async function cleanup() {

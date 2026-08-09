@@ -62,12 +62,9 @@ async function main() {
   });
   console.log(`fixture: project ${project.number}  ·  M2M SKU ${m2m.name}`);
 
-  // The seed writes SalesOrder rows with hardcoded MDV/CBE/SO/{fy}/{padded}
-  // numbers but doesn't touch NumberingSeries. First allocateNumber call
-  // therefore picks currentValue=1 → collides with the seeded SO row 1.
-  // TODO: fix the seed to reserve counters. Until then, jump the counter
-  // past the seeded max here so this smoke is self-contained.
-  await bumpCounterPastSeed(project.orgId, branch.id, "SALES_ORDER");
+  // Seed now reserves NumberingSeries counters post-seed (see
+  // reserveNumberingCounters in prisma/seed/transactions.ts), so no
+  // local counter bump needed here.
 
   const measurement = await prisma.measurementItem.create({
     data: {
@@ -197,33 +194,6 @@ function extractOutputs(snapshot: unknown): { panels?: number; cutLengthMm?: num
   return s.outputs as { panels?: number; cutLengthMm?: number };
 }
 
-async function bumpCounterPastSeed(orgId: string, branchId: string, docType: string): Promise<void> {
-  const fy = new Date().toISOString().slice(2, 4) + "-" + String(Number(new Date().toISOString().slice(0, 4)) - 2000 + 1);
-  // Find every SO already in the DB for this branch and this FY, and
-  // set NumberingSeries.currentValue to their max sequence number.
-  // Safe to re-run: only ever raises the counter.
-  const rows = await prisma.salesOrder.findMany({
-    where:  { orgId, branchId },
-    select: { number: true },
-  });
-  const seqs = rows
-    .map((r) => Number(r.number.split("/").pop()))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  const maxSeq = seqs.length === 0 ? 0 : Math.max(...seqs);
-  if (maxSeq === 0) return;
-  await prisma.numberingSeries.upsert({
-    where: {
-      orgId_branchId_docType_financialYear: {
-        orgId, branchId, docType, financialYear: fy,
-      },
-    },
-    update: { currentValue: BigInt(maxSeq) },
-    create: {
-      orgId, branchId, docType, financialYear: fy,
-      prefix: "MDV/CBE/SO", padding: 5, currentValue: BigInt(maxSeq),
-    },
-  });
-}
 
 async function cleanup() {
   // Order matters: FK RESTRICT on MakeJobLine.orderLineId means we

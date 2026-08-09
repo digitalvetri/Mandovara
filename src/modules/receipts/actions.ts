@@ -16,6 +16,13 @@
 
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
+
+// revalidatePath throws "static generation store missing" outside a
+// Next request context (smoke scripts, integration tests). Wrap so
+// the action is callable from both surfaces. Mirrors modules/*.
+function safeRevalidate(path: string): void {
+  try { revalidatePath(path); } catch { /* not in a Next request */ }
+}
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -23,7 +30,7 @@ import { parseINR } from "@/kernel/money/format";
 import { allocateNumber } from "@/kernel/numbering/series";
 import { financialYear } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
-import { createReceiptSchema } from "./schema";
+import { createReceiptSchema, bounceReceiptSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -158,11 +165,120 @@ export async function createReceipt(
     return receipt;
   });
 
-  revalidatePath("/accounts");
-  revalidatePath("/invoicing");
-  for (const p of allocationPairs) revalidatePath(`/invoicing/${p.invoiceId}`);
+  safeRevalidate("/accounts");
+  safeRevalidate("/invoicing");
+  for (const p of allocationPairs) safeRevalidate(`/invoicing/${p.invoiceId}`);
 
   return { ok: true, data: { ...created, unallocated } };
+}
+
+// ── bounceReceipt — §14 Phase 6 gate #3 ──────────────────────────
+//
+// Bouncing a cheque means the funds never actually cleared. We:
+//   1. Verify mode=CHEQUE and not already BOUNCED (idempotent guard).
+//   2. Delete every ReceiptAllocation for this receipt.
+//   3. For each affected invoice: re-sum remaining allocations from
+//      OTHER receipts, then set status to PAID (fully covered),
+//      PARTIALLY_PAID (some remaining), or ISSUED (nothing left).
+//      SELECT FOR UPDATE on the invoice inside the tx so a concurrent
+//      allocation of a different receipt can't race.
+//   4. Zero out Receipt.unallocated + flip chequeStatus to BOUNCED.
+//   5. AuditLog row with the reason.
+//
+// Cancelled invoices are skipped (they carry their own reversal
+// paperwork). If an invoice reverts from PAID → PARTIALLY_PAID the
+// caller sees this via the query-layer status flip and outstanding
+// automatically restores in the /accounts view.
+
+export async function bounceReceipt(
+  input: unknown,
+): Promise<ActionResult<{ receiptId: string; affectedInvoices: string[] }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "receipt.reverse");
+
+  const parsed = bounceReceiptSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { receiptId, reason } = parsed.data;
+
+  const db = scoped(ctx);
+  const r = await db.receipt.findUnique({
+    where: { id: receiptId },
+    select: {
+      id: true, mode: true, chequeStatus: true, amount: true, unallocated: true,
+      allocations: { select: { id: true, invoiceId: true, amount: true } },
+    },
+  });
+  if (!r) return { ok: false, error: "Receipt not found" };
+  if (r.mode !== "CHEQUE") {
+    return { ok: false, error: `Only CHEQUE receipts can be bounced (mode=${r.mode})` };
+  }
+  if (r.chequeStatus === "BOUNCED") {
+    return { ok: false, error: "Receipt is already marked BOUNCED" };
+  }
+
+  const invoiceIds = [...new Set(r.allocations.map((a) => a.invoiceId))];
+
+  const result = await withTransaction(async (tx: TxClient) => {
+    // Drop every allocation from this receipt.
+    await tx.receiptAllocation.deleteMany({ where: { receiptId: r.id } });
+
+    // Recompute each affected invoice's status from remaining
+    // allocations (across OTHER receipts). SELECT FOR UPDATE keeps
+    // parallel bounces/create-receipts from racing on the same row.
+    for (const invId of invoiceIds) {
+      const locked = await tx.$queryRaw<{
+        id: string; total: string; advanceAdjusted: string; status: string;
+      }[]>`
+        SELECT id, total::text, "advanceAdjusted"::text, status::text
+          FROM "Invoice" WHERE id = ${invId} FOR UPDATE
+      `;
+      const inv = locked[0];
+      if (!inv) continue;
+      if (inv.status === "CANCELLED") continue;
+      const remaining = await tx.receiptAllocation.aggregate({
+        where:  { invoiceId: invId },
+        _sum:   { amount: true },
+      });
+      const paid = remaining._sum.amount ?? 0n;
+      const outstanding = BigInt(inv.total) - BigInt(inv.advanceAdjusted) - paid;
+      const nextStatus = paid === 0n
+        ? "ISSUED"
+        : outstanding <= 0n ? "PAID" : "PARTIALLY_PAID";
+      if (nextStatus !== inv.status) {
+        await tx.invoice.update({ where: { id: invId }, data: { status: nextStatus } });
+      }
+    }
+
+    // Flip the receipt: BOUNCED, unallocated → 0 (funds gone).
+    await tx.receipt.update({
+      where: { id: r.id },
+      data:  { chequeStatus: "BOUNCED", unallocated: 0n },
+    });
+    await tx.auditLog.create({
+      data: {
+        orgId: ctx.orgId, actorId: ctx.userId,
+        entityType: "Receipt", entityId: r.id,
+        action: "BOUNCE_CHEQUE",
+        before: {
+          chequeStatus: r.chequeStatus,
+          allocationCount: r.allocations.length,
+          allocatedTotal: (r.amount - r.unallocated).toString(),
+        },
+        after: {
+          chequeStatus: "BOUNCED",
+          reason,
+          affectedInvoices: invoiceIds,
+        },
+      },
+    });
+    return { affectedInvoices: invoiceIds };
+  });
+
+  safeRevalidate("/accounts");
+  safeRevalidate(`/accounts/${r.id}`);
+  safeRevalidate("/invoicing");
+  for (const i of invoiceIds) safeRevalidate(`/invoicing/${i}`);
+  return { ok: true, data: { receiptId: r.id, affectedInvoices: result.affectedInvoices } };
 }
 
 // ── helpers ──────────────────────────────────────────────────────

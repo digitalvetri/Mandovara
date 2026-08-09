@@ -17,6 +17,12 @@
 
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
+
+// safeRevalidate — mirrors modules/quotations/actions.ts. Lets the
+// action run under both a Next request and a bare tsx smoke.
+function safeRevalidate(path: string): void {
+  try { revalidatePath(path); } catch { /* not in a Next request */ }
+}
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -115,6 +121,21 @@ export async function createInvoiceFromOrder(
   const roundOff =
     order.total - (order.taxableAmount + order.cgst + order.sgst + order.igst);
 
+  // §14 Phase 6 — advance auto-adjust. Pull the client's open
+  // advances in FIFO order (oldest first) and consume from them
+  // until either the invoice is fully offset or the pool is empty.
+  // Done outside the tx as a peek; the actual writes happen inside
+  // the tx below where we re-lock each row to avoid races with
+  // parallel invoice creations for the same client.
+  const openAdvances = await db.advance.findMany({
+    where: {
+      clientId: order.clientId,
+      status:   { in: ["OPEN", "PARTIALLY_ADJUSTED"] },
+    },
+    orderBy: { receivedAt: "asc" },
+    select:  { id: true, amount: true, adjusted: true },
+  });
+
   const created = await withTransaction(async (tx: TxClient) => {
     const number = await allocateNumber(tx, {
       orgId:         ctx.orgId,
@@ -123,6 +144,38 @@ export async function createInvoiceFromOrder(
       financialYear: financialYear(invoiceDate),
       prefix:        `${branch.invoicePrefix}/INV`,
     });
+    // Re-lock and drain each advance under the tx so parallel invoice
+    // creations for the same client can't double-consume the same
+    // advance. FIFO consumption up to the invoice total.
+    let remaining = order.total;
+    let advanceAdjusted = 0n;
+    const adjustedPerAdvance: { id: string; delta: bigint; newAdjusted: bigint; newStatus: string }[] = [];
+    for (const a of openAdvances) {
+      if (remaining === 0n) break;
+      const locked = await tx.$queryRaw<{
+        id: string; amount: string; adjusted: string; status: string;
+      }[]>`
+        SELECT id, amount::text, adjusted::text, status::text
+          FROM "Advance" WHERE id = ${a.id} FOR UPDATE
+      `;
+      const cur = locked[0];
+      if (!cur) continue;
+      if (cur.status !== "OPEN" && cur.status !== "PARTIALLY_ADJUSTED") continue;
+      const available = BigInt(cur.amount) - BigInt(cur.adjusted);
+      if (available <= 0n) continue;
+      const take = available < remaining ? available : remaining;
+      const newAdjusted = BigInt(cur.adjusted) + take;
+      const fullyAbsorbed = newAdjusted >= BigInt(cur.amount);
+      const newStatus = fullyAbsorbed ? "FULLY_ADJUSTED" : "PARTIALLY_ADJUSTED";
+      await tx.advance.update({
+        where: { id: cur.id },
+        data:  { adjusted: newAdjusted, status: newStatus },
+      });
+      adjustedPerAdvance.push({ id: cur.id, delta: take, newAdjusted, newStatus });
+      remaining -= take;
+      advanceAdjusted += take;
+    }
+
     const inv = await tx.invoice.create({
       data: {
         orgId:         ctx.orgId,
@@ -140,7 +193,10 @@ export async function createInvoiceFromOrder(
         igst:          order.igst,
         roundOff,
         total:         order.total,
-        status:        "ISSUED",
+        advanceAdjusted,
+        // If the advance covers the whole invoice, mark it PAID
+        // straight away; otherwise ISSUED (payment still owed).
+        status:        advanceAdjusted >= order.total ? "PAID" : "ISSUED",
         // IRN: gated on org GSTIN + B2B threshold. For now everything
         // starts NOT_REQUIRED. Session 8 backend wires the real GSP call.
         irnStatus:     "NOT_REQUIRED",
@@ -148,6 +204,25 @@ export async function createInvoiceFromOrder(
       },
       select: { id: true, number: true },
     });
+
+    // Audit each drained advance (one row per touched Advance) so
+    // the trail is per-source, not per-invoice.
+    for (const adj of adjustedPerAdvance) {
+      await tx.auditLog.create({
+        data: {
+          orgId: ctx.orgId, actorId: ctx.userId,
+          entityType: "Advance", entityId: adj.id,
+          action: "ADJUST_TO_INVOICE",
+          after: {
+            invoiceId:   inv.id,
+            invoiceNo:   inv.number,
+            delta:       adj.delta.toString(),
+            newAdjusted: adj.newAdjusted.toString(),
+            newStatus:   adj.newStatus,
+          },
+        },
+      });
+    }
     await tx.invoiceLine.createMany({
       data: order.lines.map((l, i) => ({
         invoiceId:   inv.id,
@@ -168,8 +243,9 @@ export async function createInvoiceFromOrder(
     return inv;
   });
 
-  revalidatePath("/invoicing");
-  revalidatePath(`/orders/${order.id}`);
+  safeRevalidate("/invoicing");
+  safeRevalidate(`/orders/${order.id}`);
+  safeRevalidate("/accounts");
   return { ok: true, data: created };
 }
 
@@ -210,8 +286,8 @@ export async function cancelInvoice(input: unknown): Promise<ActionResult<{ id: 
     },
   });
 
-  revalidatePath("/invoicing");
-  revalidatePath(`/invoicing/${id}`);
+  safeRevalidate("/invoicing");
+  safeRevalidate(`/invoicing/${id}`);
   return { ok: true, data: { id } };
 }
 

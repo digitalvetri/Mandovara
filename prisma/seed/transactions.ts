@@ -49,6 +49,82 @@ export async function seedTransactions(
   await seedAttendanceAndPayroll(c);
   await seedMessagesAndNotifications(c);
   await seedEdgeCases(c);
+  // Reserve NumberingSeries counters past the seed's highest per
+  // (branch, docType, fy). Without this, the first post-seed call to
+  // allocateNumber({docType: "INVOICE"|"SALES_ORDER"|"RECEIPT"|...})
+  // starts at currentValue=1 and collides with the seed's own row 1.
+  // See project memory: project_seed_numbering_bug.
+  await reserveNumberingCounters(c);
+}
+
+// Scan the highest sequence number the seed wrote per (branch,
+// docType, fy) and upsert the matching NumberingSeries row so
+// downstream allocateNumber() calls start at the next free slot.
+// Only touches docTypes whose action-layer prefix format matches
+// what the seed writes (SO, INV, RCPT, GRN). QUOTATION doesn't
+// collide (seed uses "QTN" prefix, action uses "QT"); CN uses
+// hardcoded EDGE0N suffixes and isn't sequenced.
+async function reserveNumberingCounters(c: Ctx): Promise<void> {
+  const branchId = c.ids.branchIds[0]!;
+  const groups: {
+    docType: string;
+    prefix:  string;                         // action-side prefix format
+    fetch:   () => Promise<{ number: string }[]>;
+  }[] = [
+    {
+      docType: "SALES_ORDER", prefix: "MDV/CBE/SO",
+      fetch: () => c.db.salesOrder.findMany({
+        where: { orgId: c.ids.orgId, branchId }, select: { number: true },
+      }),
+    },
+    {
+      docType: "INVOICE",     prefix: "MDV/CBE/INV",
+      fetch: () => c.db.invoice.findMany({
+        where: { orgId: c.ids.orgId, branchId }, select: { number: true },
+      }),
+    },
+    {
+      docType: "RECEIPT",     prefix: "MDV/CBE/RCPT",
+      fetch: () => c.db.receipt.findMany({
+        where: { orgId: c.ids.orgId, branchId }, select: { number: true },
+      }),
+    },
+    {
+      docType: "GRN",         prefix: "MDV/CBE/GRN",
+      fetch: () => c.db.gRN.findMany({
+        where: { orgId: c.ids.orgId, branchId }, select: { number: true },
+      }),
+    },
+  ];
+
+  for (const g of groups) {
+    const rows = await g.fetch();
+    // Bucket rows by fy label parsed out of the "MDV/CBE/<code>/<fy>/<seq>" format.
+    const maxByFy = new Map<string, number>();
+    for (const r of rows) {
+      const parts = r.number.split("/");
+      const fy = parts[3];
+      const seq = Number(parts[4]);
+      if (!fy || !Number.isFinite(seq)) continue;
+      const cur = maxByFy.get(fy) ?? 0;
+      if (seq > cur) maxByFy.set(fy, seq);
+    }
+    for (const [fy, maxSeq] of maxByFy) {
+      await c.db.numberingSeries.upsert({
+        where: {
+          orgId_branchId_docType_financialYear: {
+            orgId: c.ids.orgId, branchId, docType: g.docType, financialYear: fy,
+          },
+        },
+        update: { currentValue: BigInt(maxSeq) },
+        create: {
+          orgId: c.ids.orgId, branchId, docType: g.docType,
+          financialYear: fy, prefix: g.prefix, padding: 5,
+          currentValue: BigInt(maxSeq),
+        },
+      });
+    }
+  }
 }
 
 // ── LEADS + FOLLOW-UPS ─────────────────────────────────────────

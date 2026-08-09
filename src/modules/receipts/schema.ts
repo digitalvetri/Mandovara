@@ -23,3 +23,12 @@ export const createReceiptSchema = z.object({
 });
 
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>;
+
+// §14 Phase 6 gate — bounce a CHEQUE receipt. Releases all
+// allocations and recomputes each affected invoice's status from
+// the remaining allocations across OTHER receipts.
+export const bounceReceiptSchema = z.object({
+  receiptId: z.string().cuid(),
+  reason:    z.string().trim().min(4, "Reason required (audit trail)").max(500),
+});
+export type BounceReceiptInput = z.infer<typeof bounceReceiptSchema>;
