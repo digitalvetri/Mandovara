@@ -9,21 +9,27 @@
 // re-compute on save through @/kernel/tax. No demo data — the table
 // starts empty; the owner picks their real client and their real SKUs.
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { Minus, Plus, X } from "lucide-react";
+import { Minus, Plus, X, Ruler } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
-import { createQuotation } from "@/modules/quotations/actions";
+import {
+  createQuotation, loadMeasurementsForClient,
+} from "@/modules/quotations/actions";
 import type {
-  ClientPickerRow, ProductPickerRow,
+  ClientPickerRow, ProductPickerRow, MeasurementPickerRow,
 } from "@/modules/quotations/queries";
 import type { BranchOption } from "@/modules/branches/queries";
 
 interface LineRow {
   productId: string;
   quantity: number;
+  // §0.10: only meaningful when the picked product.requiresMeasurement is
+  // true. Server validates independently, but tracking here lets us
+  // disable "Send" until every M2M line is linked.
+  measurementItemId?: string;
 }
 
 interface Props {
@@ -46,9 +52,35 @@ export function QuotationBuilder({ clients, products, branches }: Props) {
   const [validUntil] = useState<string>(iso(nextMonth));
   const [pickerProductId, setPickerProductId] = useState<string>("");
   const [lines, setLines] = useState<LineRow[]>([]);
+  // Measurement items belonging to the selected client's projects. Loaded
+  // by a server action whenever `clientId` changes so we never leak items
+  // across clients and never blow the initial page payload with them.
+  const [measurements, setMeasurements] = useState<MeasurementPickerRow[]>([]);
+  const [measurementsLoading, setMeasurementsLoading] = useState(false);
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const measurementMap = useMemo(
+    () => new Map(measurements.map((m) => [m.id, m])),
+    [measurements],
+  );
   const client = clients.find((c) => c.id === clientId);
+
+  useEffect(() => {
+    if (!clientId) { setMeasurements([]); return; }
+    let cancelled = false;
+    setMeasurementsLoading(true);
+    loadMeasurementsForClient(clientId)
+      .then((res) => {
+        if (cancelled) return;
+        setMeasurements(res.ok && res.data ? res.data : []);
+      })
+      .finally(() => { if (!cancelled) setMeasurementsLoading(false); });
+    // Client switch → drop any stale measurement selections. Product
+    // selections stay; the user is often re-quoting the same items for
+    // a different site so keeping quantities saves retyping.
+    setLines((ls) => ls.map((l) => ({ ...l, measurementItemId: undefined })));
+    return () => { cancelled = true; };
+  }, [clientId]);
   // Supplier state vs client state drives intra/inter-state GST split. For
   // the preview we treat matching state as intra-state; server recomputes.
   const supplierState = "33";
@@ -91,6 +123,22 @@ export function QuotationBuilder({ clients, products, branches }: Props) {
   function removeLine(i: number) {
     setLines((ls) => ls.filter((_, idx) => idx !== i));
   }
+  function setLineMeasurement(i: number, v: string) {
+    setLines((ls) => ls.map((l, idx) =>
+      idx === i ? { ...l, measurementItemId: v || undefined } : l,
+    ));
+  }
+
+  // §0.10 client-side mirror of the server gate: any line whose product
+  // requiresMeasurement must carry a measurementItemId. This drives both
+  // the "Send" button's disabled state and the inline warning row.
+  const missingMeasurement = useMemo(
+    () => lines.some((l) => {
+      const p = productMap.get(l.productId);
+      return !!p?.requiresMeasurement && !l.measurementItemId;
+    }),
+    [lines, productMap],
+  );
 
   function onSend() {
     setServerError(null);
@@ -102,11 +150,12 @@ export function QuotationBuilder({ clients, products, branches }: Props) {
         lines: lines.map((l) => {
           const p = productMap.get(l.productId)!;
           return {
-            productId:   l.productId,
-            description: p.name,
-            quantity:    l.quantity,
-            rate:        String(Number(p.mrp ?? 0n) / 100),
-            discountPct: 0,
+            productId:         l.productId,
+            description:       p.name,
+            quantity:          l.quantity,
+            rate:              String(Number(p.mrp ?? 0n) / 100),
+            discountPct:       0,
+            measurementItemId: l.measurementItemId,
           };
         }),
       };
@@ -232,11 +281,46 @@ export function QuotationBuilder({ clients, products, branches }: Props) {
                 if (!p) return null;
                 const rate = p.mrp ?? 0n;
                 const amount = (rate * BigInt(Math.round(l.quantity * 10_000))) / 10_000n;
+                const linkedM = l.measurementItemId ? measurementMap.get(l.measurementItemId) : undefined;
+                const needsMeasurement = p.requiresMeasurement && !l.measurementItemId;
                 return (
-                  <tr key={l.productId} className="border-b border-rule/60 last:border-0 align-middle">
+                  <tr key={l.productId} className={`border-b border-rule/60 last:border-0 align-middle ${needsMeasurement ? "bg-bad/[0.04]" : ""}`}>
                     <Td>
                       <div className="text-text">{p.name}</div>
                       <div className="text-[10.5px] text-text-faint">per {p.uom.toLowerCase()}</div>
+                      {p.requiresMeasurement && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Ruler size={12} className={needsMeasurement ? "text-bad" : "text-accent"} />
+                          <select
+                            value={l.measurementItemId ?? ""}
+                            onChange={(e) => setLineMeasurement(i, e.target.value)}
+                            className={`min-w-0 flex-1 h-[30px] px-2 bg-white/60 border rounded-[6px] text-[11.5px] outline-none focus:border-accent transition-colors ${needsMeasurement ? "border-bad" : "border-rule"}`}
+                          >
+                            <option value="">
+                              {measurementsLoading
+                                ? "— loading site measurements —"
+                                : measurements.length === 0
+                                  ? "— no measurements for this client yet —"
+                                  : "— pick a site measurement (required) —"}
+                            </option>
+                            {measurements.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.projectNumber} · {m.roomLabel} · {m.label} · {m.family.toLowerCase()}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {p.requiresMeasurement && linkedM && (
+                        <div className="mt-1 text-[10.5px] text-text-faint tabular">
+                          {linkedM.engineVersion} · computed {formatDate(linkedM.computedAt)}
+                        </div>
+                      )}
+                      {needsMeasurement && (
+                        <div className="mt-1 text-[10.5px] text-bad">
+                          {p.name} is made-to-measure — link a site measurement before sending.
+                        </div>
+                      )}
                     </Td>
                     <Td align="center">
                       <div className="inline-flex items-center gap-1">
@@ -289,11 +373,16 @@ export function QuotationBuilder({ clients, products, branches }: Props) {
         {serverError && (
           <div className="mt-3 text-[11.5px] text-bad">{serverError}</div>
         )}
+        {missingMeasurement && !serverError && (
+          <div className="mt-3 text-[11.5px] text-bad">
+            One or more made-to-measure lines are missing a site measurement (§0.10).
+          </div>
+        )}
 
         <button
           type="button"
           onClick={onSend}
-          disabled={pending}
+          disabled={pending || missingMeasurement}
           className="mt-5 w-full h-[42px] rounded-[10px] bg-accent text-white text-[13px] font-medium hover:bg-accent-hover disabled:opacity-60 transition-colors"
         >
           {pending ? "Saving…" : "Send Quote to Client"}

@@ -16,6 +16,14 @@
 
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
+
+// revalidatePath throws "static generation store missing" when the action
+// is invoked outside a Next request context (smoke scripts, integration
+// tests). It's a cache-invalidation hint — swallowing it there keeps the
+// same action callable from both surfaces without a parallel API.
+function safeRevalidate(path: string): void {
+  try { revalidatePath(path); } catch { /* not in a Next request */ }
+}
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -27,6 +35,8 @@ import { devContext } from "@/lib/dev-context";
 import {
   createQuotationSchema, setStatusSchema, type QuotationLineInput,
 } from "./schema";
+import { enforceMeasurementGate } from "./measurement-gate";
+import { buildCalcSnapshots, type FreezeCalc } from "./calc-snapshot";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -63,9 +73,35 @@ export async function createQuotation(input: unknown): Promise<ActionResult<{ id
   const productIds = d.lines.map((l) => l.productId);
   const products = await db.product.findMany({
     where: { id: { in: productIds } },
-    select: { id: true, gstRate: true, name: true },
+    select: { id: true, gstRate: true, name: true, requiresMeasurement: true },
   });
   const productMap = new Map(products.map((p) => [p.id, p]));
+
+  // §0.10 gate — load referenced measurements once, then hand off to the
+  // pure validator in ./measurement-gate for the actual rule checks.
+  const measurementIds = d.lines
+    .map((l) => l.measurementItemId)
+    .filter((v): v is string => typeof v === "string" && v.length > 0);
+  const measurementRows = measurementIds.length > 0
+    ? await db.measurementItem.findMany({
+        where:  { id: { in: measurementIds } },
+        select: {
+          id: true,
+          project: { select: { clientId: true } },
+        },
+      })
+    : [];
+  const measurementMap = new Map(
+    measurementRows.map((m) => [m.id, { id: m.id, clientId: m.project.clientId }]),
+  );
+
+  const gate = enforceMeasurementGate({
+    clientId: client.id,
+    lines:    d.lines,
+    products: productMap,
+    measurements: measurementMap,
+  });
+  if (!gate.ok) return gate;
 
   // Build lines with kernel math
   const linesForCompute: {
@@ -137,27 +173,45 @@ export async function createQuotation(input: unknown): Promise<ActionResult<{ id
     });
     await tx.quotationLine.createMany({
       data: linesForCompute.map((l) => ({
-        quotationId: q.id,
-        lineNo:      l.lineNo,
-        productId:   l.input.productId,
-        description: l.description,
-        quantity:    new Prisma.Decimal(l.input.quantity),
-        rate:        l.ratePaise,
-        discountPct: new Prisma.Decimal(l.input.discountPct ?? 0),
-        taxable:     l.taxable,
-        gstRate:     new Prisma.Decimal(l.gstRate),
-        cgst:        l.cgst,
-        sgst:        l.sgst,
-        igst:        l.igst,
-        amount:      l.amount,
-        isOptional:  l.input.isOptional ?? false,
+        quotationId:       q.id,
+        lineNo:            l.lineNo,
+        productId:         l.input.productId,
+        // §0.10 link — kept in sync with the gate result above so the
+        // downstream freeze on SEND has a measurement to look up.
+        measurementItemId: l.input.measurementItemId ?? null,
+        description:       l.description,
+        quantity:          new Prisma.Decimal(l.input.quantity),
+        rate:              l.ratePaise,
+        discountPct:       new Prisma.Decimal(l.input.discountPct ?? 0),
+        taxable:           l.taxable,
+        gstRate:           new Prisma.Decimal(l.gstRate),
+        cgst:              l.cgst,
+        sgst:              l.sgst,
+        igst:              l.igst,
+        amount:            l.amount,
+        isOptional:        l.input.isOptional ?? false,
       })),
     });
     return q;
   });
 
-  revalidatePath("/quotations");
+  safeRevalidate("/quotations");
   return { ok: true, data: { id: created.id } };
+}
+
+// Thin server-action wrapper around listMeasurementsForClient. The
+// quotation builder can't fetch this at page load — the client isn't
+// picked yet — so it calls this after the client select changes.
+export async function loadMeasurementsForClient(
+  clientId: string,
+): Promise<ActionResult<import("./queries").MeasurementPickerRow[]>> {
+  const ctx = await devContext();
+  if (typeof clientId !== "string" || clientId.length === 0) {
+    return { ok: false, error: "clientId required" };
+  }
+  const { listMeasurementsForClient } = await import("./queries");
+  const rows = await listMeasurementsForClient(ctx, clientId);
+  return { ok: true, data: rows };
 }
 
 export async function setQuotationStatus(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -169,10 +223,61 @@ export async function setQuotationStatus(input: unknown): Promise<ActionResult<{
   requirePermission(ctx, status === "SENT" ? "quotation.send" : "quotation.update");
 
   const db = scoped(ctx);
-  await db.quotation.update({ where: { id }, data: { status } });
 
-  revalidatePath("/quotations");
-  revalidatePath(`/quotations/${id}`);
+  // §15 non-negotiable #3: on DRAFT → SENT freeze every M2M line's
+  // CalcResult onto QuotationLine.calcSnapshot so a later engine change
+  // never re-prices a sent quote. Runs in one tx alongside the status
+  // flip so we can never end up with SENT lines missing their snapshot.
+  if (status === "SENT") {
+    await withTransaction(async (tx: TxClient) => {
+      const current = await tx.quotation.findUniqueOrThrow({
+        where: { id },
+        select: { status: true, orgId: true },
+      });
+      if (current.status === "SENT") return; // idempotent — no-op re-send
+
+      const lines = await tx.quotationLine.findMany({
+        where: { quotationId: id },
+        select: { id: true, measurementItemId: true },
+      });
+      const measurementIds = lines
+        .map((l) => l.measurementItemId)
+        .filter((v): v is string => typeof v === "string" && v.length > 0);
+      const calcs = measurementIds.length > 0
+        ? await tx.calcResult.findMany({
+            where: { measurementItemId: { in: measurementIds } },
+            select: {
+              measurementItemId: true, engineVersion: true, family: true,
+              inputs: true, outputs: true, warnings: true, computedAt: true,
+            },
+          })
+        : [];
+      const calcMap = new Map<string, FreezeCalc>(
+        calcs.map((c) => [c.measurementItemId, {
+          measurementItemId: c.measurementItemId,
+          engineVersion:     c.engineVersion,
+          family:            c.family,
+          inputs:            c.inputs,
+          outputs:           c.outputs,
+          warnings:          c.warnings,
+          computedAt:        c.computedAt,
+        }]),
+      );
+      const instructions = buildCalcSnapshots({ lines, calcs: calcMap, now: new Date() });
+      for (const inst of instructions) {
+        await tx.quotationLine.update({
+          where: { id: inst.lineId },
+          data:  { calcSnapshot: inst.snapshot as unknown as Prisma.InputJsonValue },
+        });
+      }
+      await tx.quotation.update({ where: { id }, data: { status } });
+    });
+  } else {
+    await db.quotation.update({ where: { id }, data: { status } });
+  }
+
+  safeRevalidate("/quotations");
+  safeRevalidate(`/quotations/${id}`);
   return { ok: true, data: { id } };
 }
 

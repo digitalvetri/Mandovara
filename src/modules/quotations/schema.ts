@@ -21,6 +21,9 @@ export const quotationLineInput = z.object({
   rate:        z.string().trim().min(1, "Rate is required"),
   discountPct: z.number().min(0).max(100).optional(),
   isOptional:  z.boolean().optional(),
+  // §0.10: required by the action when product.requiresMeasurement is true.
+  // Nullable at the schema level so non-M2M products can still be quoted.
+  measurementItemId: z.string().cuid().optional(),
 });
 
 export const createQuotationSchema = z.object({

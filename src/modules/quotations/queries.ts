@@ -181,6 +181,24 @@ export interface ClientPickerRow {
 }
 export interface ProductPickerRow {
   id: string; code: string; name: string; uom: string; gstRate: number; mrp: bigint | null;
+  // §0.10: true → the quote builder must attach a MeasurementItem to
+  // any line that uses this product (curtains, blinds, wallpaper, etc.).
+  requiresMeasurement: boolean;
+}
+
+// One MeasurementItem, flattened for the quotation builder picker.
+// Only shows items that already have a CalcResult attached — quoting
+// off a half-measured item defeats the point of §0.10.
+export interface MeasurementPickerRow {
+  id:            string;
+  projectId:     string;
+  projectNumber: string;
+  projectName:   string;
+  roomLabel:     string;
+  label:         string;
+  family:        string;              // WALLPAPER | FLOORING | CURTAIN
+  engineVersion: string;
+  computedAt:    Date;
 }
 
 export async function listClientsForPicker(ctx: RequestContext): Promise<ClientPickerRow[]> {
@@ -206,6 +224,7 @@ export async function listProductsForPicker(ctx: RequestContext): Promise<Produc
     take: 500,
     select: {
       id: true, code: true, name: true, uom: true, gstRate: true,
+      requiresMeasurement: true,
       prices: {
         where: { tier: "MRP", effectiveTo: null },
         orderBy: { effectiveFrom: "desc" },
@@ -217,7 +236,47 @@ export async function listProductsForPicker(ctx: RequestContext): Promise<Produc
   return rows.map((r) => ({
     id: r.id, code: r.code, name: r.name, uom: r.uom, gstRate: Number(r.gstRate),
     mrp: r.prices[0]?.amount ?? null,
+    requiresMeasurement: r.requiresMeasurement,
   }));
+}
+
+// Returns every calc'd MeasurementItem attached to any project of this
+// client, so the quote builder can offer a per-line picker. Restricting
+// to items with a CalcResult keeps the dropdown honest — an item without
+// a calc row can't tell you how many rolls or metres to bill.
+export async function listMeasurementsForClient(
+  ctx: RequestContext,
+  clientId: string,
+): Promise<MeasurementPickerRow[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  const rows = await db.measurementItem.findMany({
+    where: {
+      project:    { clientId },
+      calcResult: { isNot: null },
+    },
+    orderBy: [{ projectId: "asc" }, { roomLabel: "asc" }, { createdAt: "asc" }],
+    take: 300,
+    select: {
+      id: true, roomLabel: true, label: true, family: true,
+      project:    { select: { id: true, number: true, name: true } },
+      calcResult: { select: { engineVersion: true, computedAt: true } },
+    },
+  });
+  return rows.flatMap((r) => {
+    if (!r.calcResult) return [];   // narrowed by the isNot filter, but TS wants it
+    return [{
+      id: r.id,
+      projectId:     r.project.id,
+      projectNumber: r.project.number,
+      projectName:   r.project.name,
+      roomLabel:     r.roomLabel,
+      label:         r.label,
+      family:        r.family,
+      engineVersion: r.calcResult.engineVersion,
+      computedAt:    r.calcResult.computedAt,
+    }];
+  });
 }
 
 // ── helpers ──────────────────────────────────────────────────────

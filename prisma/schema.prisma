@@ -563,6 +563,9 @@ model Product {
   minStock      Decimal?      @db.Decimal(18, 4)
   trackBatch    Boolean       @default(false)
   trackSerial   Boolean       @default(false)
+  // §0.10: made-to-measure products cannot be quoted without a linked
+  // MeasurementItem. Curtains, blinds, wallpaper, flooring, film, etc.
+  requiresMeasurement Boolean @default(false)
   status        ProductStatus @default(ACTIVE)
   // Maintained by trigger in the search_and_immutability migration.
   searchVector  Unsupported("tsvector")?
@@ -1208,11 +1211,19 @@ model QuotationLine {
   igst        BigInt
   amount      BigInt
   isOptional  Boolean @default(false)
+  // §0.10: made-to-measure lines MUST carry a measurementItemId — enforced
+  // in createQuotation server-side based on product.requiresMeasurement.
+  measurementItemId String?
+  // §7 rule 4: on status → SENT the CalcResult is frozen into this JSON
+  // blob so a later engine revision cannot silently re-price the quote.
+  calcSnapshot      Json?
 
   quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   product     Product   @relation(fields: [productId], references: [id])
+  measurement MeasurementItem? @relation(fields: [measurementItemId], references: [id], onDelete: SetNull)
 
   @@index([quotationId])
+  @@index([measurementItemId])
 }
 
 model SalesOrder {
@@ -1618,8 +1629,9 @@ model MeasurementItem {
   createdById  String?
   updatedById  String?
 
-  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  calcResult   CalcResult?
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  calcResult     CalcResult?
+  quotationLines QuotationLine[]
 
   @@index([orgId, projectId])
   @@index([orgId, family])

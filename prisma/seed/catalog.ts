@@ -46,6 +46,11 @@ export async function seedCatalog(db: PrismaClient, orgId: string, seed = 43) {
         minStock: new Prisma.Decimal(rng.pick([5, 10, 25, 50])),
         trackBatch: cat.slug === "cement" || cat.slug === "paint",
         trackSerial: false,
+        // §0.10 — flip tiles + paint so /quotations/new has demonstrable
+        // made-to-measure SKUs. The Mandovara catalog (curtains, blinds,
+        // wallpaper, flooring, etc.) hasn't landed yet — until then the
+        // gate needs *something* to gate against so QA can exercise it.
+        requiresMeasurement: cat.slug === "tiles" || cat.slug === "paint",
       });
     }
   }

@@ -70,7 +70,7 @@ async function main() {
       data: {
         orgId: project.orgId, measurementItemId: item.id,
         engineVersion: engine.engineVersion, family: c.family,
-        inputs: c.inputs, outputs: engine.outputs, warnings: engine.warnings,
+        inputs: c.inputs, outputs: engine.outputs as object, warnings: engine.warnings,
       },
     });
     created.push(item.id);
