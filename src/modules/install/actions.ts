@@ -35,6 +35,7 @@ import {
   completeInstallLineSchema,
   captureSignatureSchema,
   completeVisitSchema,
+  signAndCompleteVisitSchema,
   raiseSnagOnVisitSchema,
 } from "./schema";
 
@@ -417,6 +418,79 @@ export async function completeVisit(
         entityType: "InstallVisit", entityId: visitId,
         action: `COMPLETE_${outcome}`,
         before: { status: v.status }, after: { status: outcome },
+      },
+    });
+  });
+
+  safeRevalidate("/install");
+  safeRevalidate(`/install/${visitId}`);
+  return { ok: true, data: { visitId, status: outcome } };
+}
+
+// ── signAndCompleteVisit — Phase 5c-PWA one-shot ────────────────
+// The PWA outbox emits one of these per visit at "Complete" time.
+// One tx so a partial sync can't leave a signed-but-not-completed
+// visit orphaned. Enforces the same gates as completeVisit:
+//   - visit IN_PROGRESS
+//   - at least one line installed
+//   - make job (if any) is DELIVERED
+// Idempotent: a re-drain of the outbox after network flake finds
+// the visit already COMPLETED and returns success without a re-write.
+export async function signAndCompleteVisit(
+  input: unknown,
+): Promise<ActionResult<{ visitId: string; status: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "install.completeVisit");
+  const parsed = signAndCompleteVisitSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { visitId, signatureKey, outcome } = parsed.data;
+
+  const db = scoped(ctx);
+  const v = await db.installVisit.findUnique({
+    where: { id: visitId },
+    select: {
+      id: true, status: true, salesOrderId: true,
+      lines: { select: { installedQty: true } },
+    },
+  });
+  if (!v) return { ok: false, error: "Visit not found" };
+  // Idempotency — the outbox may resubmit after a flaky drain.
+  if (v.status === "COMPLETED" || v.status === "PARTIAL") {
+    return { ok: true, data: { visitId, status: v.status } };
+  }
+  if (v.status !== "IN_PROGRESS") {
+    return { ok: false, error: `Cannot complete a visit in status ${v.status}` };
+  }
+  if (!v.lines.some((l) => l.installedQty.gt(0))) {
+    return { ok: false, error: "No lines installed — cannot complete a visit with zero progress" };
+  }
+  const makeJob = await db.makeJob.findUnique({
+    where:  { salesOrderId: v.salesOrderId },
+    select: { status: true, number: true },
+  });
+  if (makeJob && makeJob.status !== "DELIVERED") {
+    return {
+      ok: false,
+      error: `Make job ${makeJob.number} is ${makeJob.status} — must be DELIVERED before install completion`,
+    };
+  }
+
+  await withTransaction(async (tx: TxClient) => {
+    await tx.installVisit.update({
+      where: { id: visitId },
+      data:  {
+        clientSignatureKey: signatureKey,
+        status:             outcome,
+        completedAt:        new Date(),
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        orgId: ctx.orgId, actorId: ctx.userId,
+        entityType: "InstallVisit", entityId: visitId,
+        action: `SIGN_AND_${outcome}`,
+        before: { status: v.status },
+        after:  { status: outcome, signatureCaptured: true },
       },
     });
   });

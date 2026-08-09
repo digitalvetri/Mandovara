@@ -55,11 +55,28 @@ export const completeInstallLineSchema = z.object({
 export type CompleteInstallLineInput = z.infer<typeof completeInstallLineSchema>;
 
 // ── Capture the client signature (Supabase storage key) ─────────
+// Phase 5c-office accepts a plain storage key. Phase 5c-PWA sends
+// base64 data URLs (~30-80KB "data:image/png;base64,..."), because
+// there's no storage bucket wired yet. Widen the max to accommodate
+// both — the storage-bucket migration later replaces the value
+// with a real key without changing this action's contract.
 export const captureSignatureSchema = z.object({
   visitId:      z.string().cuid(),
-  signatureKey: z.string().trim().min(1).max(500),
+  signatureKey: z.string().trim().min(1).max(200_000),
 });
 export type CaptureSignatureInput = z.infer<typeof captureSignatureSchema>;
+
+// ── Sign + complete in one atomic write (§14 Phase 5 gate) ──────
+// The PWA outbox emits ONE of these per visit at the moment the
+// installer taps "Complete". Bundles the captureSignature and
+// completeVisit gates into one server tx so a partial sync can't
+// leave a signed-but-not-completed visit orphaned in the queue.
+export const signAndCompleteVisitSchema = z.object({
+  visitId:      z.string().cuid(),
+  signatureKey: z.string().trim().min(1).max(200_000),
+  outcome:      z.enum(["COMPLETED", "PARTIAL"]).default("COMPLETED"),
+});
+export type SignAndCompleteVisitInput = z.infer<typeof signAndCompleteVisitSchema>;
 
 // ── Mark visit COMPLETED (soft gate: signature + at least one line) ─
 export const completeVisitSchema = z.object({
