@@ -7,6 +7,7 @@ import { RevenueChart } from "./_dashboard/RevenueChart";
 import { ProjectStages } from "./_dashboard/ProjectStages";
 import { SiteVisits } from "./_dashboard/SiteVisits";
 import { RecentActivity } from "./_dashboard/RecentActivity";
+import { OperationsToday } from "./_dashboard/OperationsToday";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,8 @@ export default async function DashboardPage() {
           trendTone="bad"
         />
       </section>
+
+      <OperationsToday kpi={d.operations} />
 
       <section className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">

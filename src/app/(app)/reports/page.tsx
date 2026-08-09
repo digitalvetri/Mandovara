@@ -36,6 +36,43 @@ export default async function ReportsPage() {
         eyebrow="Aggregated views across the live data — no export yet, just what's true right now."
       />
 
+      {/* ── Reports index (Phase 8b) ─────────────────────────── */}
+      <div className="rounded-[14px] bg-surface border border-rule p-4 mb-4">
+        <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-3">
+          All reports
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <IndexTile
+            href="/reports/profitability" title="Project profitability"
+            desc="Revenue minus material + expenses + commissions, per project. Material and expenses reconcile to the ledgers to the paisa."
+            badge="reconciled"
+          />
+          <IndexTile
+            href="/architects" title="Architect commissions"
+            desc="Referral partners with earned, paid, and outstanding totals + full history."
+          />
+          <IndexTile
+            href="/payroll" title="Payroll runs"
+            desc="Monthly runs with per-employee gross / PF / ESI / PT / net. Bank file + payslip PDF from the run detail."
+          />
+          <IndexTile
+            href="/purchase/allocation" title="Dye-lot allocation"
+            desc="Open order lines awaiting material with per-lot availability + mixed-lot audit trail."
+          />
+          <IndexTile
+            href="/install" title="Install schedule"
+            desc="Crew × day calendar of scheduled + in-progress site visits."
+          />
+          <IndexTile
+            href="/make" title="Make kanban"
+            desc="Cut & stitch jobs by status (QUEUED → CUTTING → … → READY)."
+          />
+        </div>
+        <div className="mt-3 text-[10.5px] text-text-faint">
+          Dashboards below aggregate across the whole studio · click a tile above for a focused view.
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-10">
         {/* ── Leads by source ─────────────────────────────────── */}
         <Card
@@ -209,4 +246,25 @@ function Card({
 
 function Empty({ text }: { text: string }) {
   return <div className="py-6 text-center text-[12px] text-text-faint">{text}</div>;
+}
+
+function IndexTile({
+  href, title, desc, badge,
+}: { href: string; title: string; desc: string; badge?: string }) {
+  return (
+    <Link
+      href={href as Route}
+      className="rounded-[10px] border border-rule bg-bg/40 hover:border-accent/40 hover:bg-bg p-3 block transition-colors"
+    >
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <div className="text-[12.5px] font-medium text-text">{title}</div>
+        {badge && (
+          <span className="text-[9.5px] uppercase tracking-[0.06em] text-good bg-good/[0.10] px-1.5 py-0.5 rounded-[3px]">
+            {badge}
+          </span>
+        )}
+      </div>
+      <div className="text-[11px] text-text-dim leading-snug">{desc}</div>
+    </Link>
+  );
 }

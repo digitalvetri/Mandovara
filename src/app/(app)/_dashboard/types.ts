@@ -31,6 +31,30 @@ export interface ActivityItem {
   when: string;
 }
 
+// Phase 8b — operational KPIs pulled from the newer modules.
+// Live counts of work in flight so the owner sees today's studio
+// state without navigating out.
+export interface OperationsKpi {
+  // Make (§5.2 / Phase 5b) — open kanban work.
+  makeInProgressCount: number;
+  makeQueuedCount:     number;
+  makeReadyCount:      number;
+
+  // Install (§5.2 / Phase 5c) — visits scheduled or in-progress
+  // in the next 7 days.
+  installVisitsThisWeek: number;
+
+  // Architect commissions (Phase 6b) — sum of unpaid, non-cancelled.
+  commissionsOutstanding: Paise;
+  commissionsCount:       number;
+
+  // Payroll (Phase 7a) — most recent run and its status.
+  latestPayrollPeriod?:  string;      // "Jul 2026"
+  latestPayrollTotal?:   Paise;
+  latestPayrollStatus?:  string;
+  latestPayrollRunId?:   string;
+}
+
 export interface DashboardData {
   revenueMtd: Paise;
   revenueMtdPrev: Paise;
@@ -47,6 +71,8 @@ export interface DashboardData {
   overdueInvoices: Paise;
   overdueInvoicesCount: number;
   overdueBadge: number;
+
+  operations: OperationsKpi;
 
   revenueByMonth: RevenueMonth[];
   projectStages: ProjectStage[];

@@ -5,6 +5,7 @@ import { scoped } from "@/kernel/db/scoped";
 import type { RequestContext } from "@/kernel/auth/context";
 import type {
   ActivityItem, DashboardData, ProjectStage, RevenueMonth, SiteVisit,
+  OperationsKpi,
 } from "@/app/(app)/_dashboard/types";
 
 const REV_STATUSES = ["ISSUED", "PARTIALLY_PAID", "PAID", "OVERDUE"] as const;
@@ -63,6 +64,9 @@ export async function loadDashboard(ctx: RequestContext): Promise<DashboardData>
     loadRecentActivity(db),
   ]);
 
+  // Phase 8b — operations KPIs after the base fan-out.
+  const operations = await loadOperationsKpi(db, now);
+
   const revenueMtd = revThisMonth;
   const revenueMtdPrev = revLastMonth;
   const revenueMtdTrendPct = percentChange(revenueMtd, revenueMtdPrev);
@@ -84,6 +88,8 @@ export async function loadDashboard(ctx: RequestContext): Promise<DashboardData>
     overdueInvoicesCount: overdueCount,
     overdueBadge: overdueClients.length,
 
+    operations,
+
     revenueByMonth,
     projectStages,
     siteVisits,
@@ -94,6 +100,70 @@ export async function loadDashboard(ctx: RequestContext): Promise<DashboardData>
 // ── field-specific loaders ───────────────────────────────────────
 
 type Db = ReturnType<typeof scoped>;
+
+// Live counts from make / install / commissions / payroll so the
+// owner sees today's studio state without navigating out.
+async function loadOperationsKpi(db: Db, now: Date): Promise<OperationsKpi> {
+  const in7Days = new Date(now); in7Days.setDate(now.getDate() + 7);
+
+  const [
+    makeStatusCounts,
+    installsThisWeek,
+    commAgg,
+    commCount,
+    latestPayroll,
+  ] = await Promise.all([
+    db.makeJob.groupBy({
+      by:     ["status"],
+      where:  { status: { not: "DELIVERED" } },
+      _count: { _all: true },
+    }),
+    db.installVisit.count({
+      where: {
+        scheduledAt: { gte: now, lte: in7Days },
+        status:      { in: ["SCHEDULED", "IN_PROGRESS"] },
+      },
+    }),
+    db.architectCommission.aggregate({
+      where: { paidAt: null, cancelledAt: null },
+      _sum:  { amount: true },
+    }),
+    db.architectCommission.count({
+      where: { paidAt: null, cancelledAt: null },
+    }),
+    db.payrollRun.findFirst({
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      select:  { id: true, month: true, year: true, status: true, totalPayable: true },
+    }),
+  ]);
+
+  const byStatus = new Map(makeStatusCounts.map((r) => [r.status, r._count._all]));
+  const makeInProgressCount =
+    (byStatus.get("CUTTING")   ?? 0) +
+    (byStatus.get("STITCHING") ?? 0) +
+    (byStatus.get("FINISHING") ?? 0) +
+    (byStatus.get("QC")        ?? 0);
+
+  const monthLabels = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+
+  return {
+    makeQueuedCount:     byStatus.get("QUEUED") ?? 0,
+    makeInProgressCount,
+    makeReadyCount:      byStatus.get("READY") ?? 0,
+    installVisitsThisWeek: installsThisWeek,
+    commissionsOutstanding: commAgg._sum.amount ?? 0n,
+    commissionsCount:      commCount,
+    ...(latestPayroll && {
+      latestPayrollPeriod: `${monthLabels[latestPayroll.month - 1]} ${latestPayroll.year}`,
+      latestPayrollTotal:  latestPayroll.totalPayable,
+      latestPayrollStatus: latestPayroll.status,
+      latestPayrollRunId:  latestPayroll.id,
+    }),
+  };
+}
 
 async function sumInvoices(db: Db, from: Date, to: Date): Promise<bigint> {
   const agg = await db.invoice.aggregate({
