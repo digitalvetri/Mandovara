@@ -675,24 +675,56 @@ model Bin {
   @@unique([rackId, code])
 }
 
+// Batch = the dye-lot record for roll-based / batch-tracked goods.
+// Wallpaper, fabric, carpet, film — every roll from one production run
+// shares one dye-lot; §0.6 forbids mixing lots on one job without an
+// audited override. Non-lot products still work: batchNumber is any
+// receipt-time identifier and rollCount/lengths remain null.
 model Batch {
-  id          String    @id @default(cuid())
-  orgId       String
-  productId   String
-  warehouseId String
-  batchNumber String
-  mfgDate     DateTime?
-  expiryDate  DateTime?
-  quantity    Decimal   @db.Decimal(18, 4)        // ledger-derived; snapshot
-  createdAt   DateTime  @default(now())
+  id           String    @id @default(cuid())
+  orgId        String
+  productId    String
+  warehouseId  String
+  batchNumber  String                                // = dye-lot code for roll goods
+  mfgDate      DateTime?
+  expiryDate   DateTime?
+  quantity     Decimal   @db.Decimal(18, 4)          // ledger-derived; snapshot
+  rollCount    Int?                                  // wallpaper/fabric receipt
+  rollLengthsM Json?                                 // e.g. [10.05, 10.05, 7.20]
+  binLocation  String?                               // shelf label; free text for now
+  createdAt    DateTime  @default(now())
 
-  product     Product   @relation(fields: [productId], references: [id])
-  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
-  ledger      StockLedgerEntry[]
+  product      Product   @relation(fields: [productId], references: [id])
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  ledger       StockLedgerEntry[]
+  allocations  LotAllocation[]
 
   @@unique([orgId, productId, batchNumber])
   @@index([orgId, productId])
   @@index([expiryDate])
+}
+
+// One reservation of a specific dye-lot to one order line. Mixed-lot on a
+// single order line is blocked unless mixedLotOverride=true with a reason —
+// see LotAllocationAction / §0.6.
+model LotAllocation {
+  id                 String   @id @default(cuid())
+  orgId              String
+  orderLineId        String
+  batchId            String
+  quantity           Decimal  @db.Decimal(18, 4)
+  mixedLotOverride   Boolean  @default(false)
+  overrideReason     String?
+  overrideById       String?
+  releasedAt         DateTime?
+  createdAt          DateTime @default(now())
+  createdById        String?
+
+  batch              Batch     @relation(fields: [batchId], references: [id])
+  orderLine          OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, orderLineId])
+  @@index([orgId, batchId])
 }
 
 model SerialNumber {
@@ -1082,18 +1114,23 @@ model GRN {
 }
 
 model GRNLine {
-  id          String  @id @default(cuid())
-  grnId       String
-  lineNo      Int
-  productId   String
-  quantity    Decimal @db.Decimal(18, 4)
-  rate        BigInt
-  amount      BigInt
-  warehouseId String
-  batchNumber String?
+  id           String  @id @default(cuid())
+  grnId        String
+  lineNo       Int
+  productId    String
+  quantity     Decimal @db.Decimal(18, 4)
+  rate         BigInt
+  amount       BigInt
+  warehouseId  String
+  // Dye-lot on receipt (§0.6). batchNumber = dye-lot code for roll goods.
+  // Roll count + individual roll lengths make partial-roll reality visible.
+  batchNumber  String?
+  rollCount    Int?
+  rollLengthsM Json?
+  binLocation  String?
 
-  grn         GRN     @relation(fields: [grnId], references: [id], onDelete: Cascade)
-  product     Product @relation(fields: [productId], references: [id])
+  grn          GRN     @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id])
 
   @@index([grnId])
 }
@@ -1221,8 +1258,9 @@ model OrderLine {
   gstRate      Decimal @db.Decimal(5, 2)
   amount       BigInt
 
-  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
-  product      Product    @relation(fields: [productId], references: [id])
+  salesOrder   SalesOrder      @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product      Product         @relation(fields: [productId], references: [id])
+  lotAllocations LotAllocation[]
 
   @@index([salesOrderId])
 }
