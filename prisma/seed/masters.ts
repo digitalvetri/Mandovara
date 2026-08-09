@@ -1,8 +1,12 @@
 // Master data — org, branch, users, employees, vendors, statutory slabs, number sequences.
 // No @ts-nocheck — this file must typecheck cleanly against the actual schema.
 import { Prisma, PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { makeGstin, makeRng, makePan } from "./rng";
 import { seedRoles } from "./roles";
+
+// Default password for all seeded users. Change before going to production.
+export const DEFAULT_DEV_PASSWORD = "Mandovara@2026";
 
 export interface SeedMasterIds {
   orgId: string;
@@ -184,12 +188,13 @@ export async function seedMasters(db: PrismaClient, seed?: number): Promise<Seed
   });
 
   // ── Users (9, one per AppRole) ─────────────────────────────────────────────
+  const pwHash = bcrypt.hashSync(DEFAULT_DEV_PASSWORD, 10);
   const userRows: Prisma.UserCreateManyInput[] = USER_SPECS.map((u) => ({
     organizationId: org.id,
     mobile:         u.mobile,
     email:          u.email,
     name:           u.name,
-    passwordHash:   null,
+    passwordHash:   pwHash,
     role:           u.role as Prisma.UserCreateManyInput["role"],
     branchIds:      [branch.id],
     locale:         "en",

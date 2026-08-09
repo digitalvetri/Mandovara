@@ -1,23 +1,17 @@
 // DEV-ONLY RequestContext helper. Until Phase 7 lands real auth (mobile-
-// number-first login, Argon2id, httpOnly cookies), the app runs as the
-// seeded organisation Owner so we can build modules against real data.
+// number-first login, Argon2id, httpOnly cookies), the app uses a cookie
+// "dev_uid" set by the dev login page to identity the current user.
 //
-// Permission resolution mirrors session.ts:
-//   1. If the OWNER user has a roleId, load RolePermission for that Role.
-//      isOwnerRole=true → allPermissions().
-//   2. Otherwise fall back to allPermissions() (during seed migration or
-//      when the DB is unreachable).
-//
-// Deliberately placed OUTSIDE src/kernel/** because Rule 10 forbids
-// automated changes to the kernel. This lives at the module boundary and
-// is gated on NODE_ENV !== "production" — throws in prod so the bypass
-// cannot escape into a deployment.
+// Uses React's cache() for per-request deduplication — multiple server
+// components/actions calling devContext() in one request share one DB read.
+// Unlike a module-level variable, this is per-request, so different browser
+// sessions get different contexts.
 
+import { cache } from "react";
+import { cookies } from "next/headers";
 import { prisma } from "@/kernel/db/client";
 import type { RequestContext } from "@/kernel/auth/context";
 import { PERMISSIONS, isPermissionKey, type PermissionKey } from "@/kernel/rbac/permissions";
-
-let cached: RequestContext | undefined;
 
 function allRegisteredPermissions(): ReadonlySet<PermissionKey> {
   const set = new Set<PermissionKey>();
@@ -36,14 +30,70 @@ const STUB_CONTEXT: RequestContext = {
   permissions: allRegisteredPermissions(),
 };
 
-export async function devContext(): Promise<RequestContext> {
+async function buildContext(userId: string): Promise<RequestContext | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, organizationId: true, branchIds: true, role: true,
+        dynamicRole: {
+          select: {
+            isOwnerRole: true,
+            permissions: { select: { key: true, scope: true } },
+          },
+        },
+      },
+    });
+    if (!user) return null;
+
+    let permissions: ReadonlySet<PermissionKey>;
+    if (user.dynamicRole) {
+      if (user.dynamicRole.isOwnerRole) {
+        permissions = allRegisteredPermissions();
+      } else {
+        const s = new Set<PermissionKey>();
+        for (const p of user.dynamicRole.permissions) {
+          if (p.scope !== "NONE" && isPermissionKey(p.key)) s.add(p.key);
+        }
+        permissions = s;
+      }
+    } else {
+      permissions = allRegisteredPermissions();
+    }
+
+    return {
+      userId: user.id,
+      orgId: user.organizationId,
+      branchIds: user.branchIds,
+      branchScope: "ALL",
+      roles: [user.role as string],
+      permissions,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export const devContext = cache(async (): Promise<RequestContext> => {
   if (process.env["NODE_ENV"] === "production") {
     throw new Error("devContext() called in production — refuse.");
   }
-  if (cached) return cached;
 
+  // 1. Try the dev_uid cookie (set by the login page)
   try {
-    const user = await prisma.user.findFirstOrThrow({
+    const jar = await cookies();
+    const uid = jar.get("dev_uid")?.value;
+    if (uid) {
+      const ctx = await buildContext(uid);
+      if (ctx) return ctx;
+    }
+  } catch {
+    // Running outside request scope (seed scripts, tests) — fall through
+  }
+
+  // 2. Fall back to the first OWNER in the DB
+  try {
+    const owner = await prisma.user.findFirstOrThrow({
       where: { role: "OWNER" },
       select: {
         id: true, organizationId: true, branchIds: true, role: true,
@@ -55,37 +105,11 @@ export async function devContext(): Promise<RequestContext> {
         },
       },
     });
-
-    let permissions: ReadonlySet<PermissionKey>;
-
-    if (user.dynamicRole) {
-      if (user.dynamicRole.isOwnerRole) {
-        permissions = allRegisteredPermissions();
-      } else {
-        const s = new Set<PermissionKey>();
-        for (const p of user.dynamicRole.permissions) {
-          if (p.scope !== "NONE" && isPermissionKey(p.key)) {
-            s.add(p.key);
-          }
-        }
-        permissions = s;
-      }
-    } else {
-      permissions = allRegisteredPermissions();
-    }
-
-    cached = {
-      userId: user.id,
-      orgId: user.organizationId,
-      branchIds: user.branchIds,
-      branchScope: "ALL",
-      roles: [user.role as string],
-      permissions,
-    };
+    const ctx = await buildContext(owner.id);
+    if (ctx) return ctx;
   } catch {
     console.warn("[devContext] DB unreachable — using stub context. Start Docker to load real data.");
-    cached = STUB_CONTEXT;
   }
 
-  return cached;
-}
+  return STUB_CONTEXT;
+});

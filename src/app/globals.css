@@ -28,17 +28,18 @@
   --color-sidebar-text:  oklch(0.94 0.008 265);
   --color-sidebar-dim:   oklch(0.68 0.028 265);
 
-  /* Antique gold — used ONCE per screen (§6.1) */
+  /* Antique gold — decorative only (hairlines, secondary badges, avatars) */
   --color-gold:          oklch(0.72 0.115 85);    /* #C9A227 */
   --color-gold-strong:   oklch(0.83 0.105 85);    /* #E5C55C */
   --color-gold-lit:      oklch(0.83 0.105 85);
   --color-gold-dim:      oklch(0.55 0.090 85);
   --color-gold-tint:     oklch(0.72 0.115 85 / 0.13);
 
-  /* Accent alias — points at gold, so bg-accent = the gold CTA */
-  --color-accent:        oklch(0.72 0.115 85);
-  --color-accent-hover:  oklch(0.83 0.105 85);
-  --color-accent-dim:    oklch(0.55 0.090 85);
+  /* Accent — Mandovara brand teal #2BA89A (matches mandovara.com) */
+  --color-accent:        oklch(0.64 0.093 191);   /* #2BA89A teal  */
+  --color-accent-hover:  oklch(0.70 0.090 191);   /* lighter teal  */
+  --color-accent-dim:    oklch(0.48 0.085 191);   /* deeper teal   */
+  --color-accent-tint:   oklch(0.64 0.093 191 / 0.12);
 
   /* Status (spec: solid/heat/fault/info) */
   --color-solid:         oklch(0.78 0.145 165);   /* ready, paid, installed */
@@ -98,8 +99,9 @@
   --color-gold-strong:   oklch(0.72 0.115 85);
   --color-gold-lit:      oklch(0.72 0.115 85);
   --color-gold-tint:     oklch(0.65 0.115 85 / 0.13);
-  --color-accent:        oklch(0.65 0.115 85);
-  --color-accent-hover:  oklch(0.72 0.115 85);
+  --color-accent:        oklch(0.59 0.093 191);   /* teal, slightly deeper for light bg */
+  --color-accent-hover:  oklch(0.64 0.093 191);   /* #2BA89A */
+  --color-accent-tint:   oklch(0.59 0.093 191 / 0.10);
 }
 
 /* ── Base ──────────────────────────────────────────────────────── */

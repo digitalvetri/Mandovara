@@ -1,19 +1,24 @@
 "use client";
 
-// Client wrapper that gives the Sidebar its responsive behaviour: fixed
-// on ≥ md, off-canvas drawer with a hamburger toggle on < md. Closes on
-// route change and on Escape.
-
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { GlobalTopbar } from "./GlobalTopbar";
 
-export function SidebarShell() {
+interface Props {
+  userName: string;
+  userRole: string;
+}
+
+export function SidebarShell({ userName, userRole }: Props) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
+  // Close sidebar when route changes (mobile nav click)
   useEffect(() => setOpen(false), [pathname]);
+
+  // Close on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
     window.addEventListener("keydown", onKey);
@@ -22,49 +27,47 @@ export function SidebarShell() {
 
   return (
     <>
-      {/* Mobile top bar with hamburger */}
-      <div className="md:hidden fixed inset-x-0 top-0 z-40 h-[52px] bg-sidebar text-sidebar-text flex items-center justify-between px-4 border-b border-white/5">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open menu"
-          className="h-[36px] w-[36px] grid place-items-center rounded-[6px] text-sidebar-text hover:bg-sidebar-hover transition-colors"
-        >
-          <Menu size={18} strokeWidth={1.75} />
-        </button>
-        <div className="font-display text-[15px] tracking-[0.24em] font-semibold">
-          MANDOVARA
-        </div>
-        <div className="w-[36px]" />
-      </div>
+      {/* ── Full-width fixed topbar (replaces the old mobile-only strip) ── */}
+      <GlobalTopbar
+        userName={userName}
+        userRole={userRole}
+        onMenuOpen={() => setOpen(true)}
+      />
 
-      {/* Backdrop */}
+      {/* ── Mobile overlay backdrop ── */}
       {open && (
         <div
+          role="presentation"
           onClick={() => setOpen(false)}
-          className="md:hidden fixed inset-0 z-40 bg-black/50 transition-opacity"
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] transition-opacity"
           aria-hidden
         />
       )}
 
-      {/* Drawer / desktop sidebar */}
+      {/* ── Sidebar panel ── */}
       <div
         className={[
-          "fixed inset-y-0 left-0 z-50 w-[260px] transition-transform duration-200",
+          // Shared: fixed, left edge, full bottom
+          "fixed left-0 bottom-0 z-50 transition-transform duration-200 ease-in-out",
+          // Mobile: full height from top, 260px wide, slides in/out
+          "top-0 w-[272px]",
           open ? "translate-x-0" : "-translate-x-full",
-          "md:translate-x-0 md:w-[240px]",
+          // Desktop: always visible, starts below the 60px global topbar
+          "md:top-[60px] md:w-[240px] md:translate-x-0",
         ].join(" ")}
       >
-        {/* Close button on mobile */}
+        {/* Mobile close button inside the drawer */}
         <button
           type="button"
           onClick={() => setOpen(false)}
-          aria-label="Close menu"
-          className="md:hidden absolute top-3 right-3 z-10 h-[32px] w-[32px] grid place-items-center rounded-[6px] text-sidebar-text hover:bg-sidebar-hover transition-colors"
+          aria-label="Close navigation menu"
+          className="md:hidden absolute top-3 right-3 z-10 h-8 w-8 grid place-items-center rounded-[7px] transition-colors"
+          style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.06)" }}
         >
-          <X size={16} strokeWidth={1.75} />
+          <X size={15} strokeWidth={2} />
         </button>
-        <Sidebar />
+
+        <Sidebar userName={userName} userRole={userRole} />
       </div>
     </>
   );
