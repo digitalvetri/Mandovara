@@ -15,14 +15,20 @@ export default async function VendorDetailPage({
   if (!v) notFound();
   return (
     <>
-      <Topbar title={v.name} eyebrow={`${v.mobile} · State ${v.stateCode} · ${v.paymentTerms}d terms`} />
+      <Topbar
+        title={v.name}
+        eyebrow={`${v.code} · ${v.mobile} · ${v.paymentTermsDays}d terms · ${v.leadTimeDays}d lead time`}
+      />
       <VendorForm
         mode="edit"
         initial={{
-          id: v.id, name: v.name,
+          id: v.id,
+          name: v.name,
           mobile: v.mobile.replace(/^\+91/, ""),
-          email: v.email ?? "", gstin: v.gstin ?? "", pan: "",
-          stateCode: v.stateCode, paymentTerms: v.paymentTerms,
+          email: v.email ?? "",
+          gstin: v.gstin ?? "",
+          paymentTermsDays: v.paymentTermsDays,
+          leadTimeDays: v.leadTimeDays,
         }}
       />
     </>

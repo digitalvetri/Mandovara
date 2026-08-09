@@ -1,4 +1,7 @@
 // Admin & Roles — real reads only.
+// Schema: User has `role AppRole` as a direct enum field (not a relation).
+// There is no Role model — roles come from the AppRole enum.
+// AppRole enum: OWNER DESIGNER SALES MEASURE_EXEC STORE MAKE_SUPERVISOR INSTALLER ACCOUNTS HR
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -7,8 +10,12 @@ import type { RequestContext } from "@/kernel/auth/context";
 export interface UserRow {
   id: string; name: string; email: string; role: string; branchLabel: string;
 }
-export interface MatrixRow { module: string; view: boolean; create: boolean; approve: boolean; delete: boolean; }
-export interface AuditRow  { id: string; when: string; actor: string; action: string; entity: string; }
+export interface MatrixRow {
+  module: string; view: boolean; create: boolean; approve: boolean; delete: boolean;
+}
+export interface AuditRow {
+  id: string; when: string; actor: string; action: string; entity: string;
+}
 export interface CompanySettings {
   orgId: string;
   orgName: string;
@@ -26,6 +33,19 @@ export interface AdminView {
   roles: { id: string; name: string }[];
 }
 
+// AppRole enum values — no DB Role model exists
+const APP_ROLES: { id: string; name: string }[] = [
+  { id: "OWNER",           name: "Owner" },
+  { id: "DESIGNER",        name: "Designer" },
+  { id: "SALES",           name: "Sales" },
+  { id: "MEASURE_EXEC",    name: "Measure Executive" },
+  { id: "STORE",           name: "Store" },
+  { id: "MAKE_SUPERVISOR", name: "Make Supervisor" },
+  { id: "INSTALLER",       name: "Installer" },
+  { id: "ACCOUNTS",        name: "Accounts" },
+  { id: "HR",              name: "HR" },
+];
+
 const MATRIX_ROWS = [
   { module: "Leads & Quotes" },
   { module: "Orders & Dispatch" },
@@ -39,37 +59,43 @@ export async function loadAdmin(ctx: RequestContext): Promise<AdminView> {
   requirePermission(ctx, "admin.settings");
   const db = scoped(ctx);
 
-  const [users, org, branches, audit, roles] = await Promise.all([
+  // User.role is a direct AppRole enum field — no userRoles relation
+  const [users, org, branches, audit] = await Promise.all([
     db.user.findMany({
-      take: 20, orderBy: { name: "asc" },
+      take: 20,
+      orderBy: { name: "asc" },
       select: {
-        id: true, name: true, email: true, branchIds: true,
-        userRoles: { select: { role: { select: { name: true } } }, take: 1 },
+        id: true, name: true, email: true, branchIds: true, role: true,
       },
     }),
     db.organization.findFirst({
       select: { id: true, name: true, gstin: true, fyStartMonth: true },
     }),
-    db.branch.findMany({ select: { id: true, name: true, invoicePrefix: true } }),
+    db.branch.findMany({
+      select: { id: true, name: true, invoicePrefix: true },
+    }),
     db.auditLog.findMany({
-      orderBy: { createdAt: "desc" }, take: 10,
+      orderBy: { createdAt: "desc" },
+      take: 10,
       select: { id: true, createdAt: true, actorId: true, action: true, entityType: true },
     }),
-    db.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const branchNameById = new Map(branches.map((b) => [b.id, b.name]));
   const primaryBranch = branches[0];
 
   const userRows: UserRow[] = users.map((u) => ({
-    id: u.id, name: u.name, email: u.email ?? "—",
-    role: u.userRoles[0]?.role.name ?? "Unassigned",
+    id: u.id,
+    name: u.name,
+    email: u.email ?? "—",
+    role: formatRole(u.role),
     branchLabel: labelBranches(u.branchIds, branchNameById),
   }));
 
-  // Resolve actor names in one round-trip so the log reads "Anbu Kumar"
-  // instead of the raw cuid tail.
-  const actorIds = [...new Set(audit.map((a) => a.actorId).filter((x): x is string => !!x))];
+  // Resolve actor names for the audit log in one round-trip
+  const actorIds = [...new Set(
+    audit.map((a) => a.actorId).filter((x): x is string => x != null),
+  )];
   const actorsById = new Map<string, string>();
   if (actorIds.length > 0) {
     const actors = await db.user.findMany({
@@ -88,7 +114,10 @@ export async function loadAdmin(ctx: RequestContext): Promise<AdminView> {
 
   const matrix: MatrixRow[] = MATRIX_ROWS.map((r, i) => ({
     module: r.module,
-    view: true, create: i < 4, approve: i === 2 || i === 4, delete: i === 5,
+    view: true,
+    create: i < 4,
+    approve: i === 2 || i === 4,
+    delete: i === 5,
   }));
 
   return {
@@ -96,17 +125,34 @@ export async function loadAdmin(ctx: RequestContext): Promise<AdminView> {
     matrix,
     audit: auditRows,
     company: {
-      orgId:         org?.id ?? "",
-      orgName:       org?.name ?? "",
-      fyStartMonth:  org?.fyStartMonth ?? 4,
-      fyLabel:       fyLabel(org?.fyStartMonth ?? 4),
-      gstin:         org?.gstin ?? null,
+      orgId:        org?.id ?? "",
+      orgName:      org?.name ?? "",
+      fyStartMonth: org?.fyStartMonth ?? 4,
+      fyLabel:      fyLabel(org?.fyStartMonth ?? 4),
+      gstin:        org?.gstin ?? null,
       invoiceSeries: primaryBranch?.invoicePrefix ?? "",
     },
-    branches, roles,
+    branches,
+    roles: APP_ROLES,
   };
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatRole(role: string): string {
+  const map: Record<string, string> = {
+    OWNER:           "Owner",
+    DESIGNER:        "Designer",
+    SALES:           "Sales",
+    MEASURE_EXEC:    "Measure Exec",
+    STORE:           "Store",
+    MAKE_SUPERVISOR: "Make Supervisor",
+    INSTALLER:       "Installer",
+    ACCOUNTS:        "Accounts",
+    HR:              "HR",
+  };
+  return map[role] ?? role;
+}
 function fyLabel(m: number): string {
   const start = new Date(0, m - 1, 1).toLocaleDateString("en", { month: "long" });
   const end   = new Date(0, ((m + 10) % 12), 1).toLocaleDateString("en", { month: "long" });
@@ -137,17 +183,13 @@ function humaniseAction(a: string): string {
 function humaniseEntity(e: string): string {
   const map: Record<string, string> = {
     Lead: "Lead", Client: "Client", Quotation: "Quotation",
-    SalesOrder: "Sales order", Dispatch: "Dispatch",
+    SalesOrder: "Sales order",
     Invoice: "Invoice", Receipt: "Receipt",
     PurchaseOrder: "Purchase order", GRN: "GRN",
-    Product: "Product", Category: "Product category",
-    StockAdjustment: "Stock adjustment", StockLedgerEntry: "Stock movement",
-    Project: "Project", Milestone: "Milestone", Task: "Task",
-    SiteLog: "Site log", SnagItem: "Snag",
+    Project: "Project", Snag: "Snag",
     FollowUp: "Follow-up",
-    User: "User", UserRole: "User role", Role: "Role",
-    Employee: "Employee", Attendance: "Attendance", Leave: "Leave",
-    PayrollRun: "Payroll run", Payslip: "Payslip", SalaryStructure: "Salary structure",
+    User: "User", Employee: "Employee", Attendance: "Attendance", Leave: "Leave",
+    PayrollRun: "Payroll run", Payslip: "Payslip",
     MessageTemplate: "Message template", AutomationRule: "Automation rule",
     Organization: "Company settings", Branch: "Branch",
   };

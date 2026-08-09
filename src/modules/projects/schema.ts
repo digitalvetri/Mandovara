@@ -2,8 +2,16 @@
 
 import { z } from "zod";
 
-export const PROJECT_STATUSES = ["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"] as const;
-export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+export const PROJECT_STAGES = [
+  "ENQUIRY", "MEASUREMENT", "QUOTATION", "ORDERED", "PROCUREMENT",
+  "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED", "CANCELLED",
+] as const;
+
+export type ProjectStage = (typeof PROJECT_STAGES)[number];
+
+// Legacy aliases — used by ProjectFilters, ProjectsTable, ProjectStatusPill, projects/page.tsx
+export const PROJECT_STATUSES = PROJECT_STAGES;
+export type ProjectStatus = ProjectStage;
 
 export const MILESTONE_STATUSES = ["PENDING", "ACTIVE", "COMPLETED"] as const;
 export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
@@ -27,7 +35,7 @@ export const createProjectSchema = z.object({
 
 export const setProjectStatusSchema = z.object({
   id:     z.string().cuid(),
-  status: z.enum(PROJECT_STATUSES),
+  status: z.enum(PROJECT_STAGES),
 });
 
 export const addMilestoneSchema = z.object({

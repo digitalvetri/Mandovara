@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Phone, Mail, Building2, Compass, IndianRupee, ClipboardList } from "lucide-react";
+import { Phone, Mail, Compass, IndianRupee, ClipboardList } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { getLead } from "@/modules/leads/queries";
@@ -38,13 +38,10 @@ export default async function LeadDetailPage({
   const createdDate = lead.createdAt.toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
   });
-  const updatedDate = lead.updatedAt.toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", timeZone: "Asia/Kolkata",
-  });
-  const expectedRupees = lead.expectedValue
-    ? String(Number(lead.expectedValue) / 100)
+  const budgetRupees = lead.budgetMax
+    ? String(Number(lead.budgetMax) / 100)
     : "";
-  const expectedDisplay = lead.expectedValue ? formatINR(lead.expectedValue) : "";
+  const budgetDisplay = lead.budgetMax ? formatINR(lead.budgetMax) : "";
   const isConverted = lead.convertedClientId != null;
 
   return (
@@ -67,10 +64,10 @@ export default async function LeadDetailPage({
             />
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <StatusPill status={lead.status} />
+            <StatusPill status={lead.stage} />
             <ConvertButton
               id={lead.id}
-              status={lead.status}
+              status={lead.stage}
               convertedClientId={lead.convertedClientId}
             />
           </div>
@@ -82,7 +79,7 @@ export default async function LeadDetailPage({
         <div className="lg:col-span-2 space-y-4">
           {isConverted && (
             <div className="rounded-[14px] bg-good/8 border border-good/30 p-4 text-[12.5px] text-text">
-              This lead has been converted to a client. Edits here won't sync — update the client record instead.
+              This lead has been converted to a client. Edits here won&apos;t sync — update the client record instead.
             </div>
           )}
 
@@ -112,15 +109,6 @@ export default async function LeadDetailPage({
               />
               <EditableField
                 leadId={lead.id}
-                field="companyName"
-                value={lead.companyName ?? ""}
-                label="Company"
-                placeholder="Add company"
-                icon={<Building2 size={14} strokeWidth={1.75} />}
-                readOnly={isConverted}
-              />
-              <EditableField
-                leadId={lead.id}
                 field="source"
                 value={lead.source}
                 displayValue={SOURCE_LABEL[lead.source] ?? lead.source}
@@ -133,8 +121,8 @@ export default async function LeadDetailPage({
               <EditableField
                 leadId={lead.id}
                 field="expectedValue"
-                value={expectedRupees}
-                displayValue={expectedDisplay}
+                value={budgetRupees}
+                displayValue={budgetDisplay}
                 label="Expected value"
                 placeholder="Add expected value"
                 icon={<IndianRupee size={14} strokeWidth={1.75} />}
@@ -160,7 +148,7 @@ export default async function LeadDetailPage({
                 <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
                   Move status
                 </div>
-                <StatusChanger id={lead.id} current={lead.status} />
+                <StatusChanger id={lead.id} current={lead.stage} />
               </div>
             </div>
           )}
@@ -227,10 +215,9 @@ export default async function LeadDetailPage({
               At a glance
             </div>
             <dl className="space-y-3 text-[13px]">
-              <Row k="Expected value" v={expectedDisplay || "—"} />
+              <Row k="Expected value" v={budgetDisplay || "—"} />
               <Row k="Source" v={SOURCE_LABEL[lead.source] ?? lead.source} />
               <Row k="Owner" v={lead.ownerId ? "Assigned" : "Unassigned"} />
-              <Row k="Last updated" v={updatedDate} />
               <Row k="Created" v={createdDate} />
             </dl>
           </div>

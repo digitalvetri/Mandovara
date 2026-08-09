@@ -1,103 +1,145 @@
-// Attendance & Leave — real DB only. Empty views render clean.
+// Attendance & Leave — read side.
+// Employee data joined separately (no Prisma back-relation on Attendance).
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
 export interface PunchRow {
+  employeeId:   string;
   employeeName: string;
-  role: string | null;
-  location: string | null;
-  inTime: string | null;
-  outTime: string | null;
-  hours: string | null;
-  status: "PRESENT" | "ABSENT" | "LATE" | "LEAVE";
+  designation:  string | null;
+  inAt:         string | null;
+  outAt:        string | null;
+  status:       "PRESENT" | "HALF_DAY" | "ABSENT" | "LEAVE" | "HOLIDAY" | "WEEK_OFF";
+  isLocked:     boolean;
 }
 
 export interface LeaveRow {
   employeeName: string;
-  kind: string;
-  days: number;
-  when: string;
-  status: "APPROVED" | "PENDING" | "REJECTED";
+  kind:         string;
+  days:         number;
+  when:         string;
+  state:        "APPROVED" | "PENDING" | "REJECTED";
 }
 
 export interface AttendanceView {
-  present: number;
-  absent: number;
-  late: number;
-  onLeave: number;
+  present:       number;
+  absent:        number;
+  halfDay:       number;
+  onLeave:       number;
   employeeCount: number;
-  punches: PunchRow[];
-  leaves: LeaveRow[];
+  punches:       PunchRow[];
+  leaves:        LeaveRow[];
 }
 
 export async function loadAttendance(ctx: RequestContext): Promise<AttendanceView> {
   requirePermission(ctx, "attendance.view");
-  const db = scoped(ctx);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const db    = scoped(ctx);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
 
   const [rows, employeeCount, leaveRows] = await Promise.all([
     db.attendance.findMany({
-      where: { date: today },
-      select: {
-        status: true, inTime: true, outTime: true, workedHours: true,
-        employee: { select: { name: true, designation: true, department: true } },
-      },
-      take: 100,
+      where:   { organizationId: ctx.orgId, date: today },
+      select:  { employeeId: true, status: true, inAt: true, outAt: true, lockedAt: true },
+      take:    100,
     }),
-    db.employee.count(),
+    db.employee.count({ where: { organizationId: ctx.orgId } }),
     db.leave.findMany({
-      where: { status: { in: ["PENDING", "APPROVED"] } },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: {
-        type: true, status: true, fromDate: true, toDate: true, days: true,
-        employee: { select: { name: true } },
-      },
+      where:   { organizationId: ctx.orgId, state: { in: ["PENDING", "APPROVED"] } },
+      orderBy: { fromDate: "desc" },
+      take:    20,
+      select:  { employeeId: true, type: true, state: true, fromDate: true, toDate: true, days: true },
     }),
   ]);
 
-  const punches: PunchRow[] = rows.map((r) => ({
-    employeeName: r.employee.name,
-    role: r.employee.designation ?? r.employee.department,
-    location: null,
-    inTime: fmt(r.inTime),
-    outTime: fmt(r.outTime),
-    hours: r.workedHours?.toString() ?? null,
-    status: normaliseStatus(r.status),
-  }));
+  // Fetch employee names for attendance and leave rows in one query
+  const empIds = [...new Set([
+    ...rows.map((r) => r.employeeId),
+    ...leaveRows.map((l) => l.employeeId),
+  ])];
+  const emps = empIds.length > 0
+    ? await db.employee.findMany({
+        where:  { id: { in: empIds } },
+        select: { id: true, name: true, designation: true },
+      })
+    : [];
+  const empMap = new Map(emps.map((e) => [e.id, e]));
 
-  const counts = countStatuses(punches);
-  const present = counts["PRESENT"] ?? 0;
-  const late    = counts["LATE"] ?? 0;
-  const onLeave = counts["LEAVE"] ?? 0;
-  const absent  = punches.length > 0
-    ? Math.max(0, employeeCount - present - late - onLeave) : 0;
+  const punches: PunchRow[] = rows.map((r) => ({
+    employeeId:   r.employeeId,
+    employeeName: empMap.get(r.employeeId)?.name ?? r.employeeId,
+    designation:  empMap.get(r.employeeId)?.designation ?? null,
+    inAt:         r.inAt ? formatTime(r.inAt) : null,
+    outAt:        r.outAt ? formatTime(r.outAt) : null,
+    status:       r.status as PunchRow["status"],
+    isLocked:     r.lockedAt != null,
+  }));
 
   const leaves: LeaveRow[] = leaveRows.map((l) => ({
-    employeeName: l.employee.name,
-    kind: humaniseKind(l.type),
-    days: Number(l.days),
-    when: leaveWhen(l.fromDate, l.toDate),
-    status: (l.status === "APPROVED" || l.status === "PENDING" || l.status === "REJECTED")
-      ? l.status : "PENDING",
+    employeeName: empMap.get(l.employeeId)?.name ?? l.employeeId,
+    kind:         humaniseKind(l.type),
+    days:         Number(l.days),
+    when:         leaveWhen(l.fromDate, l.toDate),
+    state:        l.state as LeaveRow["state"],
   }));
 
-  return { present, absent, late, onLeave, employeeCount, punches, leaves };
+  const present = punches.filter((p) => p.status === "PRESENT").length;
+  const halfDay = punches.filter((p) => p.status === "HALF_DAY").length;
+  const onLeave = punches.filter((p) => p.status === "LEAVE").length;
+  const absent  = Math.max(0, employeeCount - punches.length); // not in the table = absent
+
+  return { present, absent, halfDay, onLeave, employeeCount, punches, leaves };
 }
 
-function normaliseStatus(s: string): PunchRow["status"] {
-  if (s === "PRESENT" || s === "ABSENT" || s === "LATE" || s === "LEAVE") return s;
-  return "PRESENT";
+export interface EmployeeOption {
+  id:          string;
+  name:        string;
+  designation: string | null;
 }
-function countStatuses(rows: PunchRow[]): Record<string, number> {
-  const c: Record<string, number> = { PRESENT: 0, ABSENT: 0, LATE: 0, LEAVE: 0 };
-  for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
-  return c;
+
+export async function listEmployees(ctx: RequestContext): Promise<EmployeeOption[]> {
+  requirePermission(ctx, "attendance.view");
+  const db = scoped(ctx);
+  return db.employee.findMany({
+    where:   { organizationId: ctx.orgId, status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    select:  { id: true, name: true, designation: true },
+  });
 }
-function fmt(t: Date | null): string | null {
-  if (!t) return null;
+
+/** Absence and half-day counts for a given employee and month — used by the payroll kernel. */
+export async function getAttendanceSummaryForMonth(
+  ctx: RequestContext,
+  employeeId: string,
+  month:      number,
+  year:       number,
+): Promise<{ absentDays: number; halfDays: number }> {
+  requirePermission(ctx, "payroll.view");
+  const db         = scoped(ctx);
+  const monthStart = new Date(Date.UTC(year, month - 1, 1));
+  const monthEnd   = new Date(Date.UTC(year, month, 1));
+
+  const rows = await db.attendance.findMany({
+    where: {
+      organizationId: ctx.orgId,
+      employeeId,
+      date:   { gte: monthStart, lt: monthEnd },
+      status: { in: ["ABSENT", "HALF_DAY"] },
+    },
+    select: { status: true },
+  });
+
+  return {
+    absentDays: rows.filter((r) => r.status === "ABSENT").length,
+    halfDays:   rows.filter((r) => r.status === "HALF_DAY").length,
+  };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatTime(t: Date): string {
   return t.toLocaleTimeString("en-IN", {
     hour: "numeric", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata",
   });
@@ -113,15 +155,4 @@ function leaveWhen(from: Date, to: Date): string {
   const f = from.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" });
   const t = to.toLocaleDateString("en-IN",   { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" });
   return f === t ? f : `${f}–${t}`;
-}
-
-export interface EmployeeOption { id: string; name: string; designation: string | null; }
-
-export async function listEmployees(ctx: RequestContext): Promise<EmployeeOption[]> {
-  requirePermission(ctx, "attendance.view");
-  const db = scoped(ctx);
-  return db.employee.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, designation: true },
-  });
 }

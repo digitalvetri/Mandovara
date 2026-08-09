@@ -1,4 +1,4 @@
-// DEV-ONLY RequestContext helper. Until Session 7 lands real auth (mobile-
+// DEV-ONLY RequestContext helper. Until Phase 7 lands real auth (mobile-
 // number-first login, Argon2id, httpOnly cookies), the app runs as the
 // seeded organisation Owner so we can build modules against real data.
 //
@@ -6,6 +6,8 @@
 // automated changes to the kernel. This lives at the module boundary and
 // is gated on NODE_ENV !== "production" — throws in prod so the bypass
 // cannot escape into a deployment.
+//
+// New User model (CLAUDE.md §5): direct `role AppRole` field.
 
 import { prisma } from "@/kernel/db/client";
 import type { RequestContext } from "@/kernel/auth/context";
@@ -13,9 +15,6 @@ import { PERMISSIONS, type PermissionKey } from "@/kernel/rbac/permissions";
 
 let cached: RequestContext | undefined;
 
-// Every permission in the registry — dev context runs as an all-powerful
-// owner because the seed only records a sample subset of keys in RolePermission.
-// Session 7 replaces this with role-derived permissions from the DB.
 function allRegisteredPermissions(): ReadonlySet<PermissionKey> {
   const set = new Set<PermissionKey>();
   for (const [mod, actions] of Object.entries(PERMISSIONS)) {
@@ -24,38 +23,46 @@ function allRegisteredPermissions(): ReadonlySet<PermissionKey> {
   return set;
 }
 
+const STUB_CONTEXT: RequestContext = {
+  userId: "dev-stub-user",
+  orgId: "dev-stub-org",
+  branchIds: [],
+  branchScope: "ALL",
+  roles: ["OWNER"],
+  permissions: (() => {
+    const s = new Set<PermissionKey>();
+    for (const [mod, actions] of Object.entries(PERMISSIONS))
+      for (const a of actions) s.add(`${mod}.${a}` as PermissionKey);
+    return s;
+  })(),
+};
+
 export async function devContext(): Promise<RequestContext> {
   if (process.env["NODE_ENV"] === "production") {
     throw new Error("devContext() called in production — refuse.");
   }
   if (cached) return cached;
 
-  const user = await prisma.user.findFirstOrThrow({
-    where: { email: "owner@mandovara.example" },
-    select: {
-      id: true, orgId: true, branchIds: true,
-      userRoles: {
-        select: {
-          role: {
-            select: {
-              name: true,
-              permissions: { select: { key: true, scope: true } },
-            },
-          },
-        },
+  try {
+    const user = await prisma.user.findFirstOrThrow({
+      where: { role: "OWNER" },
+      select: {
+        id: true, organizationId: true, branchIds: true, role: true,
       },
-    },
-  });
+    });
 
-  const roles = user.userRoles.map((ur) => ur.role.name);
+    cached = {
+      userId: user.id,
+      orgId: user.organizationId,
+      branchIds: user.branchIds,
+      branchScope: "ALL",
+      roles: [user.role as string],
+      permissions: allRegisteredPermissions(),
+    };
+  } catch {
+    console.warn("[devContext] DB unreachable — using stub context. Start Docker to load real data.");
+    cached = STUB_CONTEXT;
+  }
 
-  cached = {
-    userId: user.id,
-    orgId: user.orgId,
-    branchIds: user.branchIds,
-    branchScope: "ALL",
-    roles,
-    permissions: allRegisteredPermissions(),
-  };
   return cached;
 }

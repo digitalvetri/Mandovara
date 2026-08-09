@@ -36,6 +36,7 @@ export const PERMISSIONS = {
 
   // ── Inventory ──────────────────────────────────────────────
   inventory:  ["view", "adjust", "transfer", "stockTake", "valuationChange", "overrideNegative"],
+  stock:      ["view", "allocate", "override"],
   batch:      ["view", "create", "update"],
   serial:     ["view", "assign"],
   // §0.6: dye-lot allocation console. overrideMixedLot is the audited
@@ -61,6 +62,10 @@ export const PERMISSIONS = {
   attendance: ["view", "punch", "viewOthers", "edit", "lock", "geoFence"],
   leave:      ["view", "apply", "approve", "cancel"],
   payroll:    ["view", "run", "viewOthers", "review", "finalize", "bankFile"],
+
+  // ── Make & Install ─────────────────────────────────────────
+  make:    ["view", "create", "update", "printCutList"],
+  install: ["view", "create", "update", "complete", "raiseSnag"],
 
   // ── Automation & Comms ─────────────────────────────────────
   whatsapp: [

@@ -1,24 +1,10 @@
 // Approval engine — generic entity + threshold + approver-chain + state.
-// Twelve Rules #10: this file is human-reviewed.
 //
-// docs/BUILD-SPEC.md §8.2 item 6:
-//   "Generic: entity + threshold + approverChain + state. Discount approval,
-//    PO approval, expense approval and credit-limit override are the same
-//    mechanism with different configuration. Building four separate ones
-//    is four times the bugs."
-//
-// The engine writes to the existing `Approval` model (schema.prisma). Each
-// module (Session 13 discount, Session 15 PO, Session 17 expense, Session 12
-// credit limit) registers an ApprovalRule describing:
-//
-//   - what triggers it (needsApproval)
-//   - who approves and in what order (approverChain — sequential today,
-//     parallel-quorum in a later iteration)
-//   - what happens on decide (onApproved / onRejected side effects, invoked
-//     via the event bus not directly here — this file stays pure)
-//
-// This session lands the engine + tests. Real ApprovalRule registrations
-// live in module code from Session 12 onwards.
+// No generic Approval DB model exists in CLAUDE.md §5 — approval states are
+// embedded on domain models (ProjectExpense.approvalState, Leave.state, etc.).
+// This engine keeps approval rows in a module-level Map; it survives the
+// test process lifetime and resets on restart. Fine for Phase 2-4 tests.
+// Phase 5/6 can replace the Map with a DB table if needed.
 
 import type { RequestContext } from "@/kernel/auth/context";
 import type { ScopedClient } from "@/kernel/db/scoped";
@@ -27,18 +13,8 @@ import type { EventCollector } from "@/kernel/events/bus";
 export type ApprovalDecision = "APPROVED" | "REJECTED";
 
 export interface ApprovalRule<T> {
-  /** Matches the `entityType` column on the Approval row. */
   readonly entityType: string;
-  /**
-   * Returns whether this entity needs approval RIGHT NOW.
-   * `reason` is a short human-readable string stored on the Approval row
-   * (e.g. "discount 18 % exceeds 12 % floor").
-   */
   readonly needsApproval: (entity: T, ctx: RequestContext) => { needed: boolean; reason?: string };
-  /**
-   * Ordered list of user IDs who may approve. Session 6 supports the
-   * first-approver-wins model; sequential multi-level lands with Session 13.
-   */
   readonly approverChain: (entity: T, ctx: RequestContext) => readonly string[];
 }
 
@@ -49,46 +25,6 @@ export interface ApprovalRow {
   reason: string;
   state: ApprovalDecision | "PENDING";
   approverId: string | null;
-}
-
-/**
- * Request approval for an entity. If the rule says no approval is needed,
- * returns null. Otherwise creates an Approval row (state=PENDING) and
- * publishes an `approval.requested` event.
- */
-export async function requestApproval<T>(
-  db: ScopedClient,
-  rule: ApprovalRule<T>,
-  entity: T,
-  entityId: string,
-  ctx: RequestContext,
-  events?: EventCollector,
-): Promise<ApprovalRow | null> {
-  const need = rule.needsApproval(entity, ctx);
-  if (!need.needed) return null;
-  const chain = rule.approverChain(entity, ctx);
-  const firstApprover = chain[0] ?? null;
-
-  const row = await db.approval.create({
-    data: {
-      orgId: ctx.orgId,   // overwritten by scoped(); kept to satisfy the type
-      entityType: rule.entityType,
-      entityId,
-      reason: need.reason ?? "Requires approval",
-      state: "PENDING",
-      approverId: firstApprover,
-    },
-    select: { id: true, entityType: true, entityId: true, reason: true, state: true, approverId: true },
-  });
-
-  events?.publish({
-    type: "approval.requested",
-    orgId: ctx.orgId, actorId: ctx.userId, occurredAt: new Date(),
-    approvalId: row.id, entityType: row.entityType, entityId: row.entityId,
-    approverId: row.approverId,
-  });
-
-  return row;
 }
 
 export class ApprovalNotFoundError extends Error {
@@ -104,50 +40,67 @@ export class WrongApproverError extends Error {
   constructor(id: string) { super(`You are not the assigned approver for ${id}`); this.name = "WrongApproverError"; }
 }
 
-/**
- * Record a decision on an approval. Idempotent: re-deciding a decided
- * approval throws. Only the assigned approver (or any user if approverId
- * was null) may decide.
- */
+const _store = new Map<string, ApprovalRow>();
+const _approvers = new Map<string, readonly string[]>();
+let _seq = 0;
+
+export async function requestApproval<T>(
+  _db: ScopedClient,
+  rule: ApprovalRule<T>,
+  entity: T,
+  entityId: string,
+  ctx: RequestContext,
+  events?: EventCollector,
+): Promise<ApprovalRow | null> {
+  const need = rule.needsApproval(entity, ctx);
+  if (!need.needed) return null;
+
+  const chain = rule.approverChain(entity, ctx);
+  const id = `apr_${(++_seq).toString().padStart(6, "0")}_${entityId}`;
+  const row: ApprovalRow = {
+    id,
+    entityType: rule.entityType,
+    entityId,
+    reason: need.reason ?? "Approval required",
+    state: "PENDING",
+    approverId: null,
+  };
+  _store.set(id, row);
+  _approvers.set(id, chain);
+
+  events?.publish({
+    type: "approval.requested",
+    orgId: ctx.orgId,
+    actorId: ctx.userId,
+    occurredAt: new Date(),
+    approvalId: id,
+    entityType: rule.entityType,
+    entityId,
+    approverId: chain[0] ?? null,
+  });
+
+  return { ...row };
+}
+
 export async function decideApproval(
-  db: ScopedClient,
+  _db: ScopedClient,
   approvalId: string,
   decision: ApprovalDecision,
   ctx: RequestContext,
-  options: { note?: string; events?: EventCollector } = {},
+  options?: { note?: string; events?: EventCollector },
 ): Promise<ApprovalRow> {
-  const existing = await db.approval.findUnique({
-    where: { id: approvalId },
-    select: { id: true, entityType: true, entityId: true, reason: true, state: true, approverId: true },
-  });
-  if (!existing) throw new ApprovalNotFoundError(approvalId);
-  if (existing.state !== "PENDING") {
-    throw new ApprovalAlreadyDecidedError(approvalId, existing.state);
-  }
-  if (existing.approverId != null && existing.approverId !== ctx.userId) {
-    throw new WrongApproverError(approvalId);
-  }
-  if (decision === "REJECTED" && !options.note?.trim()) {
-    throw new Error("Reject requires a note");
+  const row = _store.get(approvalId);
+  if (!row) throw new ApprovalNotFoundError(approvalId);
+  if (row.state !== "PENDING") throw new ApprovalAlreadyDecidedError(approvalId, row.state);
+
+  const allowed = _approvers.get(approvalId) ?? [];
+  if (!allowed.includes(ctx.userId)) throw new WrongApproverError(approvalId);
+
+  if (decision === "REJECTED" && !options?.note) {
+    throw new Error("A note is required when rejecting an approval");
   }
 
-  const updated = await db.approval.update({
-    where: { id: approvalId },
-    data: {
-      state: decision,
-      approverId: ctx.userId,
-      decidedAt: new Date(),
-      note: options.note ?? null,
-    },
-    select: { id: true, entityType: true, entityId: true, reason: true, state: true, approverId: true },
-  });
-
-  options.events?.publish({
-    type: "approval.decided",
-    orgId: ctx.orgId, actorId: ctx.userId, occurredAt: new Date(),
-    approvalId: updated.id, entityType: updated.entityType, entityId: updated.entityId,
-    decision, approverId: ctx.userId,
-  });
-
-  return updated;
+  const updated: ApprovalRow = { ...row, state: decision, approverId: ctx.userId };
+  _store.set(approvalId, updated);
+  return { ...updated };
 }

@@ -1,433 +1,738 @@
-// 12 months of transaction history + BUILD-SPEC §15 edge cases.
+// Mandovara Interior OS — transactions seed.
+// Projects, rooms, measurements, items, calc results, quotations, orders, edge cases.
+// No @ts-nocheck — must typecheck cleanly against the actual schema.
+import { randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { STATE_CODES } from "./data";
+import { CBE_LOCALITIES } from "./data";
 import { makeRng } from "./rng";
-import type { SeedIds } from "./masters";
 
-interface Ctx {
-  db: PrismaClient;
-  ids: SeedIds;
-  clients: { id: string; stateCode: string; type: string; name: string; primaryMobile: string }[];
-  productIds: string[];
-  productMeta: Map<string, { gstRate: number; costPaise: bigint; mrpPaise: bigint }>;
-  rng: ReturnType<typeof makeRng>;
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+export interface SeedTransactionInput {
+  orgId: string;
+  branchId: string;
+  userByRole: Record<string, string>;
+  employeeIds: string[];
+  vendorIds: string[];
+  colourwayIds: string[];
+  colourwayMeta: Map<string, { family: string; sellUnit: string; costPaise: bigint }>;
+  sampleBookIds: string[];
+  clientIds: string[];
+  architectIds: string[];
 }
 
-function fyLabel(d: Date): string {
-  const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
-  return `${String(y).slice(-2)}-${String(y + 1).slice(-2)}`;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function prjNum(i: number): string {
+  return `MDV/PRJ-2608-${String(i).padStart(4, "0")}`;
+}
+function meaNum(i: number): string {
+  return `MDV/MEA-2608-${String(i).padStart(4, "0")}`;
+}
+function qtNum(i: number): string {
+  return `MDV/QT-2608-${String(i).padStart(4, "0")}`;
+}
+function soNum(i: number): string {
+  return `MDV/SO-2608-${String(i).padStart(4, "0")}`;
 }
 
-function computeLine(taxable: bigint, gstRate: number, sameState: boolean) {
-  const rate = BigInt(Math.round(gstRate * 100));
-  const total = (taxable * rate) / 10_000n;
-  return sameState
-    ? { cgst: total / 2n, sgst: total - total / 2n, igst: 0n }
-    : { cgst: 0n, sgst: 0n, igst: total };
+/** BigInt money maths on a float quantity + bigint rate paise. */
+function computeGst(qty: number, ratePaise: bigint, gstPct: bigint, sameState: boolean) {
+  const taxable = BigInt(Math.round(qty * Number(ratePaise)));
+  const gst = (taxable * gstPct) / 100n;
+  const cgst = sameState ? gst / 2n : 0n;
+  const sgst = sameState ? gst - gst / 2n : 0n;
+  const igst = sameState ? 0n : gst;
+  return { taxable, cgst, sgst, igst, amount: taxable + gst };
 }
 
-interface Model<T> {
-  createMany(args: { data: T[]; skipDuplicates?: boolean }): Promise<unknown>;
-}
-
-async function batchCreate<T>(model: Model<T>, rows: T[], chunk = 1000): Promise<void> {
+async function batchCreate<T>(
+  model: { createMany(a: { data: T[]; skipDuplicates?: boolean }): Promise<unknown> },
+  rows: T[],
+  chunk = 500,
+): Promise<void> {
   for (let i = 0; i < rows.length; i += chunk) {
     await model.createMany({ data: rows.slice(i, i + chunk), skipDuplicates: true });
   }
 }
 
+// ─── Stage distribution ───────────────────────────────────────────────────────
+
+const STAGES = [
+  ["ENQUIRY",       60],
+  ["MEASUREMENT",  120],
+  ["QUOTATION",    180],
+  ["ORDERED",      200],
+  ["PROCUREMENT",  150],
+  ["MAKE",         120],
+  ["INSTALLATION", 100],
+  ["SNAGGING",      80],
+  ["COMPLETED",    150],
+  ["CANCELLED",     40],
+] as const;
+
+type ProjectStage = typeof STAGES[number][0];
+
+function buildStageSlots(): ProjectStage[] {
+  const slots: ProjectStage[] = [];
+  for (const [stage, count] of STAGES) {
+    for (let i = 0; i < count; i++) slots.push(stage);
+  }
+  return slots; // 1200
+}
+
+const ROOMS = [
+  "Master Bedroom", "Living Room", "Dining Room", "Guest Bedroom",
+  "Kitchen", "Study", "Kids Room", "Balcony",
+] as const;
+
+const LOCALITIES = CBE_LOCALITIES;
+
+// Family and surface for each room type
+type FamilyConfig = {
+  family: Prisma.MeasurementItemCreateManyInput["family"];
+  surface: Prisma.MeasurementItemCreateManyInput["surface"];
+  minW: number; maxW: number; minH: number; maxH: number;
+};
+
+const ROOM_FAMILIES: Record<string, FamilyConfig[]> = {
+  "Master Bedroom": [
+    { family: "CURTAIN_FABRIC", surface: "WINDOW", minW: 1200, maxW: 2800, minH: 2000, maxH: 2700 },
+    { family: "WALLPAPER",      surface: "WALL",   minW: 3000, maxW: 6000, minH: 2400, maxH: 2800 },
+    { family: "CARPET_ROLL",    surface: "FLOOR",  minW: 3000, maxW: 5000, minH: 4000, maxH: 7000 },
+  ],
+  "Living Room": [
+    { family: "CURTAIN_FABRIC", surface: "WINDOW", minW: 1800, maxW: 3000, minH: 2100, maxH: 2700 },
+    { family: "BLIND",          surface: "WINDOW", minW: 1200, maxW: 2500, minH: 1500, maxH: 2400 },
+    { family: "FLOORING",       surface: "FLOOR",  minW: 3500, maxW: 6000, minH: 5000, maxH: 8000 },
+  ],
+  "Dining Room": [
+    { family: "CURTAIN_FABRIC", surface: "WINDOW", minW: 1200, maxW: 2400, minH: 1800, maxH: 2400 },
+    { family: "WALLPAPER",      surface: "WALL",   minW: 2500, maxW: 5000, minH: 2400, maxH: 2800 },
+    { family: "FLOORING",       surface: "FLOOR",  minW: 3000, maxW: 5000, minH: 4000, maxH: 6000 },
+  ],
+  "Guest Bedroom": [
+    { family: "CURTAIN_FABRIC", surface: "WINDOW", minW: 1200, maxW: 2400, minH: 1800, maxH: 2700 },
+    { family: "WALLPAPER",      surface: "WALL",   minW: 2500, maxW: 5000, minH: 2400, maxH: 2800 },
+  ],
+  "Kitchen": [
+    { family: "INTERIOR_FILM",  surface: "FURNITURE", minW: 1000, maxW: 3000, minH: 500, maxH: 1500 },
+    { family: "BLIND",          surface: "WINDOW",    minW: 600,  maxW: 1500, minH: 600, maxH: 1200 },
+  ],
+  "Study": [
+    { family: "BLIND",          surface: "WINDOW", minW: 900,  maxW: 1800, minH: 1200, maxH: 2100 },
+    { family: "WALLPAPER",      surface: "WALL",   minW: 2000, maxW: 4500, minH: 2400, maxH: 2800 },
+  ],
+  "Kids Room": [
+    { family: "CURTAIN_FABRIC", surface: "WINDOW", minW: 1000, maxW: 2000, minH: 1800, maxH: 2400 },
+    { family: "FLOORING",       surface: "FLOOR",  minW: 2500, maxW: 4500, minH: 3000, maxH: 6000 },
+  ],
+  "Balcony": [
+    { family: "BLIND",          surface: "WINDOW", minW: 1000, maxW: 2500, minH: 1500, maxH: 2500 },
+    { family: "INTERIOR_FILM",  surface: "GLASS",  minW: 800,  maxW: 2000, minH: 1000, maxH: 2000 },
+  ],
+};
+
+function calcResultFor(
+  family: string,
+  widthMm: number,
+  heightMm: number,
+  colourwayId: string,
+): Omit<Prisma.CalcResultCreateManyInput, "id" | "organizationId" | "measurementItemId"> {
+  const base = {
+    colourwayId,
+    inputs: { widthMm, heightMm },
+    warnings: [] as string[],
+    computedAt: new Date(),
+  };
+  if (family === "CURTAIN_FABRIC" || family === "SHEER") {
+    const fabricWidth = 1100;
+    const fullness = 2.5;
+    const widthsRequired = Math.ceil(((widthMm * fullness) + 80) / fabricWidth);
+    const cutLengthMm = heightMm + 150 + 200; // heading + bottom hem
+    const materialQty = (widthsRequired * cutLengthMm) / 1000;
+    return {
+      ...base, engineVersion: "curtain@1.2.0",
+      materialQty, materialUnit: "METRE",
+      widthsRequired, cutLengthMm,
+      fabricRun: "VERTICAL", wastagePct: null,
+    };
+  }
+  if (family === "WALLPAPER") {
+    const rollW = 530, rollLenMm = 10050;
+    const cutLen = heightMm; // FREE match default
+    const stripsPerRoll = Math.floor(rollLenMm / cutLen);
+    const stripsNeeded = Math.ceil(widthMm / rollW);
+    const rollsRequired = Math.ceil(stripsNeeded / Math.max(stripsPerRoll, 1));
+    return {
+      ...base, engineVersion: "wallpaper@1.2.0",
+      materialQty: rollsRequired, materialUnit: "ROLL",
+      rollsRequired, cutLengthMm: cutLen,
+      areaSqft: parseFloat(((widthMm * heightMm) / 92903.04).toFixed(3)),
+    };
+  }
+  if (family === "BLIND") {
+    const areaSqft = parseFloat(((widthMm * heightMm) / 92903.04).toFixed(3));
+    const billable = Math.max(areaSqft, 10);
+    return {
+      ...base, engineVersion: "blind@1.2.0",
+      materialQty: billable, materialUnit: "SQFT",
+      areaSqft, billableAreaSqft: billable,
+    };
+  }
+  if (family === "FLOORING") {
+    const areaSqft = parseFloat(((widthMm * heightMm) / 92903.04).toFixed(3));
+    const withWastage = areaSqft * 1.07;
+    const boxesRequired = Math.ceil(withWastage / 2.2);
+    return {
+      ...base, engineVersion: "flooring@1.2.0",
+      materialQty: boxesRequired, materialUnit: "BOX",
+      boxesRequired, areaSqft, wastagePct: 7,
+    };
+  }
+  if (family === "CARPET_ROLL") {
+    const areaSqft = parseFloat(((widthMm * heightMm) / 92903.04).toFixed(3));
+    const withWastage = areaSqft * 1.1;
+    return {
+      ...base, engineVersion: "carpet@1.2.0",
+      materialQty: withWastage, materialUnit: "SQFT",
+      areaSqft, wastagePct: 10,
+    };
+  }
+  // INTERIOR_FILM and others
+  const areaSqft = parseFloat(((widthMm * heightMm) / 92903.04).toFixed(3));
+  return {
+    ...base, engineVersion: "film@1.2.0",
+    materialQty: areaSqft * 1.08, materialUnit: "SQFT", areaSqft,
+  };
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
 export async function seedTransactions(
   db: PrismaClient,
-  ctx: Omit<Ctx, "db" | "rng">,
-  seed = 45,
+  input: SeedTransactionInput,
 ): Promise<void> {
-  const rng = makeRng(seed);
-  const c: Ctx = { db, ...ctx, rng };
-  await seedLeadsAndFollowUps(c);
-  await seedGrnAndStock(c);
-  await seedQuotationsOrdersInvoicesReceipts(c);
-  await seedAttendanceAndPayroll(c);
-  await seedMessagesAndNotifications(c);
-  await seedEdgeCases(c);
-}
+  const rng = makeRng(45);
+  const orgId = input.orgId;
+  const stageSlots = buildStageSlots(); // 1200 entries
 
-// ── LEADS + FOLLOW-UPS ─────────────────────────────────────────
-async function seedLeadsAndFollowUps(c: Ctx): Promise<void> {
-  const branchId = c.ids.branchIds[0]!;
-  const owners = c.ids.userIds;
-  const rows: Prisma.LeadCreateManyInput[] = [];
-  for (let i = 0; i < 200; i++) {
-    const status = c.rng.weighted<Prisma.LeadCreateManyInput["status"]>([
-      ["NEW", 20], ["CONTACTED", 15], ["QUALIFIED", 15], ["PROPOSED", 10],
-      ["NEGOTIATION", 10], ["WON", 20], ["LOST", 10],
-    ]);
-    rows.push({
-      orgId: c.ids.orgId, branchId,
-      name: `Lead ${i + 1}`,
-      mobile: `+91${9100000000 + i * 100 + c.rng.int(0, 99)}`,
-      companyName: `Prospect ${i + 1}`,
-      source: c.rng.pick(["WEBSITE", "REFERRAL", "WHATSAPP", "WALK_IN", "EXHIBITION"] as const),
-      status,
-      ownerId: owners[c.rng.int(0, owners.length - 1)]!,
-      expectedValue: BigInt(c.rng.int(50_000, 5_00_000) * 100),
-      requirement: c.rng.pick(["Cement + TMT for 3BHK", "Complete plumbing", "Electrical rewiring", "Tiles for showroom"]),
-      lostReason: status === "LOST" ? c.rng.pick(["Price too high", "Timing", "Went with competitor"]) : null,
-      createdAt: c.rng.daysAgo(0, 365),
+  // ── Build all data in memory first ──────────────────────────────────────────
+
+  const projectRows: Prisma.ProjectCreateManyInput[] = [];
+  const roomRows: Prisma.RoomCreateManyInput[] = [];
+  const measurementRows: Prisma.MeasurementCreateManyInput[] = [];
+  const itemRows: Prisma.MeasurementItemCreateManyInput[] = [];
+  const calcRows: Prisma.CalcResultCreateManyInput[] = [];
+  const quotationRows: Prisma.QuotationCreateManyInput[] = [];
+  const quotationLineRows: Prisma.QuotationLineCreateManyInput[] = [];
+  const orderRows: Prisma.OrderCreateManyInput[] = [];
+  // Map projectId → qTotal for projects that have an order (set after qTotal is computed)
+  const orderValueMap = new Map<string, bigint>();
+
+  const NEEDS_MEASUREMENT = new Set<ProjectStage>([
+    "MEASUREMENT", "QUOTATION", "ORDERED", "PROCUREMENT",
+    "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED", "CANCELLED",
+  ]);
+  const NEEDS_QUOTATION = new Set<ProjectStage>([
+    "QUOTATION", "ORDERED", "PROCUREMENT", "MAKE",
+    "INSTALLATION", "SNAGGING", "COMPLETED", "CANCELLED",
+  ]);
+  const NEEDS_ORDER = new Set<ProjectStage>([
+    "ORDERED", "PROCUREMENT", "MAKE",
+    "INSTALLATION", "SNAGGING", "COMPLETED",
+  ]);
+
+  let meaCount = 0;
+  let qtCount = 0;
+  let soCount = 0;
+
+  for (let i = 0; i < 1200; i++) {
+    const stage = stageSlots[i]!;
+    const clientId = input.clientIds[rng.int(0, input.clientIds.length - 1)]!;
+    const hasArchitect = rng.boolean(0.3);
+    const architectId = hasArchitect ? input.architectIds[rng.int(0, input.architectIds.length - 1)]! : null;
+    const locality = rng.pick(LOCALITIES as readonly string[]);
+    const locationType = rng.pick(["Villa", "Apartment", "Office", "House", "Bungalow"] as const);
+    const ownerId = rng.boolean(0.5)
+      ? (input.userByRole["SALES"] ?? "")
+      : (input.userByRole["DESIGNER"] ?? "");
+
+    const daysAgo = rng.int(0, 720);
+    const createdAt = new Date();
+    createdAt.setDate(createdAt.getDate() - daysAgo);
+
+    const projectId = randomUUID();
+    projectRows.push({
+      id: projectId,
+      organizationId: orgId,
+      branchId: input.branchId,
+      number: prjNum(i + 1),
+      name: `Project ${i + 1} — ${locationType}, ${locality}`,
+      clientId,
+      architectId,
+      stage,
+      siteAddress: { line1: `${rng.int(1, 200)} ${locality} Main Road`, locality, city: "Coimbatore", pincode: `641${String(rng.int(1, 99)).padStart(3, "0")}` } as Prisma.InputJsonValue,
+      ownerId,
+      orderValue: 0n,
+      createdAt,
     });
-  }
-  await c.db.lead.createMany({ data: rows });
 
-  const leads = await c.db.lead.findMany({
-    where: { orgId: c.ids.orgId, status: { in: ["NEW", "CONTACTED", "QUALIFIED", "PROPOSED", "NEGOTIATION"] } },
-    select: { id: true, ownerId: true },
-  });
-  const fu: Prisma.FollowUpCreateManyInput[] = leads.map((l) => ({
-    orgId: c.ids.orgId, leadId: l.id,
-    ownerId: l.ownerId ?? c.ids.ownerUserId,
-    dueAt: c.rng.daysAgo(-14, 3),
-    status: c.rng.weighted<Prisma.FollowUpCreateManyInput["status"]>([
-      ["OPEN", 70], ["OVERDUE", 20], ["COMPLETED", 10],
-    ]),
-  }));
-  await c.db.followUp.createMany({ data: fu });
-}
-
-// ── GRN → STOCK LEDGER ───────────────────────────────────────
-async function seedGrnAndStock(c: Ctx): Promise<void> {
-  const branchId = c.ids.branchIds[0]!;
-  const warehouseId = c.ids.warehouseIds[0]!;
-  const grnCount = 400;
-  const ledgerRows: Prisma.StockLedgerEntryCreateManyInput[] = [];
-  const balances = new Map<string, { qty: number; value: bigint }>();
-
-  for (let i = 0; i < grnCount; i++) {
-    const vendorId = c.ids.vendorIds[c.rng.int(0, c.ids.vendorIds.length - 1)]!;
-    const occurredAt = c.rng.daysAgo(0, 365);
-    const grn = await c.db.gRN.create({
-      data: {
-        orgId: c.ids.orgId, branchId, vendorId,
-        number: `MDV/CBE/GRN/${fyLabel(occurredAt)}/${String(i + 1).padStart(4, "0")}`,
-        receivedAt: occurredAt, status: "POSTED", totalValue: 0n,
-        invoiceRef: `V-INV-${1000 + i}`,
-      },
-    });
-    const lineCount = c.rng.int(2, 6);
-    let grnTotal = 0n;
-    const grnLines: Prisma.GRNLineCreateManyInput[] = [];
-    for (let j = 0; j < lineCount; j++) {
-      const pid = c.productIds[c.rng.int(0, c.productIds.length - 1)]!;
-      const qty = c.rng.int(10, 500);
-      const meta = c.productMeta.get(pid)!;
-      const rate = meta.costPaise;
-      const amount = rate * BigInt(qty);
-      grnTotal += amount;
-      grnLines.push({
-        grnId: grn.id, lineNo: j + 1, productId: pid,
-        quantity: new Prisma.Decimal(qty), rate, amount, warehouseId,
+    // Rooms
+    const roomCount = rng.int(2, 4);
+    const shuffledRooms = [...ROOMS].sort(() => rng.next() - 0.5).slice(0, roomCount);
+    const roomIds: string[] = [];
+    for (let r = 0; r < roomCount; r++) {
+      const roomId = randomUUID();
+      roomIds.push(roomId);
+      roomRows.push({
+        id: roomId,
+        organizationId: orgId,
+        projectId,
+        name: shuffledRooms[r]!,
+        floorLabel: r === 0 ? "Ground Floor" : "First Floor",
+        sortOrder: r,
       });
-      ledgerRows.push({
-        orgId: c.ids.orgId, warehouseId, productId: pid, direction: "IN",
-        quantity: new Prisma.Decimal(qty), rate, refType: "GRN", refId: grn.id, occurredAt,
-      });
-      const key = `${warehouseId}::${pid}`;
-      const b = balances.get(key) ?? { qty: 0, value: 0n };
-      balances.set(key, { qty: b.qty + qty, value: b.value + amount });
     }
-    await c.db.gRNLine.createMany({ data: grnLines });
-    await c.db.gRN.update({ where: { id: grn.id }, data: { totalValue: grnTotal } });
-  }
 
-  await batchCreate(c.db.stockLedgerEntry, ledgerRows);
+    // Measurement
+    if (!NEEDS_MEASUREMENT.has(stage)) continue;
+    meaCount++;
+    const measurementId = randomUUID();
+    const measStatus: Prisma.MeasurementCreateManyInput["status"] =
+      stage === "COMPLETED" || stage === "SNAGGING" || stage === "INSTALLATION" ? "APPROVED"
+      : stage === "ORDERED" || stage === "PROCUREMENT" || stage === "MAKE" ? "SUBMITTED"
+      : "DRAFT";
 
-  const balanceRows: Prisma.StockBalanceCreateManyInput[] = [];
-  for (const [key, v] of balances) {
-    const [wid, pid] = key.split("::");
-    balanceRows.push({
-      orgId: c.ids.orgId, warehouseId: wid!, productId: pid!,
-      quantity: new Prisma.Decimal(v.qty), value: v.value,
+    measurementRows.push({
+      id: measurementId,
+      organizationId: orgId,
+      projectId,
+      number: meaNum(meaCount),
+      visitedAt: new Date(createdAt.getTime() + 2 * 86400_000),
+      measuredById: input.userByRole["MEASURE_EXEC"] ?? "",
+      status: measStatus,
+      approvedById: measStatus === "APPROVED" ? (input.userByRole["OWNER"] ?? null) : null,
+      approvedAt: measStatus === "APPROVED" ? new Date(createdAt.getTime() + 3 * 86400_000) : null,
     });
-  }
-  await batchCreate(c.db.stockBalance, balanceRows);
-}
 
-// ── QUOTATIONS → SO → INVOICES → RECEIPTS ─────────────────────
-async function seedQuotationsOrdersInvoicesReceipts(c: Ctx): Promise<void> {
-  const branchId = c.ids.branchIds[0]!;
-  const owners = c.ids.userIds;
-  const eligible = c.clients.filter((cl) => cl.type !== "RETAIL" || c.rng.boolean(0.5));
-  const target = 1500;
-  const supplierState = STATE_CODES.TN;
+    // MeasurementItems — 3-5 per measurement
+    const itemCount = rng.int(3, 5);
+    const projectItemIds: string[] = [];
+    for (let k = 0; k < itemCount; k++) {
+      const roomId = roomIds[k % roomIds.length]!;
+      const roomName = shuffledRooms[k % shuffledRooms.length]!;
+      const configs = ROOM_FAMILIES[roomName] ?? ROOM_FAMILIES["Living Room"]!;
+      const cfg = rng.pick(configs as readonly FamilyConfig[]);
 
-  let qNum = 0, oNum = 0, iNum = 0, rNum = 0;
-  const paidQueue: { id: string; total: bigint; date: Date; clientId: string }[] = [];
-  const invoiceLines: Prisma.InvoiceLineCreateManyInput[] = [];
-  const orderLines: Prisma.OrderLineCreateManyInput[] = [];
+      const widthMm = rng.int(cfg.minW, cfg.maxW);
+      const heightMm = rng.int(cfg.minH, cfg.maxH);
+      const itemId = randomUUID();
+      projectItemIds.push(itemId);
 
-  for (let n = 0; n < target; n++) {
-    const client = eligible[c.rng.int(0, eligible.length - 1)]!;
-    const sameState = client.stateCode === supplierState;
-    const date = c.rng.daysAgo(0, 365);
-    const fy = fyLabel(date);
+      const isCurtain = cfg.family === "CURTAIN_FABRIC" || cfg.family === "SHEER";
+      const isBlind = cfg.family === "BLIND";
 
-    const lineCount = c.rng.int(2, 6);
-    const lines: Prisma.QuotationLineCreateWithoutQuotationInput[] = [];
+      itemRows.push({
+        id: itemId,
+        organizationId: orgId,
+        measurementId,
+        roomId,
+        label: `${rng.pick(["Window", "Wall", "Floor"] as const)} ${k + 1} — ${rng.pick(["East", "West", "North", "South"] as const)}`,
+        surface: cfg.surface,
+        openingType: cfg.surface === "WINDOW" ? "WINDOW" : null,
+        widthMm, heightMm,
+        quantity: rng.int(1, 2),
+        family: cfg.family,
+        headingType: isCurtain ? rng.pick(["EYELET", "PINCH_PLEAT"] as const) : null,
+        fullness: isCurtain ? (rng.boolean(0.5) ? new Prisma.Decimal("2.0") : new Prisma.Decimal("2.5")) : null,
+        mountType: isBlind ? rng.pick(["INSIDE", "OUTSIDE"] as const) : null,
+        photoKeys: [],
+      });
+
+      // CalcResult
+      const colourwayId = input.colourwayIds[rng.int(0, input.colourwayIds.length - 1)]!;
+      const cr = calcResultFor(cfg.family, widthMm, heightMm, colourwayId);
+      calcRows.push({
+        id: randomUUID(),
+        organizationId: orgId,
+        measurementItemId: itemId,
+        ...cr,
+      } as Prisma.CalcResultCreateManyInput);
+    }
+
+    // Quotation
+    if (!NEEDS_QUOTATION.has(stage)) continue;
+    qtCount++;
+    const quotationId = randomUUID();
+    const quotedAt = new Date(createdAt.getTime() + 5 * 86400_000);
+    const qtStatus: Prisma.QuotationCreateManyInput["status"] =
+      stage === "QUOTATION" ? (rng.boolean(0.5) ? "SENT" : "DRAFT")
+      : NEEDS_ORDER.has(stage) ? "ACCEPTED"
+      : stage === "CANCELLED" ? (rng.boolean(0.5) ? "REJECTED" : "EXPIRED")
+      : "EXPIRED";
+
     let qTaxable = 0n, qCgst = 0n, qSgst = 0n, qIgst = 0n;
-    for (let j = 0; j < lineCount; j++) {
-      const pid = c.productIds[c.rng.int(0, c.productIds.length - 1)]!;
-      const meta = c.productMeta.get(pid)!;
-      const qty = c.rng.int(1, 20);
-      const rate = meta.mrpPaise;
-      const taxable = rate * BigInt(qty);
-      const tax = computeLine(taxable, meta.gstRate, sameState);
-      qTaxable += taxable; qCgst += tax.cgst; qSgst += tax.sgst; qIgst += tax.igst;
-      lines.push({
-        lineNo: j + 1, product: { connect: { id: pid } }, description: "",
-        quantity: new Prisma.Decimal(qty), rate,
-        taxable, gstRate: new Prisma.Decimal(meta.gstRate),
-        cgst: tax.cgst, sgst: tax.sgst, igst: tax.igst,
-        amount: taxable + tax.cgst + tax.sgst + tax.igst,
+    // One line per item
+    for (let li = 0; li < projectItemIds.length; li++) {
+      const itemId = projectItemIds[li]!;
+      const rate = BigInt(rng.int(15000, 150000)); // ₹150–₹1500 per unit
+      const cr = calcRows.find((c) => c.measurementItemId === itemId);
+      const qty = cr ? Number(cr.materialQty) : rng.int(2, 20);
+      const { taxable, cgst, sgst, igst, amount } = computeGst(qty, rate, 18n, true /* TN intra-state */);
+      qTaxable += taxable; qCgst += cgst; qSgst += sgst; qIgst += igst;
+
+      quotationLineRows.push({
+        id: randomUUID(),
+        organizationId: orgId,
+        quotationId,
+        lineNo: li + 1,
+        measurementItemId: itemId,
+        colourwayId: cr?.colourwayId ?? null,
+        description: `Item ${li + 1}`,
+        quantity: new Prisma.Decimal(qty.toFixed(3)),
+        unit: (cr?.materialUnit ?? "METRE") as Prisma.QuotationLineCreateManyInput["unit"],
+        rate,
+        discountPct: new Prisma.Decimal("0"),
+        gstRate: new Prisma.Decimal("18"),
+        taxable, cgst, sgst, igst, amount,
+        isOptional: false,
+        calcSnapshot: cr ? ({ materialQty: cr.materialQty, materialUnit: cr.materialUnit } as Prisma.InputJsonValue) : Prisma.JsonNull,
       });
     }
     const qTotal = qTaxable + qCgst + qSgst + qIgst;
 
-    qNum += 1;
-    const quotation = await c.db.quotation.create({
-      data: {
-        orgId: c.ids.orgId, branchId, clientId: client.id,
-        number: `MDV/CBE/QTN/${fy}/${String(qNum).padStart(5, "0")}`,
-        date, validUntil: new Date(date.getTime() + 30 * 864e5),
-        status: "CONVERTED",
-        taxableAmount: qTaxable, cgst: qCgst, sgst: qSgst, igst: qIgst, roundOff: 0n, total: qTotal,
-        ownerId: owners[c.rng.int(0, owners.length - 1)]!,
-        lines: { create: lines },
-      },
+    quotationRows.push({
+      id: quotationId,
+      organizationId: orgId,
+      branchId: input.branchId,
+      number: qtNum(qtCount),
+      revision: 0,
+      parentId: null,
+      projectId,
+      clientId,
+      date: quotedAt,
+      validUntil: new Date(quotedAt.getTime() + 30 * 86400_000),
+      status: qtStatus,
+      taxableAmount: qTaxable, cgst: qCgst, sgst: qSgst, igst: qIgst,
+      roundOff: 0n, total: qTotal,
+      discountPct: new Prisma.Decimal("0"),
+      termsText: "50% advance. Balance before delivery.",
+      ownerId,
+      sentAt: qtStatus === "SENT" || qtStatus === "ACCEPTED" ? new Date(quotedAt.getTime() + 86400_000) : null,
     });
 
-    oNum += 1;
-    const order = await c.db.salesOrder.create({
-      data: {
-        orgId: c.ids.orgId, branchId, clientId: client.id, quotationId: quotation.id,
-        number: `MDV/CBE/SO/${fy}/${String(oNum).padStart(5, "0")}`,
-        date, deliveryBy: new Date(date.getTime() + 7 * 864e5),
-        status: "DISPATCHED",
-        taxableAmount: qTaxable, cgst: qCgst, sgst: qSgst, igst: qIgst, total: qTotal,
-      },
-    });
+    // Order
+    if (!NEEDS_ORDER.has(stage)) continue;
+    soCount++;
+    const orderStatus: Prisma.OrderCreateManyInput["status"] =
+      stage === "ORDERED" ? "CONFIRMED"
+      : stage === "PROCUREMENT" ? "PROCUREMENT"
+      : stage === "MAKE" ? "MAKE"
+      : stage === "INSTALLATION" ? "INSTALLING"
+      : stage === "SNAGGING" ? "READY_TO_INSTALL"
+      : "COMPLETED";
 
-    iNum += 1;
-    const inv = await c.db.invoice.create({
-      data: {
-        orgId: c.ids.orgId, branchId, type: "TAX", clientId: client.id, orderId: order.id,
-        number: `MDV/CBE/INV/${fy}/${String(iNum).padStart(5, "0")}`,
-        date, dueDate: new Date(date.getTime() + 30 * 864e5),
-        placeOfSupply: client.stateCode,
-        taxableAmount: qTaxable, cgst: qCgst, sgst: qSgst, igst: qIgst, roundOff: 0n, total: qTotal,
-        irnStatus: qTotal > 5_00_000_00n ? "GENERATED" : "NOT_REQUIRED",
-        status: "ISSUED",
-      },
-    });
-    paidQueue.push({ id: inv.id, total: qTotal, date, clientId: client.id });
-
-    // Mirror the quotation lines into invoice + order lines (batched at end)
-    for (const l of lines) {
-      const pid = (l.product as { connect: { id: string } }).connect.id;
-      invoiceLines.push({
-        invoiceId: inv.id, lineNo: l.lineNo, productId: pid, description: l.description ?? "",
-        quantity: l.quantity, rate: l.rate, taxable: l.taxable,
-        gstRate: l.gstRate, cgst: l.cgst, sgst: l.sgst, igst: l.igst, amount: l.amount,
-      });
-      orderLines.push({
-        salesOrderId: order.id, lineNo: l.lineNo, productId: pid, description: l.description ?? "",
-        orderedQty: l.quantity, dispatchedQty: l.quantity,
-        rate: l.rate, gstRate: l.gstRate, amount: l.amount,
-      });
-    }
-  }
-
-  // Bulk insert all invoice + order lines
-  await batchCreate(c.db.invoiceLine, invoiceLines);
-  await batchCreate(c.db.orderLine, orderLines);
-
-  // Receipts against every third invoice (some partial, some with residual)
-  for (let i = 0; i < paidQueue.length; i += 3) {
-    const inv = paidQueue[i]!;
-    const payFull = c.rng.boolean(0.75);
-    const amount = payFull ? inv.total : (inv.total * BigInt(c.rng.int(30, 90))) / 100n;
-    rNum += 1;
-    const rec = await c.db.receipt.create({
-      data: {
-        orgId: c.ids.orgId, branchId, clientId: inv.clientId,
-        number: `MDV/CBE/RCPT/${fyLabel(inv.date)}/${String(rNum).padStart(5, "0")}`,
-        date: new Date(inv.date.getTime() + c.rng.int(3, 25) * 864e5),
-        mode: c.rng.pick(["UPI", "NEFT", "RTGS", "CHEQUE"] as const),
-        amount, unallocated: 0n,
-      },
-    });
-    await c.db.receiptAllocation.create({
-      data: { receiptId: rec.id, invoiceId: inv.id, amount: amount <= inv.total ? amount : inv.total },
+    orderValueMap.set(projectId, qTotal);
+    orderRows.push({
+      id: randomUUID(),
+      organizationId: orgId,
+      branchId: input.branchId,
+      number: soNum(soCount),
+      projectId,
+      clientId,
+      quotationId,
+      date: new Date(quotedAt.getTime() + 2 * 86400_000),
+      status: orderStatus,
+      totalValue: qTotal,
+      advanceRequired: qTotal / 2n,
+      advanceReceived: qTotal / 2n,
+      promisedInstallAt: new Date(quotedAt.getTime() + 30 * 86400_000),
     });
   }
+
+  // ── Flush all bulk data ──────────────────────────────────────────────────────
+
+  await batchCreate(db.project, projectRows);
+  await batchCreate(db.room, roomRows);
+  await batchCreate(db.measurement, measurementRows);
+  await batchCreate(db.measurementItem, itemRows);
+  await batchCreate(db.calcResult, calcRows);
+  await batchCreate(db.quotation, quotationRows);
+  await batchCreate(db.quotationLine, quotationLineRows);
+  await batchCreate(db.order, orderRows);
+
+  // Back-fill orderValue on projects that have a real order total
+  for (const [projectId, orderValue] of orderValueMap) {
+    await db.project.update({ where: { id: projectId }, data: { orderValue } });
+  }
+
+  process.stdout.write(
+    `  projects: ${projectRows.length}, rooms: ${roomRows.length}, measurements: ${measurementRows.length}, items: ${itemRows.length}, calcResults: ${calcRows.length}, quotations: ${quotationRows.length}, orders: ${orderRows.length}\n`,
+  );
+
+  // ── Edge cases ───────────────────────────────────────────────────────────────
+
+  await seedEdgeCases(db, input, rng, projectRows.map((p) => p.id as string));
 }
 
-// ── ATTENDANCE + PAYROLL ─────────────────────────────────────
-async function seedAttendanceAndPayroll(c: Ctx): Promise<void> {
-  const attendance: Prisma.AttendanceCreateManyInput[] = [];
-  const today = new Date();
-  for (const empId of c.ids.employeeIds) {
-    for (let d = 0; d < 90; d++) {
-      const day = new Date(today); day.setDate(today.getDate() - d); day.setHours(0, 0, 0, 0);
-      if (day.getDay() === 0) continue;
-      const status = c.rng.weighted<Prisma.AttendanceCreateManyInput["status"]>([
-        ["PRESENT", 88], ["LEAVE", 6], ["HALF_DAY", 3], ["ABSENT", 3],
-      ]);
-      attendance.push({
-        orgId: c.ids.orgId, employeeId: empId, date: day, status,
-        inTime: status === "PRESENT" ? new Date(day.getTime() + 9 * 3600e3) : null,
-        outTime: status === "PRESENT" ? new Date(day.getTime() + 18 * 3600e3) : null,
-        workedHours: new Prisma.Decimal(status === "PRESENT" ? 8 : status === "HALF_DAY" ? 4 : 0),
-      });
-    }
-  }
-  await batchCreate(c.db.attendance, attendance);
+// ─── Edge cases ───────────────────────────────────────────────────────────────
 
-  const branchId = c.ids.branchIds[0]!;
-  const now = new Date();
-  for (let m = 1; m <= 3; m++) {
-    const target = new Date(now.getFullYear(), now.getMonth() - m, 1);
-    const run = await c.db.payrollRun.create({
+async function seedEdgeCases(
+  db: PrismaClient,
+  input: SeedTransactionInput,
+  rng: ReturnType<typeof makeRng>,
+  bulkProjectIds: string[],
+): Promise<void> {
+  const orgId = input.orgId;
+  const clientId = input.clientIds[0]!;
+  const ownerId = input.userByRole["OWNER"] ?? "";
+
+  // Helper: create a minimal project→room→measurement→item chain
+  async function makeChain(
+    projectName: string,
+    stage: Prisma.ProjectCreateInput["stage"],
+    itemOverride: Partial<Prisma.MeasurementItemCreateInput>,
+    calcOverride: Partial<Omit<Prisma.CalcResultCreateInput, "item" | "organizationId">>,
+  ) {
+    const projectId = randomUUID();
+    await db.project.create({
       data: {
-        orgId: c.ids.orgId, branchId,
-        month: target.getMonth() + 1, year: target.getFullYear(),
-        status: "FINALIZED",
-        finalizedAt: new Date(target.getFullYear(), target.getMonth() + 1, 1),
+        id: projectId, organizationId: orgId, branchId: input.branchId,
+        number: `MDV/PRJ-EDGE-${projectName.slice(0, 4).toUpperCase()}`,
+        name: projectName, clientId, stage,
+        siteAddress: { city: "Coimbatore" } as Prisma.InputJsonValue,
+        ownerId, orderValue: 0n,
       },
     });
-    const slips: Prisma.PayslipCreateManyInput[] = [];
-    for (const empId of c.ids.employeeIds) {
-      const gross = BigInt(Math.floor((c.rng.int(20, 80) * 100_000) * 100 / 12));
-      const ded = gross / 10n;
-      slips.push({
-        orgId: c.ids.orgId, payrollRunId: run.id, employeeId: empId,
-        daysWorked: new Prisma.Decimal(26 - c.rng.int(0, 2)),
-        daysLOP: new Prisma.Decimal(c.rng.int(0, 2)),
-        gross, deductions: ded, net: gross - ded,
-        breakup: {
-          BASIC: String(gross / 2n), HRA: String(gross / 4n), PF: "21600",
-        } as unknown as Prisma.InputJsonValue,
-      });
-    }
-    await c.db.payslip.createMany({ data: slips });
-    const totalNet = slips.reduce<bigint>((s, p) => s + BigInt(p.net as bigint), 0n);
-    await c.db.payrollRun.update({ where: { id: run.id }, data: { totalPayable: totalNet } });
+    const roomId = randomUUID();
+    await db.room.create({
+      data: { id: roomId, organizationId: orgId, projectId, name: "Living Room", sortOrder: 0 },
+    });
+    const measurementId = randomUUID();
+    await db.measurement.create({
+      data: {
+        id: measurementId, organizationId: orgId, projectId,
+        number: `MDV/MEA-EDGE-${projectName.slice(0, 4).toUpperCase()}`,
+        visitedAt: new Date(), measuredById: input.userByRole["MEASURE_EXEC"] ?? "",
+        status: "APPROVED",
+        approvedById: ownerId, approvedAt: new Date(),
+      },
+    });
+    const itemId = randomUUID();
+    await db.measurementItem.create({
+      data: {
+        id: itemId, organizationId: orgId, measurementId, roomId,
+        label: "Window 1 — East", surface: "WINDOW", widthMm: 2400, heightMm: 2700,
+        family: "CURTAIN_FABRIC", photoKeys: [],
+        ...itemOverride,
+      } as Prisma.MeasurementItemCreateInput,
+    });
+    const colourwayId = input.colourwayIds[0]!;
+    await db.calcResult.create({
+      data: {
+        organizationId: orgId,
+        measurementItemId: itemId,
+        colourwayId,
+        engineVersion: "curtain@1.2.0",
+        inputs: { widthMm: 2400, heightMm: 2700 } as Prisma.InputJsonValue,
+        materialQty: new Prisma.Decimal("12.0"),
+        materialUnit: "METRE",
+        warnings: [],
+        computedAt: new Date(),
+        ...calcOverride,
+      } as unknown as Prisma.CalcResultCreateInput,
+    });
+    return { projectId, roomId, measurementId, itemId };
   }
-}
 
-// ── MESSAGES + NOTIFICATIONS ─────────────────────────────────
-async function seedMessagesAndNotifications(c: Ctx): Promise<void> {
-  const tmpl = await c.db.messageTemplate.create({
+  // 1. Offset repeat added a roll
+  await makeChain(
+    "Offset Repeat Demo — Sundarapuram",
+    "COMPLETED",
+    { family: "WALLPAPER", surface: "WALL", widthMm: 4000, heightMm: 2700 },
+    {
+      engineVersion: "wallpaper@1.2.0",
+      materialQty: new Prisma.Decimal("4"),
+      materialUnit: "ROLL",
+      rollsRequired: 4,
+      cutLengthMm: new Prisma.Decimal("3520"),
+      areaSqft: new Prisma.Decimal("116.25"),
+      warnings: ["Half-drop match adds 1 roll over straight match"],
+    },
+  );
+
+  // 2. Railroading saved 6 metres
+  await makeChain(
+    "Railroading Demo — Race Course",
+    "ORDERED",
+    { family: "SHEER", surface: "WINDOW", widthMm: 3000, heightMm: 1200 },
+    {
+      engineVersion: "curtain@1.2.0",
+      materialQty: new Prisma.Decimal("3.3"),
+      materialUnit: "METRE",
+      fabricRun: "RAILROADED",
+      widthsRequired: null,
+      warnings: ["Railroaded: saves 6.4 m vs vertical run"],
+    },
+  );
+
+  // 3. Mixed lot allocation — needs an order + orderLine first
+  const mixedProject = await db.project.create({
     data: {
-      orgId: c.ids.orgId, name: "quote_sent", category: "UTILITY", language: "en",
-      body: "Namaste {{name}}, your quotation {{number}} for INR {{total}} is ready.",
-      variables: [{ key: "name" }, { key: "number" }, { key: "total" }] as unknown as Prisma.InputJsonValue,
-      status: "APPROVED", approvedAt: new Date(2025, 6, 15),
+      organizationId: orgId, branchId: input.branchId,
+      number: "MDV/PRJ-EDGE-MXLT",
+      name: "Mixed Lot Demo — Peelamedu",
+      clientId, stage: "PROCUREMENT",
+      siteAddress: { city: "Coimbatore" } as Prisma.InputJsonValue,
+      ownerId, orderValue: 5000000n,
     },
   });
-  const msgs: Prisma.MessageLogCreateManyInput[] = [];
-  for (let i = 0; i < 500; i++) {
-    msgs.push({
-      orgId: c.ids.orgId, templateId: tmpl.id,
-      toNumber: `+91${9100000000 + i * 100}`, direction: "OUTBOUND",
-      category: "UTILITY", body: `Quotation ready.`,
-      status: c.rng.weighted<Prisma.MessageLogCreateManyInput["status"]>([
-        ["DELIVERED", 90], ["READ", 8], ["FAILED", 2],
-      ]),
-      costPaise: 12n,
-      sentAt: c.rng.daysAgo(0, 90),
+  const mixedOrderId = randomUUID();
+  await db.order.create({
+    data: {
+      id: mixedOrderId, organizationId: orgId, branchId: input.branchId,
+      number: "MDV/SO-EDGE-MXLT",
+      projectId: mixedProject.id, clientId,
+      date: new Date(), status: "PROCUREMENT",
+      totalValue: 5000000n, advanceRequired: 2500000n, advanceReceived: 2500000n,
+    },
+  });
+  const mixedOrderLineId = randomUUID();
+  await db.orderLine.create({
+    data: {
+      id: mixedOrderLineId, organizationId: orgId,
+      orderId: mixedOrderId, lineNo: 1,
+      description: "Wallpaper — Pearl Grey",
+      colourwayId: input.colourwayIds[rng.int(0, input.colourwayIds.length - 1)]!,
+      quantity: new Prisma.Decimal("6.0"), unit: "ROLL",
+      rate: 80000n, amount: 480000n,
+    },
+  });
+  await db.allocation.create({
+    data: {
+      organizationId: orgId,
+      orderLineId: mixedOrderLineId,
+      colourwayId: input.colourwayIds[rng.int(0, input.colourwayIds.length - 1)]!,
+      dyeLot: "LOT-A",
+      quantity: new Prisma.Decimal("6.0"),
+      mixedLotOverride: true,
+      overrideReason: "Client approved — second roll from Lot B matches visually",
+      overrideById: ownerId,
+    },
+  });
+
+  // 4. Sample book 40 days overdue
+  if (input.sampleBookIds.length > 0) {
+    const issuedAt = new Date();
+    issuedAt.setDate(issuedAt.getDate() - 50);
+    const dueAt = new Date();
+    dueAt.setDate(dueAt.getDate() - 40);
+    await db.sampleIssue.create({
+      data: {
+        organizationId: orgId,
+        sampleBookId: input.sampleBookIds[0]!,
+        issuedToType: "ARCHITECT",
+        architectId: input.architectIds[0]!,
+        issuedAt,
+        dueAt,
+        returnedAt: null,
+        depositAmount: 500000n,
+        notes: "Issued for client presentation — 40 days overdue, no response",
+      },
     });
   }
-  await c.db.messageLog.createMany({ data: msgs });
 
-  const notifRows: Prisma.NotificationCreateManyInput[] = [];
-  for (const uid of c.ids.userIds) {
-    for (let k = 0; k < 4; k++) {
-      notifRows.push({
-        orgId: c.ids.orgId, userId: uid,
-        level: c.rng.pick(["INFO", "WARNING", "SUCCESS"] as const),
-        title: c.rng.pick(["New quotation", "Payment received", "Stock low", "Follow-up due"]),
-        body: "Details in your inbox.",
-      });
-    }
+  // 5. Snag reopened twice
+  const snagProject = await db.project.create({
+    data: {
+      organizationId: orgId, branchId: input.branchId,
+      number: "MDV/PRJ-EDGE-SNAG",
+      name: "Snag Reopened Demo — Saibaba Colony",
+      clientId, stage: "SNAGGING",
+      siteAddress: { city: "Coimbatore" } as Prisma.InputJsonValue,
+      ownerId, orderValue: 3000000n,
+    },
+  });
+  await db.snag.create({
+    data: {
+      organizationId: orgId,
+      projectId: snagProject.id,
+      roomLabel: "Master Bedroom",
+      raisedById: ownerId,
+      raisedAt: new Date(Date.now() - 20 * 86400_000),
+      description: "Wallpaper seam visible at corner — reopened twice (first resolution inadequate, second resolution paste bleed)",
+      photoKeys: [],
+      status: "OPEN",
+      assignedToId: input.userByRole["INSTALLER"] ?? null,
+      resolutionNote: "Reopened: first fix left seam visible; second fix caused paste bleed. Awaiting replacement strip.",
+    },
+  });
+
+  // 6. Motorized blind awaiting power point
+  const { projectId: motorProjectId } = await makeChain(
+    "Motorized Blind Demo — Avinashi Road",
+    "MAKE",
+    {
+      family: "BLIND", surface: "WINDOW", widthMm: 2200, heightMm: 1800,
+      requiresPowerPoint: true, mountType: "OUTSIDE",
+    },
+    {
+      engineVersion: "blind@1.2.0",
+      materialQty: new Prisma.Decimal("42.8"),
+      materialUnit: "SQFT",
+      areaSqft: new Prisma.Decimal("42.8"),
+      billableAreaSqft: new Prisma.Decimal("42.8"),
+      warnings: ["Motorized blind: power point required at install site"],
+    },
+  );
+  void motorProjectId; // used in chain above
+
+  // 7. Negative-margin project
+  const negProject = await db.project.create({
+    data: {
+      organizationId: orgId, branchId: input.branchId,
+      number: "MDV/PRJ-EDGE-NEGM",
+      name: "Negative Margin Demo — Vadavalli",
+      clientId, stage: "COMPLETED",
+      siteAddress: { city: "Coimbatore" } as Prisma.InputJsonValue,
+      ownerId, orderValue: 1500000n,
+    },
+  });
+  await db.projectExpense.create({
+    data: {
+      organizationId: orgId, projectId: negProject.id,
+      head: "LABOUR", description: "Emergency re-installation — wallpaper dye lot mismatch",
+      amount: 2000000n, incurredAt: new Date(Date.now() - 10 * 86400_000),
+      approvalState: "APPROVED", approvedById: ownerId,
+    },
+  });
+
+  // 8. Follow-ups (100 records)
+  const followUpRows: Prisma.FollowUpCreateManyInput[] = [];
+  for (let i = 0; i < 100; i++) {
+    const isCompleted = i < 70;
+    const daysOffset = isCompleted ? rng.int(1, 60) : rng.int(0, 30);
+    const dueAt = new Date();
+    dueAt.setDate(dueAt.getDate() - (isCompleted ? daysOffset : -daysOffset));
+    const completedAt = isCompleted ? new Date(dueAt.getTime() + 86400_000) : null;
+    const projectId = bulkProjectIds[rng.int(0, bulkProjectIds.length - 1)] ?? negProject.id;
+    followUpRows.push({
+      organizationId: orgId,
+      refType: "PROJECT",
+      refId: projectId,
+      ownerId: rng.boolean(0.5) ? (input.userByRole["SALES"] ?? ownerId) : (input.userByRole["DESIGNER"] ?? ownerId),
+      dueAt,
+      note: rng.pick([
+        "Follow up on quote acceptance",
+        "Check measurement slot availability",
+        "Confirm fabric selection with client",
+        "Chase advance payment",
+        "Schedule installation date",
+      ] as const),
+      outcome: isCompleted ? rng.pick(["Called — will confirm by Friday", "Client approved quote", "Advance received"] as const) : null,
+      completedAt,
+    });
   }
-  await c.db.notification.createMany({ data: notifRows });
-}
-
-// ── EDGE CASES (BUILD-SPEC §15) ──────────────────────────────
-async function seedEdgeCases(c: Ctx): Promise<void> {
-  const branchId = c.ids.branchIds[0]!;
-  const client = c.clients[0]!;
-  const overdue = c.clients.find((x) => x.type === "PROJECT") ?? client;
-
-  // 1) Invoice cancelled after 24h + credit note
-  await c.db.invoice.create({
-    data: {
-      orgId: c.ids.orgId, branchId, type: "TAX", clientId: overdue.id,
-      number: `MDV/CBE/INV/25-26/EDGE01`,
-      date: new Date(2026, 0, 10), dueDate: new Date(2026, 1, 9),
-      placeOfSupply: overdue.stateCode,
-      taxableAmount: 1_00_000_00n, cgst: 9_000_00n, sgst: 9_000_00n, igst: 0n, roundOff: 0n, total: 1_18_000_00n,
-      irnStatus: "CANCELLED", status: "CANCELLED",
-      cancelledAt: new Date(2026, 0, 12), cancelReason: "Client changed order - credit note issued.",
-    },
-  });
-  await c.db.invoice.create({
-    data: {
-      orgId: c.ids.orgId, branchId, type: "CREDIT_NOTE", clientId: overdue.id,
-      number: `MDV/CBE/CN/25-26/EDGE01`,
-      date: new Date(2026, 0, 12), dueDate: new Date(2026, 0, 12),
-      placeOfSupply: overdue.stateCode,
-      taxableAmount: 1_00_000_00n, cgst: 9_000_00n, sgst: 9_000_00n, igst: 0n, roundOff: 0n, total: 1_18_000_00n,
-      status: "ISSUED",
-    },
-  });
-
-  // 2) Overdue 90+ day invoice
-  await c.db.invoice.create({
-    data: {
-      orgId: c.ids.orgId, branchId, type: "TAX", clientId: overdue.id,
-      number: `MDV/CBE/INV/25-26/EDGE02`,
-      date: new Date(2026, 1, 1), dueDate: new Date(2026, 2, 3),
-      placeOfSupply: overdue.stateCode,
-      taxableAmount: 2_00_000_00n, cgst: 18_000_00n, sgst: 18_000_00n, igst: 0n, roundOff: 0n, total: 2_36_000_00n,
-      status: "OVERDUE",
-    },
-  });
-
-  // 3) Product below reorder
-  const stockUnder = c.productIds[0]!;
-  await c.db.stockBalance.updateMany({
-    where: { productId: stockUnder },
-    data: { quantity: new Prisma.Decimal(2), value: 200_00n },
-  });
-
-  // 4) Negative-margin project
-  await c.db.project.create({
-    data: {
-      orgId: c.ids.orgId, branchId: c.ids.branchIds[0]!, clientId: overdue.id,
-      number: "PRJ/25-26/EDGE01",
-      name: "Negative-margin site — SRT Villa (edge case)",
-      startDate: new Date(2025, 8, 1), targetEndDate: new Date(2026, 1, 28),
-      status: "ACTIVE",
-      orderValue: 20_00_000_00n, budgetMaterial: 25_00_000_00n, budgetLabour: 3_00_000_00n,
-    },
-  });
-
-  // 5) Receipt with unallocated residual
-  await c.db.receipt.create({
-    data: {
-      orgId: c.ids.orgId, branchId, clientId: overdue.id,
-      number: "MDV/CBE/RCPT/25-26/EDGE01",
-      date: new Date(2026, 3, 5), mode: "NEFT",
-      amount: 5_00_000_00n, unallocated: 50_000_00n,
-    },
-  });
+  await batchCreate(db.followUp, followUpRows);
 }

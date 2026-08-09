@@ -1,19 +1,17 @@
-// Vendors repository.
-
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
 export interface VendorRow {
   id: string;
+  code: string;
   name: string;
   mobile: string;
   email: string | null;
   gstin: string | null;
-  stateCode: string;
-  paymentTerms: number;
-  status: string;
-  createdAt: Date;
+  paymentTermsDays: number;
+  leadTimeDays: number;
+  rating: number | null;
 }
 
 export interface ListVendorsResult {
@@ -34,22 +32,26 @@ export async function listVendors(
   const page = Math.max(1, q.page ?? 1);
   const skip = (page - 1) * pageSize;
 
-  const where: Record<string, unknown> = {};
-  if (q.search && q.search.trim().length > 0) {
-    const s = q.search.trim();
-    where["OR"] = [
-      { name:   { contains: s, mode: "insensitive" } },
-      { mobile: { contains: s } },
-      { gstin:  { contains: s, mode: "insensitive" } },
-    ];
-  }
+  const where = q.search?.trim()
+    ? {
+        OR: [
+          { name:   { contains: q.search.trim(), mode: "insensitive" as const } },
+          { mobile: { contains: q.search.trim() } },
+          { gstin:  { contains: q.search.trim(), mode: "insensitive" as const } },
+          { code:   { contains: q.search.trim(), mode: "insensitive" as const } },
+        ],
+      }
+    : {};
 
   const [rows, total] = await Promise.all([
     db.vendor.findMany({
-      where, orderBy: { name: "asc" }, skip, take: pageSize,
+      where,
+      orderBy: { name: "asc" },
+      skip,
+      take: pageSize,
       select: {
-        id: true, name: true, mobile: true, email: true, gstin: true,
-        stateCode: true, paymentTerms: true, status: true, createdAt: true,
+        id: true, code: true, name: true, mobile: true, email: true,
+        gstin: true, paymentTermsDays: true, leadTimeDays: true, rating: true,
       },
     }),
     db.vendor.count({ where }),
@@ -64,23 +66,24 @@ export async function getVendor(ctx: RequestContext, id: string): Promise<Vendor
   return db.vendor.findUnique({
     where: { id },
     select: {
-      id: true, name: true, mobile: true, email: true, gstin: true,
-      stateCode: true, paymentTerms: true, status: true, createdAt: true,
+      id: true, code: true, name: true, mobile: true, email: true,
+      gstin: true, paymentTermsDays: true, leadTimeDays: true, rating: true,
     },
   });
 }
 
 export interface VendorPickerRow {
-  id: string; name: string; stateCode: string; paymentTerms: number;
+  id: string;
+  name: string;
+  paymentTermsDays: number;
 }
+
 export async function listVendorsForPicker(ctx: RequestContext): Promise<VendorPickerRow[]> {
   requirePermission(ctx, "vendor.view");
   const db = scoped(ctx);
-  const rows = await db.vendor.findMany({
-    where: { status: "ACTIVE" },
+  return db.vendor.findMany({
     orderBy: { name: "asc" },
     take: 200,
-    select: { id: true, name: true, stateCode: true, paymentTerms: true },
+    select: { id: true, name: true, paymentTermsDays: true },
   });
-  return rows;
 }

@@ -1,8 +1,5 @@
 "use server";
 
-// Attendance actions. Owner/manager can mark punches for any employee for
-// today or a past date (subject to attendance.edit permission for past days).
-
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
@@ -16,7 +13,7 @@ export interface ActionResult<T = unknown> {
 const markPunchSchema = z.object({
   employeeId: z.string().cuid(),
   date:       z.string().regex(/^\d{4}-\d{2}-\d{2}/),
-  status:     z.enum(["PRESENT", "LATE", "ABSENT", "LEAVE"]),
+  status:     z.enum(["PRESENT", "HALF_DAY", "ABSENT", "LEAVE", "HOLIDAY", "WEEK_OFF"]),
   inTime:     z.string().optional().or(z.literal("")),
   outTime:    z.string().optional().or(z.literal("")),
 });
@@ -28,49 +25,88 @@ export async function markPunch(input: unknown): Promise<ActionResult<{ id: stri
   if (!parsed.success) return zodError(parsed.error);
   const d = parsed.data;
 
-  const day = new Date(`${d.date}T00:00:00Z`);
-  const inTime = d.inTime && d.inTime.trim() !== ""
-    ? new Date(`${d.date}T${padHM(d.inTime)}:00Z`) : null;
-  const outTime = d.outTime && d.outTime.trim() !== ""
-    ? new Date(`${d.date}T${padHM(d.outTime)}:00Z`) : null;
+  const day     = new Date(`${d.date}T00:00:00.000Z`);
+  const inAt    = d.inTime?.trim() ? new Date(`${d.date}T${padHM(d.inTime)}:00.000Z`) : null;
+  const outAt   = d.outTime?.trim() ? new Date(`${d.date}T${padHM(d.outTime)}:00.000Z`) : null;
 
   const db = scoped(ctx);
-  const worked = inTime && outTime
-    ? (outTime.getTime() - inTime.getTime()) / 3_600_000
-    : null;
 
-  const created = await db.attendance.upsert({
+  // Reject edits to locked records
+  const existing = await db.attendance.findUnique({
     where: { employeeId_date: { employeeId: d.employeeId, date: day } },
+    select: { lockedAt: true },
+  });
+  if (existing?.lockedAt) {
+    return { ok: false, error: "This attendance record is locked and cannot be edited." };
+  }
+
+  const record = await db.attendance.upsert({
+    where:  { employeeId_date: { employeeId: d.employeeId, date: day } },
     create: {
-      orgId:      ctx.orgId,
-      employeeId: d.employeeId,
-      date:       day,
-      status:     d.status,
-      inTime, outTime,
-      ...(worked != null && { workedHours: worked }),
+      organizationId: ctx.orgId,
+      employeeId:     d.employeeId,
+      date:           day,
+      status:         d.status,
+      inAt,
+      outAt,
     },
-    update: {
-      status:  d.status,
-      inTime, outTime,
-      ...(worked != null && { workedHours: worked }),
-    },
+    update: { status: d.status, inAt, outAt },
     select: { id: true },
   });
+
   revalidatePath("/attendance");
-  return { ok: true, data: created };
+  return { ok: true, data: record };
 }
 
+const lockMonthSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year:  z.number().int().min(2020).max(2100),
+});
+
+/**
+ * Lock all attendance records for a month-year so they can no longer be edited.
+ * Must be done before running payroll for that month.
+ */
+export async function lockMonth(input: unknown): Promise<ActionResult<{ count: number }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "attendance.lock");
+  const parsed = lockMonthSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { month, year } = parsed.data;
+
+  const monthStart = new Date(Date.UTC(year, month - 1, 1));
+  const monthEnd   = new Date(Date.UTC(year, month, 1));
+  const now        = new Date();
+
+  const db = scoped(ctx);
+  const result = await db.attendance.updateMany({
+    where: {
+      organizationId: ctx.orgId,
+      date:           { gte: monthStart, lt: monthEnd },
+      lockedAt:       null,
+    },
+    data: { lockedAt: now },
+  });
+
+  revalidatePath("/attendance");
+  return { ok: true, data: { count: result.count } };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function padHM(s: string): string {
-  // Accept "9:00", "09:00", "9" — normalise to "HH:MM"
   const parts = s.split(":");
   const h = String(parts[0] ?? "0").padStart(2, "0");
   const m = String(parts[1] ?? "0").padStart(2, "0");
   return `${h}:${m}`;
 }
+
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
   const fieldErrors: Record<string, string> = {};
   for (const iss of err.issues) {
-    const p = iss.path.filter((s): s is string | number => typeof s === "string" || typeof s === "number").join(".");
+    const p = iss.path
+      .filter((s): s is string | number => typeof s === "string" || typeof s === "number")
+      .join(".");
     if (!fieldErrors[p]) fieldErrors[p] = iss.message;
   }
   return { ok: false, error: "Validation failed", fieldErrors };

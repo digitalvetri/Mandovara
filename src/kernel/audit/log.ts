@@ -78,7 +78,7 @@ export function auditExtensionConfig(ctx: RequestContext) {
               }>)[delegateName(model)];
               if (delegate?.findFirst) {
                 before = await delegate.findFirst({
-                  where: { ...argsAny.where, orgId: ctx.orgId },
+                  where: { ...argsAny.where, organizationId: ctx.orgId },
                 });
               }
             } catch {
@@ -99,7 +99,7 @@ export function auditExtensionConfig(ctx: RequestContext) {
 
           await prisma.auditLog.create({
             data: {
-              orgId: ctx.orgId,
+              organizationId: ctx.orgId,
               actorId: ctx.userId,
               entityType: model,
               entityId,

@@ -5,12 +5,23 @@ import { useTransition, useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { ORDER_STATUSES } from "@/modules/orders/schema";
 
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT:            "Draft",
+  CONFIRMED:        "Confirmed",
+  PROCUREMENT:      "Procurement",
+  MAKE:             "Make",
+  READY_TO_INSTALL: "Ready",
+  INSTALLING:       "Installing",
+  COMPLETED:        "Completed",
+  CANCELLED:        "Cancelled",
+};
+
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: "OPEN", label: "Open" },
   { key: "ALL",  label: "All" },
   ...ORDER_STATUSES.map((s) => ({
     key: s,
-    label: s === "PARTIAL_DISPATCH" ? "Partial" : s.charAt(0) + s.slice(1).toLowerCase(),
+    label: STATUS_LABELS[s] ?? s,
   })),
 ];
 
@@ -50,7 +61,7 @@ export function OrderFilters() {
 
   return (
     <div className="flex items-center gap-4 mb-4">
-      <div className="flex items-center gap-1 border border-rule rounded-[8px] bg-surface p-0.5">
+      <div className="flex items-center gap-1 border border-rule rounded-[8px] bg-surface p-0.5 overflow-x-auto">
         {STATUS_TABS.map((tab) => {
           const active = currentStatus === tab.key;
           return (
@@ -59,8 +70,8 @@ export function OrderFilters() {
               type="button"
               onClick={() => onStatus(tab.key)}
               className={[
-                "h-[28px] px-3 rounded-[6px] text-[12px] transition-colors",
-                active ? "bg-accent text-white" : "text-text-dim hover:text-text hover:bg-surface-hover",
+                "h-[28px] px-3 rounded-[6px] text-[12px] whitespace-nowrap transition-colors",
+                active ? "bg-gold text-ink" : "text-text-dim hover:text-text hover:bg-surface-hover",
               ].join(" ")}
             >
               {tab.label}
@@ -71,13 +82,13 @@ export function OrderFilters() {
 
       <form onSubmit={onSearchSubmit} className="flex-1 max-w-[360px]">
         <label className="flex items-center gap-2 h-[32px] px-3 bg-surface border border-rule rounded-[8px]">
-          <Search size={13} strokeWidth={1.75} className="text-text-faint" />
+          <Search size={13} strokeWidth={1.75} className="text-text-muted" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Number, client name"
-            className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-text-faint"
+            className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-text-subtle"
           />
         </label>
       </form>

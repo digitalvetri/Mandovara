@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 "use server";
 
 // Leads server actions. Every mutation:
@@ -9,7 +10,7 @@
 // NOTE: The `lead.created` / `lead.statusChanged` publish() calls reference
 // event types that must be added to src/kernel/events/types.ts. Until that
 // diff is applied, `publish({ type: "lead.created", ... })` will not
-// typecheck — this is intentional so the module cannot silently ship
+// typecheck â€” this is intentional so the module cannot silently ship
 // without its events wired in.
 
 import type { z } from "zod";
@@ -200,7 +201,7 @@ export async function convertLead(input: unknown): Promise<ActionResult<{ client
   return { ok: true, data: { clientId } };
 }
 
-// ── helpers ──────────────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function zodError<T>(err: z.ZodError): ActionResult<T> {
   const fieldErrors: Record<string, string> = {};

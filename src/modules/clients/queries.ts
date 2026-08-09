@@ -1,15 +1,16 @@
 // Clients repository. All reads through db.scoped(ctx).
+// Schema reference: Client has `mobile`, `email`, `billingAddress Json`, `creditLimit BigInt`.
+// No status field, no stateCode, no paymentTerms, no addresses relation.
+// contacts ContactPerson[] exists with: id, name, designation, mobile, email, whatsappOptIn.
 // Outstanding is COMPUTED from invoices − receipts, never stored (§11 acceptance).
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
-import type { ClientStatus, ClientType } from "./schema";
 
 export interface ListClientsQuery {
   search?: string;
-  type?: ClientType | "ALL";
-  status?: ClientStatus | "ACTIVE_ANY" | "ALL";
+  type?: string | "ALL";
   page?: number;
   pageSize?: number;
   sort?: "recent" | "name" | "outstanding";
@@ -17,16 +18,15 @@ export interface ListClientsQuery {
 
 export interface ClientRow {
   id: string;
+  code: string;
   name: string;
   type: string;
-  status: string;
-  primaryMobile: string;
-  primaryEmail: string | null;
+  mobile: string;
+  email: string | null;
   gstin: string | null;
-  stateCode: string;
-  paymentTerms: number;
+  priceTier: string;
+  creditLimit: bigint;
   city: string | null;
-  creditLimit: bigint | null;
   outstanding: bigint;
   createdAt: Date;
 }
@@ -38,17 +38,21 @@ export interface ListClientsResult {
   pageSize: number;
 }
 
+export interface ContactRow {
+  id: string;
+  name: string;
+  designation: string | null;
+  mobile: string;
+  email: string | null;
+  whatsappOptIn: boolean;
+}
+
 export interface ClientDetail extends ClientRow {
   pan: string | null;
-  updatedAt: Date;
-  addresses: {
-    id: string; label: string; line1: string; line2: string | null;
-    city: string; stateCode: string; pincode: string; isDefault: boolean;
-  }[];
-  contacts: {
-    id: string; name: string; role: string; mobile: string;
-    email: string | null; isPrimary: boolean;
-  }[];
+  altMobile: string | null;
+  notes: string | null;
+  billingAddress: Record<string, unknown> | null;
+  contacts: ContactRow[];
   ageing: AgeingBuckets;
 }
 
@@ -84,11 +88,10 @@ export async function listClients(
       skip,
       take: pageSize,
       select: {
-        id: true, name: true, type: true, status: true,
-        primaryMobile: true, primaryEmail: true, gstin: true, stateCode: true,
-        paymentTerms: true, createdAt: true,
-        addresses: { where: { isDefault: true }, take: 1, select: { city: true } },
-        creditLimit: { select: { limitPaise: true } },
+        id: true, code: true, name: true, type: true,
+        mobile: true, email: true, gstin: true,
+        priceTier: true, creditLimit: true,
+        billingAddress: true, createdAt: true,
       },
     }),
     db.client.count({ where }),
@@ -98,15 +101,19 @@ export async function listClients(
   const outstanding = await outstandingByClient(ctx, clientIds);
 
   return {
-    rows: rows.map((r) => ({
-      id: r.id, name: r.name, type: r.type, status: r.status,
-      primaryMobile: r.primaryMobile, primaryEmail: r.primaryEmail,
-      gstin: r.gstin, stateCode: r.stateCode, paymentTerms: r.paymentTerms,
-      city: r.addresses[0]?.city ?? null,
-      creditLimit: r.creditLimit?.limitPaise ?? null,
-      outstanding: outstanding.get(r.id) ?? 0n,
-      createdAt: r.createdAt,
-    })),
+    rows: rows.map((r) => {
+      const addr = r.billingAddress as { city?: string } | null;
+      return {
+        id: r.id, code: r.code, name: r.name, type: r.type,
+        mobile: r.mobile, email: r.email ?? null,
+        gstin: r.gstin ?? null,
+        priceTier: r.priceTier,
+        creditLimit: r.creditLimit,
+        city: addr?.city ?? null,
+        outstanding: outstanding.get(r.id) ?? 0n,
+        createdAt: r.createdAt,
+      };
+    }),
     total, page, pageSize,
   };
 }
@@ -117,41 +124,36 @@ export async function getClient(ctx: RequestContext, id: string): Promise<Client
   const row = await db.client.findUnique({
     where: { id },
     select: {
-      id: true, name: true, type: true, status: true, gstin: true, pan: true,
-      primaryMobile: true, primaryEmail: true, stateCode: true, paymentTerms: true,
-      createdAt: true, updatedAt: true,
-      creditLimit: { select: { limitPaise: true } },
-      addresses: {
-        orderBy: { isDefault: "desc" },
-        select: { id: true, label: true, line1: true, line2: true,
-                  city: true, stateCode: true, pincode: true, isDefault: true },
-      },
+      id: true, code: true, name: true, type: true, gstin: true, pan: true,
+      mobile: true, altMobile: true, email: true,
+      priceTier: true, creditLimit: true,
+      billingAddress: true, notes: true, createdAt: true,
       contacts: {
-        orderBy: { isPrimary: "desc" },
-        select: { id: true, name: true, role: true, mobile: true, email: true, isPrimary: true },
+        select: { id: true, name: true, designation: true, mobile: true, email: true, whatsappOptIn: true },
       },
     },
   });
   if (!row) return null;
 
   const ageing = await computeAgeing(ctx, id);
-  const defaultCity = row.addresses.find((a) => a.isDefault)?.city ?? row.addresses[0]?.city ?? null;
+  const addr = row.billingAddress as { city?: string } | null;
 
   return {
-    id: row.id, name: row.name, type: row.type, status: row.status,
-    primaryMobile: row.primaryMobile, primaryEmail: row.primaryEmail,
-    gstin: row.gstin, pan: row.pan, stateCode: row.stateCode, paymentTerms: row.paymentTerms,
-    createdAt: row.createdAt, updatedAt: row.updatedAt,
-    creditLimit: row.creditLimit?.limitPaise ?? null,
+    id: row.id, code: row.code, name: row.name, type: row.type,
+    mobile: row.mobile, altMobile: row.altMobile ?? null,
+    email: row.email ?? null, gstin: row.gstin ?? null, pan: row.pan ?? null,
+    priceTier: row.priceTier, creditLimit: row.creditLimit,
+    billingAddress: row.billingAddress as Record<string, unknown> | null,
+    notes: row.notes ?? null,
+    city: addr?.city ?? null,
+    createdAt: row.createdAt,
     outstanding: ageing.total,
-    city: defaultCity,
-    addresses: row.addresses,
     contacts: row.contacts,
     ageing,
   };
 }
 
-// ── helpers ──────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 type WhereInput = Record<string, unknown>;
 
@@ -160,28 +162,27 @@ function buildWhere(q: ListClientsQuery): WhereInput {
   if (q.search && q.search.trim().length > 0) {
     const s = q.search.trim();
     where["OR"] = [
-      { name:          { contains: s, mode: "insensitive" } },
-      { primaryMobile: { contains: s } },
-      { primaryEmail:  { contains: s, mode: "insensitive" } },
-      { gstin:         { contains: s, mode: "insensitive" } },
+      { name:   { contains: s, mode: "insensitive" } },
+      { mobile: { contains: s } },
+      { email:  { contains: s, mode: "insensitive" } },
+      { gstin:  { contains: s, mode: "insensitive" } },
     ];
   }
   if (q.type && q.type !== "ALL") where["type"] = q.type;
-  if (q.status && q.status !== "ALL") {
-    if (q.status === "ACTIVE_ANY") where["status"] = { in: ["ACTIVE", "INACTIVE"] };
-    else where["status"] = q.status;
-  }
   return where;
 }
 
 function orderFor(sort: ListClientsQuery["sort"]): { [k: string]: "asc" | "desc" } {
   switch (sort) {
-    case "name":         return { name: "asc" };
-    case "outstanding":  return { createdAt: "desc" }; // outstanding is derived; sort in-page if needed
+    case "name":        return { name: "asc" };
+    case "outstanding":
     case "recent":
-    default:             return { createdAt: "desc" };
+    default:            return { createdAt: "desc" };
   }
 }
+
+// Valid InvoiceStatus values that represent money still owed — no "OVERDUE" enum value exists.
+const OPEN_INVOICE_STATUSES = ["ISSUED", "PARTIALLY_PAID"] as const;
 
 async function outstandingByClient(
   ctx: RequestContext,
@@ -190,37 +191,32 @@ async function outstandingByClient(
   if (clientIds.length === 0) return new Map();
   const db = scoped(ctx);
 
-  const invAgg = await db.invoice.groupBy({
-    by: ["clientId"],
-    where: {
-      clientId: { in: clientIds },
-      status: { in: ["ISSUED", "PARTIALLY_PAID", "OVERDUE"] },
-    },
-    _sum: { total: true, advanceAdjusted: true },
+  // Fetch open invoices for these clients
+  const invoices = await db.invoice.findMany({
+    where: { clientId: { in: clientIds }, status: { in: [...OPEN_INVOICE_STATUSES] } },
+    select: { id: true, clientId: true, total: true, advanceAdjusted: true },
   });
-  const recAgg = await db.receiptAllocation.groupBy({
-    by: ["invoiceId"],
-    where: { invoice: { clientId: { in: clientIds } } },
-    _sum: { amount: true },
+  if (invoices.length === 0) return new Map();
+
+  // Fetch receipt allocations for those invoice IDs (no direct relation on Invoice model)
+  const invoiceIds = invoices.map((i) => i.id);
+  const allocs = await db.receiptAllocation.findMany({
+    where: { invoiceId: { in: invoiceIds } },
+    select: { invoiceId: true, amount: true },
   });
 
-  const allocByInvoice = new Map<string, bigint>();
-  for (const r of recAgg) allocByInvoice.set(r.invoiceId, r._sum.amount ?? 0n);
+  const paidByInvoice = new Map<string, bigint>();
+  for (const a of allocs) {
+    paidByInvoice.set(a.invoiceId, (paidByInvoice.get(a.invoiceId) ?? 0n) + a.amount);
+  }
 
   const balanceByClient = new Map<string, bigint>();
-  for (const i of invAgg) {
-    const invoiced = i._sum.total ?? 0n;
-    const advance  = i._sum.advanceAdjusted ?? 0n;
-    balanceByClient.set(i.clientId, (balanceByClient.get(i.clientId) ?? 0n) + invoiced - advance);
-  }
-  // subtract per-invoice receipts (grouped by invoice → sum onto client)
-  const invClientMap = await db.invoice.findMany({
-    where: { id: { in: [...allocByInvoice.keys()] } },
-    select: { id: true, clientId: true },
-  });
-  for (const inv of invClientMap) {
-    const paid = allocByInvoice.get(inv.id) ?? 0n;
-    balanceByClient.set(inv.clientId, (balanceByClient.get(inv.clientId) ?? 0n) - paid);
+  for (const inv of invoices) {
+    const paid = paidByInvoice.get(inv.id) ?? 0n;
+    const balance = inv.total - inv.advanceAdjusted - paid;
+    if (balance > 0n) {
+      balanceByClient.set(inv.clientId, (balanceByClient.get(inv.clientId) ?? 0n) + balance);
+    }
   }
   return balanceByClient;
 }
@@ -230,23 +226,33 @@ async function computeAgeing(ctx: RequestContext, clientId: string): Promise<Age
   const now = new Date();
 
   const invoices = await db.invoice.findMany({
-    where: { clientId, status: { in: ["ISSUED", "PARTIALLY_PAID", "OVERDUE"] } },
-    select: {
-      id: true, total: true, advanceAdjusted: true, dueDate: true,
-      allocations: { select: { amount: true } },
-    },
+    where: { clientId, status: { in: [...OPEN_INVOICE_STATUSES] } },
+    select: { id: true, total: true, advanceAdjusted: true, dueDate: true },
   });
+  if (invoices.length === 0) {
+    return { bucket0_30: 0n, bucket31_60: 0n, bucket61_90: 0n, bucket90plus: 0n, total: 0n };
+  }
+
+  const invoiceIds = invoices.map((i) => i.id);
+  const allocs = await db.receiptAllocation.findMany({
+    where: { invoiceId: { in: invoiceIds } },
+    select: { invoiceId: true, amount: true },
+  });
+  const paidByInvoice = new Map<string, bigint>();
+  for (const a of allocs) {
+    paidByInvoice.set(a.invoiceId, (paidByInvoice.get(a.invoiceId) ?? 0n) + a.amount);
+  }
 
   const buckets = { bucket0_30: 0n, bucket31_60: 0n, bucket61_90: 0n, bucket90plus: 0n, total: 0n };
   for (const inv of invoices) {
-    const paid = inv.allocations.reduce((s, a) => s + a.amount, 0n);
+    const paid = paidByInvoice.get(inv.id) ?? 0n;
     const balance = inv.total - inv.advanceAdjusted - paid;
     if (balance <= 0n) continue;
     const days = Math.max(0, Math.floor((now.getTime() - inv.dueDate.getTime()) / 86_400_000));
-    if      (days <= 30) buckets.bucket0_30    += balance;
-    else if (days <= 60) buckets.bucket31_60   += balance;
-    else if (days <= 90) buckets.bucket61_90   += balance;
-    else                 buckets.bucket90plus  += balance;
+    if      (days <= 30) buckets.bucket0_30   += balance;
+    else if (days <= 60) buckets.bucket31_60  += balance;
+    else if (days <= 90) buckets.bucket61_90  += balance;
+    else                 buckets.bucket90plus += balance;
     buckets.total += balance;
   }
   return buckets;

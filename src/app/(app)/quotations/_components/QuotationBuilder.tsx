@@ -1,355 +1,238 @@
 "use client";
 
-// Quote Builder — pick a product from the top dropdown, click "Add item"
-// to drop a row into the table. Adjust quantity with the − / + stepper.
-// Right sidebar shows a live Subtotal / GST / Total plus the primary
-// "Send Quote to Client" and "Download PDF" actions.
-//
-// Numbers on screen are client-side previews of what the server will
-// re-compute on save through @/kernel/tax. No demo data — the table
-// starts empty; the owner picks their real client and their real SKUs.
+// Quotation builder — project-centric, matching the Mandovara measure-to-install flow.
+// Start from a project (pass ?project=<id> in the URL). Lines are added manually.
+// The §0.10 measurement gate is enforced server-side; measurementItemId is optional
+// only for non-made-to-measure lines (accessories, services, etc.).
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { Minus, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
-import { formatDate } from "@/kernel/datetime";
 import { createQuotation } from "@/modules/quotations/actions";
-import type {
-  ClientPickerRow, ProductPickerRow,
-} from "@/modules/quotations/queries";
 import type { BranchOption } from "@/modules/branches/queries";
+import { SELL_UNITS } from "@/modules/quotations/schema";
+import { Th, Td, iso } from "./_builder-primitives";
 
-interface LineRow {
-  productId: string;
-  quantity: number;
+interface LineInput {
+  description: string;
+  quantity: string;
+  unit: string;
+  rate: string;
+  gstRate: string;
+  discountPct: string;
+  roomLabel: string;
+  measurementItemId: string;
 }
 
 interface Props {
-  clients: ClientPickerRow[];
-  products: ProductPickerRow[];
+  projectId: string;
   branches: BranchOption[];
 }
 
-export function QuotationBuilder({ clients, products, branches }: Props) {
+const EMPTY_LINE: LineInput = {
+  description: "", quantity: "1", unit: "PIECE",
+  rate: "", gstRate: "18", discountPct: "0",
+  roomLabel: "", measurementItemId: "",
+};
+
+export function QuotationBuilder({ projectId, branches }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const today = new Date();
   const nextMonth = new Date(); nextMonth.setDate(today.getDate() + 30);
 
-  const [clientId, setClientId] = useState<string>("");
-  const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
-  const [date] = useState<string>(iso(today));
-  const [validUntil] = useState<string>(iso(nextMonth));
-  const [pickerProductId, setPickerProductId] = useState<string>("");
-  const [lines, setLines] = useState<LineRow[]>([]);
+  const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
+  const [placeOfSupplyCode, setPlaceOfSupplyCode] = useState("33");
+  const [date] = useState(iso(today));
+  const [validUntil] = useState(iso(nextMonth));
+  const [lines, setLines] = useState<LineInput[]>([{ ...EMPTY_LINE }]);
 
-  const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
-  const client = clients.find((c) => c.id === clientId);
-  // Supplier state vs client state drives intra/inter-state GST split. For
-  // the preview we treat matching state as intra-state; server recomputes.
-  const supplierState = "33";
-  const clientState = client?.stateCode ?? supplierState;
-  const isIntraState = supplierState === clientState;
-
-  const totals = useMemo(() => {
-    let subtotal = 0n, gst = 0n;
-    for (const l of lines) {
-      const p = productMap.get(l.productId);
-      if (!p) continue;
-      const rate = p.mrp ?? 0n;
-      const qty = l.quantity || 0;
-      const gross = (rate * BigInt(Math.round(qty * 10_000))) / 10_000n;
-      subtotal += gross;
-      gst += (gross * BigInt(Math.round(p.gstRate * 100))) / 10_000n;
-    }
-    return { subtotal, gst, total: subtotal + gst };
-  }, [lines, productMap]);
-
-  function addItem() {
-    if (!pickerProductId) return;
-    const idx = lines.findIndex((l) => l.productId === pickerProductId);
-    if (idx >= 0) {
-      setLines((ls) => ls.map((l, i) => i === idx ? { ...l, quantity: l.quantity + 1 } : l));
-    } else {
-      setLines((ls) => [...ls, { productId: pickerProductId, quantity: 1 }]);
-    }
-    setPickerProductId("");
-  }
-  function bump(i: number, delta: number) {
-    setLines((ls) => ls.map((l, idx) =>
-      idx === i ? { ...l, quantity: Math.max(1, l.quantity + delta) } : l,
-    ));
-  }
-  function setQty(i: number, v: string) {
-    const n = Math.max(1, Math.floor(Number(v) || 1));
-    setLines((ls) => ls.map((l, idx) => idx === i ? { ...l, quantity: n } : l));
-  }
-  function removeLine(i: number) {
-    setLines((ls) => ls.filter((_, idx) => idx !== i));
-  }
-
-  function onSend() {
-    setServerError(null);
-    if (!clientId) { setServerError("Pick a client first."); return; }
-    if (lines.length === 0) { setServerError("Add at least one item."); return; }
-    startTransition(async () => {
-      const payload = {
-        clientId, branchId, date, validUntil,
-        lines: lines.map((l) => {
-          const p = productMap.get(l.productId)!;
-          return {
-            productId:   l.productId,
-            description: p.name,
-            quantity:    l.quantity,
-            rate:        String(Number(p.mrp ?? 0n) / 100),
-            discountPct: 0,
-          };
-        }),
-      };
-      const res = await createQuotation(payload);
-      if (!res.ok) { setServerError(res.error ?? "Could not create quote"); return; }
-      router.push(`/quotations/${res.data!.id}` as Route);
-      router.refresh();
-    });
-  }
-
-  if (clients.length === 0 || products.length === 0) {
+  if (!projectId) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-14 text-center">
-        <div className="text-[14px] text-text mb-2">
-          {clients.length === 0 && products.length === 0
-            ? "Add at least one client and one product first."
-            : clients.length === 0 ? "Add at least one client first." : "Add at least one product first."}
-        </div>
-        <p className="text-[12px] text-text-dim">
-          A quote needs a client to send to and at least one SKU in the catalog.
+        <div className="text-[15px] font-display text-text mb-2">Start from a project</div>
+        <p className="text-[12.5px] text-text-muted max-w-[420px] mx-auto">
+          Quotations in Mandovara are always linked to a project. Open a project and use its{" "}
+          <strong>Quotation</strong> tab — or navigate here with{" "}
+          <code className="font-data text-[11px]">?project=&lt;id&gt;</code>.
         </p>
       </div>
     );
   }
 
+  const set = (i: number, f: keyof LineInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setLines((ls) => ls.map((l, idx) => idx === i ? { ...l, [f]: e.target.value } : l));
+
+  function addLine() { setLines((ls) => [...ls, { ...EMPTY_LINE }]); }
+  function removeLine(i: number) {
+    if (lines.length > 1) setLines((ls) => ls.filter((_, idx) => idx !== i));
+  }
+
+  function lineAmount(l: LineInput): string {
+    const r = Number(l.rate.replace(/,/g, "")) || 0;
+    const q = Number(l.quantity) || 0;
+    const d = Number(l.discountPct) || 0;
+    const taxable = r * q * (1 - d / 100);
+    return formatINR(BigInt(Math.round((taxable + taxable * (Number(l.gstRate) / 100)) * 100)));
+  }
+
+  function onSave() {
+    setServerError(null); setFieldErrors({});
+    const valid = lines.filter((l) => l.description.trim() && l.rate.trim());
+    if (!valid.length) { setServerError("Add at least one line with description and rate."); return; }
+    if (!branchId) { setServerError("Select a branch."); return; }
+    if (placeOfSupplyCode.length !== 2) { setServerError("State code must be 2 digits."); return; }
+
+    startTransition(async () => {
+      const res = await createQuotation({
+        projectId, branchId, date, validUntil, placeOfSupplyCode,
+        lines: valid.map((l) => ({
+          description:  l.description.trim(),
+          quantity:     Number(l.quantity) || 1,
+          unit:         l.unit as typeof SELL_UNITS[number],
+          rate:         l.rate.trim(),
+          gstRate:      Number(l.gstRate) as 0 | 5 | 12 | 18 | 28,
+          discountPct:  Number(l.discountPct) || 0,
+          ...(l.roomLabel.trim()         && { roomLabel:         l.roomLabel.trim() }),
+          ...(l.measurementItemId.trim() && { measurementItemId: l.measurementItemId.trim() }),
+        })),
+      });
+      if (!res.ok) {
+        setServerError(res.error ?? "Could not create quotation");
+        if (res.fieldErrors) setFieldErrors(res.fieldErrors);
+        return;
+      }
+      router.push(`/quotations/${res.data!.id}` as Route);
+      router.refresh();
+    });
+  }
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 pb-10">
-      {/* ── Main card ─────────────────────────────────────────── */}
-      <div className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6">
-        {/* Quotation header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 pb-5">
-          <div>
-            <div className="font-display text-[24px] sm:text-[28px] font-semibold text-text leading-tight">
-              Quotation
-            </div>
-            <div className="mt-1 text-[11.5px] text-text-dim tabular">
-              Draft · {formatDate(new Date(date))}
-            </div>
-          </div>
-          <div className="sm:text-right min-w-0">
-            {client ? (
-              <>
-                <div className="font-display text-[18px] sm:text-[20px] font-semibold text-text leading-tight truncate">
-                  {client.name}
-                </div>
-                <div className="mt-1 text-[11.5px] text-text-dim">
-                  State {client.stateCode} · {client.mobile}
-                </div>
-              </>
-            ) : (
-              <div className="text-[12px] text-text-faint italic">
-                Pick a client below to see their details here
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Client + branch pickers (compact) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4 border-b border-rule">
-          <label className="block">
-            <div className="mb-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim">Client</div>
-            <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={fieldCls}>
-              <option value="">— pick a client —</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} · {c.mobile}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <div className="mb-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim">From branch</div>
-            <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={fieldCls}>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </label>
-        </div>
-
-        {/* Item picker + Add */}
-        <div className="pt-4 pb-4 flex flex-col sm:flex-row gap-2">
-          <select
-            value={pickerProductId}
-            onChange={(e) => setPickerProductId(e.target.value)}
-            className={`${fieldCls} h-[42px] flex-1`}
-          >
-            <option value="">— pick an item to add —</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — {p.mrp ? formatINR(p.mrp) : "no price"}
-              </option>
-            ))}
+    <div className="space-y-4 pb-10">
+      {/* Header */}
+      <div className="rounded-[14px] bg-surface border border-rule p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <label className="block">
+          <div className={lbl}>Branch</div>
+          <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={fld}>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          <button
-            type="button"
-            onClick={addItem}
-            disabled={!pickerProductId}
-            className="h-[42px] px-5 rounded-[8px] bg-sidebar text-sidebar-text text-[12.5px] font-medium hover:opacity-90 disabled:opacity-40 transition-opacity whitespace-nowrap"
-          >
-            Add item
-          </button>
-        </div>
-
-        {/* Line table */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[540px] text-[12.5px]">
-            <thead>
-              <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
-                <Th>Item</Th>
-                <Th align="center" width={140}>Qty</Th>
-                <Th align="right"  width={110}>Rate</Th>
-                <Th align="right"  width={110}>Amount</Th>
-                <Th width={40}></Th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-[12px] text-text-faint">
-                    Nothing added yet. Pick a product above and click <b>Add item</b>.
-                  </td>
-                </tr>
-              )}
-              {lines.map((l, i) => {
-                const p = productMap.get(l.productId);
-                if (!p) return null;
-                const rate = p.mrp ?? 0n;
-                const amount = (rate * BigInt(Math.round(l.quantity * 10_000))) / 10_000n;
-                return (
-                  <tr key={l.productId} className="border-b border-rule/60 last:border-0 align-middle">
-                    <Td>
-                      <div className="text-text">{p.name}</div>
-                      <div className="text-[10.5px] text-text-faint">per {p.uom.toLowerCase()}</div>
-                    </Td>
-                    <Td align="center">
-                      <div className="inline-flex items-center gap-1">
-                        <StepButton onClick={() => bump(i, -1)} label="Decrease"><Minus size={12} /></StepButton>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={l.quantity}
-                          onChange={(e) => setQty(i, e.target.value)}
-                          className="w-[46px] h-[28px] bg-white/60 border border-rule rounded-[6px] text-center text-[12.5px] tabular outline-none focus:border-accent"
-                        />
-                        <StepButton onClick={() => bump(i, 1)} label="Increase"><Plus size={12} /></StepButton>
-                      </div>
-                    </Td>
-                    <Td align="right"><span className="tabular text-text-dim">{formatINR(rate)}</span></Td>
-                    <Td align="right"><span className="tabular text-text font-medium">{formatINR(amount)}</span></Td>
-                    <Td align="right">
-                      <button
-                        type="button"
-                        onClick={() => removeLine(i)}
-                        aria-label="Remove"
-                        className="h-[24px] w-[24px] grid place-items-center rounded-[4px] text-text-faint hover:text-bad hover:bg-bad/10 transition-colors"
-                      >
-                        <X size={13} />
-                      </button>
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        </label>
+        <label className="block">
+          <div className={lbl}>Place of supply (state code)</div>
+          <input value={placeOfSupplyCode}
+                 onChange={(e) => setPlaceOfSupplyCode(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                 maxLength={2} className={fld} placeholder="33 = Tamil Nadu" />
+        </label>
+        <div>
+          <div className={lbl}>Project</div>
+          <div className="h-[34px] flex items-center text-[11.5px] text-text-muted font-data">{projectId}</div>
         </div>
       </div>
 
-      {/* ── Summary sidebar ────────────────────────────────────── */}
-      <aside className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6 h-fit">
-        <div className="font-display text-[20px] font-semibold text-text mb-4">Summary</div>
+      {/* Lines */}
+      <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px] text-[12.5px]">
+            <thead>
+              <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
+                <Th width={28}>#</Th>
+                <Th>Description · Measurement ID</Th>
+                <Th width={85}>Room</Th>
+                <Th width={75}>Qty</Th>
+                <Th width={90}>Unit</Th>
+                <Th width={105}>Rate (₹)</Th>
+                <Th width={68}>Disc %</Th>
+                <Th width={65}>GST %</Th>
+                <Th width={105} align="right">Amount</Th>
+                <Th width={36}></Th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={i} className="border-b border-rule/60 last:border-0 align-middle">
+                  <Td><span className="tabular text-text-muted text-[11px]">{i + 1}</span></Td>
+                  <Td>
+                    <input value={l.description} onChange={set(i, "description")}
+                           placeholder="e.g. Main curtain — Master bedroom" className={cel} />
+                    {fieldErrors[`lines.${i}.measurementItemId`] && (
+                      <div className="mt-0.5 text-[10.5px] text-fault">{fieldErrors[`lines.${i}.measurementItemId`]}</div>
+                    )}
+                    <input value={l.measurementItemId} onChange={set(i, "measurementItemId")}
+                           placeholder="Measurement ID (M2M required)" className={`${cel} mt-1 text-[11px] font-data`} />
+                  </Td>
+                  <Td>
+                    <input value={l.roomLabel} onChange={set(i, "roomLabel")}
+                           placeholder="Room" className={cel} />
+                  </Td>
+                  <Td>
+                    <input value={l.quantity} onChange={set(i, "quantity")}
+                           inputMode="decimal" className={`${cel} tabular text-right`} />
+                  </Td>
+                  <Td>
+                    <select value={l.unit} onChange={set(i, "unit")} className={cel}>
+                      {SELL_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </Td>
+                  <Td>
+                    <input value={l.rate} onChange={set(i, "rate")}
+                           inputMode="decimal" placeholder="0.00" className={`${cel} tabular text-right`} />
+                  </Td>
+                  <Td>
+                    <input value={l.discountPct} onChange={set(i, "discountPct")}
+                           inputMode="decimal" className={`${cel} tabular text-right`} />
+                  </Td>
+                  <Td>
+                    <select value={l.gstRate} onChange={set(i, "gstRate")} className={cel}>
+                      {["0","5","12","18","28"].map((r) => <option key={r} value={r}>{r}%</option>)}
+                    </select>
+                  </Td>
+                  <Td align="right">
+                    <span className="tabular text-text font-medium">{lineAmount(l)}</span>
+                  </Td>
+                  <Td>
+                    <button type="button" onClick={() => removeLine(i)} disabled={lines.length === 1}
+                            aria-label="Remove" className="h-[28px] w-[28px] grid place-items-center rounded-[4px] text-text-subtle hover:text-fault hover:bg-fault/10 disabled:opacity-30 transition-colors">
+                      <X size={12} />
+                    </button>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="p-3 border-t border-rule/60">
+          <button type="button" onClick={addLine}
+                  className="flex items-center gap-1.5 h-[30px] px-3 rounded-[6px] text-[12px] text-text-muted hover:text-text hover:bg-surface-hover transition-colors">
+            <Plus size={12} /> Add line
+          </button>
+        </div>
+      </div>
 
-        <dl className="space-y-3 text-[12.5px]">
-          <Row k="Subtotal" v={formatINR(totals.subtotal)} />
-          <Row k={`GST${isIntraState ? "" : " (IGST)"}`} v={formatINR(totals.gst)} />
-          <div className="pt-3 mt-2 border-t border-rule flex items-baseline justify-between">
-            <dt className="text-text uppercase text-[10.5px] tracking-[0.14em]">Total</dt>
-            <dd className="font-display text-[24px] sm:text-[28px] font-semibold text-accent tabular-nums leading-none">
-              {formatINR(totals.total)}
-            </dd>
-          </div>
-        </dl>
+      {serverError && (
+        <div className="rounded-[8px] bg-fault/10 border border-fault/30 px-4 py-3 text-[12.5px] text-fault">
+          {serverError}
+        </div>
+      )}
 
-        {serverError && (
-          <div className="mt-3 text-[11.5px] text-bad">{serverError}</div>
-        )}
-
-        <button
-          type="button"
-          onClick={onSend}
-          disabled={pending}
-          className="mt-5 w-full h-[42px] rounded-[10px] bg-accent text-white text-[13px] font-medium hover:bg-accent-hover disabled:opacity-60 transition-colors"
-        >
-          {pending ? "Saving…" : "Send Quote to Client"}
+      <div className="flex justify-end gap-3">
+        <button type="button" onClick={() => router.back()}
+                className="h-[38px] px-5 rounded-[8px] text-[13px] text-text-muted hover:text-text hover:bg-surface-hover transition-colors">
+          Cancel
         </button>
-        <button
-          type="button"
-          disabled
-          className="mt-2 w-full h-[42px] rounded-[10px] bg-transparent border border-rule text-text-dim text-[13px] font-medium hover:bg-surface-hover disabled:opacity-70"
-          title="PDF template ships with Session 16"
-        >
-          Download PDF
+        <button type="button" onClick={onSave} disabled={pending}
+                className="h-[38px] px-6 rounded-[8px] bg-gold text-ink text-[13px] font-medium hover:bg-gold-strong disabled:opacity-60 transition-colors">
+          {pending ? "Saving…" : "Save quotation"}
         </button>
-
-        <p className="mt-3 text-[10.5px] text-text-faint">
-          Numbers here are a live preview. The server re-computes GST per line
-          on save so anything you post is audit-safe.
-        </p>
-      </aside>
+      </div>
     </div>
   );
 }
 
-// ── primitives ──────────────────────────────────────────────────
-
-const fieldCls =
-  "w-full h-[38px] px-3 bg-white/60 border border-rule rounded-[8px] text-[12.5px] outline-none focus:border-accent transition-colors";
-
-function iso(d: Date): string { return d.toISOString().slice(0, 10); }
-
-function StepButton({ onClick, label, children }: {
-  onClick: () => void; label: string; children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="h-[28px] w-[28px] grid place-items-center rounded-[6px] border border-rule text-text-dim hover:text-text hover:bg-surface-hover transition-colors"
-    >
-      {children}
-    </button>
-  );
-}
-function Th({ children, align = "left", width }: { children?: React.ReactNode; align?: "left" | "center" | "right"; width?: number }) {
-  const cls = align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
-  return <th style={width ? { width } : undefined} className={`px-3 h-[36px] font-medium ${cls}`}>{children}</th>;
-}
-function Td({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "center" | "right" }) {
-  const cls = align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
-  return <td className={`px-3 py-3 ${cls}`}>{children}</td>;
-}
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-text-dim text-[12px]">{k}</dt>
-      <dd className="text-text text-right tabular font-medium">{v}</dd>
-    </div>
-  );
-}
+const lbl = "mb-1 text-[10.5px] uppercase tracking-[0.06em] text-text-muted";
+const fld = "w-full h-[34px] px-3 bg-surface-2 border border-border rounded-[6px] text-[12.5px] outline-none focus:border-gold transition-colors";
+const cel = "w-full h-[28px] px-2 bg-surface-2 border border-border rounded-[4px] text-[12.5px] outline-none focus:border-gold transition-colors";

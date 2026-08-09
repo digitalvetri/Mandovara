@@ -4,14 +4,16 @@
 //   - createEmployee: enter a person into HR. Auto-generates a code if the
 //     owner doesn't set one.
 //   - deleteEmployee: HARD delete only if there's no attendance / payslip
-//     history. Otherwise refuse and point at setEmployeeStatus(TERMINATED)
+//     history. Otherwise refuse and point at setEmployeeStatus(SUSPENDED)
 //     for a soft archive — payroll history must remain intact.
 
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
+import { prisma } from "@/kernel/db/client";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
+import type { RequestContext } from "@/kernel/auth/context";
 import {
   createEmployeeSchema, deleteEmployeeSchema, setEmployeeStatusSchema,
 } from "./schema";
@@ -35,17 +37,14 @@ export async function createEmployee(input: unknown): Promise<ActionResult<{ id:
 
   const created = await db.employee.create({
     data: {
-      orgId:       ctx.orgId,
-      branchId:    d.branchId,
+      organizationId: ctx.orgId,
       code,
-      name:        d.name,
+      name:           d.name,
       mobile,
-      email:       nullish(d.email),
-      designation: nullish(d.designation),
-      department:  nullish(d.department),
-      joinDate:    new Date(d.joinDate),
-      status:      "ACTIVE",
-      panNumber:   nullish(d.panNumber)?.toUpperCase() ?? null,
+      designation:    nullish(d.designation) ?? "",
+      department:     nullish(d.department) ?? "",
+      doj:            new Date(d.joinDate),
+      status:         "ACTIVE",
     },
     select: { id: true },
   });
@@ -64,19 +63,16 @@ export async function deleteEmployee(input: unknown): Promise<ActionResult<{ id:
   const { id } = parsed.data;
 
   const db = scoped(ctx);
-  const emp = await db.employee.findUniqueOrThrow({
-    where: { id },
-    select: {
-      _count: { select: { attendance: true, payslips: true, leaves: true } },
-    },
-  });
-  const hasHistory = emp._count.attendance > 0
-                  || emp._count.payslips > 0
-                  || emp._count.leaves > 0;
-  if (hasHistory) {
+  await db.employee.findUniqueOrThrow({ where: { id }, select: { id: true } });
+
+  const [attendanceCount, payslipCount] = await Promise.all([
+    prisma.attendance.count({ where: { employeeId: id } }),
+    prisma.payslip.count({ where: { employeeId: id } }),
+  ]);
+  if (attendanceCount > 0 || payslipCount > 0) {
     return {
       ok: false,
-      error: "This employee has attendance / payroll / leave history. Mark them Terminated instead so payroll records stay intact.",
+      error: "This employee has attendance / payroll history. Mark them Suspended instead so payroll records stay intact.",
     };
   }
   await db.employee.delete({ where: { id } });
@@ -91,17 +87,15 @@ export async function setEmployeeStatus(input: unknown): Promise<ActionResult<{ 
   requirePermission(ctx, "employee.terminate");
   const parsed = setEmployeeStatusSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
-  const { id, status, exitDate } = parsed.data;
+  const { id, status } = parsed.data;
+
+  // DB uses UserStatus enum (ACTIVE | SUSPENDED). Map UI statuses to DB values.
+  const dbStatus: "ACTIVE" | "SUSPENDED" = status === "ACTIVE" ? "ACTIVE" : "SUSPENDED";
 
   const db = scoped(ctx);
   await db.employee.update({
     where: { id },
-    data: {
-      status,
-      ...(status === "RESIGNED" || status === "TERMINATED"
-        ? { exitDate: exitDate && exitDate !== "" ? new Date(exitDate) : new Date() }
-        : { exitDate: null }),
-    },
+    data: { status: dbStatus },
   });
   revalidatePath("/admin");
   revalidatePath("/payroll");
@@ -109,19 +103,16 @@ export async function setEmployeeStatus(input: unknown): Promise<ActionResult<{ 
   return { ok: true, data: { id } };
 }
 
-// ── helpers ──────────────────────────────────────────────────────
+// ── helpers ────────────────────────────────────────────────────────────────────
 
-async function nextEmployeeCode(ctx: { orgId: string }): Promise<string> {
-  // Simple sequential EMP#### code within the org.
-  const db = scoped({ ...ctx } as never);
-  const highest = await db.employee.findMany({
-    where: { code: { startsWith: "EMP" } },
+async function nextEmployeeCode(ctx: RequestContext): Promise<string> {
+  const highest = await prisma.employee.findFirst({
+    where: { organizationId: ctx.orgId, code: { startsWith: "EMP" } },
     orderBy: { code: "desc" },
-    take: 1,
     select: { code: true },
   });
-  const lastNum = highest[0]
-    ? Number(highest[0].code.replace("EMP", "").replace(/\D/g, "")) || 0
+  const lastNum = highest
+    ? Number(highest.code.replace("EMP", "").replace(/\D/g, "")) || 0
     : 0;
   return `EMP${String(lastNum + 1).padStart(4, "0")}`;
 }

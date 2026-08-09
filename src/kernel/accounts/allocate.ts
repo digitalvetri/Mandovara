@@ -14,6 +14,7 @@ export interface AllocateReceiptParams {
   receiptId: string;
   invoiceId: string;
   amount: bigint;   // paise
+  organizationId: string;
 }
 
 export class OverAllocationError extends Error {
@@ -34,8 +35,8 @@ export async function allocateReceiptToInvoice(
 
   // Lock the invoice row. Concurrent txns allocating to the same invoice
   // queue behind us.
-  const rows = await tx.$queryRaw<{ id: string; total: bigint }[]>`
-    SELECT "id", "total"
+  const rows = await tx.$queryRaw<{ id: string; total: bigint; advanceAdjusted: bigint }[]>`
+    SELECT "id", "total", "advanceAdjusted"
     FROM "Invoice"
     WHERE "id" = ${params.invoiceId}
     FOR UPDATE
@@ -49,7 +50,8 @@ export async function allocateReceiptToInvoice(
     _sum: { amount: true },
   });
   const alreadyAllocated = sum._sum.amount ?? 0n;
-  const remaining = invoice.total - alreadyAllocated;
+  // outstanding = total − advanceAdjusted − Σ allocations (mirrors computeOutstanding)
+  const remaining = invoice.total - invoice.advanceAdjusted - alreadyAllocated;
 
   if (params.amount > remaining) {
     throw new OverAllocationError(params.invoiceId, params.amount, remaining);
@@ -57,6 +59,7 @@ export async function allocateReceiptToInvoice(
 
   await tx.receiptAllocation.create({
     data: {
+      organizationId: params.organizationId,
       receiptId: params.receiptId,
       invoiceId: params.invoiceId,
       amount: params.amount,

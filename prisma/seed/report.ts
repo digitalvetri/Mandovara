@@ -1,36 +1,38 @@
 import { PrismaClient } from "@prisma/client";
 
-// Row-count report for the Session 3 gate.
+// Row-count report for the Phase 3 gate.
+// Lists all 62 Mandovara models from CLAUDE.md §5.
 const MODELS = [
-  "organization","branch","user","role","rolePermission","userRole","numberingSeries",
-  "auditLog","approval",
-  "category","specTemplate","product","productPrice","productDocument",
-  "warehouse","rack","bin","batch","serialNumber","stockLedgerEntry","stockBalance",
-  "stockTransfer","stockAdjustment","stockTake","stockTakeLine",
-  "lead","leadActivity","client","contactPerson","address","priceSlab","creditLimit","complaint",
-  "vendor","purchaseRequisition","purchaseOrder","pOLine","gRN","gRNLine","vendorPayment",
-  "quotation","quotationLine","salesOrder","orderLine","reservation","dispatch","dispatchLine","deliveryChallan",
-  "invoice","invoiceLine","receipt","receiptAllocation",
-  "project","milestone","task","materialIssue","siteLog","projectExpense","snagItem","handover",
-  "advance","payment","expenseHead","expense","pettyCash","employeeAdvance",
-  "employee","shift","attendance","leave","leaveBalance","salaryStructure","salaryComponent",
-  "payrollRun","payslip","statutorySlab",
-  "automationRule","messageTemplate","messageLog","whatsAppConversation","notification","followUp",
-  "savedView","setting","importJob","exportJob",
+  "organization","branch","user","employee",
+  "brand","collection","design","colourway","price","serviceRate",
+  "sampleBook","sampleIssue",
+  "lead","client","contactPerson","architect","architectCommission",
+  "project","room","measurement","measurementItem","calcResult",
+  "quotation","quotationLine",
+  "order","orderLine",
+  "vendor","purchaseOrder","pOLine","gRN","gRNLine",
+  "stockBalance","stockMove","allocation",
+  "makeJob","makeJobLine",
+  "installCrew","installVisit","installLine","snag",
+  "invoice","invoiceLine","advance","receipt","receiptAllocation",
+  "projectExpense","expense",
+  "attendance","leave","statutorySlab","payrollRun","payslip",
+  "messageTemplate","automationLog","whatsAppConversation","automationRule","followUp",
+  "projectDocument","numberSequence","auditLog","savedView","setting",
 ] as const;
 
-export async function printRowCounts(db: PrismaClient) {
+export async function printRowCounts(db: PrismaClient): Promise<void> {
   const rows: { model: string; count: number }[] = [];
   for (const m of MODELS) {
-    const model = (db as unknown as Record<string, { count: () => Promise<number> }>)[m];
-    if (!model || typeof model.count !== "function") continue;
-    try { rows.push({ model: m, count: await model.count() }); }
-    catch { /* model not present; skip */ }
+    const delegate = (db as unknown as Record<string, { count: () => Promise<number> }>)[m];
+    if (!delegate || typeof delegate.count !== "function") continue;
+    try { rows.push({ model: m, count: await delegate.count() }); }
+    catch { /* model not present or inaccessible — skip */ }
   }
   const total = rows.reduce((s, r) => s + r.count, 0);
   const width = Math.max(...rows.map((r) => r.model.length));
   process.stdout.write("\n" + "═".repeat(60) + "\n");
-  process.stdout.write("  ROW COUNTS\n");
+  process.stdout.write("  MANDOVARA SEED · ROW COUNTS\n");
   process.stdout.write("═".repeat(60) + "\n");
   for (const r of rows) {
     process.stdout.write("  " + r.model.padEnd(width + 4) + String(r.count).padStart(8) + "\n");

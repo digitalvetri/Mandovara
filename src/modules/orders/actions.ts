@@ -1,31 +1,14 @@
 "use server";
 
-// Sales orders + dispatch server actions.
-//
-// createFromQuotation:
-//   - Reads an ACCEPTED quotation, mints an order copying header + lines,
-//     allocates order number inside the tx, flips the quotation to CONVERTED.
-//   - Everything in one transaction so a failure doesn't leave a converted
-//     quote without an order.
-//
-// createDispatch:
-//   - Increments dispatchedQty on each affected OrderLine.
-//   - Guards: dispatched can never exceed ordered (§11 acceptance).
-//   - Updates order status: DRAFT/CONFIRMED → PARTIAL_DISPATCH → DISPATCHED
-//     based on whether all lines are fully dispatched.
-//   - Numbering allocated inside the same tx.
-
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
-import { allocateNumber, Prisma } from "@/kernel/numbering/series";
-import { financialYear } from "@/kernel/datetime";
+import { parseINR } from "@/kernel/money/format";
+import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
-import {
-  convertQuotationSchema, createDispatchSchema, setOrderStatusSchema,
-} from "./schema";
+import { convertQuotationSchema, setOrderStatusSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -42,75 +25,81 @@ export async function createOrderFromQuotation(
 
   const parsed = convertQuotationSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
-  const { quotationId, deliveryBy } = parsed.data;
+  const d = parsed.data;
 
-  // Pre-tx load
   const db = scoped(ctx);
   const q = await db.quotation.findUniqueOrThrow({
-    where: { id: quotationId },
+    where: { id: d.quotationId },
     select: {
-      id: true, branchId: true, clientId: true, status: true,
-      taxableAmount: true, cgst: true, sgst: true, igst: true, total: true,
+      id: true, branchId: true, projectId: true, clientId: true,
+      status: true, total: true,
       lines: {
         orderBy: { lineNo: "asc" },
         select: {
-          lineNo: true, productId: true, description: true, quantity: true,
-          rate: true, gstRate: true, amount: true,
+          lineNo: true, measurementItemId: true, colourwayId: true, serviceRateId: true,
+          description: true, quantity: true, unit: true, rate: true, amount: true,
         },
       },
     },
   });
+
   if (q.status !== "ACCEPTED") {
-    return { ok: false, error: `Quotation must be ACCEPTED to convert (currently ${q.status})` };
+    return {
+      ok: false,
+      error: `Quotation must be ACCEPTED to convert (currently ${q.status})`,
+    };
   }
+
   const branch = await db.branch.findUniqueOrThrow({
     where: { id: q.branchId },
     select: { invoicePrefix: true },
   });
 
   const now = new Date();
+  const advanceRequired =
+    d.advanceRequired && d.advanceRequired.trim() ? parseINR(d.advanceRequired) : 0n;
+  const promisedInstallAt =
+    d.promisedInstallAt && d.promisedInstallAt.trim()
+      ? new Date(d.promisedInstallAt)
+      : null;
+
   const created = await withTransaction(async (tx: TxClient) => {
     const number = await allocateNumber(tx, {
-      orgId:         ctx.orgId,
-      branchId:      q.branchId,
-      docType:       "SALES_ORDER",
-      financialYear: financialYear(now),
-      prefix:        `${branch.invoicePrefix}/SO`,
+      orgId:  ctx.orgId,
+      series: "SO",
+      yymm:   yymmFromDate(now),
+      prefix: branch.invoicePrefix,
     });
-    const order = await tx.salesOrder.create({
+    const order = await tx.order.create({
       data: {
-        orgId:         ctx.orgId,
-        branchId:      q.branchId,
+        organizationId:   ctx.orgId,
+        branchId:         q.branchId,
         number,
-        clientId:      q.clientId,
-        quotationId:   q.id,
-        date:          now,
-        ...(deliveryBy != null && deliveryBy !== "" && { deliveryBy: new Date(deliveryBy) }),
-        status:        "CONFIRMED",
-        taxableAmount: q.taxableAmount,
-        cgst:          q.cgst,
-        sgst:          q.sgst,
-        igst:          q.igst,
-        total:         q.total,
-        createdById:   ctx.userId,
+        projectId:        q.projectId,
+        clientId:         q.clientId,
+        quotationId:      q.id,
+        date:             now,
+        status:           "CONFIRMED",
+        totalValue:       q.total,
+        advanceRequired,
+        ...(promisedInstallAt && { promisedInstallAt }),
       },
       select: { id: true, number: true },
     });
     await tx.orderLine.createMany({
       data: q.lines.map((l) => ({
-        salesOrderId: order.id,
-        lineNo:       l.lineNo,
-        productId:    l.productId,
-        description:  l.description,
-        orderedQty:   l.quantity,
-        rate:         l.rate,
-        gstRate:      l.gstRate,
-        amount:       l.amount,
+        organizationId:    ctx.orgId,
+        orderId:           order.id,
+        lineNo:            l.lineNo,
+        measurementItemId: l.measurementItemId ?? null,
+        colourwayId:       l.colourwayId ?? null,
+        serviceRateId:     l.serviceRateId ?? null,
+        description:       l.description,
+        quantity:          l.quantity,
+        unit:              l.unit,
+        rate:              l.rate,
+        amount:            l.amount,
       })),
-    });
-    await tx.quotation.update({
-      where: { id: q.id },
-      data: { status: "CONVERTED" },
     });
     return order;
   });
@@ -121,134 +110,25 @@ export async function createOrderFromQuotation(
   return { ok: true, data: created };
 }
 
-export async function createDispatch(
+export async function setOrderStatus(
   input: unknown,
-): Promise<ActionResult<{ id: string; number: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "dispatch.create");
-
-  const parsed = createDispatchSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
-  const d = parsed.data;
-
-  const db = scoped(ctx);
-  const order = await db.salesOrder.findUniqueOrThrow({
-    where: { id: d.salesOrderId },
-    select: {
-      id: true, branchId: true, status: true,
-      lines: {
-        select: { id: true, orderedQty: true, dispatchedQty: true, productId: true, lineNo: true },
-      },
-    },
-  });
-  if (order.status === "CANCELLED" || order.status === "DISPATCHED") {
-    return { ok: false, error: `Order status ${order.status} does not permit dispatch` };
-  }
-  const branch = await db.branch.findUniqueOrThrow({
-    where: { id: order.branchId },
-    select: { invoicePrefix: true },
-  });
-
-  // Over-dispatch guard — server-side, per line, using Decimal safe compare.
-  const linesByOrderLineId = new Map(order.lines.map((l) => [l.id, l]));
-  for (const req of d.lines) {
-    const line = linesByOrderLineId.get(req.orderLineId);
-    if (!line) {
-      return { ok: false, error: "Validation failed",
-               fieldErrors: { [`lines.${req.orderLineId}`]: "Order line not found" } };
-    }
-    const remaining = line.orderedQty.minus(line.dispatchedQty);
-    if (new Prisma.Decimal(req.quantity).gt(remaining)) {
-      return {
-        ok: false,
-        error: "Over-dispatch blocked",
-        fieldErrors: {
-          [`lines.${req.orderLineId}`]:
-            `Only ${remaining.toString()} pending on line ${line.lineNo}`,
-        },
-      };
-    }
-  }
-
-  const dispatchedAt = new Date(d.dispatchedAt);
-
-  const created = await withTransaction(async (tx: TxClient) => {
-    const number = await allocateNumber(tx, {
-      orgId:         ctx.orgId,
-      branchId:      order.branchId,
-      docType:       "DISPATCH",
-      financialYear: financialYear(dispatchedAt),
-      prefix:        `${branch.invoicePrefix}/DC`,
-    });
-    const dispatch = await tx.dispatch.create({
-      data: {
-        orgId:        ctx.orgId,
-        branchId:     order.branchId,
-        number,
-        salesOrderId: order.id,
-        status:       "POSTED",
-        dispatchedAt,
-        vehicleNumber: (d.vehicleNumber ?? "").trim() || null,
-        transporter:   (d.transporter   ?? "").trim() || null,
-        createdById:  ctx.userId,
-      },
-      select: { id: true, number: true },
-    });
-    await tx.dispatchLine.createMany({
-      data: d.lines.map((l, i) => {
-        const orderLine = linesByOrderLineId.get(l.orderLineId)!;
-        return {
-          dispatchId: dispatch.id,
-          lineNo:     i + 1,
-          productId:  orderLine.productId,
-          quantity:   new Prisma.Decimal(l.quantity),
-        };
-      }),
-    });
-    // Ratchet dispatchedQty on each OrderLine.
-    for (const l of d.lines) {
-      await tx.orderLine.update({
-        where: { id: l.orderLineId },
-        data:  { dispatchedQty: { increment: new Prisma.Decimal(l.quantity) } },
-      });
-    }
-    // Recompute order status.
-    const fresh = await tx.orderLine.findMany({
-      where: { salesOrderId: order.id },
-      select: { orderedQty: true, dispatchedQty: true },
-    });
-    const allComplete = fresh.every((l) => l.dispatchedQty.gte(l.orderedQty));
-    const anyDispatched = fresh.some((l) => l.dispatchedQty.gt(0));
-    const nextStatus = allComplete ? "DISPATCHED"
-                     : anyDispatched ? "PARTIAL_DISPATCH"
-                     : order.status;
-    if (nextStatus !== order.status) {
-      await tx.salesOrder.update({ where: { id: order.id }, data: { status: nextStatus } });
-    }
-    return dispatch;
-  });
-
-  revalidatePath("/orders");
-  revalidatePath(`/orders/${order.id}`);
-  return { ok: true, data: created };
-}
-
-export async function setOrderStatus(input: unknown): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string }>> {
   const ctx = await devContext();
   const parsed = setOrderStatusSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
   const { id, status } = parsed.data;
 
   requirePermission(ctx, status === "CANCELLED" ? "order.cancel" : "order.amend");
+
   const db = scoped(ctx);
-  await db.salesOrder.update({ where: { id }, data: { status } });
+  await db.order.update({ where: { id }, data: { status } });
 
   revalidatePath("/orders");
   revalidatePath(`/orders/${id}`);
   return { ok: true, data: { id } };
 }
 
-// ── helpers ──────────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
   const fieldErrors: Record<string, string> = {};

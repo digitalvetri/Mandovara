@@ -3,7 +3,6 @@ import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { listLeads } from "@/modules/leads/queries";
-import type { LeadStatus } from "@/modules/leads/schema";
 import { LEAD_STATUSES } from "@/modules/leads/schema";
 import { Pager } from "@/components/data/Pager";
 import { LeadFilters } from "./_components/LeadFilters";
@@ -13,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 interface SearchParams {
   q?: string;
+  stage?: string;
   status?: string;
   page?: string;
   sort?: string;
@@ -25,20 +25,20 @@ export default async function LeadsPage({
   const ctx = await devContext();
 
   const q = params.q?.trim();
-  const status = normaliseStatus(params.status);
+  const stage = normaliseStage(params.stage ?? params.status);
   const page = parsePositiveInt(params.page) ?? 1;
   const sort = (params.sort as "recent" | "oldest" | "name" | "value" | undefined) ?? "recent";
 
   const { rows, total, pageSize } = await listLeads(ctx, {
     ...(q != null && { search: q }),
-    status, page, sort,
+    stage, page, sort,
   });
 
   return (
     <>
       <Topbar
         title="Lead Management"
-        eyebrow={`${total} lead${total === 1 ? "" : "s"} · ${filterEyebrow(status, q)}`}
+        eyebrow={`${total} lead${total === 1 ? "" : "s"} · ${filterEyebrow(stage, q)}`}
         actions={
           <Link href={"/leads/new" as Route}>
             <PrimaryButton>New Lead</PrimaryButton>
@@ -52,10 +52,10 @@ export default async function LeadsPage({
   );
 }
 
-function normaliseStatus(v: string | undefined): LeadStatus | "OPEN" | "ALL" {
+function normaliseStage(v: string | undefined): string | "OPEN" | "ALL" {
   if (v == null || v === "") return "ALL";
   if (v === "OPEN" || v === "ALL") return v;
-  if ((LEAD_STATUSES as readonly string[]).includes(v)) return v as LeadStatus;
+  if ((LEAD_STATUSES as readonly string[]).includes(v)) return v;
   return "ALL";
 }
 

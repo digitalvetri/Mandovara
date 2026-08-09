@@ -9,7 +9,7 @@ export function RuleToggle({ id, enabled }: { id: string; enabled: boolean }) {
   const [pending, startTransition] = useTransition();
   function flip() {
     startTransition(async () => {
-      await toggleAutomationRule({ id, enabled: !enabled });
+      await toggleAutomationRule({ id, isActive: !enabled });
       router.refresh();
     });
   }

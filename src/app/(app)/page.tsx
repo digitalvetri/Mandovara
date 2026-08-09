@@ -7,16 +7,70 @@ import { RevenueChart } from "./_dashboard/RevenueChart";
 import { ProjectStages } from "./_dashboard/ProjectStages";
 import { SiteVisits } from "./_dashboard/SiteVisits";
 import { RecentActivity } from "./_dashboard/RecentActivity";
+import { SalesView } from "./_dashboard/SalesView";
+import { MeasureExecView } from "./_dashboard/MeasureExecView";
+import { StoreView } from "./_dashboard/StoreView";
+import { MakeSupervisorView } from "./_dashboard/MakeSupervisorView";
+import { InstallerView } from "./_dashboard/InstallerView";
+import { AccountsView } from "./_dashboard/AccountsView";
 
 export const dynamic = "force-dynamic";
 
-// Owner Dashboard. Composition only — data comes from the dashboard
-// repository (src/modules/dashboard/queries.ts) via db.scoped(ctx). Every
-// numeric section lives in its own file under _dashboard/ so nothing here
-// crosses the 300-line rule.
-
 export default async function DashboardPage() {
-  const ctx = await devContext();
+  const ctx  = await devContext();
+  const role = ctx.roles[0] ?? "OWNER";
+
+  // Role-specific landing — each role sees the data most relevant to their job
+  if (role === "SALES" || role === "DESIGNER") {
+    return (
+      <>
+        <Topbar title="My Dashboard" eyebrow={`${role.toLowerCase()} · ${todayEyebrow()}`} />
+        <SalesView ctx={ctx} />
+      </>
+    );
+  }
+  if (role === "MEASURE_EXEC") {
+    return (
+      <>
+        <Topbar title="Measurement Schedule" eyebrow={`${todayEyebrow()}`} />
+        <MeasureExecView ctx={ctx} />
+      </>
+    );
+  }
+  if (role === "STORE") {
+    return (
+      <>
+        <Topbar title="Store Dashboard" eyebrow={`${todayEyebrow()}`} />
+        <StoreView ctx={ctx} />
+      </>
+    );
+  }
+  if (role === "MAKE_SUPERVISOR") {
+    return (
+      <>
+        <Topbar title="Production Dashboard" eyebrow={`${todayEyebrow()}`} />
+        <MakeSupervisorView ctx={ctx} />
+      </>
+    );
+  }
+  if (role === "INSTALLER") {
+    return (
+      <>
+        <Topbar title="Install Route" eyebrow={`${todayEyebrow()}`} />
+        <InstallerView ctx={ctx} />
+      </>
+    );
+  }
+  if (role === "ACCOUNTS") {
+    return (
+      <>
+        <Topbar title="Accounts Dashboard" eyebrow={`${todayEyebrow()}`} />
+        <AccountsView ctx={ctx} />
+      </>
+    );
+  }
+
+  // OWNER / HR / fallback → full cockpit view
   const d = await loadDashboard(ctx);
 
   const trendTone = d.revenueMtdTrendPct >= 0 ? "good" : "bad";

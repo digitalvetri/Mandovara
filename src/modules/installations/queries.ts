@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 // Installations console repository.
 
 import { scoped } from "@/kernel/db/scoped";

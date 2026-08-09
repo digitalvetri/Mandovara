@@ -1,254 +1,356 @@
-// Master data — org, branches, roles, users, warehouses, employees, vendors.
-import { PrismaClient } from "@prisma/client";
-import {
-  COMPANY_SUFFIXES, FIRST_NAMES_TN, LAST_NAMES_TN, PERMISSION_KEYS,
-  ROLES, STATE_CODES, TN_CITIES,
-} from "./data";
+// Master data — org, branch, users, employees, vendors, statutory slabs, number sequences.
+// No @ts-nocheck — this file must typecheck cleanly against the actual schema.
+import { Prisma, PrismaClient } from "@prisma/client";
 import { makeGstin, makeRng, makePan } from "./rng";
 
-export interface SeedIds {
+export interface SeedMasterIds {
   orgId: string;
-  branchIds: string[];
-  branchNames: string[];
-  warehouseIds: string[];
-  binIdsByWarehouse: Map<string, string[]>;
-  userIds: string[];
-  ownerUserId: string;
-  roleIdsByKey: Map<string, string>;
+  branchId: string;
+  userByRole: Record<string, string>; // "OWNER" → userId, etc.
   employeeIds: string[];
   vendorIds: string[];
 }
 
-export async function seedMasters(db: PrismaClient, seed = 42): Promise<SeedIds> {
-  const rng = makeRng(seed);
+// ── User definitions (9, one per AppRole) ────────────────────────────────────
 
-  // ── Organization + branches ─────────────────────────────────
+const USER_SPECS = [
+  { role: "OWNER",          name: "Rohit Mandovara",  mobile: "+91 9843012345", email: "rohit@mandovara.com"     },
+  { role: "DESIGNER",       name: "Aishwarya Raj",    mobile: "+91 9843012346", email: "aishwarya@mandovara.com" },
+  { role: "SALES",          name: "Karthik Suresh",   mobile: "+91 9843012347", email: "karthik@mandovara.com"   },
+  { role: "MEASURE_EXEC",   name: "Bala Kumar",       mobile: "+91 9843012348", email: "bala@mandovara.com"      },
+  { role: "STORE",          name: "Senthil Murugan",  mobile: "+91 9843012349", email: "senthil@mandovara.com"   },
+  { role: "MAKE_SUPERVISOR",name: "Manoj Krishnan",   mobile: "+91 9843012350", email: "manoj@mandovara.com"     },
+  { role: "INSTALLER",      name: "Vignesh Prasad",   mobile: "+91 9843012351", email: "vignesh@mandovara.com"   },
+  { role: "ACCOUNTS",       name: "Deepa Iyer",       mobile: "+91 9843012352", email: "deepa@mandovara.com"     },
+  { role: "HR",             name: "Priya Natarajan",  mobile: "+91 9843012353", email: "priya@mandovara.com"     },
+] as const;
+
+// ── Department map by role ────────────────────────────────────────────────────
+
+const DEPT_BY_ROLE: Record<string, string> = {
+  OWNER:           "SALES",
+  DESIGNER:        "DESIGN",
+  SALES:           "SALES",
+  MEASURE_EXEC:    "MEASURE",
+  STORE:           "STORE",
+  MAKE_SUPERVISOR: "MAKE",
+  INSTALLER:       "INSTALL",
+  ACCOUNTS:        "ACCOUNTS",
+  HR:              "HR",
+};
+
+const DESIGNATION_BY_ROLE: Record<string, string> = {
+  OWNER:           "Managing Director",
+  DESIGNER:        "Senior Designer",
+  SALES:           "Sales Executive",
+  MEASURE_EXEC:    "Measurement Executive",
+  STORE:           "Store Keeper",
+  MAKE_SUPERVISOR: "Make Supervisor",
+  INSTALLER:       "Installation Technician",
+  ACCOUNTS:        "Accounts Manager",
+  HR:              "HR Executive",
+};
+
+// ── Vendor definitions (15) ───────────────────────────────────────────────────
+
+const VENDOR_SPECS = [
+  // 5 wallpaper importers
+  { name: "Grandeco India Pvt Ltd",   category: "wallpaper", paymentTermsDays: 45, leadTimeDays: 21 },
+  { name: "G&B Wallcoverings India",  category: "wallpaper", paymentTermsDays: 30, leadTimeDays: 28 },
+  { name: "York India",               category: "wallpaper", paymentTermsDays: 60, leadTimeDays: 35 },
+  { name: "Nilaya Wallpapers",        category: "wallpaper", paymentTermsDays: 30, leadTimeDays: 14 },
+  { name: "Divine Décors Pvt Ltd",    category: "wallpaper", paymentTermsDays: 45, leadTimeDays: 21 },
+  // 4 fabric suppliers
+  { name: "Fibre Naturelle India",    category: "fabric",    paymentTermsDays: 30, leadTimeDays: 14 },
+  { name: "Rialto Fabrics India",     category: "fabric",    paymentTermsDays: 30, leadTimeDays: 10 },
+  { name: "Miros Textiles",           category: "fabric",    paymentTermsDays: 45, leadTimeDays: 14 },
+  { name: "Casamance India",          category: "fabric",    paymentTermsDays: 60, leadTimeDays: 21 },
+  // 3 flooring distributors
+  { name: "Quick-Step India",         category: "flooring",  paymentTermsDays: 30, leadTimeDays: 10 },
+  { name: "Pergo India Pvt Ltd",      category: "flooring",  paymentTermsDays: 45, leadTimeDays: 14 },
+  { name: "Gerflor India",            category: "flooring",  paymentTermsDays: 30, leadTimeDays: 7  },
+  // 2 blind hardware
+  { name: "Toso India",               category: "blind",     paymentTermsDays: 30, leadTimeDays: 14 },
+  { name: "Rolluya Systems",          category: "blind",     paymentTermsDays: 45, leadTimeDays: 21 },
+  // 1 film supplier
+  { name: "3M India Ltd",             category: "film",      paymentTermsDays: 30, leadTimeDays: 7  },
+] as const;
+
+// ── Extra standalone employees (9, no userId) ─────────────────────────────────
+
+const EXTRA_EMPLOYEE_SPECS = [
+  // 3 INSTALL
+  { name: "Arjun Selvam",     mobile: "+91 9500000010", designation: "Installer",               department: "INSTALL" },
+  { name: "Dinesh Rajan",     mobile: "+91 9500000011", designation: "Installer",               department: "INSTALL" },
+  { name: "Gokul Saravanan",  mobile: "+91 9500000012", designation: "Senior Installer",        department: "INSTALL" },
+  // 3 MAKE
+  { name: "Muthu Lakshmi",    mobile: "+91 9500000013", designation: "Tailor",                  department: "MAKE"    },
+  { name: "Kavitha Devi",     mobile: "+91 9500000014", designation: "Senior Tailor",           department: "MAKE"    },
+  { name: "Ranjith Kumar",    mobile: "+91 9500000015", designation: "Cutting Master",          department: "MAKE"    },
+  // 3 MEASURE
+  { name: "Prakash Anand",    mobile: "+91 9500000016", designation: "Measurement Assistant",   department: "MEASURE" },
+  { name: "Suresh Babu",      mobile: "+91 9500000017", designation: "Measurement Executive",   department: "MEASURE" },
+  { name: "Nithya Moorthy",   mobile: "+91 9500000018", designation: "Site Survey Executive",   department: "MEASURE" },
+] as const;
+
+// ── Salary structure helper ───────────────────────────────────────────────────
+
+function salaryStructure(dept: string): { basic: string; hra: string; conveyance: string } {
+  const map: Record<string, { basic: string; hra: string; conveyance: string }> = {
+    SALES:    { basic: "35000", hra: "14000", conveyance: "3000" },
+    DESIGN:   { basic: "40000", hra: "16000", conveyance: "3000" },
+    MEASURE:  { basic: "25000", hra: "10000", conveyance: "2000" },
+    STORE:    { basic: "28000", hra: "11200", conveyance: "2000" },
+    MAKE:     { basic: "22000", hra:  "8800", conveyance: "2000" },
+    INSTALL:  { basic: "24000", hra:  "9600", conveyance: "2500" },
+    ACCOUNTS: { basic: "38000", hra: "15200", conveyance: "3000" },
+    HR:       { basic: "30000", hra: "12000", conveyance: "2000" },
+  };
+  return map[dept] ?? { basic: "25000", hra: "10000", conveyance: "2000" };
+}
+
+// ── Number series list ────────────────────────────────────────────────────────
+
+const ALL_SERIES = ["ENQ", "PRJ", "MEA", "QT", "SO", "PO", "GRN", "MJ", "INS", "INV", "RCT", "SMP", "CN"] as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main export
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function seedMasters(db: PrismaClient, seed?: number): Promise<SeedMasterIds> {
+  const rng = makeRng(seed ?? 42);
+
+  // ── Organization ───────────────────────────────────────────────────────────
   const org = await db.organization.create({
     data: {
-      name: "Mandovara Business Solutions",
-      gstin: makeGstin(rng.next, STATE_CODES.TN),
-      pan: makePan(rng.next, "C"),
+      name:        "Mandovara",
+      legalName:   "Mandovara Interior Solutions",
+      gstin:       makeGstin(rng.next, "33"),
+      pan:         makePan(rng.next, "C"),
+      addressLine: "32 Thirumoorthy Layout, Thadagam Road, RS Puram",
+      city:        "Coimbatore",
+      state:       "Tamil Nadu",
+      stateCode:   "33",
+      pincode:     "641002",
+      phone:       "+91 8940430051",
+      email:       "mandovara22@gmail.com",
+      website:     "https://mandovara.com",
       fyStartMonth: 4,
-      settings: { theme: "sovereign", locale: "en", tz: "Asia/Kolkata" },
+      settings: {
+        wastage: {
+          flooring_straight:   7,
+          flooring_diagonal:  10,
+          flooring_herringbone: 15,
+          wallpaper:          10,
+          carpet:             10,
+        },
+        fullness: {
+          sheer:              2.5,
+          main_pinch_pleat:   2.5,
+          main_eyelet:        2.0,
+          main_pencil_pleat:  2.5,
+        },
+        roll: {
+          width_mm: 530,
+          length_m: 10.05,
+        },
+        hem: {
+          side_mm:    40,
+          heading_mm: 150,
+          bottom_mm:  200,
+        },
+        currency: "INR",
+        tz: "Asia/Kolkata",
+      } as Prisma.InputJsonValue,
     },
   });
 
-  const branches = await Promise.all([
-    db.branch.create({
-      data: {
-        orgId: org.id, name: "Coimbatore HQ",
-        gstin: makeGstin(rng.next, STATE_CODES.TN), stateCode: STATE_CODES.TN,
-        address: { line1: "123 Avinashi Road", city: "Coimbatore", pincode: "641018" },
-        invoicePrefix: "MDV/CBE",
-      },
-    }),
-    db.branch.create({
-      data: {
-        orgId: org.id, name: "Chennai Branch",
-        gstin: makeGstin(rng.next, STATE_CODES.TN), stateCode: STATE_CODES.TN,
-        address: { line1: "45 Anna Salai", city: "Chennai", pincode: "600002" },
-        invoicePrefix: "MDV/CHE",
-      },
-    }),
-  ]);
-
-  // ── Roles + permissions ─────────────────────────────────────
-  const roleIdsByKey = new Map<string, string>();
-  for (const r of ROLES) {
-    const role = await db.role.create({ data: { orgId: org.id, name: r.name } });
-    roleIdsByKey.set(r.key, role.id);
-    const isOwnerOrManager = r.key === "OWNER" || r.key === "MANAGER";
-    await db.rolePermission.createMany({
-      data: PERMISSION_KEYS.map((key) => ({
-        roleId: role.id,
-        key,
-        scope: (isOwnerOrManager ? "FULL" : subsetScope(r.key, key)) as never,
-      })),
-    });
-  }
-
-  // ── Users ───────────────────────────────────────────────────
-  const userNames = pickUnique(rng, FIRST_NAMES_TN, LAST_NAMES_TN, 25);
-  const users = [];
-  const ownerName = userNames[0]!;
-  const ownerUser = await db.user.create({
+  // ── Branch ─────────────────────────────────────────────────────────────────
+  const branch = await db.branch.create({
     data: {
-      orgId: org.id, mobile: `+91${9800000000 + rng.int(0, 9_999_999)}`,
-      email: `owner@mandovara.example`, name: `${ownerName.first} ${ownerName.last}`,
-      status: "ACTIVE", locale: "en", branchIds: branches.map((b) => b.id),
+      organizationId: org.id,
+      name:           "RS Puram Showroom",
+      gstin:          makeGstin(rng.next, "33"),
+      stateCode:      "33",
+      address: {
+        line1:   "32 Thirumoorthy Layout, Thadagam Road, RS Puram",
+        city:    "Coimbatore",
+        state:   "Tamil Nadu",
+        pincode: "641002",
+      } as Prisma.InputJsonValue,
+      invoicePrefix: "MDV",
     },
   });
-  users.push(ownerUser.id);
-  await db.userRole.create({ data: { userId: ownerUser.id, roleId: roleIdsByKey.get("OWNER")! } });
 
-  for (let i = 1; i < 25; i++) {
-    const n = userNames[i]!;
-    const roleKey = roleForIndex(i);
-    const branchIds = [branches[rng.int(0, 1)]!.id];
-    const user = await db.user.create({
-      data: {
-        orgId: org.id,
-        mobile: `+91${9700000000 + i * 100 + rng.int(0, 99)}`,
-        email: `${n.first.toLowerCase()}.${n.last.toLowerCase()}${i}@mandovara.example`,
-        name: `${n.first} ${n.last}`,
-        status: "ACTIVE", locale: rng.boolean(0.3) ? "ta" : "en", branchIds,
-      },
-    });
-    users.push(user.id);
-    await db.userRole.create({ data: { userId: user.id, roleId: roleIdsByKey.get(roleKey)! } });
-  }
+  // ── Users (9, one per AppRole) ─────────────────────────────────────────────
+  const userRows: Prisma.UserCreateManyInput[] = USER_SPECS.map((u) => ({
+    organizationId: org.id,
+    mobile:         u.mobile,
+    email:          u.email,
+    name:           u.name,
+    passwordHash:   null,
+    role:           u.role as Prisma.UserCreateManyInput["role"],
+    branchIds:      [branch.id],
+    locale:         "en",
+    status:         "ACTIVE",
+  }));
 
-  // ── Warehouses + racks + bins ──────────────────────────────
-  const warehouseIds: string[] = [];
-  const binIdsByWarehouse = new Map<string, string[]>();
-  const whSpec = [
-    { name: "Main Godown",    branchIdx: 0 },
-    { name: "Site Store",     branchIdx: 0 },
-    { name: "Chennai Godown", branchIdx: 1 },
-  ];
-  for (const w of whSpec) {
-    const wh = await db.warehouse.create({
-      data: {
-        orgId: org.id, branchId: branches[w.branchIdx]!.id, name: w.name,
-        address: { city: TN_CITIES[w.branchIdx * 3 % TN_CITIES.length] },
-      },
-    });
-    warehouseIds.push(wh.id);
-    const rackCodes = ["A", "B", "C", "D", "E"];
-    const bins: string[] = [];
-    for (const rc of rackCodes) {
-      const rack = await db.rack.create({ data: { warehouseId: wh.id, code: rc } });
-      for (let b = 1; b <= 8; b++) {
-        const bin = await db.bin.create({ data: { rackId: rack.id, code: `${rc}${b.toString().padStart(2, "0")}` } });
-        bins.push(bin.id);
-      }
-    }
-    binIdsByWarehouse.set(wh.id, bins);
-  }
+  const createdUsers = await db.user.createManyAndReturn({ data: userRows });
 
-  // ── Employees (mirror users so payroll has real people) ────
-  const employeeIds: string[] = [];
-  for (let i = 0; i < 25; i++) {
-    const n = userNames[i]!;
-    const emp = await db.employee.create({
-      data: {
-        orgId: org.id, branchId: branches[rng.int(0, 1)]!.id,
-        code: `EMP${String(1001 + i).padStart(4, "0")}`,
-        userId: users[i]!,
-        name: `${n.first} ${n.last}`,
-        mobile: `+91${9600000000 + i * 100}`,
-        designation: roleForIndex(i),
-        department: departmentForRole(roleForIndex(i)),
-        joinDate: new Date(2023 + rng.int(0, 2), rng.int(0, 11), rng.int(1, 28)),
-        panNumber: makePan(rng.next),
-      },
-    });
-    employeeIds.push(emp.id);
+  const userByRole: Record<string, string> = Object.fromEntries(
+    createdUsers.map((u) => [u.role as string, u.id]),
+  );
 
-    const ctc = BigInt((rng.int(20, 80) * 100000) * 100); // ₹2L–8L / month × 100 for paise
-    const structure = await db.salaryStructure.create({
-      data: { orgId: org.id, employeeId: emp.id, effectiveFrom: emp.joinDate, ctc },
-    });
-    const basic = ctc / 2n;
-    const hra   = ctc / 4n;
-    const spec  = ctc - basic - hra;
-    await db.salaryComponent.createMany({
-      data: [
-        { salaryStructureId: structure.id, name: "BASIC",   amount: basic, isEarning: true,  ordering: 1 },
-        { salaryStructureId: structure.id, name: "HRA",     amount: hra,   isEarning: true,  ordering: 2 },
-        { salaryStructureId: structure.id, name: "SPECIAL", amount: spec,  isEarning: true,  ordering: 3 },
-        { salaryStructureId: structure.id, name: "PF_EMPLOYEE", amount: 1800n * 100n, isEarning: false, isTaxable: false, ordering: 10 },
-      ],
+  // ── Employees (18) ─────────────────────────────────────────────────────────
+  // 9 user-linked (EMP-001..009) + 9 standalone (EMP-010..018)
+  const employeeRows: Prisma.EmployeeCreateManyInput[] = [];
+
+  // User-linked employees
+  for (let i = 0; i < USER_SPECS.length; i++) {
+    const spec = USER_SPECS[i]!;
+    const dept = DEPT_BY_ROLE[spec.role]!;
+    const salary = salaryStructure(dept);
+    employeeRows.push({
+      organizationId:  org.id,
+      userId:          userByRole[spec.role],
+      code:            `EMP-${String(i + 1).padStart(3, "0")}`,
+      name:            spec.name,
+      mobile:          spec.mobile,
+      designation:     DESIGNATION_BY_ROLE[spec.role]!,
+      department:      dept,
+      doj:             rng.daysAgo(365, 1095),
+      salaryStructure: salary as Prisma.InputJsonValue,
+      status:          "ACTIVE",
     });
   }
 
-  // ── Vendors ────────────────────────────────────────────────
-  const vendorIds: string[] = [];
-  const vendorData = [];
-  for (let i = 0; i < 60; i++) {
-    const suffix = COMPANY_SUFFIXES[i % COMPANY_SUFFIXES.length]!;
-    const first = FIRST_NAMES_TN[rng.int(0, FIRST_NAMES_TN.length - 1)]!;
-    const stateCode = rng.weighted([[STATE_CODES.TN, 7], [STATE_CODES.KA, 2], [STATE_CODES.KL, 1]]);
-    vendorData.push({
-      orgId: org.id,
-      name: `${first} ${suffix} #${1001 + i}`,
-      gstin: makeGstin(rng.next, stateCode),
-      pan: makePan(rng.next),
-      status: "ACTIVE" as const,
-      stateCode,
-      mobile: `+91${9500000000 + i * 1000}`,
-      paymentTerms: rng.pick([15, 30, 45, 60]),
+  // Standalone employees (no userId)
+  for (let i = 0; i < EXTRA_EMPLOYEE_SPECS.length; i++) {
+    const spec = EXTRA_EMPLOYEE_SPECS[i]!;
+    const salary = salaryStructure(spec.department);
+    employeeRows.push({
+      organizationId:  org.id,
+      userId:          null,
+      code:            `EMP-${String(USER_SPECS.length + i + 1).padStart(3, "0")}`,
+      name:            spec.name,
+      mobile:          spec.mobile,
+      designation:     spec.designation,
+      department:      spec.department,
+      doj:             rng.daysAgo(180, 900),
+      salaryStructure: salary as Prisma.InputJsonValue,
+      status:          "ACTIVE",
     });
   }
-  const created = await db.vendor.createManyAndReturn({ data: vendorData });
-  vendorIds.push(...created.map((v) => v.id));
 
-  // ── Statutory slabs (India, table-driven) ──────────────────
-  const from2025 = new Date(2025, 3, 1);
+  const createdEmployees = await db.employee.createManyAndReturn({ data: employeeRows });
+  const employeeIds = createdEmployees.map((e) => e.id);
+
+  // ── Vendors (15) ───────────────────────────────────────────────────────────
+  const vendorRows: Prisma.VendorCreateManyInput[] = VENDOR_SPECS.map((v, i) => ({
+    organizationId:  org.id,
+    code:            `VND-${String(i + 1).padStart(3, "0")}`,
+    name:            v.name,
+    gstin:           makeGstin(rng.next, "33"),
+    mobile:          `+91 98${String(40000000 + i * 1000 + rng.int(0, 999)).padStart(8, "0")}`,
+    email:           `procurement@${v.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20)}.in`,
+    address: {
+      city:    "Coimbatore",
+      state:   "Tamil Nadu",
+      pincode: "641001",
+    } as Prisma.InputJsonValue,
+    paymentTermsDays: v.paymentTermsDays,
+    leadTimeDays:     v.leadTimeDays,
+    brandIds:         [],
+    rating:           rng.int(3, 5),
+  }));
+
+  const createdVendors = await db.vendor.createManyAndReturn({ data: vendorRows });
+  const vendorIds = createdVendors.map((v) => v.id);
+
+  // ── Statutory Slabs ────────────────────────────────────────────────────────
+  const from2020 = new Date("2020-04-01T00:00:00.000Z");
+  const from2023 = new Date("2023-04-01T00:00:00.000Z");
+
   await db.statutorySlab.createMany({
     data: [
-      // PF 12% of basic up to ceiling
-      { orgId: org.id, kind: "PF", fromAmount: 0n, toAmount: 1_500_000n, employeeRate: 0.12, employerRate: 0.12, effectiveFrom: from2025 },
-      // ESI applicable below 21,000
-      { orgId: org.id, kind: "ESI", fromAmount: 0n, toAmount: 2_100_000n, employeeRate: 0.0075, employerRate: 0.0325, effectiveFrom: from2025 },
-      // TN professional tax — half-yearly slab (approximate)
-      { orgId: org.id, kind: "PT_TN", fromAmount: 0n,       toAmount: 2_100_000n,   flatAmount: 0n,        effectiveFrom: from2025 },
-      { orgId: org.id, kind: "PT_TN", fromAmount: 2_100_000n, toAmount: 3_000_000n, flatAmount: 13_500n,   effectiveFrom: from2025 },
-      { orgId: org.id, kind: "PT_TN", fromAmount: 3_000_000n, toAmount: 4_500_000n, flatAmount: 31_500n,   effectiveFrom: from2025 },
-      { orgId: org.id, kind: "PT_TN", fromAmount: 4_500_000n, toAmount: 6_000_000n, flatAmount: 63_000n,   effectiveFrom: from2025 },
-      { orgId: org.id, kind: "PT_TN", fromAmount: 6_000_000n, toAmount: 7_500_000n, flatAmount: 94_500n,   effectiveFrom: from2025 },
-      { orgId: org.id, kind: "PT_TN", fromAmount: 7_500_000n, toAmount: null,       flatAmount: 125_000n,  effectiveFrom: from2025 },
+      // PF: 12% flat on basic (employer & employee each); no ceiling enforced at slab level
+      {
+        organizationId: org.id,
+        kind:           "PF",
+        stateCode:      null,
+        fromAmount:     0n,
+        toAmount:       null,
+        rate:           new Prisma.Decimal("12.000"),
+        flatAmount:     null,
+        effectiveFrom:  from2020,
+        effectiveTo:    null,
+      },
+      // ESI employer: 3.25% on gross up to ₹21,000/month
+      {
+        organizationId: org.id,
+        kind:           "ESI_EMP",
+        stateCode:      "33",
+        fromAmount:     0n,
+        toAmount:       2100000n,
+        rate:           new Prisma.Decimal("3.250"),
+        flatAmount:     null,
+        effectiveFrom:  from2020,
+        effectiveTo:    null,
+      },
+      // ESI employee: 0.75% on gross up to ₹21,000/month
+      {
+        organizationId: org.id,
+        kind:           "ESI_EE",
+        stateCode:      "33",
+        fromAmount:     0n,
+        toAmount:       2100000n,
+        rate:           new Prisma.Decimal("0.750"),
+        flatAmount:     null,
+        effectiveFrom:  from2020,
+        effectiveTo:    null,
+      },
+      // PT Tamil Nadu — nil slab (up to ₹21,000/month gross)
+      {
+        organizationId: org.id,
+        kind:           "PT",
+        stateCode:      "33",
+        fromAmount:     0n,
+        toAmount:       2100000n,
+        rate:           null,
+        flatAmount:     0n,
+        effectiveFrom:  from2023,
+        effectiveTo:    null,
+      },
+      // PT Tamil Nadu — ₹200/month (above ₹21,000/month gross)
+      {
+        organizationId: org.id,
+        kind:           "PT",
+        stateCode:      "33",
+        fromAmount:     2100001n,
+        toAmount:       null,
+        rate:           null,
+        flatAmount:     20000n,
+        effectiveFrom:  from2023,
+        effectiveTo:    null,
+      },
     ],
   });
 
+  // ── Number Sequences (all 13 series, yymm "2608", counter 0) ───────────────
+  await db.numberSequence.createMany({
+    data: ALL_SERIES.map((series) => ({
+      organizationId: org.id,
+      series,
+      yymm:    "2608",
+      counter: 0,
+    })),
+  });
+
   return {
-    orgId: org.id,
-    branchIds: branches.map((b) => b.id),
-    branchNames: branches.map((b) => b.name),
-    warehouseIds, binIdsByWarehouse,
-    userIds: users, ownerUserId: ownerUser.id,
-    roleIdsByKey, employeeIds, vendorIds,
+    orgId:      org.id,
+    branchId:   branch.id,
+    userByRole,
+    employeeIds,
+    vendorIds,
   };
-}
-
-function roleForIndex(i: number): string {
-  const map = ["OWNER", "MANAGER", "MANAGER", "SALES", "SALES", "SALES", "SALES", "SALES",
-               "STORE", "STORE", "STORE", "STORE", "ACCOUNTS", "ACCOUNTS", "ACCOUNTS",
-               "HR", "HR", "SITE", "SITE", "SITE", "SITE", "SALES", "STORE", "SITE", "MANAGER"];
-  return map[i % map.length]!;
-}
-
-function departmentForRole(role: string): string {
-  return {
-    OWNER: "Leadership", MANAGER: "Operations", SALES: "Sales",
-    STORE: "Warehouse", ACCOUNTS: "Finance", HR: "HR", SITE: "Projects",
-  }[role] ?? "Operations";
-}
-
-function subsetScope(roleKey: string, permKey: string): "NONE" | "VIEW" | "OWN" | "FULL" {
-  // Rough model — real registry is Session 4.
-  if (roleKey === "SALES" && permKey.startsWith("product.")) return "VIEW";
-  if (roleKey === "SALES" && permKey === "product.viewCost") return "NONE";
-  if (roleKey === "SALES" && (permKey.startsWith("client.") || permKey.startsWith("quotation."))) return "OWN";
-  if (roleKey === "STORE" && (permKey.startsWith("stock.") || permKey.startsWith("grn."))) return "FULL";
-  if (roleKey === "STORE" && permKey === "payroll.view") return "NONE";
-  if (roleKey === "ACCOUNTS" && (permKey.startsWith("invoice.") || permKey.startsWith("receipt."))) return "FULL";
-  if (roleKey === "HR" && (permKey.startsWith("payroll.") || permKey.startsWith("attendance."))) return "FULL";
-  if (roleKey === "SITE" && permKey.startsWith("attendance.")) return "FULL";
-  return "VIEW";
-}
-
-interface Name { first: string; last: string }
-function pickUnique(rng: ReturnType<typeof makeRng>, firsts: readonly string[], lasts: readonly string[], n: number): Name[] {
-  const out: Name[] = [];
-  const seen = new Set<string>();
-  while (out.length < n) {
-    const f = firsts[rng.int(0, firsts.length - 1)]!;
-    const l = lasts[rng.int(0, lasts.length - 1)]!;
-    const key = `${f} ${l}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ first: f, last: l });
-  }
-  return out;
 }

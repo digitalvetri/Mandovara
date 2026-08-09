@@ -4,7 +4,6 @@ import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { getPO } from "@/modules/purchase/queries";
-import { listWarehouses } from "@/modules/inventory/queries";
 import { POStatusPill } from "../_components/StatusPill";
 import { GRNForm } from "../_components/GRNForm";
 
@@ -15,39 +14,33 @@ export default async function PODetailPage({
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await devContext();
-  const [po, warehouses] = await Promise.all([
-    getPO(ctx, id),
-    listWarehouses(ctx),
-  ]);
+  const po = await getPO(ctx, id);
   if (!po) notFound();
 
   return (
     <>
       <Topbar
         title={po.number}
-        eyebrow={`${po.vendorName} · ${po.vendorMobile} · ${formatDate(po.date)}${po.expectedDate ? ` → expected by ${formatDate(po.expectedDate)}` : ""}`}
+        eyebrow={`${po.vendorName} · ${po.vendorMobile} · ${formatDate(po.date)}${po.expectedAt ? ` → expected by ${formatDate(po.expectedAt)}` : ""}`}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Status</div>
-              <POStatusPill status={po.status} />
-            </div>
+          <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center gap-3">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Status</div>
+            <POStatusPill status={po.status} />
           </div>
 
           <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
             <table className="w-full text-[12.5px]">
               <thead>
                 <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
-                  <Th align="right">#</Th>
-                  <Th>Product</Th>
+                  <Th>Colourway</Th>
+                  <Th>Unit</Th>
                   <Th align="right">Ordered</Th>
                   <Th align="right">Received</Th>
                   <Th align="right">Pending</Th>
                   <Th align="right">Rate</Th>
-                  <Th align="right">Amount</Th>
                 </tr>
               </thead>
               <tbody>
@@ -55,21 +48,25 @@ export default async function PODetailPage({
                   const orderedNum = parseFloat(l.orderedQty);
                   const recNum = parseFloat(l.receivedQty);
                   const pct = orderedNum === 0 ? 0 : Math.min(100, (recNum / orderedNum) * 100);
+                  const pendingNum = parseFloat(l.pendingQty);
                   return (
                     <tr key={l.id} className="border-b border-rule/70 last:border-0 align-top">
-                      <Td align="right"><span className="tabular text-text-dim">{l.lineNo}</span></Td>
                       <Td>
-                        <div className="tabular text-text-dim text-[11.5px]">{l.productCode}</div>
-                        <div className="text-text">{l.description}</div>
+                        <div className="tabular text-text">{l.colourwayCode}</div>
+                        <div className="text-[11.5px] text-text-dim">{l.colourName} · {l.designCode}</div>
                         <div className="mt-1.5 h-[3px] w-[160px] bg-rule/70 rounded-full overflow-hidden">
                           <div className="h-full bg-good rounded-full" style={{ width: `${pct}%` }} />
                         </div>
                       </Td>
-                      <Td align="right"><span className="tabular text-text">{l.orderedQty} <span className="text-text-faint">{l.uom}</span></span></Td>
+                      <Td><span className="text-text-dim text-[11px] uppercase">{l.unit}</span></Td>
+                      <Td align="right"><span className="tabular text-text">{l.orderedQty}</span></Td>
                       <Td align="right"><span className="tabular text-good">{l.receivedQty}</span></Td>
-                      <Td align="right"><span className={`tabular ${parseFloat(l.pendingQty) > 0 ? "text-warn" : "text-text-dim"}`}>{l.pendingQty}</span></Td>
+                      <Td align="right">
+                        <span className={`tabular ${pendingNum > 0 ? "text-warn" : "text-text-dim"}`}>
+                          {l.pendingQty}
+                        </span>
+                      </Td>
                       <Td align="right"><span className="tabular text-text-dim">{formatINR(l.rate)}</span></Td>
-                      <Td align="right"><span className="tabular text-text">{formatINR(l.amount)}</span></Td>
                     </tr>
                   );
                 })}
@@ -78,7 +75,7 @@ export default async function PODetailPage({
           </div>
 
           {po.status !== "CANCELLED" && po.status !== "RECEIVED" && (
-            <GRNForm purchaseOrderId={po.id} warehouses={warehouses} lines={po.lines} />
+            <GRNForm purchaseOrderId={po.id} lines={po.lines} />
           )}
 
           <div className="rounded-[14px] bg-surface border border-rule p-5">
@@ -94,11 +91,9 @@ export default async function PODetailPage({
                     <div className="tabular text-[12.5px] text-text w-[220px]">{g.number}</div>
                     <div className="text-[11.5px] text-text-dim w-[110px] tabular">{formatDate(g.receivedAt)}</div>
                     <div className="text-[11.5px] text-text-dim flex-1">
-                      {g.vehicleNumber && <span className="tabular mr-2">{g.vehicleNumber}</span>}
                       {g.invoiceRef && <span>ref {g.invoiceRef}</span>}
                     </div>
                     <div className="text-[11.5px] text-text-dim tabular">{g.lineCount} line{g.lineCount === 1 ? "" : "s"}</div>
-                    <div className="text-[11.5px] text-text tabular">{formatINR(g.totalValue)}</div>
                   </li>
                 ))}
               </ul>
@@ -108,30 +103,17 @@ export default async function PODetailPage({
 
         <aside className="space-y-4 h-fit">
           <div className="rounded-[14px] bg-surface border border-rule p-5">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Totals</div>
-            <dl className="space-y-2 text-[12.5px]">
-              <Row k="Taxable" v={formatINR(po.taxableAmount)} />
-              {po.igst > 0n ? (
-                <Row k="IGST" v={formatINR(po.igst)} />
-              ) : (
-                <>
-                  <Row k="CGST" v={formatINR(po.cgst)} />
-                  <Row k="SGST" v={formatINR(po.sgst)} />
-                </>
-              )}
-              <div className="pt-2 mt-2 border-t border-rule flex items-baseline justify-between">
-                <dt className="text-text uppercase text-[10.5px] tracking-[0.14em]">Grand total</dt>
-                <dd className="font-display text-[20px] font-semibold text-text tabular-nums">{formatINR(po.total)}</dd>
-              </div>
-            </dl>
+            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Total</div>
+            <div className="font-display text-[24px] font-semibold text-text tabular-nums">
+              {formatINR(po.totalValue)}
+            </div>
           </div>
 
           <div className="rounded-[14px] bg-surface border border-rule p-5">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Vendor + branch</div>
+            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Vendor</div>
             <dl className="space-y-3 text-[12.5px]">
-              <Row k="Vendor" v={po.vendorName} />
+              <Row k="Name"   v={po.vendorName} />
               <Row k="Mobile" v={po.vendorMobile} mono />
-              <Row k="To branch" v={po.branchName} />
             </dl>
           </div>
         </aside>

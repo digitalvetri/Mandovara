@@ -1,9 +1,7 @@
 "use server";
 
 // Follow-up server actions.
-//
-// completeFollowUp enforces §11 acceptance: cannot close without outcome.
-// Zod requires outcome; server double-checks (defense in depth).
+// §11 acceptance: completeFollowUp requires an outcome — cannot close without one.
 
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -28,17 +26,27 @@ export async function createFollowUp(input: unknown): Promise<ActionResult<{ id:
   const parsed = createFollowUpSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
   const d = parsed.data;
+
+  // Convert leadId/clientId/quotationId form input to refType/refId (schema uses the latter)
+  let refType: string;
+  let refId: string;
+  if (d.leadId && d.leadId !== "") {
+    refType = "LEAD";      refId = d.leadId;
+  } else if (d.clientId && d.clientId !== "") {
+    refType = "CLIENT";    refId = d.clientId;
+  } else {
+    refType = "QUOTATION"; refId = d.quotationId!;
+  }
+
   const db = scoped(ctx);
   const created = await db.followUp.create({
     data: {
-      orgId:    ctx.orgId,
-      ownerId:  ctx.userId,
-      dueAt:    new Date(d.dueAt),
-      status:   "OPEN",
-      note:     emptyToNull(d.note),
-      leadId:      emptyToNull(d.leadId),
-      clientId:    emptyToNull(d.clientId),
-      quotationId: emptyToNull(d.quotationId),
+      organizationId: ctx.orgId,
+      ownerId:        ctx.userId,
+      dueAt:          new Date(d.dueAt),
+      note:           d.note?.trim() || "",
+      refType,
+      refId,
     },
     select: { id: true },
   });
@@ -53,7 +61,6 @@ export async function completeFollowUp(input: unknown): Promise<ActionResult<{ i
   if (!parsed.success) return zodError(parsed.error);
   const { id, outcome, note } = parsed.data;
 
-  // Server-side belt-and-braces: outcome MUST be one of the known values.
   if (!(FOLLOWUP_OUTCOMES as readonly string[]).includes(outcome)) {
     return { ok: false, error: "Outcome is required" };
   }
@@ -62,10 +69,9 @@ export async function completeFollowUp(input: unknown): Promise<ActionResult<{ i
   await db.followUp.update({
     where: { id },
     data: {
-      status:      "COMPLETED",
       outcome,
       completedAt: new Date(),
-      ...(note != null && note.trim() !== "" && { note }),
+      ...(note != null && note.trim() !== "" && { note: note.trim() }),
     },
   });
   revalidatePath("/followups");
@@ -82,9 +88,9 @@ export async function rescheduleFollowUp(input: unknown): Promise<ActionResult<{
   await db.followUp.update({
     where: { id },
     data: {
-      dueAt:  new Date(dueAt),
-      status: "OPEN",
-      ...(note != null && note.trim() !== "" && { note }),
+      dueAt:       new Date(dueAt),
+      completedAt: null,
+      ...(note != null && note.trim() !== "" && { note: note.trim() }),
     },
   });
   revalidatePath("/followups");
@@ -94,13 +100,10 @@ export async function rescheduleFollowUp(input: unknown): Promise<ActionResult<{
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
   const fieldErrors: Record<string, string> = {};
   for (const iss of err.issues) {
-    const p = iss.path.filter((s): s is string | number => typeof s === "string" || typeof s === "number").join(".");
+    const p = iss.path
+      .filter((s): s is string | number => typeof s === "string" || typeof s === "number")
+      .join(".");
     if (!fieldErrors[p]) fieldErrors[p] = iss.message;
   }
   return { ok: false, error: "Validation failed", fieldErrors };
-}
-function emptyToNull(v: string | undefined | null): string | null {
-  if (v == null) return null;
-  const t = v.trim();
-  return t.length === 0 ? null : t;
 }

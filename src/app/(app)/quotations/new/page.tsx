@@ -1,25 +1,29 @@
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
-import { listClientsForPicker, listProductsForPicker } from "@/modules/quotations/queries";
 import { listBranches } from "@/modules/branches/queries";
 import { QuotationBuilder } from "../_components/QuotationBuilder";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewQuotationPage() {
+interface SearchParams {
+  project?: string;
+}
+
+export default async function NewQuotationPage({
+  searchParams,
+}: { searchParams: Promise<SearchParams> }) {
+  const params = await searchParams;
   const ctx = await devContext();
-  const [clients, products, branches] = await Promise.all([
-    listClientsForPicker(ctx),
-    listProductsForPicker(ctx),
-    listBranches(ctx),
-  ]);
+  const branches = await listBranches(ctx);
+  const projectId = params.project?.trim() ?? "";
+
   return (
     <>
       <Topbar
-        title="Quote Builder"
-        eyebrow="Create and send client estimates"
+        title="New Quotation"
+        eyebrow={projectId ? `Project ${projectId}` : "Select a project first"}
       />
-      <QuotationBuilder clients={clients} products={products} branches={branches} />
+      <QuotationBuilder projectId={projectId} branches={branches} />
     </>
   );
 }

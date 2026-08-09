@@ -1,20 +1,27 @@
-import type { ProjectStatus } from "@/modules/projects/schema";
+import type { ProjectStage } from "@/modules/projects/schema";
 
-const TONE: Record<ProjectStatus, string> = {
-  PLANNING:  "bg-text-dim/12 text-text-dim",
-  ACTIVE:    "bg-warn/15 text-warn",
-  ON_HOLD:   "bg-warn/15 text-warn",
-  COMPLETED: "bg-good/12 text-good",
-  CANCELLED: "bg-bad/12 text-bad line-through",
+const TONE: Record<ProjectStage, string> = {
+  ENQUIRY:       "bg-text-dim/12 text-text-dim",
+  MEASUREMENT:   "bg-info/15 text-info",
+  QUOTATION:     "bg-warn/15 text-warn",
+  ORDERED:       "bg-warn/15 text-warn",
+  PROCUREMENT:   "bg-warn/15 text-warn",
+  MAKE:          "bg-warn/15 text-warn",
+  INSTALLATION:  "bg-warn/15 text-warn",
+  SNAGGING:      "bg-heat/15 text-heat",
+  COMPLETED:     "bg-good/12 text-good",
+  CANCELLED:     "bg-bad/12 text-bad line-through",
 };
-const LABEL: Record<ProjectStatus, string> = {
-  PLANNING: "Planning", ACTIVE: "Active", ON_HOLD: "On hold",
+const LABEL: Record<ProjectStage, string> = {
+  ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
+  ORDERED: "Ordered", PROCUREMENT: "Procurement", MAKE: "Make",
+  INSTALLATION: "Installation", SNAGGING: "Snagging",
   COMPLETED: "Completed", CANCELLED: "Cancelled",
 };
 
 export function ProjectStatusPill({ status }: { status: string }) {
-  const tone = TONE[status as ProjectStatus] ?? "bg-text-dim/12 text-text-dim";
-  const label = LABEL[status as ProjectStatus] ?? status;
+  const tone = TONE[status as ProjectStage] ?? "bg-text-dim/12 text-text-dim";
+  const label = LABEL[status as ProjectStage] ?? status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, " ");
   return (
     <span
       className={`inline-block text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${tone}`}

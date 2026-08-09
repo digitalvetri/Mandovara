@@ -10,7 +10,7 @@ export function AddRuleForm() {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
-  const [eventType, setEventType] = useState("quotation.sent");
+  const [triggerEvent, setTriggerEvent] = useState("quotation.sent");
   const [action, setAction] = useState("whatsapp");
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +18,7 @@ export function AddRuleForm() {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const res = await createAutomationRule({ name, eventType, action });
+      const res = await createAutomationRule({ name, triggerEvent, action });
       if (!res.ok) { setError(res.error ?? "Could not create rule"); return; }
       setName(""); setOpen(false);
       router.refresh();
@@ -44,7 +44,7 @@ export function AddRuleForm() {
       </div>
       <div>
         <div className="mb-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim">Fires on</div>
-        <select value={eventType} onChange={(e) => setEventType(e.target.value)} className={fieldCls}>
+        <select value={triggerEvent} onChange={(e) => setTriggerEvent(e.target.value)} className={fieldCls}>
           <option value="lead.created">lead.created</option>
           <option value="quotation.sent">quotation.sent</option>
           <option value="dispatch.posted">dispatch.posted</option>

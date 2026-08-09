@@ -32,9 +32,11 @@ export default async function ReceiptDetailPage({
           <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <ModePill mode={r.mode} />
-              <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">
-                {r.branchName}
-              </div>
+              {r.chequeStatus && (
+                <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">
+                  Cheque · {r.chequeStatus}
+                </div>
+              )}
             </div>
           </div>
 
@@ -95,8 +97,7 @@ export default async function ReceiptDetailPage({
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Meta</div>
             <dl className="space-y-3 text-[12.5px]">
               <Row k="Reference" v={r.reference ?? "—"} mono />
-              <Row k="Recorded" v={formatDate(r.createdAt)} />
-              <Row k="Branch" v={r.branchName} />
+              <Row k="Recorded" v={formatDate(r.date)} />
             </dl>
           </div>
         </aside>

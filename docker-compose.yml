@@ -1,4 +1,4 @@
-services:
+eservices:
   postgres:
     image: postgres:16-alpine
     container_name: mandovara-postgres

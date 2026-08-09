@@ -1,13 +1,11 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import type { Route } from "next";
-import { Ruler } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { shortNumber } from "@/lib/short-number";
 import { devContext } from "@/lib/dev-context";
 import { getProject } from "@/modules/projects/queries";
+import type { ProjectMilestone, ProjectTask, ProjectSiteLog } from "@/modules/projects/queries";
 import { ProjectStatusPill } from "../_components/StatusPill";
 import { ProjectPanels } from "../_components/ProjectPanels";
 
@@ -21,8 +19,12 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const completedMs = p.milestones.filter((m) => m.status === "COMPLETED").length;
-  const completedBilling = p.milestones
+  const milestones: ProjectMilestone[] = [];
+  const tasks: ProjectTask[] = [];
+  const siteLogs: ProjectSiteLog[] = [];
+
+  const completedMs = milestones.filter((m) => m.status === "COMPLETED").length;
+  const completedBilling = milestones
     .filter((m) => m.status === "COMPLETED")
     .reduce((s, m) => s + Number(m.billingPct), 0);
 
@@ -30,38 +32,26 @@ export default async function ProjectDetailPage({
     <>
       <Topbar
         title={p.name}
-        eyebrow={`${shortNumber(p.number, "P-")} · ${p.clientName} · ${formatDate(p.startDate)}${p.targetEndDate ? ` → ${formatDate(p.targetEndDate)}` : ""}`}
+        eyebrow={`${shortNumber(p.number, "P-")} · ${p.clientName} · ${formatDate(p.createdAt)}${p.expectedInstallAt ? ` → ${formatDate(p.expectedInstallAt)}` : ""}`}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between flex-wrap gap-3">
+          <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Status</div>
-              <ProjectStatusPill status={p.status} />
+              <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Stage</div>
+              <ProjectStatusPill status={p.stage} />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-[11.5px] text-text-dim tabular">
-                {completedMs}/{p.milestones.length} milestones · {completedBilling}% billable
-              </div>
-              <Link
-                href={`/projects/${p.id}/measurements` as Route}
-                className="inline-flex items-center gap-1.5 h-[30px] px-3 rounded-[6px] bg-accent/12 text-accent text-[11.5px] font-medium hover:bg-accent/20 transition-colors"
-              >
-                <Ruler size={12} />
-                Site measurements →
-              </Link>
+            <div className="text-[11.5px] text-text-dim tabular">
+              {completedMs}/{milestones.length} milestones · {completedBilling}% billable
             </div>
           </div>
 
           <ProjectPanels
             projectId={p.id}
-            milestones={p.milestones}
-            tasks={p.tasks}
-            siteLogs={p.siteLogs}
-            snags={p.snags}
-            expenses={p.expenses}
-            handover={p.handover}
+            milestones={milestones}
+            tasks={tasks}
+            siteLogs={siteLogs}
           />
         </div>
 
@@ -73,8 +63,6 @@ export default async function ProjectDetailPage({
                 <dt className="text-text-dim text-[11.5px]">Order value</dt>
                 <dd className="font-display text-[22px] font-semibold text-text tabular-nums">{formatINR(p.orderValue)}</dd>
               </div>
-              <Row k="Material budget" v={p.budgetMaterial > 0n ? formatINR(p.budgetMaterial) : "—"} />
-              <Row k="Labour budget"   v={p.budgetLabour   > 0n ? formatINR(p.budgetLabour)   : "—"} />
             </dl>
           </div>
 
@@ -83,10 +71,8 @@ export default async function ProjectDetailPage({
             <dl className="space-y-3 text-[12.5px]">
               <Row k="Client" v={p.clientName} />
               <Row k="Mobile" v={p.clientMobile} mono />
-              <Row k="Branch" v={p.branchName} />
-              <Row k="Started" v={formatDate(p.startDate)} />
-              <Row k="Target end" v={p.targetEndDate ? formatDate(p.targetEndDate) : "—"} />
-              <Row k="Actual end" v={p.actualEndDate ? formatDate(p.actualEndDate) : "—"} />
+              <Row k="Created" v={formatDate(p.createdAt)} />
+              <Row k="Expected install" v={p.expectedInstallAt ? formatDate(p.expectedInstallAt) : "—"} />
             </dl>
           </div>
         </aside>

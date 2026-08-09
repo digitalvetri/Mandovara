@@ -15,11 +15,17 @@ export interface ActionResult<T = unknown> {
 
 const mobileRegex = /^(\+91)?\d{10}$/;
 
+// roleId carries the AppRole enum value (e.g. "OWNER", "DESIGNER") — no Role model exists.
+const APP_ROLE_VALUES = [
+  "OWNER", "DESIGNER", "SALES", "MEASURE_EXEC", "STORE",
+  "MAKE_SUPERVISOR", "INSTALLER", "ACCOUNTS", "HR",
+] as const;
+
 const createUserSchema = z.object({
   name:      z.string().trim().min(2).max(120),
   mobile:    z.string().trim().regex(mobileRegex, "10-digit mobile"),
   email:     z.string().trim().email().optional().or(z.literal("")),
-  roleId:    z.string().cuid("Pick a role"),
+  roleId:    z.enum(APP_ROLE_VALUES),
   branchIds: z.array(z.string().cuid()).min(1, "Assign at least one branch"),
   locale:    z.enum(["en", "ta"]).default("en"),
 });
@@ -42,14 +48,14 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
   const mobile = d.mobile.startsWith("+91") ? d.mobile : `+91${d.mobile}`;
   const created = await db.user.create({
     data: {
-      orgId:     ctx.orgId,
-      name:      d.name,
+      organizationId: ctx.orgId,
+      name:           d.name,
       mobile,
-      email:     d.email && d.email.trim() !== "" ? d.email : null,
-      status:    "ACTIVE",
-      locale:    d.locale,
-      branchIds: d.branchIds,
-      userRoles: { create: [{ roleId: d.roleId }] },
+      email:          d.email && d.email.trim() !== "" ? d.email : null,
+      status:         "ACTIVE",
+      locale:         d.locale,
+      branchIds:      d.branchIds,
+      role:           d.roleId,
     },
     select: { id: true },
   });
@@ -64,8 +70,6 @@ export async function updateCompanySettings(input: unknown): Promise<ActionResul
   if (!parsed.success) return zodError(parsed.error);
   const d = parsed.data;
 
-  // Organization is org-scoped by definition — write via raw prisma with an
-  // explicit orgId equality check (defense in depth against scoping bypass).
   await prisma.organization.update({
     where: { id: d.orgId },
     data: {

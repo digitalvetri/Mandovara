@@ -7,14 +7,13 @@ import {
   LayoutDashboard,
   UserPlus,
   Users,
-  Ruler,
   FileText,
   Package,
   Truck,
-  Layers,
   Boxes,
   Send,
   Briefcase,
+  Scissors,
   Wrench,
   Receipt,
   Wallet,
@@ -22,7 +21,6 @@ import {
   IndianRupee,
   MessageSquare,
   ShieldCheck,
-  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,27 +42,27 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "Revenue",
     items: [
-      { label: "Lead Management",   href: "/leads",      icon: UserPlus },
-      { label: "Client 360",        href: "/clients",    icon: Users },
-      { label: "Material Estimator", href: "/measure",    icon: Ruler },
-      { label: "Quotations (BOQ)",  href: "/quotations", icon: FileText },
+      { label: "Lead Management",  href: "/leads",      icon: UserPlus },
+      { label: "Client 360",       href: "/clients",    icon: Users },
+      { label: "Quotations (BOQ)", href: "/quotations", icon: FileText },
     ],
   },
   {
     section: "Catalog & Stock",
     items: [
       { label: "Product Catalog",    href: "/products",  icon: Package },
-      { label: "Purchase & Vendors", href: "/purchase",  icon: Truck },
-      { label: "Dye-lot Allocation", href: "/purchase/allocation", icon: Layers },
-      { label: "Inventory & Stock",  href: "/inventory", icon: Boxes },
+      { label: "Purchase & Vendors", href: "/purchase",          icon: Truck },
+      { label: "Allocate Stock",    href: "/purchase/allocation", icon: Boxes },
+      { label: "Stock & Dye Lots",  href: "/inventory",           icon: Boxes },
     ],
   },
   {
     section: "Delivery",
     items: [
-      { label: "Sales Orders & Dispatch", href: "/orders",        icon: Send },
-      { label: "Project Pipeline",        href: "/projects",      icon: Briefcase },
-      { label: "Installations",           href: "/installations", icon: Wrench },
+      { label: "Sales Orders & Dispatch", href: "/orders",   icon: Send },
+      { label: "Project Pipeline",        href: "/projects", icon: Briefcase },
+      { label: "Make (Cut & Stitch)",     href: "/make",     icon: Scissors },
+      { label: "Installation",            href: "/install",  icon: Wrench },
     ],
   },
   {
@@ -84,7 +82,6 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "System",
     items: [
-      { label: "Reports",             href: "/reports",  icon: BarChart3 },
       { label: "WhatsApp Automation", href: "/whatsapp", icon: MessageSquare },
       { label: "Admin & Roles",       href: "/admin",    icon: ShieldCheck },
     ],
@@ -129,16 +126,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* ⌘K discovery hint — the palette itself is mounted globally in the app layout */}
-      <div className="px-4 pt-3 pb-1 border-t border-white/[0.08] flex items-center justify-between text-[10.5px] text-sidebar-dim">
-        <span>Jump to anything</span>
-        <kbd className="tabular text-[10px] px-1.5 py-0.5 rounded-[4px] bg-white/[0.06] border border-white/[0.08]">
-          Ctrl K
-        </kbd>
-      </div>
-
       {/* Profile block */}
-      <div className="px-4 py-3 flex items-center gap-3">
+      <div className="border-t border-white/[0.08] px-4 py-3 flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-accent/85 text-white flex items-center justify-center text-[11px] font-medium tracking-wider">
           AK
         </div>

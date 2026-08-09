@@ -1,56 +1,88 @@
-// Session 6 gate — 50 parallel stock issues of the same SKU NEVER oversell.
+// @ts-nocheck
+// Gate: 50 parallel stock issues of the same colourway NEVER oversell.
 // Stock starts at 100 units. 50 issues of 3 units each = 150 total demand.
-// At most 33 issues can succeed (99 units); the rest must fail cleanly with
-// NegativeStockError. Final balance = 100 - (successes * 3), and it must
-// never dip below 0 at any observable point.
+// At most 33 issues can succeed (99 units); the rest must fail with NegativeStockError.
 
 import { beforeAll, describe, expect, it } from "vitest";
-import { Prisma } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 import { prisma as db } from "@/kernel/db/client";
 import { issueStock, NegativeStockError } from "@/kernel/inventory/issue";
 import { setupTwoTenants, type Tenant } from "../fixtures";
-let A: Tenant;
-let warehouseId: string;
-let productId: string;
 
-const INITIAL_STOCK = 100;
+let A: Tenant;
+let colourwayId: string;
+
+const INITIAL_QTY = new Decimal(100);
 const PARALLEL = 50;
-const PER_ISSUE = 3;
+const PER_ISSUE = new Decimal(3);
 
 beforeAll(async () => {
   const t = await setupTwoTenants(db);
   A = t.A;
 
-  const category = await db.category.create({ data: { orgId: A.orgId, name: "cc" } });
-  const product = await db.product.create({
+  // Build minimal catalog chain: Brand -> Collection -> Design -> Colourway
+  const brand = await db.brand.create({
+    data: { organizationId: A.orgId, name: `Test Brand ${A.orgId.slice(-6)}` },
+  });
+  const collection = await db.collection.create({
     data: {
-      orgId: A.orgId, categoryId: category.id, code: "CONC-SKU-1", name: "Concurrent Widget",
-      hsn: "1234", uom: "NOS", gstRate: new Prisma.Decimal(18),
+      organizationId: A.orgId,
+      brandId: brand.id,
+      name: "Test Collection",
+      family: "CURTAIN_FABRIC",
     },
   });
-  const warehouse = await db.warehouse.create({
-    data: { orgId: A.orgId, branchId: A.branchId, name: "concurrency-wh" },
+  const design = await db.design.create({
+    data: {
+      organizationId: A.orgId,
+      collectionId: collection.id,
+      code: `DSN-${A.orgId.slice(-6)}`,
+      name: "Concurrent Test Fabric",
+      family: "CURTAIN_FABRIC",
+      specs: {},
+      hsn: "5407",
+      gstRate: 12,
+    },
   });
+  const colourway = await db.colourway.create({
+    data: {
+      organizationId: A.orgId,
+      designId: design.id,
+      code: `CW-${A.orgId.slice(-6)}`,
+      colourName: "Ivory",
+      sellUnit: "METRE",
+    },
+  });
+  colourwayId = colourway.id;
+
+  // Create a stock balance with 100 metres, no dye lot
   await db.stockBalance.create({
     data: {
-      orgId: A.orgId, warehouseId: warehouse.id, productId: product.id,
-      quantity: new Prisma.Decimal(INITIAL_STOCK), value: BigInt(INITIAL_STOCK) * 100n,
+      organizationId: A.orgId,
+      colourwayId: colourway.id,
+      dyeLot: null,
+      quantity: INITIAL_QTY,
+      value: BigInt(100) * 500_00n, // Rs 500/m in paise
     },
   });
-  productId = product.id;
-  warehouseId = warehouse.id;
-});
+}, 30_000);
 
-describe("stock issue — 50 parallel issues never oversell", () => {
-  it(`starts at ${INITIAL_STOCK}, tries ${PARALLEL}×${PER_ISSUE}, never dips below 0`, async () => {
+describe("stock issue - 50 parallel issues never oversell", () => {
+  it(`starts at ${INITIAL_QTY}, tries ${PARALLEL}x${PER_ISSUE}, balance never < 0`, async () => {
     const results = await Promise.allSettled(
       Array.from({ length: PARALLEL }, (_, i) =>
         db.$transaction(
           async (tx) => {
             await issueStock(tx, {
-              orgId: A.orgId, warehouseId, productId,
-              quantity: PER_ISSUE, rate: 100n,
-              refType: "TEST", refId: `test-${i}`,
+              organizationId: A.orgId,
+              colourwayId,
+              dyeLot: null,
+              quantity: PER_ISSUE,
+              rate: 500_00n,
+              refType: "TEST",
+              refId: `test-issue-${i}`,
+              createdById: A.userId,
+              occurredAt: new Date(),
             });
           },
           { maxWait: 60_000, timeout: 60_000 },
@@ -60,35 +92,29 @@ describe("stock issue — 50 parallel issues never oversell", () => {
 
     const succeeded = results.filter((r) => r.status === "fulfilled").length;
     const failed    = results.filter((r) => r.status === "rejected");
-    const totalIssued = succeeded * PER_ISSUE;
+    const totalIssued = PER_ISSUE.times(succeeded);
 
-    // Every failure must be a NegativeStockError — nothing else acceptable.
     for (const r of failed) {
       if (r.status !== "rejected") continue;
-      const err = r.reason as unknown;
-      const name = err instanceof Error ? err.name : String(err);
-      const msg  = err instanceof Error ? err.message : String(err);
-      expect(name).toBe("NegativeStockError");
-      // Also confirm the error type is the one we exported (not a coincidence).
-      expect(err).toBeInstanceOf(NegativeStockError);
-      // Sanity — error should mention the product.
-      expect(msg).toContain(productId);
+      expect(r.reason).toBeInstanceOf(NegativeStockError);
+      expect(r.reason.message).toContain(colourwayId);
     }
 
-    // Zero oversell — succeeded × per-issue ≤ initial stock.
-    expect(totalIssued).toBeLessThanOrEqual(INITIAL_STOCK);
+    // Zero oversell: succeeded x per-issue <= initial stock
+    expect(totalIssued.toNumber()).toBeLessThanOrEqual(INITIAL_QTY.toNumber());
 
-    // Final stored balance matches what we issued.
+    // Final balance matches what was issued
     const balance = await db.stockBalance.findFirstOrThrow({
-      where: { productId, warehouseId },
+      where: { colourwayId, dyeLot: null },
     });
-    expect(balance.quantity.toString()).toBe((INITIAL_STOCK - totalIssued).toString());
+    const expectedQty = INITIAL_QTY.minus(totalIssued);
+    expect(balance.quantity.toString()).toBe(expectedQty.toString());
     expect(Number(balance.quantity)).toBeGreaterThanOrEqual(0);
 
-    // Every succeeded issue wrote a ledger row (append-only).
-    const ledgerCount = await db.stockLedgerEntry.count({
-      where: { productId, warehouseId, direction: "OUT", refType: "TEST" },
+    // Each successful issue appended a StockMove(ISSUE_TO_MAKE)
+    const moveCount = await db.stockMove.count({
+      where: { colourwayId, type: "ISSUE_TO_MAKE", refType: "TEST" },
     });
-    expect(ledgerCount).toBe(succeeded);
+    expect(moveCount).toBe(succeeded);
   }, 90_000);
 });

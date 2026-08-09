@@ -54,7 +54,7 @@ export default async function PayrollPage() {
                 <Td className="text-text-dim">{r.department ?? "—"}</Td>
                 <Td align="right"><span className="tabular text-text">{formatINR(r.gross)}</span></Td>
                 <Td align="right"><span className="tabular text-bad">−{formatINR(r.deductions)}</span></Td>
-                <Td align="right"><span className="tabular text-text font-medium">{formatINR(r.net)}</span></Td>
+                <Td align="right"><span className="tabular text-text font-medium">{formatINR(r.netPay)}</span></Td>
                 <Td align="right"><a className="text-accent hover:underline text-[11.5px]">Send</a></Td>
               </tr>
             ))}

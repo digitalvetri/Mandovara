@@ -1,42 +1,41 @@
-// Zod schemas for the quotations module.
-//
-// Money on the wire: paise as string ("165000" = ₹1,650). Server parses to
-// BigInt via parseINR before touching the DB. Rate and discountPct are the
-// only writable numerics on a line — taxable / gst / amount are DERIVED and
-// never trusted from the client (Rule 7 spirit: math lives in kernel/tax).
-
 import { z } from "zod";
 
 export const QUOTATION_STATUSES = [
-  "DRAFT", "SENT", "VIEWED", "ACCEPTED", "REJECTED", "EXPIRED", "CONVERTED",
+  "DRAFT", "SENT", "REVISED", "ACCEPTED", "REJECTED", "EXPIRED",
 ] as const;
 export type QuotationStatus = (typeof QUOTATION_STATUSES)[number];
+
+export const SELL_UNITS = [
+  "METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT",
+] as const;
+export type SellUnit = (typeof SELL_UNITS)[number];
 
 const isoDate = z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}/));
 
 export const quotationLineInput = z.object({
-  productId:   z.string().cuid("Pick a product"),
-  description: z.string().trim().max(500).optional().or(z.literal("")),
-  quantity:    z.number().positive("Quantity must be > 0"),
-  rate:        z.string().trim().min(1, "Rate is required"),
-  discountPct: z.number().min(0).max(100).optional(),
-  isOptional:  z.boolean().optional(),
+  colourwayId:       z.string().cuid().optional(),
+  serviceRateId:     z.string().cuid().optional(),
+  measurementItemId: z.string().cuid().optional(),
+  roomLabel:         z.string().trim().max(120).optional().or(z.literal("")),
+  description:       z.string().trim().min(1, "Description required").max(500),
+  quantity:          z.number().positive("Quantity must be > 0"),
+  unit:              z.enum(SELL_UNITS),
+  rate:              z.string().trim().min(1, "Rate is required"),
+  discountPct:       z.number().min(0).max(100).optional(),
+  // gstRate: authoritative from design when colourwayId is set; fallback for service/text lines
+  gstRate:           z.number().min(0).max(28),
+  isOptional:        z.boolean().optional(),
 });
 
 export const createQuotationSchema = z.object({
-  clientId:   z.string().cuid("Pick a client"),
-  branchId:   z.string().cuid("Pick a branch"),
-  date:       isoDate,
-  validUntil: isoDate,
-  lines:      z.array(quotationLineInput).min(1, "At least one line is required"),
-});
-
-export const updateQuotationSchema = z.object({
-  id:         z.string().cuid(),
-  clientId:   z.string().cuid().optional(),
-  date:       isoDate.optional(),
-  validUntil: isoDate.optional(),
-  lines:      z.array(quotationLineInput).min(1).optional(),
+  projectId:         z.string().cuid("Pick a project"),
+  clientId:          z.string().cuid().optional(),   // derived from project when omitted
+  branchId:          z.string().cuid("Pick a branch"),
+  date:              isoDate,
+  validUntil:        isoDate,
+  placeOfSupplyCode: z.string().length(2, "2-digit state code required"),
+  termsText:         z.string().max(2000).optional().or(z.literal("")),
+  lines:             z.array(quotationLineInput).min(1, "At least one line is required"),
 });
 
 export const setStatusSchema = z.object({
@@ -44,7 +43,6 @@ export const setStatusSchema = z.object({
   status: z.enum(QUOTATION_STATUSES),
 });
 
-export type QuotationLineInput = z.infer<typeof quotationLineInput>;
+export type QuotationLineInput   = z.infer<typeof quotationLineInput>;
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>;
-export type UpdateQuotationInput = z.infer<typeof updateQuotationSchema>;
-export type SetStatusInput = z.infer<typeof setStatusSchema>;
+export type SetStatusInput       = z.infer<typeof setStatusSchema>;

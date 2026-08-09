@@ -1,34 +1,30 @@
-import type { OrderStatus, DispatchStatus } from "@/modules/orders/schema";
+import type { OrderStatus } from "@/modules/orders/schema";
 
 const ORDER_TONE: Record<OrderStatus, string> = {
   DRAFT:            "bg-text-dim/12 text-text-dim",
-  CONFIRMED:        "bg-warn/15 text-warn",
-  PARTIAL_DISPATCH: "bg-warn/15 text-warn",
-  DISPATCHED:       "bg-good/12 text-good",
-  CANCELLED:        "bg-bad/12 text-bad",
+  CONFIRMED:        "bg-heat/15 text-heat",
+  PROCUREMENT:      "bg-heat/15 text-heat",
+  MAKE:             "bg-info/15 text-info",
+  READY_TO_INSTALL: "bg-info/15 text-info",
+  INSTALLING:       "bg-solid/12 text-solid",
+  COMPLETED:        "bg-solid/12 text-solid",
+  CANCELLED:        "bg-fault/12 text-fault",
 };
 const ORDER_LABEL: Record<OrderStatus, string> = {
-  DRAFT: "Draft", CONFIRMED: "Confirmed", PARTIAL_DISPATCH: "Partial",
-  DISPATCHED: "Dispatched", CANCELLED: "Cancelled",
+  DRAFT:            "Draft",
+  CONFIRMED:        "Confirmed",
+  PROCUREMENT:      "Procurement",
+  MAKE:             "Make",
+  READY_TO_INSTALL: "Ready",
+  INSTALLING:       "Installing",
+  COMPLETED:        "Completed",
+  CANCELLED:        "Cancelled",
 };
 
-const DISPATCH_TONE: Record<DispatchStatus, string> = {
-  DRAFT:     "bg-text-dim/12 text-text-dim",
-  POSTED:    "bg-warn/15 text-warn",
-  DELIVERED: "bg-good/12 text-good",
-};
-const DISPATCH_LABEL: Record<DispatchStatus, string> = {
-  DRAFT: "Draft", POSTED: "Posted", DELIVERED: "Delivered",
-};
-
-export function StatusPill({ status, kind = "order" }: { status: string; kind?: "order" | "dispatch" }) {
-  const isDispatch = kind === "dispatch";
-  const tone = isDispatch
-    ? DISPATCH_TONE[status as DispatchStatus] ?? "bg-text-dim/12 text-text-dim"
-    : ORDER_TONE[status as OrderStatus] ?? "bg-text-dim/12 text-text-dim";
-  const label = isDispatch
-    ? DISPATCH_LABEL[status as DispatchStatus] ?? status
-    : ORDER_LABEL[status as OrderStatus] ?? status;
+export function StatusPill({ status }: { status: string }) {
+  const key = status as OrderStatus;
+  const tone = ORDER_TONE[key] ?? "bg-text-dim/12 text-text-dim";
+  const label = ORDER_LABEL[key] ?? status;
   return (
     <span
       className={`inline-block text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${tone}`}

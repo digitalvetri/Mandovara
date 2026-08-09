@@ -19,7 +19,7 @@ export default async function InvoiceDetailPage({
   const inv = await getInvoice(ctx, id);
   if (!inv) notFound();
 
-  const isIntra = inv.supplierStateCode === inv.placeOfSupply;
+  const isIntra = inv.supplierStateCode === inv.placeOfSupplyCode;
   const overdueDays = Math.floor((Date.now() - inv.dueDate.getTime()) / 86_400_000);
   const isOverdue = inv.status !== "PAID" && inv.status !== "CANCELLED" && overdueDays > 0;
   const canCancel = inv.status === "ISSUED" || inv.status === "DRAFT";
@@ -49,7 +49,7 @@ export default async function InvoiceDetailPage({
               )}
             </div>
             {canCancel && (
-              <CancelInvoiceButton id={inv.id} number={inv.number} createdAt={inv.createdAt} />
+              <CancelInvoiceButton id={inv.id} number={inv.number} createdAt={inv.date} />
             )}
           </div>
 
@@ -87,10 +87,10 @@ export default async function InvoiceDetailPage({
                   <tr key={l.id} className="border-b border-rule/70 last:border-0 align-top">
                     <Td align="right"><span className="tabular text-text-dim">{l.lineNo}</span></Td>
                     <Td>
-                      <div className="tabular text-text-dim text-[11.5px]">{l.productCode}</div>
+                      <div className="tabular text-text-dim text-[11.5px]">{l.hsn}</div>
                       <div className="text-text">{l.description}</div>
                     </Td>
-                    <Td align="right"><span className="tabular">{trimZero(l.quantity)} <span className="text-text-faint">{l.uom}</span></span></Td>
+                    <Td align="right"><span className="tabular">{trimZero(l.quantity)} <span className="text-text-faint">{l.unit}</span></span></Td>
                     <Td align="right"><span className="tabular text-text-dim">{formatINR(l.rate)}</span></Td>
                     <Td align="right"><span className="tabular text-text">{formatINR(l.taxable)}</span></Td>
                     <Td align="right"><span className="tabular text-text-dim">{trimZero(l.gstRate)}%</span></Td>
@@ -149,7 +149,7 @@ export default async function InvoiceDetailPage({
               <Row k="Client" v={inv.clientName} />
               <Row k="Mobile" v={inv.clientMobile} mono />
               <Row k="Client GSTIN" v={inv.clientGstin ?? "—"} mono />
-              <Row k="Place of supply" v={inv.placeOfSupply} mono />
+              <Row k="Place of supply" v={inv.placeOfSupplyCode} mono />
               <Row k="Supplier state" v={inv.supplierStateCode} mono />
               <Row k="Supply type" v={isIntra ? "Intra-state" : "Inter-state"} />
               <Row k="Type" v={inv.type} />

@@ -1,6 +1,9 @@
 import type { InvoiceStatus, IrnStatus } from "@/modules/invoices/schema";
 
-const TONE: Record<InvoiceStatus, string> = {
+// OVERDUE is a display-only state computed from dueDate — it's not in the DB enum.
+type DisplayStatus = InvoiceStatus | "OVERDUE";
+
+const TONE: Record<DisplayStatus, string> = {
   DRAFT:          "bg-text-dim/12 text-text-dim",
   ISSUED:         "bg-warn/15 text-warn",
   PARTIALLY_PAID: "bg-warn/15 text-warn",
@@ -8,7 +11,7 @@ const TONE: Record<InvoiceStatus, string> = {
   CANCELLED:      "bg-text-dim/12 text-text-dim line-through",
   OVERDUE:        "bg-bad/12 text-bad",
 };
-const LABEL: Record<InvoiceStatus, string> = {
+const LABEL: Record<DisplayStatus, string> = {
   DRAFT: "Draft", ISSUED: "Issued", PARTIALLY_PAID: "Partial",
   PAID: "Paid", CANCELLED: "Cancelled", OVERDUE: "Overdue",
 };

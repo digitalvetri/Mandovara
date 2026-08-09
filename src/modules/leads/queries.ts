@@ -1,13 +1,14 @@
 // Leads repository — read side. All queries go through db.scoped(ctx).
+// Schema reference: Lead has `stage LeadStage` (not `status`), `budgetMin`/`budgetMax` (not
+// `expectedValue`), `mobile`, `email` — no companyName, no updatedAt, no stateCode.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
-import type { LeadStatus } from "./schema";
 
 export interface ListLeadsQuery {
   search?: string;
-  status?: LeadStatus | "OPEN" | "ALL";
+  stage?: string | "OPEN" | "ALL";
   page?: number;
   pageSize?: number;
   sort?: "recent" | "oldest" | "name" | "value";
@@ -15,21 +16,23 @@ export interface ListLeadsQuery {
 
 export interface LeadRow {
   id: string;
+  number: string;
   name: string;
   mobile: string;
   email: string | null;
-  companyName: string | null;
   source: string;
-  status: string;
-  expectedValue: bigint | null;
+  stage: string;
   requirement: string | null;
-  ownerId: string | null;
+  budgetMin: bigint | null;
+  budgetMax: bigint | null;
+  ownerId: string;
   createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface LeadDetail extends LeadRow {
   convertedClientId: string | null;
+  lostReason: string | null;
+  nextActionAt: Date | null;
 }
 
 export interface ListLeadsResult {
@@ -41,6 +44,11 @@ export interface ListLeadsResult {
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
+
+// Valid LeadStage values per schema enum, excluding WON and LOST
+const OPEN_STAGES = [
+  "NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION",
+] as const;
 
 export async function listLeads(
   ctx: RequestContext,
@@ -63,9 +71,10 @@ export async function listLeads(
       skip,
       take: pageSize,
       select: {
-        id: true, name: true, mobile: true, email: true, companyName: true,
-        source: true, status: true, expectedValue: true, requirement: true,
-        ownerId: true, createdAt: true, updatedAt: true,
+        id: true, number: true, name: true, mobile: true, email: true,
+        source: true, stage: true, requirement: true,
+        budgetMin: true, budgetMax: true,
+        ownerId: true, createdAt: true,
       },
     }),
     db.lead.count({ where }),
@@ -80,15 +89,16 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
   return db.lead.findUnique({
     where: { id },
     select: {
-      id: true, name: true, mobile: true, email: true, companyName: true,
-      source: true, status: true, expectedValue: true, requirement: true,
-      ownerId: true, createdAt: true, updatedAt: true,
-      convertedClientId: true,
+      id: true, number: true, name: true, mobile: true, email: true,
+      source: true, stage: true, requirement: true,
+      budgetMin: true, budgetMax: true,
+      ownerId: true, createdAt: true,
+      convertedClientId: true, lostReason: true, nextActionAt: true,
     },
   });
 }
 
-// ── helpers ──────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 type WhereInput = Record<string, unknown>;
 
@@ -97,17 +107,16 @@ function buildWhere(q: ListLeadsQuery): WhereInput {
   if (q.search && q.search.trim().length > 0) {
     const s = q.search.trim();
     where["OR"] = [
-      { name:        { contains: s, mode: "insensitive" } },
-      { mobile:      { contains: s } },
-      { email:       { contains: s, mode: "insensitive" } },
-      { companyName: { contains: s, mode: "insensitive" } },
+      { name:   { contains: s, mode: "insensitive" } },
+      { mobile: { contains: s } },
+      { email:  { contains: s, mode: "insensitive" } },
     ];
   }
-  if (q.status && q.status !== "ALL") {
-    if (q.status === "OPEN") {
-      where["status"] = { in: ["NEW", "CONTACTED", "QUALIFIED", "PROPOSED", "NEGOTIATION"] };
+  if (q.stage && q.stage !== "ALL") {
+    if (q.stage === "OPEN") {
+      where["stage"] = { in: [...OPEN_STAGES] };
     } else {
-      where["status"] = q.status;
+      where["stage"] = q.stage;
     }
   }
   return where;
@@ -117,7 +126,7 @@ function orderFor(sort: ListLeadsQuery["sort"]): { [k: string]: "asc" | "desc" }
   switch (sort) {
     case "oldest": return { createdAt: "asc" };
     case "name":   return { name: "asc" };
-    case "value":  return { expectedValue: "desc" };
+    case "value":  return { budgetMax: "desc" };
     case "recent":
     default:       return { createdAt: "desc" };
   }

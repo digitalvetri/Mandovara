@@ -4,14 +4,25 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition, useState, useEffect } from "react";
 import { Search } from "lucide-react";
 
-interface Props { warehouses: { id: string; name: string }[] }
+const FAMILIES = [
+  ["CURTAIN_FABRIC", "Curtain"],
+  ["SHEER", "Sheer"],
+  ["LINING", "Lining"],
+  ["BLIND", "Blind"],
+  ["WALLPAPER", "Wallpaper"],
+  ["FLOORING", "Flooring"],
+  ["CARPET_ROLL", "Carpet roll"],
+  ["CARPET_TILE", "Carpet tile"],
+  ["UPHOLSTERY_FABRIC", "Upholstery"],
+  ["INTERIOR_FILM", "Film"],
+  ["VERTICAL_GARDEN", "V. Garden"],
+] as const;
 
-export function BalanceFilters({ warehouses }: Props) {
+export function BalanceFilters() {
   const router = useRouter();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
-  const currentWh = params.get("warehouseId") ?? "ALL";
-  const onlyLow = params.get("low") === "1";
+  const currentFamily = params.get("family") ?? "";
   const currentSearch = params.get("q") ?? "";
   const [search, setSearch] = useState(currentSearch);
   useEffect(() => setSearch(currentSearch), [currentSearch]);
@@ -22,20 +33,15 @@ export function BalanceFilters({ warehouses }: Props) {
       router.push(s.length > 0 ? `/inventory?${s}` : "/inventory");
     });
   }
-  function onWh(e: React.ChangeEvent<HTMLSelectElement>) {
+
+  function onFamily(e: React.ChangeEvent<HTMLSelectElement>) {
     const next = new URLSearchParams(params.toString());
-    if (e.target.value === "ALL") next.delete("warehouseId");
-    else next.set("warehouseId", e.target.value);
+    if (e.target.value === "") next.delete("family");
+    else next.set("family", e.target.value);
     next.delete("page");
     push(next);
   }
-  function onLow() {
-    const next = new URLSearchParams(params.toString());
-    if (onlyLow) next.delete("low");
-    else next.set("low", "1");
-    next.delete("page");
-    push(next);
-  }
+
   function onSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
     const next = new URLSearchParams(params.toString());
@@ -47,24 +53,27 @@ export function BalanceFilters({ warehouses }: Props) {
 
   return (
     <div className="flex items-center gap-3 mb-4">
-      <select value={currentWh} onChange={onWh}
-              className="h-[32px] px-2 bg-surface border border-rule rounded-[8px] text-[12.5px] outline-none focus:border-accent">
-        <option value="ALL">All warehouses</option>
-        {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+      <select
+        value={currentFamily}
+        onChange={onFamily}
+        className="h-[32px] px-2 bg-surface border border-rule rounded-[8px] text-[12.5px] outline-none focus:border-gold"
+      >
+        <option value="">All families</option>
+        {FAMILIES.map(([val, label]) => (
+          <option key={val} value={val}>{label}</option>
+        ))}
       </select>
-      <button type="button" onClick={onLow}
-              className={[
-                "h-[32px] px-3 rounded-[8px] text-[12px] border transition-colors",
-                onlyLow ? "bg-bad text-white border-bad" : "bg-surface text-text-dim border-rule hover:text-text",
-              ].join(" ")}>
-        Below reorder only
-      </button>
+
       <form onSubmit={onSearchSubmit} className="flex-1 max-w-[360px]">
         <label className="flex items-center gap-2 h-[32px] px-3 bg-surface border border-rule rounded-[8px]">
-          <Search size={13} strokeWidth={1.75} className="text-text-faint" />
-          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
-                 placeholder="Code or name"
-                 className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-text-faint" />
+          <Search size={13} strokeWidth={1.75} className="text-text-muted" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Colourway code, name or dye lot"
+            className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-text-muted"
+          />
         </label>
       </form>
     </div>

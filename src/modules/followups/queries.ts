@@ -3,156 +3,167 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import type { Prisma } from "@prisma/client";
+
+// ── Automation rules ─────────────────────────────────────────────────────────
 
 export interface AutomationRuleRow {
-  id: string;
-  name: string;
+  id:      string;
+  name:    string;
   cadence: string;
-  active: boolean;
+  active:  boolean;
 }
 
 export async function listAutomationRules(ctx: RequestContext): Promise<AutomationRuleRow[]> {
   requirePermission(ctx, "automation.view");
   const db = scoped(ctx);
   const rows = await db.automationRule.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: { name: "asc" },
     take: 40,
-    select: { id: true, name: true, eventType: true, actions: true, enabled: true },
+    select: { id: true, name: true, triggerEvent: true, actions: true, isActive: true },
   });
   return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    cadence: `${r.eventType}${describeActions(r.actions)}`,
-    active: r.enabled,
+    id:      r.id,
+    name:    r.name,
+    cadence: `${r.triggerEvent}${describeActions(r.actions)}`,
+    active:  r.isActive,
   }));
 }
 
-function describeActions(actions: unknown): string {
+function describeActions(actions: Prisma.JsonValue): string {
   if (!Array.isArray(actions) || actions.length === 0) return "";
   const first = actions[0] as { kind?: unknown } | undefined;
   const kind = first && typeof first.kind === "string" ? first.kind : "";
   return kind ? ` · ${kind}` : "";
 }
 
+// ── Follow-up list ────────────────────────────────────────────────────────────
+
 export interface ListFollowUpsQuery {
-  bucket?: "OPEN" | "TODAY" | "OVERDUE" | "COMPLETED" | "ALL";
+  bucket?:   "OPEN" | "TODAY" | "OVERDUE" | "COMPLETED" | "ALL";
   mineOnly?: boolean;
-  page?: number;
+  page?:     number;
   pageSize?: number;
 }
 
 export interface FollowUpRow {
-  id: string;
-  dueAt: Date;
-  status: string;
-  outcome: string | null;
-  note: string | null;
-  ownerId: string;
-  ownerName: string;
+  id:          string;
+  dueAt:       Date;
+  status:      string;    // derived: OPEN | OVERDUE | COMPLETED
+  outcome:     string | null;
+  note:        string;
+  ownerId:     string;
+  ownerName:   string;
   completedAt: Date | null;
-  leadId: string | null;
-  leadName: string | null;
-  clientId: string | null;
-  clientName: string | null;
-  quotationId: string | null;
-  quotationNumber: string | null;
+  refType:     string;
+  refId:       string;
+  refLabel:    string | null;  // lead name / client name / quotation number
   daysOverdue: number;
 }
 
 export interface ListFollowUpsResult {
-  rows: FollowUpRow[];
-  total: number;
-  page: number;
+  rows:     FollowUpRow[];
+  total:    number;
+  page:     number;
   pageSize: number;
-  counts: { open: number; today: number; overdue: number; completed: number };
+  counts:   { open: number; today: number; overdue: number; completed: number };
 }
 
 const DEFAULT_PAGE_SIZE = 30;
-const MAX_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE     = 100;
 
 export async function listFollowUps(
   ctx: RequestContext,
-  q: ListFollowUpsQuery,
+  q:   ListFollowUpsQuery,
 ): Promise<ListFollowUpsResult> {
   requirePermission(ctx, "followup.view");
   const db = scoped(ctx);
-  const now = new Date();
+  const now        = new Date();
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
   const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
 
   const bucket = q.bucket ?? "OPEN";
-  const where: Record<string, unknown> = {};
-  if (q.mineOnly) where["ownerId"] = ctx.userId;
+  let where: Prisma.FollowUpWhereInput = {};
+  if (q.mineOnly) where = { ...where, ownerId: ctx.userId };
 
   switch (bucket) {
     case "TODAY":
-      where["status"] = { in: ["OPEN", "OVERDUE"] };
-      where["dueAt"] = { gte: todayStart, lte: todayEnd };
+      where = { ...where, completedAt: null, dueAt: { gte: todayStart, lte: todayEnd } };
       break;
     case "OVERDUE":
-      where["status"] = { in: ["OPEN", "OVERDUE"] };
-      where["dueAt"] = { lt: todayStart };
+      where = { ...where, completedAt: null, dueAt: { lt: todayStart } };
       break;
     case "COMPLETED":
-      where["status"] = "COMPLETED";
-      break;
-    case "ALL":
+      where = { ...where, completedAt: { not: null } };
       break;
     case "OPEN":
-    default:
-      where["status"] = { in: ["OPEN", "OVERDUE"] };
+      where = { ...where, completedAt: null };
+      break;
+    case "ALL":
       break;
   }
 
   const pageSize = Math.min(q.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-  const page = Math.max(1, q.page ?? 1);
-  const skip = (page - 1) * pageSize;
+  const page     = Math.max(1, q.page ?? 1);
+  const skip     = (page - 1) * pageSize;
 
   const [rows, total, counts] = await Promise.all([
     db.followUp.findMany({
-      where, orderBy: { dueAt: "asc" }, skip, take: pageSize,
+      where,
+      orderBy: { dueAt: "asc" },
+      skip,
+      take: pageSize,
       select: {
-        id: true, dueAt: true, status: true, outcome: true, note: true,
-        ownerId: true, completedAt: true,
-        leadId: true, clientId: true, quotationId: true,
-        lead: { select: { id: true, name: true } },
+        id: true, dueAt: true, outcome: true, note: true,
+        ownerId: true, completedAt: true, refType: true, refId: true,
       },
     }),
     db.followUp.count({ where }),
     loadCounts(ctx, todayStart, todayEnd),
   ]);
 
-  // Resolve owner names + client/quotation names in follow-up queries
-  const ownerIds = [...new Set(rows.map((r) => r.ownerId))];
-  const clientIds = [...new Set(rows.map((r) => r.clientId).filter((x): x is string => x != null))];
-  const quotationIds = [...new Set(rows.map((r) => r.quotationId).filter((x): x is string => x != null))];
+  // Batch-resolve owner names and ref-entity labels
+  const ownerIds     = [...new Set(rows.map((r) => r.ownerId))];
+  const leadIds      = rows.filter((r) => r.refType === "LEAD").map((r) => r.refId);
+  const clientIds    = rows.filter((r) => r.refType === "CLIENT").map((r) => r.refId);
+  const quotationIds = rows.filter((r) => r.refType === "QUOTATION").map((r) => r.refId);
 
-  const [owners, clients, quotations] = await Promise.all([
+  const [owners, leads, clients, quotations] = await Promise.all([
     ownerIds.length
       ? db.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })
-      : Promise.resolve([]),
+      : ([] as { id: string; name: string }[]),
+    leadIds.length
+      ? db.lead.findMany({ where: { id: { in: leadIds } }, select: { id: true, name: true } })
+      : ([] as { id: string; name: string }[]),
     clientIds.length
       ? db.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true } })
-      : Promise.resolve([]),
+      : ([] as { id: string; name: string }[]),
     quotationIds.length
       ? db.quotation.findMany({ where: { id: { in: quotationIds } }, select: { id: true, number: true } })
-      : Promise.resolve([]),
+      : ([] as { id: string; number: string }[]),
   ]);
-  const ownerMap = new Map(owners.map((o) => [o.id, o.name]));
-  const clientMap = new Map(clients.map((c) => [c.id, c.name]));
-  const quoMap = new Map(quotations.map((q) => [q.id, q.number]));
+
+  const ownerMap    = new Map(owners.map((o) => [o.id, o.name]));
+  const refLabelMap = new Map<string, string>();
+  for (const l of leads)      refLabelMap.set(l.id, l.name);
+  for (const c of clients)    refLabelMap.set(c.id, c.name);
+  for (const qt of quotations) refLabelMap.set(qt.id, qt.number);
 
   return {
     rows: rows.map((r) => {
-      const daysOverdue = Math.max(0, Math.floor((now.getTime() - r.dueAt.getTime()) / 86_400_000));
+      const daysOverdue = r.completedAt == null
+        ? Math.max(0, Math.floor((now.getTime() - r.dueAt.getTime()) / 86_400_000))
+        : 0;
+      const status = r.completedAt != null
+        ? "COMPLETED"
+        : r.dueAt < todayStart ? "OVERDUE" : "OPEN";
       return {
-        id: r.id, dueAt: r.dueAt, status: r.status,
+        id: r.id, dueAt: r.dueAt, status,
         outcome: r.outcome, note: r.note,
         ownerId: r.ownerId, ownerName: ownerMap.get(r.ownerId) ?? "Unknown",
         completedAt: r.completedAt,
-        leadId: r.leadId, leadName: r.lead?.name ?? null,
-        clientId: r.clientId, clientName: r.clientId ? clientMap.get(r.clientId) ?? null : null,
-        quotationId: r.quotationId, quotationNumber: r.quotationId ? quoMap.get(r.quotationId) ?? null : null,
+        refType: r.refType, refId: r.refId,
+        refLabel: refLabelMap.get(r.refId) ?? null,
         daysOverdue,
       };
     }),
@@ -161,55 +172,53 @@ export async function listFollowUps(
 }
 
 async function loadCounts(
-  ctx: RequestContext,
+  ctx:        RequestContext,
   todayStart: Date,
-  todayEnd: Date,
+  todayEnd:   Date,
 ): Promise<ListFollowUpsResult["counts"]> {
   const db = scoped(ctx);
   const [open, today, overdue, completed] = await Promise.all([
-    db.followUp.count({ where: { status: { in: ["OPEN", "OVERDUE"] } } }),
-    db.followUp.count({
-      where: {
-        status: { in: ["OPEN", "OVERDUE"] },
-        dueAt: { gte: todayStart, lte: todayEnd },
-      },
-    }),
-    db.followUp.count({
-      where: {
-        status: { in: ["OPEN", "OVERDUE"] },
-        dueAt: { lt: todayStart },
-      },
-    }),
-    db.followUp.count({ where: { status: "COMPLETED" } }),
+    db.followUp.count({ where: { completedAt: null } }),
+    db.followUp.count({ where: { completedAt: null, dueAt: { gte: todayStart, lte: todayEnd } } }),
+    db.followUp.count({ where: { completedAt: null, dueAt: { lt: todayStart } } }),
+    db.followUp.count({ where: { completedAt: { not: null } } }),
   ]);
   return { open, today, overdue, completed };
 }
 
+// ── Per-lead follow-up list ───────────────────────────────────────────────────
+
 export interface LeadFollowUpRow {
-  id: string;
-  dueAt: Date;
-  status: string;
-  outcome: string | null;
-  note: string | null;
+  id:          string;
+  dueAt:       Date;
+  status:      string;
+  outcome:     string | null;
+  note:        string;
   completedAt: Date | null;
 }
 
 export async function listFollowUpsForLead(
-  ctx: RequestContext,
+  ctx:    RequestContext,
   leadId: string,
 ): Promise<LeadFollowUpRow[]> {
   requirePermission(ctx, "followup.view");
-  const db = scoped(ctx);
-  return db.followUp.findMany({
-    where: { leadId },
-    orderBy: [{ status: "asc" }, { dueAt: "asc" }],
-    take: 50,
-    select: {
-      id: true, dueAt: true, status: true, outcome: true, note: true,
-      completedAt: true,
-    },
+  const db         = scoped(ctx);
+  const now        = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+
+  const rows = await db.followUp.findMany({
+    where:   { refType: "LEAD", refId: leadId },
+    orderBy: [{ completedAt: "asc" }, { dueAt: "asc" }],
+    take:    50,
+    select:  { id: true, dueAt: true, outcome: true, note: true, completedAt: true },
   });
+  return rows.map((r) => ({
+    ...r,
+    status: r.completedAt != null ? "COMPLETED" : r.dueAt < todayStart ? "OVERDUE" : "OPEN",
+  }));
 }
+
+// ── Pickers ───────────────────────────────────────────────────────────────────
 
 export interface FollowUpPickerLead {
   id: string; name: string; mobile: string;
@@ -217,13 +226,16 @@ export interface FollowUpPickerLead {
 export async function listLeadsForFollowUp(ctx: RequestContext): Promise<FollowUpPickerLead[]> {
   requirePermission(ctx, "lead.view");
   const db = scoped(ctx);
-  const rows = await db.lead.findMany({
-    where: { status: { in: ["NEW", "CONTACTED", "QUALIFIED", "PROPOSED", "NEGOTIATION"] } },
+  return db.lead.findMany({
+    where: {
+      stage: {
+        in: ["NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION"],
+      },
+    },
     orderBy: { createdAt: "desc" },
-    take: 200,
-    select: { id: true, name: true, mobile: true },
+    take:    200,
+    select:  { id: true, name: true, mobile: true },
   });
-  return rows;
 }
 
 export interface FollowUpPickerClient {
@@ -232,11 +244,9 @@ export interface FollowUpPickerClient {
 export async function listClientsForFollowUp(ctx: RequestContext): Promise<FollowUpPickerClient[]> {
   requirePermission(ctx, "client.view");
   const db = scoped(ctx);
-  const rows = await db.client.findMany({
-    where: { status: "ACTIVE" },
+  return db.client.findMany({
     orderBy: { name: "asc" },
-    take: 200,
-    select: { id: true, name: true, primaryMobile: true },
+    take:    200,
+    select:  { id: true, name: true, mobile: true },
   });
-  return rows.map((r) => ({ id: r.id, name: r.name, mobile: r.primaryMobile }));
 }

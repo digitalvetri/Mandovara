@@ -4,19 +4,28 @@ import { loadAttendance } from "@/modules/attendance/queries";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_TONE = {
-  PRESENT: "bg-good/12 text-good",
-  ABSENT:  "bg-bad/12 text-bad",
-  LATE:    "bg-warn/15 text-warn",
-  LEAVE:   "bg-accent/12 text-accent",
-} as const;
-const STATUS_LABEL = { PRESENT: "Present", ABSENT: "Absent", LATE: "Late", LEAVE: "Leave" } as const;
+const STATUS_TONE: Record<string, string> = {
+  PRESENT:  "bg-good/12 text-good",
+  ABSENT:   "bg-bad/12 text-bad",
+  HALF_DAY: "bg-warn/15 text-warn",
+  LEAVE:    "bg-accent/12 text-accent",
+  HOLIDAY:  "bg-info/12 text-info",
+  WEEK_OFF: "bg-text-dim/12 text-text-dim",
+};
+const STATUS_LABEL: Record<string, string> = {
+  PRESENT:  "Present",
+  ABSENT:   "Absent",
+  HALF_DAY: "Half day",
+  LEAVE:    "Leave",
+  HOLIDAY:  "Holiday",
+  WEEK_OFF: "Week off",
+};
 
-const LEAVE_TONE = {
+const LEAVE_TONE: Record<string, string> = {
   APPROVED: "bg-good/12 text-good",
   PENDING:  "bg-warn/15 text-warn",
   REJECTED: "bg-bad/12 text-bad",
-} as const;
+};
 
 export default async function AttendancePage() {
   const ctx = await devContext();
@@ -29,7 +38,7 @@ export default async function AttendancePage() {
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
         <BandCard label="Present"  value={a.present}  tone="good" />
         <BandCard label="Absent"   value={a.absent}   tone="bad" />
-        <BandCard label="Late in"  value={a.late}     tone="warn" />
+        <BandCard label="Half day" value={a.halfDay}  tone="warn" />
         <BandCard label="On leave" value={a.onLeave}  tone="accent" />
       </section>
 
@@ -53,14 +62,14 @@ export default async function AttendancePage() {
                 <tr key={i} className="border-b border-rule/70 last:border-0">
                   <Td>
                     <div className="text-text">{p.employeeName}</div>
-                    <div className="text-[10.5px] text-text-dim">{p.role}{p.location ? ` · ${p.location}` : ""}</div>
+                    <div className="text-[10.5px] text-text-dim">{p.designation ?? "—"}</div>
                   </Td>
-                  <Td className="tabular text-text-dim">{p.inTime ?? "—"}</Td>
-                  <Td className="tabular text-text-dim">{p.outTime ?? "—"}</Td>
-                  <Td className="tabular text-text-dim">{p.hours ?? "—"}</Td>
+                  <Td className="tabular text-text-dim">{p.inAt ?? "—"}</Td>
+                  <Td className="tabular text-text-dim">{p.outAt ?? "—"}</Td>
+                  <Td className="tabular text-text-dim">{p.isLocked ? "🔒" : "—"}</Td>
                   <Td>
-                    <span className={`inline-block text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${STATUS_TONE[p.status]}`}>
-                      {STATUS_LABEL[p.status]}
+                    <span className={`inline-block text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${STATUS_TONE[p.status] ?? ""}`}>
+                      {STATUS_LABEL[p.status] ?? p.status}
                     </span>
                   </Td>
                 </tr>
@@ -76,8 +85,8 @@ export default async function AttendancePage() {
               <li key={i} className="pb-4 border-b border-rule/60 last:border-0 last:pb-0">
                 <div className="flex items-baseline justify-between mb-1">
                   <div className="text-[12.5px] text-text">{l.employeeName}</div>
-                  <span className={`text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${LEAVE_TONE[l.status]}`}>
-                    {l.status.charAt(0) + l.status.slice(1).toLowerCase()}
+                  <span className={`text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${LEAVE_TONE[l.state] ?? ""}`}>
+                    {l.state.charAt(0) + l.state.slice(1).toLowerCase()}
                   </span>
                 </div>
                 <div className="text-[11.5px] text-text-dim">

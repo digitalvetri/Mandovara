@@ -10,13 +10,17 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Wand2 } from "lucide-react";
-import { formatINR, parseINR } from "@/kernel/money/format";
+import { formatINR } from "@/kernel/money/format";
 import { createReceipt } from "@/modules/receipts/actions";
 import { PAYMENT_MODES, type PaymentMode } from "@/modules/receipts/schema";
 import type {
   ClientForReceiptOption, OutstandingInvoice,
 } from "@/modules/receipts/queries";
 import type { BranchOption } from "@/modules/branches/queries";
+import {
+  wireToBigInt, fieldCls, cellCls, iso, fmt, safePaise,
+  Field, Th, Td, Row, type OutstandingInvoiceWire,
+} from "./_receipt-primitives";
 
 interface Props {
   clients: ClientForReceiptOption[];
@@ -240,78 +244,4 @@ export function ReceiptRecorder({ clients, branches }: Props) {
   );
 }
 
-// ── serialisation for wire ───────────────────────────────────────
-// BigInts don't survive JSON; the API route sends strings, we widen back.
-
-interface OutstandingInvoiceWire {
-  id: string;
-  number: string;
-  date: string;
-  dueDate: string;
-  total: string;
-  paidTotal: string;
-  advanceAdjusted: string;
-  outstanding: string;
-}
-function wireToBigInt(w: OutstandingInvoiceWire): OutstandingInvoice {
-  return {
-    id: w.id, number: w.number,
-    date: new Date(w.date), dueDate: new Date(w.dueDate),
-    total: BigInt(w.total), paidTotal: BigInt(w.paidTotal),
-    advanceAdjusted: BigInt(w.advanceAdjusted),
-    outstanding: BigInt(w.outstanding),
-  };
-}
-
-// ── primitives ───────────────────────────────────────────────────
-
-const fieldCls =
-  "w-full h-[34px] px-3 bg-white/60 border border-rule rounded-[6px] text-[12.5px] outline-none focus:border-accent transition-colors";
-const cellCls =
-  "w-full h-[28px] px-2 bg-white/60 border border-rule rounded-[4px] text-[12.5px] outline-none focus:border-accent";
-
-function iso(d: Date): string { return d.toISOString().slice(0, 10); }
-function fmt(d: Date): string {
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" });
-}
-function safePaise(v: string): bigint {
-  if (v == null || v.trim() === "") return 0n;
-  try { return parseINR(v); } catch { return 0n; }
-}
-function Field({
-  label, required, error, hint, span = 1, children,
-}: { label: string; required?: boolean; error?: string; hint?: string; span?: 1 | 2 | 3;
-     children: React.ReactNode }) {
-  const spanCls = span === 3 ? "col-span-3" : span === 2 ? "lg:col-span-2" : undefined;
-  return (
-    <div className={spanCls}>
-      <div className="mb-1 text-[11px] tracking-[0.06em] uppercase text-text-dim">
-        {label}{required && <span className="text-accent"> *</span>}
-      </div>
-      {children}
-      <div className="mt-1 min-h-[14px] text-[11px]">
-        {error ? <span className="text-bad">{error}</span>
-              : hint ? <span className="text-text-faint">{hint}</span> : null}
-      </div>
-    </div>
-  );
-}
-function Th({ children, align = "left", width }: { children: React.ReactNode; align?: "left" | "right"; width?: number }) {
-  return (
-    <th style={width ? { width } : undefined}
-        className={`px-3 h-[34px] font-medium ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-function Td({ children, align = "left", className = "" }: { children: React.ReactNode; align?: "left" | "right"; className?: string }) {
-  return <td className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"} ${className}`}>{children}</td>;
-}
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-text-dim text-[11.5px]">{k}</dt>
-      <dd className="text-text text-right tabular">{v}</dd>
-    </div>
-  );
-}
+// Primitives, wire serialisation and helpers live in _receipt-primitives.tsx.

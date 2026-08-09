@@ -50,16 +50,18 @@ export default async function VendorsPage({
           <table className="w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
+                <th className="px-4 h-[34px] text-left font-medium">Code</th>
                 <th className="px-4 h-[34px] text-left font-medium">Name</th>
                 <th className="px-4 h-[34px] text-left font-medium">Mobile</th>
                 <th className="px-4 h-[34px] text-left font-medium">GSTIN</th>
-                <th className="px-4 h-[34px] text-left font-medium">State</th>
                 <th className="px-4 h-[34px] text-right font-medium">Terms</th>
+                <th className="px-4 h-[34px] text-right font-medium">Lead time</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((v) => (
                 <tr key={v.id} className="border-b border-rule/70 last:border-0 hover:bg-surface-hover transition-colors">
+                  <td className="px-4 py-2 tabular text-text-dim text-[11.5px]">{v.code}</td>
                   <td className="px-4 py-2">
                     <Link href={`/purchase/vendors/${v.id}` as Route} className="text-text hover:text-accent">
                       {v.name}
@@ -67,8 +69,8 @@ export default async function VendorsPage({
                   </td>
                   <td className="px-4 py-2 tabular">{v.mobile}</td>
                   <td className="px-4 py-2 tabular text-text-dim">{v.gstin ?? "—"}</td>
-                  <td className="px-4 py-2 tabular text-text-dim">{v.stateCode}</td>
-                  <td className="px-4 py-2 text-right tabular text-text-dim">{v.paymentTerms}d</td>
+                  <td className="px-4 py-2 text-right tabular text-text-dim">{v.paymentTermsDays}d</td>
+                  <td className="px-4 py-2 text-right tabular text-text-dim">{v.leadTimeDays}d</td>
                 </tr>
               ))}
             </tbody>

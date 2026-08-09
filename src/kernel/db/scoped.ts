@@ -102,15 +102,15 @@ function scopeExtensionConfig(ctx: RequestContext) {
                 ? (args.data as Record<string, unknown>[])
                 : [args.data as Record<string, unknown>];
               for (const r of rows) validateBranch(model, r, ctx, isBranch);
-              return query({ ...args, data: rows.map((r) => ({ ...r, orgId: ctx.orgId })) });
+              return query({ ...args, data: rows.map((r) => ({ ...r, organizationId: ctx.orgId })) });
             }
 
             case "upsert": {
               validateBranch(model, args.create, ctx, isBranch);
               return query({
                 ...args,
-                where: { ...(args.where ?? {}), orgId: ctx.orgId, ...branchFilter },
-                create: { ...(args.create as Record<string, unknown> ?? {}), orgId: ctx.orgId },
+                where: { ...(args.where ?? {}), organizationId: ctx.orgId, ...branchFilter },
+                create: { ...(args.create as Record<string, unknown> ?? {}), organizationId: ctx.orgId },
               });
             }
 
@@ -118,8 +118,8 @@ function scopeExtensionConfig(ctx: RequestContext) {
             case "findUniqueOrThrow": {
               const raw = await query(args);
               if (raw == null) return raw;
-              const row = raw as { orgId?: string; branchId?: string };
-              if (row.orgId != null && row.orgId !== ctx.orgId) {
+              const row = raw as { organizationId?: string; branchId?: string };
+              if (row.organizationId != null && row.organizationId !== ctx.orgId) {
                 if (operation === "findUniqueOrThrow") {
                   throw new Prisma.PrismaClientKnownRequestError(
                     `No ${model} found`, { code: "P2025", clientVersion: "scoped" },
@@ -160,7 +160,7 @@ function withWhere<T extends HasWhere>(
   orgId: string,
   branchFilter: Record<string, unknown>,
 ): T {
-  return { ...args, where: { ...(args.where ?? {}), orgId, ...branchFilter } };
+  return { ...args, where: { ...(args.where ?? {}), organizationId: orgId, ...branchFilter } };
 }
 
 interface HasData<D> {
@@ -170,8 +170,8 @@ interface HasData<D> {
 function withData<D extends Record<string, unknown>>(
   args: HasData<D>,
   orgId: string,
-): HasData<D & { orgId: string }> {
-  return { ...args, data: { ...(args.data ?? {} as D), orgId } };
+): HasData<D & { organizationId: string }> {
+  return { ...args, data: { ...(args.data ?? {} as D), organizationId: orgId } };
 }
 
 function validateBranch(

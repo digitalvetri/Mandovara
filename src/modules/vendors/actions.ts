@@ -22,22 +22,34 @@ export async function createVendor(input: unknown): Promise<ActionResult<{ id: s
   const d = parsed.data;
 
   const db = scoped(ctx);
-  const created = await db.vendor.create({
-    data: {
-      orgId:       ctx.orgId,
-      name:        d.name,
-      mobile:      normaliseMobile(d.mobile),
-      email:       emptyToNull(d.email),
-      gstin:       upper(emptyToNull(d.gstin)),
-      pan:         upper(emptyToNull(d.pan)),
-      stateCode:   d.stateCode,
-      paymentTerms: d.paymentTerms,
-      status:      "ACTIVE",
-    },
-    select: { id: true },
-  });
-  revalidatePath("/purchase/vendors");
-  return { ok: true, data: created };
+  // Auto-generate vendor code: VEN-NNN (sequential per org, not atomic — acceptable for low-volume admin)
+  const vendorCount = await db.vendor.count({ where: { organizationId: ctx.orgId } });
+  const code = `VEN-${String(vendorCount + 1).padStart(3, "0")}`;
+
+  try {
+    const created = await db.vendor.create({
+      data: {
+        organizationId: ctx.orgId,
+        code,
+        name:             d.name,
+        mobile:           normaliseMobile(d.mobile),
+        email:            emptyToNull(d.email),
+        gstin:            emptyToNull(d.gstin)?.toUpperCase() ?? null,
+        paymentTermsDays: d.paymentTermsDays,
+        leadTimeDays:     d.leadTimeDays,
+        brandIds:         d.brandIds,
+        ...(d.rating != null && { rating: d.rating }),
+      },
+      select: { id: true },
+    });
+    revalidatePath("/purchase/vendors");
+    return { ok: true, data: created };
+  } catch (e: unknown) {
+    if (isUniqueConstraint(e)) {
+      return { ok: false, error: "Vendor code conflict — please retry" };
+    }
+    throw e;
+  }
 }
 
 export async function updateVendor(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -51,13 +63,14 @@ export async function updateVendor(input: unknown): Promise<ActionResult<{ id: s
   await db.vendor.update({
     where: { id },
     data: {
-      ...(rest.name != null    && { name: rest.name }),
-      ...(rest.mobile != null  && { mobile: normaliseMobile(rest.mobile) }),
-      ...(rest.email != null   && { email: emptyToNull(rest.email) }),
-      ...(rest.gstin != null   && { gstin: upper(emptyToNull(rest.gstin)) }),
-      ...(rest.pan != null     && { pan: upper(emptyToNull(rest.pan)) }),
-      ...(rest.stateCode != null && { stateCode: rest.stateCode }),
-      ...(rest.paymentTerms != null && { paymentTerms: rest.paymentTerms }),
+      ...(rest.name != null             && { name: rest.name }),
+      ...(rest.mobile != null           && { mobile: normaliseMobile(rest.mobile) }),
+      ...(rest.email != null            && { email: emptyToNull(rest.email) }),
+      ...(rest.gstin != null            && { gstin: emptyToNull(rest.gstin)?.toUpperCase() ?? null }),
+      ...(rest.paymentTermsDays != null && { paymentTermsDays: rest.paymentTermsDays }),
+      ...(rest.leadTimeDays != null     && { leadTimeDays: rest.leadTimeDays }),
+      ...(rest.brandIds != null         && { brandIds: rest.brandIds }),
+      ...(rest.rating !== undefined     && { rating: rest.rating }),
     },
   });
   revalidatePath("/purchase/vendors");
@@ -68,11 +81,25 @@ export async function updateVendor(input: unknown): Promise<ActionResult<{ id: s
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
   const fieldErrors: Record<string, string> = {};
   for (const iss of err.issues) {
-    const p = iss.path.filter((s): s is string | number => typeof s === "string" || typeof s === "number").join(".");
+    const p = iss.path
+      .filter((s): s is string | number => typeof s === "string" || typeof s === "number")
+      .join(".");
     if (!fieldErrors[p]) fieldErrors[p] = iss.message;
   }
   return { ok: false, error: "Validation failed", fieldErrors };
 }
-function normaliseMobile(m: string): string { const t = m.trim(); return t.startsWith("+91") ? t : `+91${t}`; }
-function emptyToNull(v: string | undefined | null): string | null { if (v == null) return null; const t = v.trim(); return t.length === 0 ? null : t; }
-function upper(v: string | null): string | null { return v == null ? null : v.toUpperCase(); }
+
+function normaliseMobile(m: string): string {
+  const t = m.trim();
+  return t.startsWith("+91") ? t : `+91${t}`;
+}
+
+function emptyToNull(v: string | undefined | null): string | null {
+  if (v == null) return null;
+  const t = v.trim();
+  return t.length === 0 ? null : t;
+}
+
+function isUniqueConstraint(e: unknown): boolean {
+  return typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "P2002";
+}

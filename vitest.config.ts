@@ -15,13 +15,17 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary"],
-      // Only compute coverage against the two kernels the KIT gate enforces.
-      include: ["src/kernel/money/**/*.ts", "src/kernel/tax/**/*.ts"],
+      // Calc engine added in Phase 8 — 100% branch coverage is a Phase 8 gate (§12.1).
+      include: [
+        "src/kernel/money/**/*.ts",
+        "src/kernel/tax/**/*.ts",
+        "src/kernel/calc/**/*.ts",
+      ],
       exclude: ["**/*.test.ts", "**/index.ts"],
-      // Gate: 100 % branch coverage on money and tax (Session 5 KIT).
       thresholds: {
         "src/kernel/money/**": { branches: 100, functions: 100, lines: 100, statements: 100 },
         "src/kernel/tax/**":   { branches: 100, functions: 100, lines: 100, statements: 100 },
+        "src/kernel/calc/**":  { branches: 100, functions: 100, lines: 100, statements: 100 },
       },
     },
   },

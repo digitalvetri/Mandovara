@@ -1,4 +1,8 @@
 // Employees repository.
+// Schema: Employee has id, organizationId, userId?, code, name, mobile, designation,
+// department, doj DateTime, salaryStructure?, status UserStatus (ACTIVE|SUSPENDED).
+// No email, branchId, joinDate, exitDate fields.
+// No back-relations to Attendance or Payslip — queried separately.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -9,13 +13,12 @@ export interface EmployeeRow {
   code: string;
   name: string;
   mobile: string;
-  email: string | null;
+  email: null;             // Not in schema — always null
   designation: string | null;
   department: string | null;
-  branchId: string;
-  branchName: string;
-  joinDate: Date;
-  exitDate: Date | null;
+  branchName: string;      // Not in schema — always "—"
+  joinDate: Date;          // maps to schema field doj
+  exitDate: null;          // Not in schema — always null
   status: string;
   hasAttendance: boolean;
   hasPayslip: boolean;
@@ -33,34 +36,62 @@ export async function listEmployees(
 ): Promise<EmployeesView> {
   requirePermission(ctx, "employee.view");
   const db = scoped(ctx);
-  const [rows, branches, totalCount, activeCount] = await Promise.all([
+
+  const where = opts.includeTerminated ? {} : { status: "ACTIVE" as const };
+
+  const [rows, totalCount, activeCount] = await Promise.all([
     db.employee.findMany({
-      where: opts.includeTerminated
-        ? {}
-        : { status: { in: ["ACTIVE", "ON_LEAVE"] } },
+      where,
       orderBy: { name: "asc" },
       take: 200,
       select: {
-        id: true, code: true, name: true, mobile: true, email: true,
-        designation: true, department: true, branchId: true,
-        joinDate: true, exitDate: true, status: true,
-        _count: { select: { attendance: true, payslips: true } },
+        id: true, code: true, name: true, mobile: true,
+        designation: true, department: true,
+        doj: true, status: true,
       },
     }),
-    db.branch.findMany({ select: { id: true, name: true } }),
     db.employee.count(),
-    db.employee.count({ where: { status: { in: ["ACTIVE", "ON_LEAVE"] } } }),
+    db.employee.count({ where: { status: "ACTIVE" } }),
   ]);
-  const branchNameById = new Map(branches.map((b) => [b.id, b.name]));
+
+  if (rows.length === 0) {
+    return { rows: [], activeCount, totalCount };
+  }
+
+  const empIds = rows.map((r) => r.id);
+  const [attendanceSample, payslipSample] = await Promise.all([
+    db.attendance.findMany({
+      where: { employeeId: { in: empIds } },
+      select: { employeeId: true },
+      distinct: ["employeeId"],
+    }),
+    db.payslip.findMany({
+      where: { employeeId: { in: empIds } },
+      select: { employeeId: true },
+      distinct: ["employeeId"],
+    }),
+  ]);
+
+  const hasAttendanceIds = new Set(attendanceSample.map((a) => a.employeeId));
+  const hasPayslipIds = new Set(payslipSample.map((p) => p.employeeId));
+
   return {
     rows: rows.map((r) => ({
-      id: r.id, code: r.code, name: r.name, mobile: r.mobile, email: r.email,
-      designation: r.designation, department: r.department,
-      branchId: r.branchId, branchName: branchNameById.get(r.branchId) ?? "?",
-      joinDate: r.joinDate, exitDate: r.exitDate, status: r.status,
-      hasAttendance: r._count.attendance > 0,
-      hasPayslip: r._count.payslips > 0,
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      mobile: r.mobile,
+      email: null,
+      designation: r.designation,
+      department: r.department,
+      branchName: "—",
+      joinDate: r.doj,
+      exitDate: null,
+      status: r.status,
+      hasAttendance: hasAttendanceIds.has(r.id),
+      hasPayslip: hasPayslipIds.has(r.id),
     })),
-    activeCount, totalCount,
+    activeCount,
+    totalCount,
   };
 }

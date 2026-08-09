@@ -2,7 +2,9 @@
 
 import { z } from "zod";
 
-export const EMPLOYEE_STATUSES = ["ACTIVE", "ON_LEAVE", "RESIGNED", "TERMINATED"] as const;
+// UI exposes extended labels; DB stores only ACTIVE|SUSPENDED (UserStatus enum).
+// Actions map ON_LEAVE/RESIGNED/TERMINATED → SUSPENDED at write time.
+export const EMPLOYEE_STATUSES = ["ACTIVE", "SUSPENDED", "ON_LEAVE", "RESIGNED", "TERMINATED"] as const;
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
 
 const mobileRegex = /^(\+91)?\d{10}$/;

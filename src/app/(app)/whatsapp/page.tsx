@@ -100,6 +100,13 @@ export default async function WhatsAppPage() {
                       <div className="text-[10.5px] text-text-dim tabular shrink-0">{m.when}</div>
                     </div>
                     <div className="text-[11.5px] text-text-dim truncate">{m.body}</div>
+                    {m.serviceWindowMins != null ? (
+                      <div className="mt-0.5 text-[10.5px] text-good font-medium tabular-nums">
+                        Free window: {fmtWindow(m.serviceWindowMins)}
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 text-[10.5px] text-text-faint">Window closed</div>
+                    )}
                   </div>
                   {m.unread > 0 && (
                     <span className="tabular text-[11px] font-medium h-[20px] min-w-[20px] px-1.5 rounded-full bg-accent text-white grid place-items-center shrink-0">
@@ -114,6 +121,13 @@ export default async function WhatsAppPage() {
       </div>
     </>
   );
+}
+
+function fmtWindow(mins: number): string {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 function Kpi({ label, value }: { label: string; value: number }) {

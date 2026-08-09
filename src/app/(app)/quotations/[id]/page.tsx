@@ -17,7 +17,8 @@ export default async function QuotationDetailPage({
   const q = await getQuotation(ctx, id);
   if (!q) notFound();
 
-  const isIntraState = q.supplierStateCode === q.clientStateCode;
+  // igst > 0 means inter-state; otherwise intra-state (CGST+SGST)
+  const isIntraState = q.igst === 0n;
 
   return (
     <>
@@ -66,10 +67,15 @@ export default async function QuotationDetailPage({
                   <tr key={l.id} className="border-b border-rule/70 last:border-0">
                     <Td align="right"><span className="tabular text-text-dim">{l.lineNo}</span></Td>
                     <Td>
-                      <div className="tabular text-text-dim text-[11.5px]">{l.productCode}</div>
+                      {l.colourwayId && (
+                        <div className="tabular text-text-muted text-[11px] mb-0.5">{l.colourwayId.slice(-8)}</div>
+                      )}
                       <div className="text-text">{l.description}</div>
+                      {l.roomLabel && (
+                        <div className="text-[11px] text-text-muted">{l.roomLabel}</div>
+                      )}
                     </Td>
-                    <Td align="right"><span className="tabular">{trimTrailingZeros(l.quantity)} <span className="text-text-faint">{l.uom}</span></span></Td>
+                    <Td align="right"><span className="tabular">{trimTrailingZeros(l.quantity)} <span className="text-text-subtle text-[11px]">{l.unit}</span></span></Td>
                     <Td align="right"><span className="tabular text-text-dim">{formatINR(l.rate)}</span></Td>
                     <Td align="right"><span className="tabular text-text-dim">{trimTrailingZeros(l.discountPct)}</span></Td>
                     <Td align="right"><span className="tabular text-text">{formatINR(l.taxable)}</span></Td>
@@ -115,7 +121,6 @@ export default async function QuotationDetailPage({
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Client + supply</div>
             <dl className="space-y-3 text-[12.5px]">
               <Row k="Client" v={q.clientName} />
-              <Row k="Client state" v={q.clientStateCode} mono />
               <Row k="Client GSTIN" v={q.clientGstin ?? "—"} mono />
               <Row k="From branch" v={q.branchName} />
               <Row k="Supplier state" v={q.supplierStateCode} mono />

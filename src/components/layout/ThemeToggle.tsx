@@ -18,6 +18,7 @@ export function ThemeToggle() {
   function toggle() {
     const next: Mode = mode === "light" ? "dark" : "light";
     document.documentElement.classList.toggle("light", next === "light");
+    document.cookie = `theme=${next};path=/;max-age=31536000;SameSite=Lax`;
     try { localStorage.setItem("theme", next); } catch { /* storage disabled — ignore */ }
     setMode(next);
   }
