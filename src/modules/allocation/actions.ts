@@ -15,6 +15,14 @@ import { devContext } from "@/lib/dev-context";
 import { allocateLotSchema, releaseAllocationSchema } from "./schema";
 import { allocateInTx, AllocationError } from "./core";
 
+// revalidatePath throws "static generation store missing" outside a Next
+// request context (smoke scripts, integration tests). Wrap it so the
+// action is callable from both surfaces without a parallel API. Mirrors
+// the safeRevalidate in modules/quotations/actions.ts.
+function safeRevalidate(path: string): void {
+  try { revalidatePath(path); } catch { /* not in a Next request */ }
+}
+
 export interface ActionResult<T = unknown> {
   ok: boolean;
   data?: T;
@@ -66,7 +74,7 @@ export async function allocateLots(
       return alloc;
     });
 
-    revalidatePath("/purchase/allocation");
+    safeRevalidate("/purchase/allocation");
     return {
       ok: true,
       data: { id: result.id, mixedLotOverride: result.wouldBeMixed },
@@ -122,7 +130,7 @@ export async function releaseAllocation(
     });
   });
 
-  revalidatePath("/purchase/allocation");
+  safeRevalidate("/purchase/allocation");
   return { ok: true, data: { id } };
 }
 
