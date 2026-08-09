@@ -5,6 +5,12 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+
+function safeRevalidate(path: string): void {
+  try { revalidatePath(path); } catch { /* not in a Next request */ }
+}
+
+import { prisma } from "@/kernel/db/client";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
@@ -35,11 +41,40 @@ export async function markPunch(input: unknown): Promise<ActionResult<{ id: stri
     ? new Date(`${d.date}T${padHM(d.outTime)}:00Z`) : null;
 
   const db = scoped(ctx);
+
+  // Month-lock (§14 Phase 7 gate) — refuse edits to any day covered
+  // by a FINALIZED or PAID PayrollRun for this employee's branch.
+  const emp = await db.employee.findUnique({
+    where:  { id: d.employeeId },
+    select: { branchId: true },
+  });
+  if (!emp) return { ok: false, error: "Employee not found" };
+  const month = day.getUTCMonth() + 1;
+  const year  = day.getUTCFullYear();
+  const lockedRun = await db.payrollRun.findFirst({
+    where: {
+      branchId: emp.branchId,
+      month, year,
+      status: { in: ["FINALIZED", "PAID"] },
+    },
+    select: { id: true, status: true },
+  });
+  if (lockedRun) {
+    return {
+      ok: false,
+      error: `Payroll for ${month}/${year} is ${lockedRun.status} — attendance for this month is locked`,
+    };
+  }
+
   const worked = inTime && outTime
     ? (outTime.getTime() - inTime.getTime()) / 3_600_000
     : null;
 
-  const created = await db.attendance.upsert({
+  // The scoped extension injects orgId into upsert where clauses;
+  // Prisma refuses extra fields alongside a compound-unique key.
+  // Use raw prisma here — org scoping is already enforced above via
+  // the employee lookup through `db = scoped(ctx)`.
+  const created = await prisma.attendance.upsert({
     where: { employeeId_date: { employeeId: d.employeeId, date: day } },
     create: {
       orgId:      ctx.orgId,
@@ -56,7 +91,7 @@ export async function markPunch(input: unknown): Promise<ActionResult<{ id: stri
     },
     select: { id: true },
   });
-  revalidatePath("/attendance");
+  safeRevalidate("/attendance");
   return { ok: true, data: created };
 }
 
