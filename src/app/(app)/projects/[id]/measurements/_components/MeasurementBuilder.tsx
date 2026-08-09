@@ -1,17 +1,19 @@
 "use client";
 
-// Site measurement builder — TRACK-B-CRAFT.md §3 W8-11.
+// Site measurement builder — Phase 2 gate.
 //
-// Persistence: localStorage keyed by projectId. Once Dev A ships the
-// Room + MeasurementItem models this hydrates from Prisma instead;
-// the shape below deliberately mirrors what those tables should hold.
-// A localStorage-only build lets the site team start capturing on the
-// phone TODAY without waiting for the schema pair-session.
+// Persistence: server-side via createMeasurement / updateMeasurement /
+// deleteMeasurement actions in modules/measurement.  The engine runs
+// client-side for live feedback while typing AND server-side on save,
+// with the persisted CalcResult being the source of truth for
+// downstream artefacts (cut list, quote snapshot). Both paths call
+// exactly the same /lib/calc functions — see modules/measurement/engine.ts.
 //
-// The three engine calculators from /lib/calc run client-side against
-// the current draft so the numbers move as you type (§6.4 test 5).
+// Photos are captured locally today for the estimator's own reference;
+// server persistence of the image key waits for Supabase Storage.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Trash2, Pencil, X, ImagePlus, AlertTriangle, Pen } from "lucide-react";
 import { SketchOverlay } from "./SketchOverlay";
 import {
@@ -26,20 +28,12 @@ import {
   calcCurtain, CURTAIN_ENGINE_VERSION,
   type PatternMatch as CurtainPatternMatch,
 } from "@/lib/calc/curtain";
+import {
+  createMeasurement, updateMeasurement, deleteMeasurement,
+} from "@/modules/measurement/actions";
+import type { MeasurementItemRow } from "@/modules/measurement/queries";
 
 type Family = "WALLPAPER" | "FLOORING" | "CURTAIN";
-
-// ── Storage shape (mirrors the future MeasurementItem row) ─────────
-interface StoredBase {
-  id:              string;
-  projectId:       string;
-  room:            string;
-  label:           string;
-  family:          Family;
-  photoDataUrl?:   string;
-  createdAt:       number;
-  updatedAt:       number;
-}
 
 interface WallpaperInputs {
   wallWidthMm:     number;
@@ -70,30 +64,12 @@ interface CurtainInputs {
   lining:                   boolean;
 }
 
-type StoredMeasurement =
-  | (StoredBase & { family: "WALLPAPER"; inputs: WallpaperInputs })
-  | (StoredBase & { family: "FLOORING";  inputs: FlooringInputs  })
-  | (StoredBase & { family: "CURTAIN";   inputs: CurtainInputs   });
-
-// ── Storage helpers ────────────────────────────────────────────────
-const STORAGE_PREFIX = "mandovara:measurements:";
-function storageKey(projectId: string): string { return STORAGE_PREFIX + projectId; }
-
-function loadAll(projectId: string): StoredMeasurement[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(storageKey(projectId));
-    return raw ? JSON.parse(raw) as StoredMeasurement[] : [];
-  } catch { return []; }
-}
-function saveAll(projectId: string, items: StoredMeasurement[]): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(storageKey(projectId), JSON.stringify(items));
-}
-function newId(): string {
-  // Ephemeral client-side id; server will replace with cuid on migration.
-  return `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
+// The `inputs` JSON on a persisted MeasurementItem carries one of the
+// three shapes above.  We narrow at the read boundary; a bad shape from
+// the DB is a data-migration bug, not a runtime one.
+function wallpaperInputsFrom(v: unknown): WallpaperInputs { return v as WallpaperInputs; }
+function flooringInputsFrom(v: unknown): FlooringInputs   { return v as FlooringInputs;  }
+function curtainInputsFrom(v: unknown): CurtainInputs     { return v as CurtainInputs;   }
 
 // ── Family defaults ────────────────────────────────────────────────
 const DEFAULT_WALLPAPER: WallpaperInputs = {
@@ -112,8 +88,13 @@ const DEFAULT_CURTAIN: CurtainInputs = {
 };
 
 // ── Root component ─────────────────────────────────────────────────
-export function MeasurementBuilder({ projectId }: { projectId: string }) {
-  const [items, setItems] = useState<StoredMeasurement[]>([]);
+export function MeasurementBuilder({
+  projectId,
+  initial,
+}: { projectId: string; initial: MeasurementItemRow[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [items] = useState<MeasurementItemRow[]>(initial);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [room, setRoom] = useState("");
   const [label, setLabel] = useState("");
@@ -121,14 +102,17 @@ export function MeasurementBuilder({ projectId }: { projectId: string }) {
   const [wp, setWp] = useState<WallpaperInputs>(DEFAULT_WALLPAPER);
   const [fl, setFl] = useState<FlooringInputs>(DEFAULT_FLOORING);
   const [ct, setCt] = useState<CurtainInputs>(DEFAULT_CURTAIN);
+  // Photo is captured for the estimator's own reference while typing;
+  // server storage waits for Supabase Storage.
   const [photoDataUrl, setPhotoDataUrl] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
 
-  // Hydrate from localStorage once mounted.
+  // Server data changes on router.refresh() → replace client cache.
   useEffect(() => {
-    setItems(loadAll(projectId));
-  }, [projectId]);
-
-  const editing = editingId ? items.find((i) => i.id === editingId) : null;
+    // Items comes from prop; useState only for local optimism if needed.
+    // When the server re-fetches on refresh, the parent re-mounts the
+    // client tree so `initial` is fresh. Nothing to do here.
+  }, [initial]);
 
   function resetForm() {
     setEditingId(null);
@@ -137,54 +121,69 @@ export function MeasurementBuilder({ projectId }: { projectId: string }) {
     setFl(DEFAULT_FLOORING);
     setCt(DEFAULT_CURTAIN);
     setPhotoDataUrl(undefined);
+    setError(null);
   }
 
-  function beginEdit(m: StoredMeasurement) {
+  function beginEdit(m: MeasurementItemRow) {
     setEditingId(m.id);
-    setRoom(m.room);
+    setRoom(m.roomLabel);
     setLabel(m.label);
     setFamily(m.family);
-    setPhotoDataUrl(m.photoDataUrl);
-    if (m.family === "WALLPAPER") setWp(m.inputs);
-    if (m.family === "FLOORING")  setFl(m.inputs);
-    if (m.family === "CURTAIN")   setCt(m.inputs);
-  }
-
-  function persist(next: StoredMeasurement[]) {
-    setItems(next);
-    saveAll(projectId, next);
+    setPhotoDataUrl(undefined);
+    if (m.family === "WALLPAPER") setWp(wallpaperInputsFrom(m.inputs));
+    if (m.family === "FLOORING")  setFl(flooringInputsFrom(m.inputs));
+    if (m.family === "CURTAIN")   setCt(curtainInputsFrom(m.inputs));
+    setError(null);
   }
 
   function save() {
     const trimmedRoom  = room.trim()  || "Untitled room";
     const trimmedLabel = label.trim() || `${familyLabel(family)} item`;
+    const inputs =
+      family === "WALLPAPER" ? {
+        ...wp,
+        patternRepeatMm: wp.patternMatch === "FREE" ? 0 : wp.patternRepeatMm,
+      }
+      : family === "FLOORING" ? {
+        ...fl,
+        areaPerBoxSqft: fl.productKind === "BOX" ? fl.areaPerBoxSqft : 0,
+        rollWidthMm:    fl.productKind === "ROLL" ? fl.rollWidthMm  : 0,
+      }
+      : {
+        ...ct,
+        patternRepeatMm:         ct.patternMatch === "FREE" ? 0 : ct.patternRepeatMm,
+        railroadedFabricWidthMm: ct.railroadable ? ct.railroadedFabricWidthMm : 0,
+      };
     const base = {
-      id:        editingId ?? newId(),
       projectId,
-      room:      trimmedRoom,
+      roomLabel: trimmedRoom,
       label:     trimmedLabel,
       family,
-      photoDataUrl,
-      createdAt: editing?.createdAt ?? Date.now(),
-      updatedAt: Date.now(),
-    };
-    const item: StoredMeasurement =
-      family === "WALLPAPER" ? { ...base, family: "WALLPAPER", inputs: wp }
-      : family === "FLOORING" ? { ...base, family: "FLOORING",  inputs: fl }
-      : { ...base, family: "CURTAIN", inputs: ct };
+      inputs,
+    } as const;
 
-    persist(
-      editingId
-        ? items.map((x) => (x.id === editingId ? item : x))
-        : [...items, item],
-    );
-    resetForm();
+    setError(null);
+    startTransition(async () => {
+      const res = editingId
+        ? await updateMeasurement({ id: editingId, ...base })
+        : await createMeasurement(base);
+      if (!res.ok) {
+        setError(res.error ?? "Could not save measurement");
+        return;
+      }
+      resetForm();
+      router.refresh();
+    });
   }
 
   function remove(id: string) {
     if (!confirm("Delete this measurement? This cannot be undone.")) return;
-    persist(items.filter((i) => i.id !== id));
-    if (editingId === id) resetForm();
+    startTransition(async () => {
+      const res = await deleteMeasurement({ id });
+      if (!res.ok) { setError(res.error ?? "Could not delete"); return; }
+      if (editingId === id) resetForm();
+      router.refresh();
+    });
   }
 
   return (
@@ -242,13 +241,20 @@ export function MeasurementBuilder({ projectId }: { projectId: string }) {
           {/* Photo capture */}
           <PhotoPicker value={photoDataUrl} onChange={setPhotoDataUrl} />
 
+          {error && (
+            <div className="text-[12px] text-bad bg-bad/8 border border-bad/30 rounded-[8px] px-3 py-2">
+              {error}
+            </div>
+          )}
+
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={save}
-              className="h-[36px] px-5 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:bg-accent-hover transition-colors"
+              disabled={pending}
+              className="h-[36px] px-5 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:bg-accent-hover disabled:opacity-60 transition-colors"
             >
-              {editingId ? "Save changes" : "Add measurement"}
+              {pending ? (editingId ? "Saving…" : "Adding…") : (editingId ? "Save changes" : "Add measurement")}
             </button>
           </div>
         </div>
@@ -260,8 +266,6 @@ export function MeasurementBuilder({ projectId }: { projectId: string }) {
           </div>
           <LiveResult family={family} wp={wp} fl={fl} ct={ct} />
         </div>
-
-        <StorageHint />
       </div>
 
       {/* ── RIGHT: captured items by room ─────────────────────────── */}
@@ -485,17 +489,17 @@ function LiveResult({
 function ItemsList({
   items, onEdit, onDelete, editingId,
 }: {
-  items: StoredMeasurement[];
-  onEdit: (m: StoredMeasurement) => void;
+  items: MeasurementItemRow[];
+  onEdit: (m: MeasurementItemRow) => void;
   onDelete: (id: string) => void;
   editingId: string | null;
 }) {
   const byRoom = useMemo(() => {
-    const map = new Map<string, StoredMeasurement[]>();
+    const map = new Map<string, MeasurementItemRow[]>();
     for (const m of items) {
-      const list = map.get(m.room) ?? [];
+      const list = map.get(m.roomLabel) ?? [];
       list.push(m);
-      map.set(m.room, list);
+      map.set(m.roomLabel, list);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [items]);
@@ -522,13 +526,9 @@ function ItemsList({
           <ul className="divide-y divide-rule/60">
             {rows.map((m) => (
               <li key={m.id} className={`px-4 py-3 flex items-start gap-3 ${editingId === m.id ? "bg-accent/6" : ""}`}>
-                {m.photoDataUrl ? (
-                  <img src={m.photoDataUrl} alt="" className="h-[42px] w-[42px] rounded-[6px] object-cover border border-rule shrink-0" />
-                ) : (
-                  <div className="h-[42px] w-[42px] rounded-[6px] border border-dashed border-rule flex items-center justify-center text-text-faint shrink-0">
-                    <ImagePlus size={14} />
-                  </div>
-                )}
+                <div className="h-[42px] w-[42px] rounded-[6px] border border-dashed border-rule flex items-center justify-center text-text-faint shrink-0">
+                  <ImagePlus size={14} />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[12.5px] text-text truncate">{m.label}</div>
                   <div className="text-[10.5px] text-text-dim tabular flex items-center gap-2 mt-0.5">
@@ -554,10 +554,17 @@ function ItemsList({
   );
 }
 
-function summariseInputs(m: StoredMeasurement): string {
-  if (m.family === "WALLPAPER") return `${m.inputs.wallWidthMm}×${m.inputs.wallHeightMm} · ${m.inputs.patternMatch}`;
-  if (m.family === "FLOORING")  return `${m.inputs.roomLengthMm}×${m.inputs.roomWidthMm} · ${m.inputs.layPattern} · ${m.inputs.productKind}`;
-  return `${m.inputs.windowWidthMm}×${m.inputs.windowHeightMm} · ${m.inputs.fullness}× fullness`;
+function summariseInputs(m: MeasurementItemRow): string {
+  if (m.family === "WALLPAPER") {
+    const i = wallpaperInputsFrom(m.inputs);
+    return `${i.wallWidthMm}×${i.wallHeightMm} · ${i.patternMatch}`;
+  }
+  if (m.family === "FLOORING") {
+    const i = flooringInputsFrom(m.inputs);
+    return `${i.roomLengthMm}×${i.roomWidthMm} · ${i.layPattern} · ${i.productKind}`;
+  }
+  const i = curtainInputsFrom(m.inputs);
+  return `${i.windowWidthMm}×${i.windowHeightMm} · ${i.fullness}× fullness`;
 }
 
 // ── Photo picker (compresses client-side to ~1024px longest edge) ──
@@ -646,18 +653,6 @@ function PhotoPicker({
           onCancel={() => setSketching(false)}
         />
       )}
-    </div>
-  );
-}
-
-// ── Storage hint (make the tradeoff visible) ───────────────────────
-
-function StorageHint() {
-  return (
-    <div className="rounded-[10px] bg-accent/8 border border-accent/25 px-3 py-2 text-[11px] text-text">
-      Measurements save to this browser only for now. When the Prisma
-      Room + MeasurementItem models land they&apos;ll persist to the
-      server and sync across devices.
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { getProject } from "@/modules/projects/queries";
+import { listMeasurementsForProject } from "@/modules/measurement/queries";
 import { shortNumber } from "@/lib/short-number";
 import { MeasurementBuilder } from "./_components/MeasurementBuilder";
 
@@ -17,6 +18,7 @@ export default async function MeasurementsPage({
   const ctx = await devContext();
   const p = await getProject(ctx, id);
   if (!p) notFound();
+  const initial = await listMeasurementsForProject(ctx, p.id);
 
   return (
     <>
@@ -35,7 +37,7 @@ export default async function MeasurementsPage({
         </Link>
       </div>
 
-      <MeasurementBuilder projectId={p.id} />
+      <MeasurementBuilder projectId={p.id} initial={initial} />
     </>
   );
 }
