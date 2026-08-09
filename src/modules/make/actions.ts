@@ -23,8 +23,15 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { allocateNumber, Prisma } from "@/kernel/numbering/series";
 import { financialYear } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
-import { createMakeJobFromOrderSchema } from "./schema";
+import {
+  createMakeJobFromOrderSchema,
+  advanceMakeJobStatusSchema,
+  issueMaterialSchema,
+  recordUsageSchema,
+  qcLineSchema,
+} from "./schema";
 import { buildCutList, type OrderLineForCutList } from "./cut-list";
+import { canTransition } from "./status";
 
 // safeRevalidate — mirrors modules/quotations/actions.ts and
 // modules/allocation/actions.ts. Lets the action run under both a
@@ -142,6 +149,230 @@ export async function createMakeJobFromOrder(
     ok:   true,
     data: { id: created.id, number: created.number, lineCount: cutList.length },
   };
+}
+
+// ── helpers ──────────────────────────────────────────────────────
+
+// ── 5b — status transitions ──────────────────────────────────────
+
+export async function advanceMakeJobStatus(
+  input: unknown,
+): Promise<ActionResult<{ id: string; from: string; to: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "make.advanceStatus");
+
+  const parsed = advanceMakeJobStatusSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { jobId, toStatus, qcNote } = parsed.data;
+
+  const db = scoped(ctx);
+  const current = await db.makeJob.findUnique({
+    where:  { id: jobId },
+    select: { id: true, status: true, startedAt: true },
+  });
+  if (!current) return { ok: false, error: "Make job not found" };
+  if (!canTransition(current.status, toStatus)) {
+    return {
+      ok: false,
+      error: `Illegal transition ${current.status} → ${toStatus}`,
+      fieldErrors: { toStatus: `Not allowed from ${current.status}` },
+    };
+  }
+
+  // startedAt: first time we leave QUEUED. completedAt: on DELIVERED.
+  // Both are one-way — a QC-fail loop back to CUTTING does NOT reset
+  // startedAt so the "aged days" widget stays honest.
+  const now = new Date();
+  const patch: Record<string, unknown> = { status: toStatus };
+  if (current.startedAt == null && toStatus !== "QUEUED") {
+    patch["startedAt"] = now;
+  }
+  if (toStatus === "DELIVERED") {
+    patch["completedAt"] = now;
+  }
+
+  await withTransaction(async (tx: TxClient) => {
+    await tx.makeJob.update({ where: { id: jobId }, data: patch });
+    await tx.auditLog.create({
+      data: {
+        orgId:      ctx.orgId,
+        actorId:    ctx.userId,
+        entityType: "MakeJob",
+        entityId:   jobId,
+        action:     `STATUS_${toStatus}`,
+        before:     { status: current.status },
+        after:      {
+          status: toStatus,
+          ...(qcNote != null && qcNote.length > 0 && { qcNote }),
+        },
+      },
+    });
+  });
+
+  safeRevalidate("/make");
+  safeRevalidate(`/make/${jobId}`);
+  return { ok: true, data: { id: jobId, from: current.status, to: toStatus } };
+}
+
+// ── 5b — per-line material issuance ──────────────────────────────
+
+export async function issueMakeJobLineMaterial(
+  input: unknown,
+): Promise<ActionResult<{ lineId: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "make.issueMaterial");
+
+  const parsed = issueMaterialSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { lineId, fabricIssuedM, liningIssuedM } = parsed.data;
+
+  const db = scoped(ctx);
+  const line = await db.makeJobLine.findUnique({
+    where:  { id: lineId },
+    select: {
+      id: true, makeJobId: true,
+      fabricIssuedM: true, liningIssuedM: true,
+      // Confirm the line lives under the caller's tenant — MakeJobLine
+      // has no orgId of its own, so scope through the parent MakeJob.
+      makeJob: { select: { orgId: true } },
+    },
+  });
+  if (!line || line.makeJob.orgId !== ctx.orgId) return { ok: false, error: "Line not found" };
+
+  await withTransaction(async (tx: TxClient) => {
+    await tx.makeJobLine.update({
+      where: { id: lineId },
+      data: {
+        ...(fabricIssuedM != null && { fabricIssuedM: new Prisma.Decimal(fabricIssuedM) }),
+        ...(liningIssuedM != null && { liningIssuedM: new Prisma.Decimal(liningIssuedM) }),
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        orgId:      ctx.orgId,
+        actorId:    ctx.userId,
+        entityType: "MakeJobLine",
+        entityId:   lineId,
+        action:     "ISSUE_MATERIAL",
+        before: {
+          fabricIssuedM: line.fabricIssuedM?.toString() ?? null,
+          liningIssuedM: line.liningIssuedM?.toString() ?? null,
+        },
+        after: {
+          ...(fabricIssuedM != null && { fabricIssuedM: fabricIssuedM.toString() }),
+          ...(liningIssuedM != null && { liningIssuedM: liningIssuedM.toString() }),
+        },
+      },
+    });
+  });
+
+  safeRevalidate(`/make/${line.makeJobId}`);
+  return { ok: true, data: { lineId } };
+}
+
+// ── 5b — per-line usage capture (post-cut, tailor's actual) ──────
+
+export async function recordMakeJobLineUsage(
+  input: unknown,
+): Promise<ActionResult<{ lineId: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "make.recordUsage");
+
+  const parsed = recordUsageSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { lineId, actualUsedM, wastageM } = parsed.data;
+
+  const db = scoped(ctx);
+  const line = await db.makeJobLine.findUnique({
+    where:  { id: lineId },
+    select: {
+      id: true, makeJobId: true, fabricIssuedM: true,
+      actualUsedM: true, wastageM: true,
+      makeJob: { select: { orgId: true } },
+    },
+  });
+  if (!line || line.makeJob.orgId !== ctx.orgId) return { ok: false, error: "Line not found" };
+  // Wastage defaults to (issued − used) when the tailor doesn't type it
+  // in explicitly — matches how the shop floor already thinks about it.
+  const derivedWastage = wastageM != null
+    ? wastageM
+    : line.fabricIssuedM != null
+      ? Math.max(0, Number(line.fabricIssuedM) - actualUsedM)
+      : null;
+
+  await withTransaction(async (tx: TxClient) => {
+    await tx.makeJobLine.update({
+      where: { id: lineId },
+      data: {
+        actualUsedM: new Prisma.Decimal(actualUsedM),
+        ...(derivedWastage != null && { wastageM: new Prisma.Decimal(derivedWastage) }),
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        orgId:      ctx.orgId,
+        actorId:    ctx.userId,
+        entityType: "MakeJobLine",
+        entityId:   lineId,
+        action:     "RECORD_USAGE",
+        before: {
+          actualUsedM: line.actualUsedM?.toString() ?? null,
+          wastageM:    line.wastageM?.toString()    ?? null,
+        },
+        after: {
+          actualUsedM: actualUsedM.toString(),
+          ...(derivedWastage != null && { wastageM: derivedWastage.toString() }),
+        },
+      },
+    });
+  });
+
+  safeRevalidate(`/make/${line.makeJobId}`);
+  return { ok: true, data: { lineId } };
+}
+
+// ── 5b — per-line QC ────────────────────────────────────────────
+
+export async function qcMakeJobLine(
+  input: unknown,
+): Promise<ActionResult<{ lineId: string; passed: boolean }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "make.qcPass");
+
+  const parsed = qcLineSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { lineId, passed, notes } = parsed.data;
+
+  const db = scoped(ctx);
+  const line = await db.makeJobLine.findUnique({
+    where:  { id: lineId },
+    select: { id: true, makeJobId: true, qcPassed: true },
+  });
+  if (!line) return { ok: false, error: "Line not found" };
+
+  await withTransaction(async (tx: TxClient) => {
+    await tx.makeJobLine.update({
+      where: { id: lineId },
+      data: {
+        qcPassed: passed,
+        ...(notes != null && { qcNotes: notes }),
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        orgId:      ctx.orgId,
+        actorId:    ctx.userId,
+        entityType: "MakeJobLine",
+        entityId:   lineId,
+        action:     passed ? "QC_PASS" : "QC_FAIL",
+        before:     { qcPassed: line.qcPassed },
+        after:      { qcPassed: passed, ...(notes != null && { qcNotes: notes }) },
+      },
+    });
+  });
+
+  safeRevalidate(`/make/${line.makeJobId}`);
+  return { ok: true, data: { lineId, passed } };
 }
 
 // ── helpers ──────────────────────────────────────────────────────

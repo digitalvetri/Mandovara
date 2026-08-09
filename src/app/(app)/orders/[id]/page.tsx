@@ -6,9 +6,11 @@ import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { getOrder } from "@/modules/orders/queries";
+import { getMakeJobForOrder } from "@/modules/make/queries";
 import { StatusPill } from "../_components/StatusPill";
 import { DispatchForm } from "../_components/DispatchForm";
 import { CreateInvoiceButton } from "../_components/CreateInvoiceButton";
+import { MakeJobButton } from "../_components/MakeJobButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,7 @@ export default async function OrderDetailPage({
   const ctx = await devContext();
   const o = await getOrder(ctx, id);
   if (!o) notFound();
+  const makeJob = await getMakeJobForOrder(ctx, id);
 
   return (
     <>
@@ -40,9 +43,14 @@ export default async function OrderDetailPage({
                 </Link>
               )}
             </div>
-            {(o.status === "CONFIRMED" || o.status === "PARTIAL_DISPATCH" || o.status === "DISPATCHED") && (
-              <CreateInvoiceButton orderId={o.id} />
-            )}
+            <div className="flex items-center gap-2">
+              {o.status !== "CANCELLED" && (
+                <MakeJobButton orderId={o.id} existing={makeJob} />
+              )}
+              {(o.status === "CONFIRMED" || o.status === "PARTIAL_DISPATCH" || o.status === "DISPATCHED") && (
+                <CreateInvoiceButton orderId={o.id} />
+              )}
+            </div>
           </div>
 
           <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">

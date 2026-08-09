@@ -16,6 +16,7 @@ import {
   Send,
   Briefcase,
   Wrench,
+  Scissors,
   Receipt,
   Wallet,
   CalendarCheck,
@@ -63,6 +64,7 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
     section: "Delivery",
     items: [
       { label: "Sales Orders & Dispatch", href: "/orders",        icon: Send },
+      { label: "Make (Cut & Stitch)",     href: "/make",          icon: Scissors },
       { label: "Project Pipeline",        href: "/projects",      icon: Briefcase },
       { label: "Installations",           href: "/installations", icon: Wrench },
     ],

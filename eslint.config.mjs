@@ -30,6 +30,7 @@ export default tseslint.config(
       "coverage/**",
       "playwright-report/**",
       "test-results/**",
+      "tmp/**",
       "next-env.d.ts",
       "prisma/migrations/**",
       "install*.log",

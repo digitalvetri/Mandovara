@@ -49,3 +49,4 @@ test-results/
 
 # verification screenshots (root only)
 /*.png
+tmp/
