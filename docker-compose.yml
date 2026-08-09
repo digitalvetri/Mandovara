@@ -18,5 +18,23 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: mandovara-redis
+    restart: unless-stopped
+    # 56379 mirrors the postgres offset pattern (55432) to avoid a clash with
+    # any host-installed Redis on 6379. BullMQ URLs must point here.
+    ports:
+      - "56379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - mandovara_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   mandovara_pg_data:
+  mandovara_redis_data:
