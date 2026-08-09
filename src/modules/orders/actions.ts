@@ -83,6 +83,21 @@ export async function createOrderFromQuotation(
     select: { invoicePrefix: true },
   });
 
+  // §5.2 / Phase 6b — architect commission. If the client was
+  // referred by an active architect with a non-zero rate, stamp a
+  // commission row inside the same tx as the order. Rate captured
+  // at stamp time so future rate edits don't retroactively re-price.
+  const client = await db.client.findUniqueOrThrow({
+    where: { id: q.clientId },
+    select: { architectId: true },
+  });
+  const architect = client.architectId != null
+    ? await db.architect.findUnique({
+        where: { id: client.architectId },
+        select: { id: true, commissionPct: true, isActive: true },
+      })
+    : null;
+
   const now = new Date();
   const created = await withTransaction(async (tx: TxClient) => {
     const number = await allocateNumber(tx, {
@@ -134,12 +149,53 @@ export async function createOrderFromQuotation(
       where: { id: q.id },
       data: { status: "CONVERTED" },
     });
+
+    // Stamp commission if the client was referred + architect active
+    // + rate > 0. Skip silently otherwise — three legitimate reasons
+    // to have no commission and none of them are errors.
+    if (architect && architect.isActive) {
+      const pctDec = new Prisma.Decimal(architect.commissionPct);
+      if (pctDec.gt(0)) {
+        // amount = baseAmount × pct / 100, rounded to the nearest paisa.
+        // BigInt-safe math via Prisma.Decimal.
+        const base = new Prisma.Decimal(q.taxableAmount.toString());
+        const amount = BigInt(base.mul(pctDec).div(100).round().toString());
+        const commission = await tx.architectCommission.create({
+          data: {
+            orgId:        ctx.orgId,
+            architectId:  architect.id,
+            salesOrderId: order.id,
+            baseAmount:   q.taxableAmount,
+            pct:          pctDec,
+            amount,
+            createdById:  ctx.userId,
+          },
+          select: { id: true },
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: ctx.orgId, actorId: ctx.userId,
+            entityType: "ArchitectCommission", entityId: commission.id,
+            action: "STAMP_ON_ORDER",
+            after: {
+              salesOrderId: order.id, orderNumber: order.number,
+              architectId:  architect.id,
+              baseAmount:   q.taxableAmount.toString(),
+              pct:          pctDec.toString(),
+              amount:       amount.toString(),
+            },
+          },
+        });
+      }
+    }
+
     return order;
   });
 
   safeRevalidate("/orders");
   safeRevalidate("/quotations");
   safeRevalidate(`/quotations/${q.id}`);
+  if (architect) safeRevalidate(`/architects/${architect.id}`);
   return { ok: true, data: created };
 }
 

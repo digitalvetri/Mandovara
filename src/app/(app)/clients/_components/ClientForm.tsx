@@ -14,6 +14,9 @@ import { EntityForm } from "@/components/data/EntityForm";
 interface ClientFormProps {
   mode: "create" | "edit";
   initial?: Partial<CreateClientInput> & { id?: string };
+  // Phase 6b — architect picker options. Empty array collapses the
+  // field into an "add an architect first" hint.
+  architects?: { id: string; code: string; firmName: string; commissionPct: string }[];
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -21,7 +24,7 @@ const TYPE_LABEL: Record<string, string> = {
   PROJECT: "Project", GOVERNMENT: "Government",
 };
 
-export function ClientForm({ mode, initial }: ClientFormProps) {
+export function ClientForm({ mode, initial, architects = [] }: ClientFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -40,6 +43,7 @@ export function ClientForm({ mode, initial }: ClientFormProps) {
       stateCode:     initial?.stateCode     ?? "33",
       paymentTerms:  initial?.paymentTerms  ?? 30,
       creditLimit:   initial?.creditLimit   ?? "",
+      architectId:   initial?.architectId   ?? "",
     },
   });
 
@@ -106,6 +110,22 @@ export function ClientForm({ mode, initial }: ClientFormProps) {
       </EntityForm.Field>
       <EntityForm.Field label="Credit limit" error={errors.creditLimit?.message} hint="e.g. 500000, 5L, 5 lakh — optional">
         <input {...register("creditLimit")} className={`${EntityForm.fieldCls} tabular`} inputMode="decimal" />
+      </EntityForm.Field>
+      <EntityForm.Field
+        label="Referring architect"
+        error={errors.architectId?.message}
+        hint={architects.length === 0
+          ? "Add architects first at /architects to enable this."
+          : "Optional. When set, orders auto-stamp a commission at the architect's current rate."}
+      >
+        <select {...register("architectId")} className={EntityForm.fieldCls} disabled={architects.length === 0}>
+          <option value="">— none —</option>
+          {architects.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.firmName} ({a.code}) · {a.commissionPct}%
+            </option>
+          ))}
+        </select>
       </EntityForm.Field>
     </EntityForm>
   );

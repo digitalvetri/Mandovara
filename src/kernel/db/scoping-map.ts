@@ -20,6 +20,7 @@ export const TENANT_SCOPED = new Set<string>([
   "StockLedgerEntry", "StockBalance", "StockTransfer", "StockAdjustment", "StockTake",
   // customer
   "Lead", "Client", "PriceSlab", "Complaint",
+  "Architect", "ArchitectCommission",
   // procurement
   "Vendor", "PurchaseRequisition", "PurchaseOrder", "GRN", "VendorPayment",
   // sales

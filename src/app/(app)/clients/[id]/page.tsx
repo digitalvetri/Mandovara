@@ -4,6 +4,7 @@ import { formatINR } from "@/kernel/money/format";
 import { AgeingBars } from "@/components/data/AgeingBars";
 import { devContext } from "@/lib/dev-context";
 import { getClient } from "@/modules/clients/queries";
+import { listArchitectsForPicker } from "@/modules/architects/queries";
 import { ClientForm } from "../_components/ClientForm";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
@@ -16,7 +17,10 @@ export default async function ClientDetailPage({
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await devContext();
-  const client = await getClient(ctx, id);
+  const [client, architects] = await Promise.all([
+    getClient(ctx, id),
+    listArchitectsForPicker(ctx),
+  ]);
   if (!client) notFound();
 
   return (
@@ -38,6 +42,7 @@ export default async function ClientDetailPage({
 
           <ClientForm
             mode="edit"
+            architects={architects}
             initial={{
               id: client.id,
               name: client.name,
@@ -51,6 +56,7 @@ export default async function ClientDetailPage({
               creditLimit: client.creditLimit
                 ? String(Number(client.creditLimit) / 100)
                 : "",
+              architectId: client.architectId ?? "",
             }}
           />
 

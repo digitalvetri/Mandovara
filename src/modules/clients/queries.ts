@@ -40,6 +40,7 @@ export interface ListClientsResult {
 
 export interface ClientDetail extends ClientRow {
   pan: string | null;
+  architectId: string | null;
   updatedAt: Date;
   addresses: {
     id: string; label: string; line1: string; line2: string | null;
@@ -119,6 +120,7 @@ export async function getClient(ctx: RequestContext, id: string): Promise<Client
     select: {
       id: true, name: true, type: true, status: true, gstin: true, pan: true,
       primaryMobile: true, primaryEmail: true, stateCode: true, paymentTerms: true,
+      architectId: true,
       createdAt: true, updatedAt: true,
       creditLimit: { select: { limitPaise: true } },
       addresses: {
@@ -141,6 +143,7 @@ export async function getClient(ctx: RequestContext, id: string): Promise<Client
     id: row.id, name: row.name, type: row.type, status: row.status,
     primaryMobile: row.primaryMobile, primaryEmail: row.primaryEmail,
     gstin: row.gstin, pan: row.pan, stateCode: row.stateCode, paymentTerms: row.paymentTerms,
+    architectId: row.architectId,
     createdAt: row.createdAt, updatedAt: row.updatedAt,
     creditLimit: row.creditLimit?.limitPaise ?? null,
     outstanding: ageing.total,

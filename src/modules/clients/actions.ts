@@ -47,6 +47,7 @@ export async function createClient(input: unknown): Promise<ActionResult<{ id: s
       pan:           upper(emptyToNull(d.pan)),
       stateCode:     d.stateCode,
       paymentTerms:  d.paymentTerms,
+      ...(d.architectId != null && d.architectId.length > 0 && { architectId: d.architectId }),
       createdById:   ctx.userId,
       ...(d.billingAddress && {
         addresses: {
@@ -102,6 +103,10 @@ export async function updateClient(input: unknown): Promise<ActionResult<{ id: s
       ...(rest.pan != null           && { pan: upper(emptyToNull(rest.pan)) }),
       ...(rest.stateCode != null     && { stateCode: rest.stateCode }),
       ...(rest.paymentTerms != null  && { paymentTerms: rest.paymentTerms }),
+      // architectId: empty string → clear the link (SetNull FK).
+      ...(rest.architectId !== undefined && {
+        architectId: rest.architectId.length > 0 ? rest.architectId : null,
+      }),
     },
   });
 

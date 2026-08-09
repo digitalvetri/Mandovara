@@ -58,6 +58,10 @@ export const PERMISSIONS = {
   // installer can raise/assign without holding project-close rights.
   snag: ["view", "create", "assign", "resolve", "close"],
 
+  // ── Architect + commission (§5.2, Phase 6b) ────────────────
+  architect:  ["view", "create", "update", "deactivate"],
+  commission: ["view", "recordPayment", "cancel"],
+
   // ── Projects ───────────────────────────────────────────────
   project:    ["view", "create", "update", "materialIssue", "milestoneBill", "closeSnag", "handover"],
   sitelog:    ["view", "create"],

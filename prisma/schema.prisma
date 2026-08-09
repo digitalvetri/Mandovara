@@ -938,6 +938,10 @@ model Client {
   primaryMobile String
   primaryEmail  String?
   paymentTerms  Int          @default(30)          // days
+  // §5.2 referral link — the architect who brought this client.
+  // Nullable because most clients walk in without a referrer. When
+  // present, order creation stamps an ArchitectCommission row.
+  architectId   String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   createdById   String?
@@ -952,10 +956,70 @@ model Client {
   creditLimit   CreditLimit?
   advances      Advance[]
   projects      Project[]
+  architect     Architect?   @relation(fields: [architectId], references: [id], onDelete: SetNull)
 
   @@index([orgId, status])
   @@index([orgId, type])
   @@index([orgId, primaryMobile])
+  @@index([orgId, architectId])
+}
+
+// =================================================================
+// ARCHITECT — referral partners + commissions (§5.2, Phase 6b)
+// =================================================================
+//
+// Architects refer clients to Mandovara. When a referred client
+// places an order, a commission row is stamped inside the same tx
+// as createOrderFromQuotation. The commission rate is CAPTURED at
+// stamp time (not read live from the Architect), so a future rate
+// change never retroactively re-prices old commissions — same
+// freeze semantics as QuotationLine.calcSnapshot.
+
+model Architect {
+  id            String   @id @default(cuid())
+  orgId         String
+  code          String                                // ARC-001
+  firmName      String
+  contactName   String
+  mobile        String
+  email         String?
+  commissionPct Decimal  @db.Decimal(5, 2) @default(0)
+  address       Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+
+  clients       Client[]
+  commissions   ArchitectCommission[]
+
+  @@unique([orgId, code])
+  @@index([orgId, isActive])
+}
+
+model ArchitectCommission {
+  id           String    @id @default(cuid())
+  orgId        String
+  architectId  String
+  salesOrderId String
+  // Base is order.taxableAmount (pre-GST). pct is FROZEN at stamp
+  // time so subsequent Architect.commissionPct edits don't re-price.
+  baseAmount   BigInt
+  pct          Decimal   @db.Decimal(5, 2)
+  amount       BigInt
+  paidAt       DateTime?
+  paymentRef   String?                                // UPI ref / cheque no
+  cancelledAt  DateTime?
+  cancelReason String?
+  createdAt    DateTime  @default(now())
+  createdById  String?
+
+  architect    Architect  @relation(fields: [architectId], references: [id])
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([salesOrderId])                            // one commission per order
+  @@index([orgId, architectId, paidAt])
+  @@index([orgId, cancelledAt])
 }
 
 model ContactPerson {
@@ -1282,6 +1346,7 @@ model SalesOrder {
   reservations Reservation[]
   makeJobs     MakeJob[]
   installVisits InstallVisit[]
+  commissions  ArchitectCommission[]
 
   @@unique([orgId, branchId, number])
   @@index([orgId, clientId, status])

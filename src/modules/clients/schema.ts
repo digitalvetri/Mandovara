@@ -36,6 +36,9 @@ export const createClientSchema = z.object({
   stateCode:     z.string().trim().regex(stateRegex, "2-digit state code (e.g. 33 for TN)"),
   paymentTerms:  z.number().int().min(0).max(365),
   creditLimit:   z.string().trim().optional().or(z.literal("")),
+  // §5.2 — referring architect. Nullable/empty for direct walk-ins.
+  // When set, order creation stamps an ArchitectCommission (Phase 6b).
+  architectId:   z.string().cuid().optional().or(z.literal("")),
   billingAddress: addressSchema.optional(),
 });
 
