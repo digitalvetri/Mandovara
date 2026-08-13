@@ -8,6 +8,12 @@
 
 import { z } from "zod";
 
+// The DB accepts both cuid and uuid ids (seed uses uuid; Prisma
+// `@default(cuid())` generates cuid for anything created via the
+// app). The FK constraints are authoritative — this validator only
+// screens obviously-wrong inputs.
+const idField = z.string().min(20).max(64);
+
 // ── Enums that the client can type-narrow against ──────────────────
 export const SURFACE_TYPES = ["WINDOW", "WALL", "FLOOR", "CEILING", "FURNITURE", "GLASS"] as const;
 export const OPENING_TYPES = ["WINDOW", "DOOR", "WALL", "FLOOR", "CEILING", "FURNITURE", "OTHER"] as const;
@@ -42,21 +48,21 @@ export type DeductionInput = z.infer<typeof deductionSchema>;
 
 // ── Round lifecycle inputs ──────────────────────────────────────────
 export const startRoundSchema = z.object({
-  projectId:   z.string().cuid(),
+  projectId:   idField,
   visitedAt:   z.coerce.date(),
-  siteVisitId: z.string().cuid().optional(),
+  siteVisitId: idField.optional(),
   notes:       z.string().trim().max(500).optional(),
 });
 export type StartRoundInput = z.infer<typeof startRoundSchema>;
 
-export const submitRoundSchema  = z.object({ measurementId: z.string().cuid() });
+export const submitRoundSchema  = z.object({ measurementId: idField });
 export type SubmitRoundInput    = z.infer<typeof submitRoundSchema>;
 
-export const approveRoundSchema = z.object({ measurementId: z.string().cuid() });
+export const approveRoundSchema = z.object({ measurementId: idField });
 export type ApproveRoundInput   = z.infer<typeof approveRoundSchema>;
 
 export const reviseRoundSchema  = z.object({
-  parentMeasurementId: z.string().cuid(),
+  parentMeasurementId: idField,
   visitedAt:           z.coerce.date(),
   notes:               z.string().trim().max(500).optional(),
 });
@@ -66,9 +72,9 @@ export type ReviseRoundInput    = z.infer<typeof reviseRoundSchema>;
 // clientCuid: optional client-generated cuid for the offline outbox
 // (§7 — idempotent retries). Server treats it as the row PK.
 const itemCoreShape = {
-  clientCuid:   z.string().cuid().optional(),
-  measurementId: z.string().cuid(),
-  roomId:       z.string().cuid(),
+  clientCuid:   idField.optional(),
+  measurementId: idField,
+  roomId:       idField,
   label:        z.string().trim().min(1).max(120),
   surface:      z.enum(SURFACE_TYPES),
   openingType:  z.enum(OPENING_TYPES).optional(),
@@ -118,24 +124,24 @@ export type AddItemInput   = z.infer<typeof addItemSchema>;
 // Update: same core plus the item's id. Family may change (rare) —
 // the same required-extras rule applies to the new family.
 export const updateItemSchema = z.object({
-  id: z.string().cuid(),
+  id: idField,
   ...itemCoreShape,
 }).superRefine(requireFamilyExtras);
 export type UpdateItemInput   = z.infer<typeof updateItemSchema>;
 
-export const deleteItemSchema = z.object({ id: z.string().cuid() });
+export const deleteItemSchema = z.object({ id: idField });
 export type DeleteItemInput   = z.infer<typeof deleteItemSchema>;
 
 // Convenience for the field PWA: create-or-upsert by clientCuid.
 // (Reuses addItemSchema — clientCuid is already declared there.)
 export const syncItemSchema = addItemSchema.and(
-  z.object({ clientCuid: z.string().cuid() }),
+  z.object({ clientCuid: idField }),
 );
 export type SyncItemInput    = z.infer<typeof syncItemSchema>;
 
 // Room creation (a measurer often creates a new room name on site).
 export const createRoomSchema = z.object({
-  projectId:  z.string().cuid(),
+  projectId:  idField,
   name:       z.string().trim().min(1).max(80),
   floorLabel: z.string().trim().max(40).optional(),
 });
