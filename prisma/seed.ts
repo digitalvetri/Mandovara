@@ -38,10 +38,51 @@ async function main(): Promise<void> {
     architectIds: customers.architectIds,
   });
 
+  process.stdout.write("Seed: bumping NumberSequence past inserted rows...\n");
+  await bumpNumberSequences(db, masters.orgId);
+
   const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
   process.stdout.write(`\nSeed completed in ${elapsed}s\n`);
   await printRowCounts(db);
   await db.$disconnect();
+}
+
+// The seed inserts rows with hardcoded MDV/{SERIES}-{YYMM}-NNNN numbers
+// but never touches NumberSequence. When a real user action later calls
+// allocateNumber(), the atomic upsert starts at counter=1 and collides
+// with the seeded rows on the unique (organizationId, number) index.
+// This post-seed pass scans every series and seeds the counter to the
+// max used, so the very next allocation returns the following number.
+async function bumpNumberSequences(db: PrismaClient, orgId: string): Promise<void> {
+  const cfg: { series: string; table: string; prefix: string }[] = [
+    { series: "PRJ", table: "Project",     prefix: "MDV" },
+    { series: "MEA", table: "Measurement", prefix: "MDV" },
+    { series: "QT",  table: "Quotation",   prefix: "MDV" },
+    { series: "SO",  table: "Order",       prefix: "MDV" },
+    { series: "INV", table: "Invoice",     prefix: "MDV" },
+    { series: "RCT", table: "Receipt",     prefix: "MDV" },
+    { series: "PO",  table: "PurchaseOrder", prefix: "MDV" },
+    { series: "GRN", table: "GRN",         prefix: "MDV" },
+    { series: "INS", table: "InstallVisit", prefix: "MDV" },
+    { series: "MJ",  table: "MakeJob",     prefix: "MDV" },
+  ];
+  for (const c of cfg) {
+    const rows = await db.$queryRawUnsafe<{ yymm: string; max: number }[]>(`
+      SELECT SPLIT_PART(number, '-', 2) AS yymm,
+             MAX(CAST(SPLIT_PART(number, '-', 3) AS INT)) AS max
+      FROM "${c.table}"
+      WHERE "organizationId" = $1
+        AND number ~ '^${c.prefix}/${c.series}-[0-9]+-[0-9]+$'
+      GROUP BY 1
+    `, orgId);
+    for (const r of rows) {
+      await db.numberSequence.upsert({
+        where:  { organizationId_series_yymm: { organizationId: orgId, series: c.series, yymm: r.yymm } },
+        update: { counter: r.max },
+        create: { organizationId: orgId, series: c.series, yymm: r.yymm, counter: r.max },
+      });
+    }
+  }
 }
 
 // Wipe all tables — dev only. Bypasses append-only triggers for TRUNCATE.
