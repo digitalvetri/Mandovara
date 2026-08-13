@@ -1,8 +1,6 @@
 // Carpet calculator — §7.5 — handles both roll goods and tiles.
 // Pure: no I/O, no side-effects.
 
-import type { CarpetMode } from "./types";
-
 // ── Wall-to-wall roll goods ───────────────────────────────────────────────
 
 export interface CarpetRollInput {

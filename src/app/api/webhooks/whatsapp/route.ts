@@ -11,9 +11,7 @@
 // UI shows a live countdown so staff know how long the free reply window lasts.
 
 import { createHmac, timingSafeEqual } from "crypto";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/kernel/db/client";
 
 // ── GET: Meta verification handshake ─────────────────────────────────────────
 

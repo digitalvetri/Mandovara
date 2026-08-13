@@ -8,6 +8,8 @@ import {
   Scissors, Wrench, IndianRupee, UserCog,
   ChevronDown, Loader2, Eye, EyeOff, ArrowRight, Info,
 } from "lucide-react";
+import { MandovaraLogo } from "./MandovaraLogo";
+import { CredentialsPanel, DEFAULT_PASSWORD } from "./CredentialsPanel";
 
 const EMPLOYEE_ROLES = [
   { value: "DESIGNER",        label: "Interior Designer",    Icon: Palette     },
@@ -20,20 +22,6 @@ const EMPLOYEE_ROLES = [
   { value: "HR",              label: "HR Manager",           Icon: UserCog     },
 ] as const;
 
-// All seeded credentials — shown in the credentials helper
-const SEEDED_USERS = [
-  { role: "Owner",            email: "rohit@mandovara.com"     },
-  { role: "Designer",         email: "aishwarya@mandovara.com" },
-  { role: "Sales",            email: "karthik@mandovara.com"   },
-  { role: "Measure Exec",     email: "bala@mandovara.com"      },
-  { role: "Store Keeper",     email: "senthil@mandovara.com"   },
-  { role: "Make Supervisor",  email: "manoj@mandovara.com"     },
-  { role: "Installer",        email: "vignesh@mandovara.com"   },
-  { role: "Accounts",         email: "deepa@mandovara.com"     },
-  { role: "HR",               email: "priya@mandovara.com"     },
-] as const;
-
-const DEFAULT_PASSWORD = "Mandovara@2026";
 
 function focusStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.borderColor = "#2BA89A";
@@ -132,30 +120,7 @@ export function LoginCard() {
 
           {/* Credentials helper panel */}
           {showCreds && (
-            <div
-              className="mb-2 rounded-[10px] overflow-hidden border"
-              style={{ borderColor: "#C8E8E4", background: "#F0FBF9" }}
-            >
-              <div className="px-3 py-2 border-b" style={{ borderColor: "#C8E8E4" }}>
-                <div className="text-[10.5px] font-semibold" style={{ color: "#1B8A7E" }}>
-                  Seeded accounts · password for all: <span className="font-mono tracking-wide">{DEFAULT_PASSWORD}</span>
-                </div>
-              </div>
-              <div className="max-h-[180px] overflow-y-auto">
-                {SEEDED_USERS.map(({ role, email }) => (
-                  <button
-                    key={email}
-                    type="button"
-                    onClick={() => fillCredential(email)}
-                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-[#D8F5F0] transition-colors border-b last:border-0 text-left"
-                    style={{ borderColor: "#DDF0EC" }}
-                  >
-                    <span className="text-[11px] font-medium" style={{ color: "#0F2A28" }}>{role}</span>
-                    <span className="text-[10.5px] font-mono" style={{ color: "#5A7A78" }}>{email}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <CredentialsPanel onSelect={fillCredential} />
           )}
 
           <input
@@ -311,42 +276,3 @@ export function LoginCard() {
   );
 }
 
-// ── Logo — matches mandovara.com teal leaf icon ────────────────────────────────
-
-function MandovaraLogo() {
-  return (
-    <div className="flex items-center gap-3">
-      {/* Teal leaf icon — replicates the logo from mandovara.com */}
-      <svg width="46" height="46" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 36 C 14 26 8 18 11 6 C 17 8 21 20 20 36 Z"  fill="#2BA89A" opacity="0.55" />
-        <path d="M20 36 C 17 24 13 16 16 7 C 20 9 21 22 20 36 Z"  fill="#2BA89A" opacity="0.82" />
-        <path d="M20 36 C 20 24 19 15 20 4 C 21 15 20 24 20 36 Z"  fill="#2BA89A" />
-        <path d="M20 36 C 23 24 27 16 24 7 C 20 9 19 22 20 36 Z"  fill="#2BA89A" opacity="0.82" />
-        <path d="M20 36 C 26 26 32 18 29 6 C 23 8 19 20 20 36 Z"  fill="#2BA89A" opacity="0.55" />
-      </svg>
-      <div>
-        <div style={{
-          color: "#1A4A45",
-          fontFamily: "'Fraunces', Georgia, serif",
-          fontSize: 24,
-          fontWeight: 600,
-          letterSpacing: "0.02em",
-          lineHeight: 1,
-        }}>
-          Mandovara
-        </div>
-        <div style={{
-          color: "#2BA89A",
-          fontSize: 9,
-          letterSpacing: "0.26em",
-          marginTop: 5,
-          fontFamily: "'Inter', system-ui, sans-serif",
-          fontWeight: 600,
-          textTransform: "uppercase",
-        }}>
-          Interiors
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/kernel/db/client";
-import type { AppRole } from "@prisma/client";
+import type { AppRole } from "@/kernel/db/client";
 
 const COOKIE = "dev_uid";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days

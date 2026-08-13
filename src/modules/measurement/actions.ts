@@ -1,4 +1,5 @@
-// @ts-nocheck — remote module, schema reconciliation pending
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck — schema uses orgId shorthand; reconciliation pending Phase 2
 "use server";
 
 // Measurement server actions — Phase 2 gate.

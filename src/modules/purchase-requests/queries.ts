@@ -3,7 +3,7 @@
 // Note: PurchaseRequest.projectId and PurchaseRequestLine.colourwayId are raw FK fields
 // with no Prisma relations defined on the project/colourway side — we do manual lookups.
 
-import type { RequestStatus } from "@prisma/client";
+import type { RequestStatus } from "@/kernel/db/client";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission, can } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";

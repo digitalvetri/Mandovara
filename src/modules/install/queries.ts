@@ -1,6 +1,6 @@
 import { prisma as db } from "@/kernel/db/client";
 import type { RequestContext } from "@/kernel/auth/context";
-import type { InstallStatus } from "@prisma/client";
+import type { InstallStatus } from "@/kernel/db/client";
 
 export interface InstallVisitRow {
   id: string;

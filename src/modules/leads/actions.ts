@@ -172,7 +172,6 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id
   if (!parsed.success) return zodError<{ id: string }>(parsed.error);
   const { id, to, lostReason } = parsed.data;
 
-  const db = scoped(ctx);
   const { publish, flush } = collectEvents();
 
   await withTransaction(async (tx: TxClient) => {

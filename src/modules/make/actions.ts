@@ -1,7 +1,7 @@
 "use server";
 
 import type { z } from "zod";
-import type { HeadingType } from "@prisma/client";
+import type { HeadingType } from "@/kernel/db/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
@@ -68,7 +68,7 @@ export async function createMakeJob(
     },
   });
 
-  const project = await db.project.findUniqueOrThrow({
+  const _project = await db.project.findUniqueOrThrow({
     where: { id: order.projectId },
     select: { branchId: true },
   });

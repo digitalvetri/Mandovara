@@ -110,7 +110,7 @@ export async function listCategories(ctx: RequestContext): Promise<CategoryOptio
   }));
 }
 
-export async function getProduct(ctx: RequestContext, id: string): Promise<ProductDetail | null> {
+export async function getProduct(ctx: RequestContext, _id: string): Promise<ProductDetail | null> {
   // Colourway detail — catalog detail page uses /catalog/design/[id]; this returns null
   // so the pages call notFound() and users are redirected to the correct catalog route.
   requirePermission(ctx, "catalog.view");

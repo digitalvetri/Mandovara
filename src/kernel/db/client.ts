@@ -16,3 +16,7 @@ export const prisma: PrismaClient =
 if (process.env["NODE_ENV"] !== "production") {
   globalThis.__prisma__ = prisma;
 }
+
+export type {
+  AppRole, InstallStatus, MakeJobStatus, HeadingType, RequestStatus,
+} from "@prisma/client";
