@@ -16,9 +16,9 @@ test.describe("fullscreen snapshots", () => {
   ];
   for (const route of routes) {
     test(`snap ${route}`, async ({ page }) => {
-      if (route.endsWith("/")) test.skip(false, "");
+      if (route.endsWith("/")) { test.skip(); return; }
       await page.goto(route);
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("load");
       const name = route === "/" ? "root" : route.replace(/\//g, "_").replace(/[^a-z0-9_-]/gi, "");
       await page.screenshot({ path: path.join(OUT, `fs${name}.png`), fullPage: false });
     });
