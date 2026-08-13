@@ -7,7 +7,6 @@ import { devContext } from "@/lib/dev-context";
 import {
   getProject, getProjectMilestones, getProjectTasks, getProjectSiteLogs,
 } from "@/modules/projects/queries";
-import type { ProjectMilestone, ProjectTask, ProjectSiteLog } from "@/modules/projects/queries";
 import { ProjectStatusPill } from "../_components/StatusPill";
 import { ProjectPanels } from "../_components/ProjectPanels";
 
