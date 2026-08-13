@@ -8,6 +8,7 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, Send, Briefcase, Scissors, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, MessageSquare, ShieldCheck, LogOut,
+  Ruler,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -40,10 +41,11 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "Delivery",
     items: [
-      { label: "Sales Orders & Dispatch", href: "/orders",   icon: Send      },
-      { label: "Project Pipeline",        href: "/projects", icon: Briefcase },
-      { label: "Make (Cut & Stitch)",     href: "/make",     icon: Scissors  },
-      { label: "Installation",            href: "/install",  icon: Wrench    },
+      { label: "Sales Orders & Dispatch", href: "/orders",       icon: Send      },
+      { label: "Project Pipeline",        href: "/projects",     icon: Briefcase },
+      { label: "Measurements",            href: "/measurements", icon: Ruler     },
+      { label: "Make (Cut & Stitch)",     href: "/make",         icon: Scissors  },
+      { label: "Installation",            href: "/install",      icon: Wrench    },
     ],
   },
   {

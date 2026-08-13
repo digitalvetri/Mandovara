@@ -250,3 +250,24 @@ export async function listRoomsForProject(
     select:  { id: true, name: true, floorLabel: true, sortOrder: true },
   });
 }
+
+/** Find the caller's most recent DRAFT round on this project — the
+ *  field PWA uses this to resume rather than start a fresh round on
+ *  every reload (§5.3 must survive tab close and reopen). */
+export async function findResumableRound(
+  ctx:       RequestContext,
+  projectId: string,
+): Promise<{ id: string; number: string; visitedAt: Date; itemCount: number } | null> {
+  requirePermission(ctx, "measurement.view");
+  const db = scoped(ctx);
+  const round = await db.measurement.findFirst({
+    where:   { projectId, status: "DRAFT", measuredById: ctx.userId },
+    orderBy: { visitedAt: "desc" },
+    select:  {
+      id: true, number: true, visitedAt: true,
+      items: { select: { id: true } },
+    },
+  });
+  if (!round) return null;
+  return { id: round.id, number: round.number, visitedAt: round.visitedAt, itemCount: round.items.length };
+}
