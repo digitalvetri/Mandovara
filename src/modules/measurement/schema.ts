@@ -1,84 +1,142 @@
-// Zod schemas for the measurement module — a discriminated union
-// per family (WALLPAPER | FLOORING | CURTAIN) so the server picks the
-// right calc engine and the client can trust the shape.
+// Zod schemas for the measurement module — canonical shape (§3 of
+// docs/MEASUREMENT-MODULE.md).
 //
-// Numeric bounds match sensible on-site limits: no wall taller than 6m,
-// no window wider than 10m, fabric width in a plausible bolt range. Too
-// tight and we reject valid odd-shaped rooms; too loose and typos slip
-// through. These are ceiling checks — they don't replace the calc
-// engine's own assertPositive() guards.
+// A Measurement is a ROUND (one site visit). It carries a chain of
+// MeasurementItem rows, each tied to a Room. Server actions read these
+// schemas; the field PWA uses the same shapes to validate before
+// enqueueing to the offline outbox.
 
 import { z } from "zod";
 
-export const MEASUREMENT_FAMILIES = ["WALLPAPER", "FLOORING", "CURTAIN"] as const;
-export type MeasurementFamily = (typeof MEASUREMENT_FAMILIES)[number];
+// ── Enums that the client can type-narrow against ──────────────────
+export const SURFACE_TYPES = ["WINDOW", "WALL", "FLOOR", "CEILING", "FURNITURE", "GLASS"] as const;
+export const OPENING_TYPES = ["WINDOW", "DOOR", "WALL", "FLOOR", "CEILING", "FURNITURE", "OTHER"] as const;
+export const PRODUCT_FAMILIES = [
+  "CURTAIN_FABRIC", "SHEER", "LINING", "BLIND", "WALLPAPER", "FLOORING",
+  "CARPET_ROLL", "CARPET_TILE", "UPHOLSTERY_FABRIC", "FOAM_FILLING",
+  "VERTICAL_GARDEN", "INTERIOR_FILM", "MURAL", "HARDWARE_TRACK",
+  "HARDWARE_ROD", "MOTOR", "ACCESSORY", "SERVICE",
+] as const;
+export const HEADING_TYPES = ["EYELET", "PINCH_PLEAT", "PENCIL_PLEAT", "RIPPLE_FOLD", "TAB_TOP", "ROD_POCKET"] as const;
+export const MOUNT_TYPES   = ["INSIDE", "OUTSIDE", "CEILING"] as const;
+export const LAY_PATTERNS  = ["STRAIGHT", "DIAGONAL", "HERRINGBONE"] as const;
 
-const mm     = z.number().positive().max(20_000); // 20 m ceiling
-const pctPos = z.number().nonnegative().max(200);
+// Families that require field-level extras (§6.4).
+const CURTAIN_FAMILIES = new Set(["CURTAIN_FABRIC", "SHEER"]);
+const FLOORING_FAMILIES = new Set(["FLOORING"]);
+const WALLPAPER_FAMILIES = new Set(["WALLPAPER"]);
 
-// ── WALLPAPER ──────────────────────────────────────────────────────
-export const wallpaperInputSchema = z.object({
-  wallWidthMm:     mm,
-  wallHeightMm:    mm,
-  rollWidthMm:     z.number().positive().max(2000),
-  rollLengthM:     z.number().positive().max(100),
-  patternMatch:    z.enum(["FREE", "STRAIGHT", "OFFSET"]),
-  patternRepeatMm: z.number().nonnegative().max(2000),
+// Dimensions: always millimetres, positive, bounded by a 20 m ceiling
+// so a typo like `18000000` fails validation instead of getting to
+// the engine. The engine also asserts positivity; this is belt+braces.
+const mm = z.number().positive().max(20_000);
+const mmOpt = z.number().positive().max(20_000).optional();
+
+const deductionSchema = z.object({
+  label:  z.string().trim().max(80).optional(),
+  widthMm: mm,
+  heightMm: mm,
+  qty: z.number().int().positive().max(50).default(1),
 });
-export type WallpaperInput = z.infer<typeof wallpaperInputSchema>;
+export type DeductionInput = z.infer<typeof deductionSchema>;
 
-// ── FLOORING ──────────────────────────────────────────────────────
-export const flooringInputSchema = z.object({
-  roomLengthMm:   mm,
-  roomWidthMm:    mm,
-  layPattern:     z.enum(["STRAIGHT", "DIAGONAL", "HERRINGBONE"]),
-  productKind:    z.enum(["BOX", "ROLL"]),
-  areaPerBoxSqft: z.number().nonnegative().max(100),   // 0 for ROLL
-  rollWidthMm:    z.number().nonnegative().max(5000),  // 0 for BOX
+// ── Round lifecycle inputs ──────────────────────────────────────────
+export const startRoundSchema = z.object({
+  projectId:   z.string().cuid(),
+  visitedAt:   z.coerce.date(),
+  siteVisitId: z.string().cuid().optional(),
+  notes:       z.string().trim().max(500).optional(),
 });
-export type FlooringInput = z.infer<typeof flooringInputSchema>;
+export type StartRoundInput = z.infer<typeof startRoundSchema>;
 
-// ── CURTAIN ──────────────────────────────────────────────────────
-export const curtainInputSchema = z.object({
-  windowWidthMm:            mm,
-  windowHeightMm:           mm,
-  fullness:                 z.number().positive().max(5),
-  fabricWidthMm:            z.number().positive().max(3500),
-  patternMatch:             z.enum(["FREE", "STRAIGHT", "OFFSET"]),
-  patternRepeatMm:          z.number().nonnegative().max(2000),
-  railroadable:             z.boolean(),
-  railroadedFabricWidthMm:  z.number().nonnegative().max(3500),
-  eyelet:                   z.boolean(),
-  lining:                   z.boolean(),
+export const submitRoundSchema  = z.object({ measurementId: z.string().cuid() });
+export type SubmitRoundInput    = z.infer<typeof submitRoundSchema>;
+
+export const approveRoundSchema = z.object({ measurementId: z.string().cuid() });
+export type ApproveRoundInput   = z.infer<typeof approveRoundSchema>;
+
+export const reviseRoundSchema  = z.object({
+  parentMeasurementId: z.string().cuid(),
+  visitedAt:           z.coerce.date(),
+  notes:               z.string().trim().max(500).optional(),
 });
-export type CurtainInput = z.infer<typeof curtainInputSchema>;
+export type ReviseRoundInput    = z.infer<typeof reviseRoundSchema>;
 
-// ── Family discriminator + create / update payloads ────────────────
-const commonFields = {
-  projectId: z.string().cuid(),
-  roomLabel: z.string().trim().min(1).max(80),
-  label:     z.string().trim().min(1).max(120),
-  notes:     z.string().trim().max(500).optional(),
-  photoKey:  z.string().trim().max(200).optional(),
+// ── Item lifecycle inputs ──────────────────────────────────────────
+// clientCuid: optional client-generated cuid for the offline outbox
+// (§7 — idempotent retries). Server treats it as the row PK.
+const itemCoreShape = {
+  clientCuid:   z.string().cuid().optional(),
+  measurementId: z.string().cuid(),
+  roomId:       z.string().cuid(),
+  label:        z.string().trim().min(1).max(120),
+  surface:      z.enum(SURFACE_TYPES),
+  openingType:  z.enum(OPENING_TYPES).optional(),
+  widthMm:      mm,
+  heightMm:     mm,
+  depthMm:      mmOpt,
+  quantity:     z.number().int().positive().max(200).default(1),
+  deductions:   z.array(deductionSchema).max(20).optional(),
+  family:       z.enum(PRODUCT_FAMILIES),
+  headingType:  z.enum(HEADING_TYPES).optional(),
+  fullness:     z.number().positive().max(5).optional(),
+  layPattern:   z.enum(LAY_PATTERNS).optional(),
+  mountType:    z.enum(MOUNT_TYPES).optional(),
+  requiresPowerPoint: z.boolean().optional().default(false),
+  photoKeys:    z.array(z.string().trim().max(200)).max(20).optional(),
+  sketchKey:    z.string().trim().max(200).optional(),
+  notes:        z.string().trim().max(500).optional(),
+} as const;
+
+// §6.4 family-specific required fields — enforced with a superRefine
+// so field errors surface on the correct paths.
+const requireFamilyExtras = (
+  data: { family: string; headingType?: string; fullness?: number; layPattern?: string; deductions?: unknown[] },
+  ctx: z.RefinementCtx,
+): void => {
+  if (CURTAIN_FAMILIES.has(data.family)) {
+    if (!data.headingType) {
+      ctx.addIssue({ code: "custom", path: ["headingType"], message: "Heading type required for curtains and sheers." });
+    }
+    if (data.fullness === undefined) {
+      ctx.addIssue({ code: "custom", path: ["fullness"], message: "Fullness required for curtains and sheers." });
+    }
+  }
+  if (FLOORING_FAMILIES.has(data.family) && !data.layPattern) {
+    ctx.addIssue({ code: "custom", path: ["layPattern"], message: "Lay pattern required for flooring." });
+  }
+  if (WALLPAPER_FAMILIES.has(data.family) && data.deductions === undefined) {
+    // Deductions array may be EMPTY, but must be present so we know the
+    // measurer considered openings.
+    ctx.addIssue({ code: "custom", path: ["deductions"], message: "Deductions array required for wallpaper (may be empty)." });
+  }
 };
 
-export const createMeasurementSchema = z.discriminatedUnion("family", [
-  z.object({ ...commonFields, family: z.literal("WALLPAPER"), inputs: wallpaperInputSchema }),
-  z.object({ ...commonFields, family: z.literal("FLOORING"),  inputs: flooringInputSchema  }),
-  z.object({ ...commonFields, family: z.literal("CURTAIN"),   inputs: curtainInputSchema   }),
-]);
-export type CreateMeasurementInput = z.infer<typeof createMeasurementSchema>;
+export const addItemSchema = z.object(itemCoreShape).superRefine(requireFamilyExtras);
+export type AddItemInput   = z.infer<typeof addItemSchema>;
 
-// Update = create + id (same family; changing family = delete + create).
-export const updateMeasurementSchema = z.discriminatedUnion("family", [
-  z.object({ id: z.string().cuid(), ...commonFields, family: z.literal("WALLPAPER"), inputs: wallpaperInputSchema }),
-  z.object({ id: z.string().cuid(), ...commonFields, family: z.literal("FLOORING"),  inputs: flooringInputSchema  }),
-  z.object({ id: z.string().cuid(), ...commonFields, family: z.literal("CURTAIN"),   inputs: curtainInputSchema   }),
-]);
-export type UpdateMeasurementInput = z.infer<typeof updateMeasurementSchema>;
+// Update: same core plus the item's id. Family may change (rare) —
+// the same required-extras rule applies to the new family.
+export const updateItemSchema = z.object({
+  id: z.string().cuid(),
+  ...itemCoreShape,
+}).superRefine(requireFamilyExtras);
+export type UpdateItemInput   = z.infer<typeof updateItemSchema>;
 
-export const deleteMeasurementSchema = z.object({ id: z.string().cuid() });
+export const deleteItemSchema = z.object({ id: z.string().cuid() });
+export type DeleteItemInput   = z.infer<typeof deleteItemSchema>;
 
-// Percentile helpers exported for callers that display validation limits.
-export const LIMIT_MM = 20_000;
-export const LIMIT_PCT = pctPos;
+// Convenience for the field PWA: create-or-upsert by clientCuid.
+// (Reuses addItemSchema — clientCuid is already declared there.)
+export const syncItemSchema = addItemSchema.and(
+  z.object({ clientCuid: z.string().cuid() }),
+);
+export type SyncItemInput    = z.infer<typeof syncItemSchema>;
+
+// Room creation (a measurer often creates a new room name on site).
+export const createRoomSchema = z.object({
+  projectId:  z.string().cuid(),
+  name:       z.string().trim().min(1).max(80),
+  floorLabel: z.string().trim().max(40).optional(),
+});
+export type CreateRoomInput   = z.infer<typeof createRoomSchema>;

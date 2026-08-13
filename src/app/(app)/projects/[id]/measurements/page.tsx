@@ -1,3 +1,10 @@
+// §5.1 Measurement rounds list — /projects/[id]/measurements
+//
+// Columns: number · visit date · measured by · status pill · item count
+// · rooms covered · revision.  Superseded rounds collapse UNDER their
+// replacement rather than disappearing — a user must always be able to
+// see the prior dimensions and who changed them.
+
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
@@ -5,9 +12,9 @@ import { ArrowLeft } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { getProject } from "@/modules/projects/queries";
-import { listMeasurementsForProject } from "@/modules/measurement/queries";
-import { shortNumber } from "@/lib/short-number";
-import { MeasurementBuilder } from "./_components/MeasurementBuilder";
+import { listRoundsForProject } from "@/modules/measurement/queries";
+import { RoundsList } from "./_components/RoundsList";
+import { NewRoundButton } from "./_components/NewRoundButton";
 
 export const dynamic = "force-dynamic";
 
@@ -16,28 +23,29 @@ export default async function MeasurementsPage({
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await devContext();
-  const p = await getProject(ctx, id);
-  if (!p) notFound();
-  const initial = await listMeasurementsForProject(ctx, p.id);
+  const project = await getProject(ctx, id);
+  if (!project) notFound();
+  const groups = await listRoundsForProject(ctx, project.id);
 
   return (
     <>
       <Topbar
         title="Measurements"
-        eyebrow={`${shortNumber(p.number, "P-")} · ${p.clientName} · ${p.name} · Type dimensions on site; the engine runs live and warnings render as you go.`}
+        eyebrow={`${project.number} · ${project.clientName} · ${project.name}`}
       />
 
-      <div className="pb-3">
+      <div className="flex items-center justify-between pb-4">
         <Link
-          href={`/projects/${p.id}` as Route}
+          href={`/projects/${project.id}` as Route}
           className="inline-flex items-center gap-1.5 text-[11.5px] text-text-dim hover:text-text transition-colors"
         >
           <ArrowLeft size={12} />
           Back to project
         </Link>
+        <NewRoundButton projectId={project.id} />
       </div>
 
-      <MeasurementBuilder projectId={p.id} initial={initial} />
+      <RoundsList projectId={project.id} groups={groups} />
     </>
   );
 }

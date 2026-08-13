@@ -1,90 +1,252 @@
-// Measurement repository — read side for /projects/[id]/measurements.
-// Items are stored in the Measurement→Room→MeasurementItem hierarchy.
-// CalcResult.inputs stores the full JSON input blob; output fields are typed.
+// Measurement read-side. Feeds §5.1 (rounds list) and §5.2 (round detail).
+//
+// Superseded rounds are NOT hidden: the list groups them under their
+// replacement so a user can always see the prior dimensions and who
+// changed them (§5.1). A round chains via Measurement.supersedesId.
+//
+// Row shapes live in queries-types.ts so this file stays under
+// CLAUDE.md §10's 300-line ceiling.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
-import type { MeasurementFamily } from "./schema";
+import type {
+  RoundListRow, RoundListGroup, RoundDetail, ItemDetail, RoomItemsBucket,
+} from "./queries-types";
 
-// Map canonical ProductFamily back to the simplified family string the UI uses.
-const FAMILY_MAP: Record<string, MeasurementFamily | undefined> = {
-  WALLPAPER:       "WALLPAPER",
-  FLOORING:        "FLOORING",
-  CURTAIN_FABRIC:  "CURTAIN",
-  SHEER:           "CURTAIN",
-};
+export type {
+  RoundListRow, RoundListGroup, RoundDetail, ItemDetail, RoomItemsBucket,
+  ItemCalcSnapshot, MeasurementStatusStr,
+} from "./queries-types";
 
-export interface MeasurementItemRow {
-  id:            string;
-  projectId:     string;
-  roomLabel:     string;
-  label:         string;
-  family:        MeasurementFamily;
-  inputs:        unknown;              // family-specific JSON blob (stored in CalcResult.inputs)
-  photoKey:      string | null;
-  notes:         string | null;
-  createdAt:     Date;
-  updatedAt:     Date;
-  calc: {
-    engineVersion: string;
-    outputs:       unknown;
-    warnings:      string[];
-    computedAt:    Date;
-  } | null;
-}
-
-export async function listMeasurementsForProject(
-  ctx: RequestContext,
+export async function listRoundsForProject(
+  ctx:       RequestContext,
   projectId: string,
-): Promise<MeasurementItemRow[]> {
-  requirePermission(ctx, "project.view");
+): Promise<RoundListGroup[]> {
+  requirePermission(ctx, "measurement.view");
   const db = scoped(ctx);
 
-  const items = await db.measurementItem.findMany({
-    where:   { measurement: { projectId } },
-    orderBy: [{ room: { name: "asc" } }, { label: "asc" }],
+  const rounds = await db.measurement.findMany({
+    where:   { projectId },
+    orderBy: [{ revision: "desc" }, { visitedAt: "desc" }],
     select: {
-      id: true, label: true, family: true, photoKeys: true, notes: true,
-      room:        { select: { name: true } },
-      measurement: { select: { projectId: true, visitedAt: true } },
-      calc: {
+      id: true, number: true, revision: true, visitedAt: true,
+      status: true, notes: true, measuredById: true, supersedesId: true,
+      items: { select: { id: true, room: { select: { name: true } } } },
+    },
+  });
+
+  const measurerIds = new Set(rounds.map((r) => r.measuredById));
+  const users = await db.user.findMany({
+    where:  { id: { in: [...measurerIds] } },
+    select: { id: true, name: true },
+  });
+  const nameOf = new Map(users.map((u) => [u.id, u.name] as const));
+
+  const rows: RoundListRow[] = rounds.map((r) => ({
+    id:             r.id,
+    number:         r.number,
+    revision:       r.revision,
+    visitedAt:      r.visitedAt,
+    status:         r.status,
+    measuredById:   r.measuredById,
+    measuredByName: nameOf.get(r.measuredById) ?? "—",
+    approvedByName: null,
+    itemCount:      r.items.length,
+    roomsCovered: [...new Set(
+      r.items.map((i) => i.room.name).sort((a, b) => a.localeCompare(b)),
+    )],
+    notes:          r.notes,
+    supersedesId:   r.supersedesId,
+  }));
+
+  return groupBySupersedeChain(rows);
+}
+
+/** Collapse revisions into {head, history[]}. Head is the latest revision
+ *  that no other row supersedes; history is the chain to older revisions,
+ *  most recent first. Groups sorted by head visit date, newest first. */
+function groupBySupersedeChain(rows: RoundListRow[]): RoundListGroup[] {
+  const byId       = new Map(rows.map((r) => [r.id, r] as const));
+  const supersedes = new Set(
+    rows.map((r) => r.supersedesId).filter((id): id is string => typeof id === "string"),
+  );
+
+  const groups: RoundListGroup[] = [];
+  for (const row of rows) {
+    if (supersedes.has(row.id)) continue;
+    const history: RoundListRow[] = [];
+    let cursor: string | null = row.supersedesId;
+    while (cursor) {
+      const prior = byId.get(cursor);
+      if (!prior) break;
+      history.push(prior);
+      cursor = prior.supersedesId;
+    }
+    groups.push({ head: row, history });
+  }
+
+  groups.sort((a, b) => b.head.visitedAt.getTime() - a.head.visitedAt.getTime());
+  return groups;
+}
+
+export async function getRoundDetail(
+  ctx:           RequestContext,
+  measurementId: string,
+): Promise<RoundDetail | null> {
+  requirePermission(ctx, "measurement.view");
+  const db = scoped(ctx);
+
+  const round = await db.measurement.findUnique({
+    where: { id: measurementId },
+    select: {
+      id: true, number: true, revision: true, visitedAt: true,
+      status: true, notes: true, measuredById: true,
+      approvedById: true, approvedAt: true, supersedesId: true,
+      project: {
         select: {
-          engineVersion: true, inputs: true, warnings: true, computedAt: true,
-          materialQty: true, materialUnit: true,
-          rollsRequired: true, boxesRequired: true, areaSqft: true,
-          cutLengthMm: true, widthsRequired: true,
+          id: true, name: true, number: true,
+          client: { select: { name: true } },
+        },
+      },
+      items: {
+        orderBy: [{ room: { sortOrder: "asc" } }, { label: "asc" }],
+        select: {
+          id: true, roomId: true, label: true, surface: true, openingType: true,
+          widthMm: true, heightMm: true, depthMm: true, quantity: true,
+          deductions: true, family: true, headingType: true, fullness: true,
+          layPattern: true, mountType: true, requiresPowerPoint: true,
+          photoKeys: true, sketchKey: true, notes: true,
+          room: { select: { id: true, name: true, floorLabel: true, sortOrder: true } },
+          calc: {
+            select: {
+              engineVersion: true, materialQty: true, materialUnit: true,
+              widthsRequired: true, cutLengthMm: true, rollsRequired: true,
+              boxesRequired: true, areaSqft: true, warnings: true, computedAt: true,
+            },
+          },
         },
       },
     },
   });
+  if (!round) return null;
 
-  return items.map((r): MeasurementItemRow => ({
-    id:        r.id,
-    projectId: r.measurement.projectId,
-    roomLabel: r.room.name,
-    label:     r.label,
-    family:    FAMILY_MAP[r.family] ?? "WALLPAPER",
-    inputs:    r.calc?.inputs ?? {},
-    photoKey:  r.photoKeys[0] ?? null,
-    notes:     r.notes,
-    createdAt: r.measurement.visitedAt,
-    updatedAt: r.measurement.visitedAt,
-    calc:      r.calc
-      ? {
-          engineVersion: r.calc.engineVersion,
-          outputs: {
-            materialQty:    Number(r.calc.materialQty),
-            materialUnit:   r.calc.materialUnit,
-            rollsRequired:  r.calc.rollsRequired,
-            boxesRequired:  r.calc.boxesRequired,
-            areaSqft:       r.calc.areaSqft ? Number(r.calc.areaSqft) : null,
-            cutLengthMm:    r.calc.cutLengthMm ? Number(r.calc.cutLengthMm) : null,
-            widthsRequired: r.calc.widthsRequired,
-          },
-          warnings:   r.calc.warnings,
-          computedAt: r.calc.computedAt,
-        }
-      : null,
-  }));
+  const userIds = [round.measuredById, round.approvedById]
+    .filter((id): id is string => typeof id === "string");
+  const users = userIds.length > 0
+    ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
+    : [];
+  const nameOf = new Map(users.map((u) => [u.id, u.name] as const));
+
+  const itemsByRoom = groupItemsByRoom(round.items);
+
+  return {
+    id:             round.id,
+    number:         round.number,
+    revision:       round.revision,
+    visitedAt:      round.visitedAt,
+    status:         round.status,
+    notes:          round.notes,
+    measuredById:   round.measuredById,
+    measuredByName: nameOf.get(round.measuredById) ?? "—",
+    approvedByName: round.approvedById ? (nameOf.get(round.approvedById) ?? "—") : null,
+    approvedAt:     round.approvedAt,
+    supersedesId:   round.supersedesId,
+    project: {
+      id:         round.project.id,
+      name:       round.project.name,
+      number:     round.project.number,
+      clientName: round.project.client.name,
+    },
+    itemsByRoom,
+  };
+}
+
+/** Bucket items under their Room, preserving Room.sortOrder. */
+function groupItemsByRoom(
+  items: Array<Parameters<typeof toItemDetail>[0]>,
+): RoomItemsBucket[] {
+  const byRoom = new Map<string, RoomItemsBucket>();
+  for (const it of items) {
+    const key = it.room.id;
+    const bucket = byRoom.get(key) ?? {
+      roomId:     it.room.id,
+      roomName:   it.room.name,
+      floorLabel: it.room.floorLabel,
+      sortOrder:  it.room.sortOrder,
+      items:      [],
+    };
+    bucket.items.push(toItemDetail(it));
+    byRoom.set(key, bucket);
+  }
+  return [...byRoom.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+type ItemRow = {
+  id: string; roomId: string; label: string; surface: string;
+  openingType: string | null; widthMm: { toString: () => string };
+  heightMm: { toString: () => string }; depthMm: { toString: () => string } | null;
+  quantity: number; deductions: unknown; family: string;
+  headingType: string | null; fullness: { toString: () => string } | null;
+  layPattern: string | null; mountType: string | null; requiresPowerPoint: boolean;
+  photoKeys: string[]; sketchKey: string | null; notes: string | null;
+  room: { id: string; name: string; floorLabel: string | null; sortOrder: number };
+  calc: {
+    engineVersion: string; materialQty: { toString: () => string }; materialUnit: string;
+    widthsRequired: number | null; cutLengthMm: { toString: () => string } | null;
+    rollsRequired: number | null; boxesRequired: number | null;
+    areaSqft: { toString: () => string } | null;
+    warnings: string[]; computedAt: Date;
+  } | null;
+};
+
+function toItemDetail(it: ItemRow): ItemDetail {
+  return {
+    id:                 it.id,
+    roomId:             it.roomId,
+    roomName:           it.room.name,
+    floorLabel:         it.room.floorLabel,
+    label:              it.label,
+    surface:            it.surface,
+    openingType:        it.openingType,
+    widthMm:            it.widthMm.toString(),
+    heightMm:           it.heightMm.toString(),
+    depthMm:            it.depthMm?.toString() ?? null,
+    quantity:           it.quantity,
+    deductions:         it.deductions,
+    family:             it.family,
+    headingType:        it.headingType,
+    fullness:           it.fullness?.toString() ?? null,
+    layPattern:         it.layPattern,
+    mountType:          it.mountType,
+    requiresPowerPoint: it.requiresPowerPoint,
+    photoKeys:          it.photoKeys,
+    sketchKey:          it.sketchKey,
+    notes:              it.notes,
+    calc: it.calc ? {
+      engineVersion:  it.calc.engineVersion,
+      materialQty:    it.calc.materialQty.toString(),
+      materialUnit:   it.calc.materialUnit,
+      widthsRequired: it.calc.widthsRequired,
+      cutLengthMm:    it.calc.cutLengthMm?.toString() ?? null,
+      rollsRequired:  it.calc.rollsRequired,
+      boxesRequired:  it.calc.boxesRequired,
+      areaSqft:       it.calc.areaSqft?.toString() ?? null,
+      warnings:       it.calc.warnings,
+      computedAt:     it.calc.computedAt,
+    } : null,
+  };
+}
+
+export async function listRoomsForProject(
+  ctx:       RequestContext,
+  projectId: string,
+): Promise<{ id: string; name: string; floorLabel: string | null; sortOrder: number }[]> {
+  requirePermission(ctx, "measurement.view");
+  const db = scoped(ctx);
+  return db.room.findMany({
+    where:   { projectId },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select:  { id: true, name: true, floorLabel: true, sortOrder: true },
+  });
 }

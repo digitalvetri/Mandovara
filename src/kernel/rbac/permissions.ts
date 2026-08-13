@@ -47,7 +47,7 @@ export const PERMISSIONS = {
   project:    ["view", "create", "update", "materialIssue", "milestoneBill", "closeSnag", "handover"],
   sitelog:    ["view", "create"],
   // Site measurements + persisted CalcResult (§7, Phase 2 gate).
-  measurement: ["view", "create", "update", "delete"],
+  measurement: ["view", "create", "update", "delete", "submit", "approve", "revise"],
 
   // ── Finance ────────────────────────────────────────────────
   invoice:     ["view", "create", "cancel", "viewMargin", "irnRegenerate", "irnCancel"],
