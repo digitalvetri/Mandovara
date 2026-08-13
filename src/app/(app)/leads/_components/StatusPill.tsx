@@ -1,29 +1,33 @@
-import type { LeadStatus } from "@/modules/leads/schema";
+import type { LeadStage } from "@/modules/leads/schema";
 
-// Single central status-colour map. §7.5 of BUILD-SPEC — one map, everywhere.
+// Single central stage-colour map — matches Prisma LeadStage enum.
 
-const TONE: Record<LeadStatus, string> = {
-  NEW:         "bg-accent/12 text-accent",
-  CONTACTED:   "bg-warn/15 text-warn",
-  QUALIFIED:   "bg-warn/15 text-warn",
-  PROPOSED:    "bg-good/12 text-good",
-  NEGOTIATION: "bg-good/12 text-good",
-  WON:         "bg-good/15 text-good",
-  LOST:        "bg-bad/12 text-bad",
+const TONE: Record<LeadStage, string> = {
+  NEW:                    "bg-accent/12 text-accent",
+  CONTACTED:              "bg-warn/15 text-warn",
+  MEASUREMENT_SCHEDULED:  "bg-warn/15 text-warn",
+  VISIT_SCHEDULED:        "bg-warn/15 text-warn",
+  MEASURED:               "bg-info/15 text-info",
+  QUOTED:                 "bg-good/12 text-good",
+  NEGOTIATION:            "bg-good/12 text-good",
+  WON:                    "bg-good/15 text-good",
+  LOST:                   "bg-bad/12 text-bad",
 };
 
-const LABEL: Record<LeadStatus, string> = {
-  NEW:         "New",
-  CONTACTED:   "Contacted",
-  QUALIFIED:   "Qualified",
-  PROPOSED:    "Proposed",
-  NEGOTIATION: "Negotiation",
-  WON:         "Won",
-  LOST:        "Lost",
+const LABEL: Record<LeadStage, string> = {
+  NEW:                    "New",
+  CONTACTED:              "Contacted",
+  MEASUREMENT_SCHEDULED:  "Meas. Scheduled",
+  VISIT_SCHEDULED:        "Visit Scheduled",
+  MEASURED:               "Measured",
+  QUOTED:                 "Quoted",
+  NEGOTIATION:            "Negotiation",
+  WON:                    "Won",
+  LOST:                   "Lost",
 };
 
 export function StatusPill({ status }: { status: string }) {
-  const key = status as LeadStatus;
+  const key = status as LeadStage;
   const tone = TONE[key] ?? "bg-text-dim/12 text-text-dim";
   const label = LABEL[key] ?? status;
   return (

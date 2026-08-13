@@ -10,7 +10,7 @@ export async function InstallerView({ ctx }: { ctx: RequestContext }) {
   const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
   const weekEnd    = new Date(todayEnd.getTime() + 6 * 86_400_000);
 
-  const [todayVisits, upcomingVisits, mySnags] = await Promise.all([
+  const result = await Promise.all([
     db.installVisit.findMany({
       where: {
         organizationId: ctx.orgId,
@@ -49,7 +49,9 @@ export async function InstallerView({ ctx }: { ctx: RequestContext }) {
       orderBy: { raisedAt: "asc" },
       take: 5,
     }),
-  ]);
+  ] as const).catch(() => null);
+  if (!result) return <DbOffline />;
+  const [todayVisits, upcomingVisits, mySnags] = result;
 
   return (
     <div className="space-y-4">
@@ -100,6 +102,10 @@ export async function InstallerView({ ctx }: { ctx: RequestContext }) {
       </div>
     </div>
   );
+}
+
+function DbOffline() {
+  return <p className="text-[13px] text-text-dim p-4">Database offline — start Docker to load real data.</p>;
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone?: "good" | "warn" }) {

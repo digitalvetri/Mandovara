@@ -10,7 +10,7 @@ export async function MakeSupervisorView({ ctx }: { ctx: RequestContext }) {
   const db  = scoped(ctx);
   const now = new Date();
 
-  const [byStatus, overdue, recentReady] = await Promise.all([
+  const result = await Promise.all([
     db.makeJob.groupBy({
       by:    ["status"],
       where: { organizationId: ctx.orgId, status: { in: [...STATUS_ORDER] } },
@@ -29,7 +29,9 @@ export async function MakeSupervisorView({ ctx }: { ctx: RequestContext }) {
       orderBy: { completedAt: "desc" },
       take:    5,
     }),
-  ]);
+  ] as const).catch(() => null);
+  if (!result) return <DbOffline />;
+  const [byStatus, overdue, recentReady] = result;
 
   const countByStatus = new Map(byStatus.map((r) => [r.status as MakeStatus, r._count._all]));
   const inProgress = STATUS_ORDER.reduce((s, st) => s + (countByStatus.get(st) ?? 0), 0);
@@ -69,6 +71,10 @@ export async function MakeSupervisorView({ ctx }: { ctx: RequestContext }) {
       </Card>
     </div>
   );
+}
+
+function DbOffline() {
+  return <p className="text-[13px] text-text-dim p-4">Database offline — start Docker to load real data.</p>;
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone?: "good" | "warn" | "fault" }) {

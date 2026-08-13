@@ -7,8 +7,9 @@ import { StatusPill } from "./StatusPill";
 // Density-first row (~34px tall per §5.6 of the design system).
 
 const SOURCE_LABEL: Record<string, string> = {
-  WEBSITE: "Website", REFERRAL: "Referral", WHATSAPP: "WhatsApp",
-  WALK_IN: "Walk-in", EXHIBITION: "Exhibition", COLD_CALL: "Cold call", OTHER: "Other",
+  WALK_IN: "Walk-in", PHONE: "Phone", WHATSAPP: "WhatsApp", WEBSITE: "Website",
+  INSTAGRAM: "Instagram", ARCHITECT_REFERRAL: "Architect Ref.", CLIENT_REFERRAL: "Client Ref.",
+  EXHIBITION: "Exhibition", OTHER: "Other",
 };
 
 export function LeadsTable({ rows }: { rows: LeadRow[] }) {

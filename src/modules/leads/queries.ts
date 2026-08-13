@@ -47,7 +47,7 @@ const MAX_PAGE_SIZE = 100;
 
 // Valid LeadStage values per schema enum, excluding WON and LOST
 const OPEN_STAGES = [
-  "NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION",
+  "NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION",
 ] as const;
 
 export async function listLeads(
@@ -96,6 +96,22 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
       convertedClientId: true, lostReason: true, nextActionAt: true,
     },
   });
+}
+
+export interface SalesUserOption {
+  id:   string;
+  name: string;
+  role: string;
+}
+
+export async function listSalesUsers(ctx: RequestContext): Promise<SalesUserOption[]> {
+  const db = scoped(ctx);
+  const rows = await db.user.findMany({
+    where: { role: { in: ["OWNER", "SALES", "DESIGNER"] as const }, status: "ACTIVE" },
+    select: { id: true, name: true, role: true },
+    orderBy: { name: "asc" },
+  });
+  return rows.map((u) => ({ id: u.id, name: u.name, role: u.role }));
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

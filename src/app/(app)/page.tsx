@@ -1,6 +1,15 @@
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { loadDashboard } from "@/modules/dashboard/queries";
+import type { DashboardData } from "./_dashboard/types";
+
+const STUB_DASHBOARD: DashboardData = {
+  revenueMtd: 0n, revenueMtdPrev: 0n, revenueMtdTrendPct: 0,
+  activeProjects: 0, activeProjectsDelta: 0, activeProjectsHandover: 0,
+  openLeads: 0, openLeadsDelta: 0, openLeadsAwaitingQuote: 0,
+  overdueInvoices: 0n, overdueInvoicesCount: 0, overdueBadge: 0,
+  revenueByMonth: [], projectStages: [], siteVisits: [], activity: [],
+};
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { KpiCard } from "./_dashboard/KpiCard";
 import { RevenueChart } from "./_dashboard/RevenueChart";
@@ -71,7 +80,12 @@ export default async function DashboardPage() {
   }
 
   // OWNER / HR / fallback → full cockpit view
-  const d = await loadDashboard(ctx);
+  let d: DashboardData;
+  try {
+    d = await loadDashboard(ctx);
+  } catch {
+    d = STUB_DASHBOARD;
+  }
 
   const trendTone = d.revenueMtdTrendPct >= 0 ? "good" : "bad";
   const trendSign = d.revenueMtdTrendPct >= 0 ? "+" : "";

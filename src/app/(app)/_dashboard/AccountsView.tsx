@@ -9,7 +9,7 @@ export async function AccountsView({ ctx }: { ctx: RequestContext }) {
   const now        = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [overdueInvoices, recentReceipts, pendingAdvances] = await Promise.all([
+  const baseResult = await Promise.all([
     db.invoice.findMany({
       where: {
         organizationId: ctx.orgId,
@@ -35,7 +35,9 @@ export async function AccountsView({ ctx }: { ctx: RequestContext }) {
       orderBy: { receivedAt: "desc" },
       take: 5,
     }),
-  ]);
+  ] as const).catch(() => null);
+  if (!baseResult) return <DbOffline />;
+  const [overdueInvoices, recentReceipts, pendingAdvances] = baseResult;
 
   // Invoice has no client relation — fetch names by clientId separately
   const clientIds = [...new Set(overdueInvoices.map((i) => i.clientId))];
@@ -43,7 +45,7 @@ export async function AccountsView({ ctx }: { ctx: RequestContext }) {
     ? await db.client.findMany({
         where:  { id: { in: clientIds } },
         select: { id: true, name: true },
-      })
+      }).catch(() => [])
     : [];
   const clientName = new Map(clients.map((c) => [c.id, c.name]));
 
@@ -104,6 +106,10 @@ export async function AccountsView({ ctx }: { ctx: RequestContext }) {
       </div>
     </div>
   );
+}
+
+function DbOffline() {
+  return <p className="text-[13px] text-text-dim p-4">Database offline — start Docker to load real data.</p>;
 }
 
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: "good" | "fault" }) {

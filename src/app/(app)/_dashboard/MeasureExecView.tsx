@@ -9,7 +9,7 @@ export async function MeasureExecView({ ctx }: { ctx: RequestContext }) {
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
   const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
 
-  const [todayMeasurements, myDrafts, upcomingCount] = await Promise.all([
+  const result = await Promise.all([
     db.measurement.findMany({
       where: {
         organizationId: ctx.orgId,
@@ -42,7 +42,9 @@ export async function MeasureExecView({ ctx }: { ctx: RequestContext }) {
         visitedAt:      { gt: todayEnd },
       },
     }),
-  ]);
+  ] as const).catch(() => null);
+  if (!result) return <DbOffline />;
+  const [todayMeasurements, myDrafts, upcomingCount] = result;
 
   return (
     <div className="space-y-4">
@@ -91,6 +93,10 @@ export async function MeasureExecView({ ctx }: { ctx: RequestContext }) {
       </div>
     </div>
   );
+}
+
+function DbOffline() {
+  return <p className="text-[13px] text-text-dim p-4">Database offline — start Docker to load real data.</p>;
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone?: "warn" }) {

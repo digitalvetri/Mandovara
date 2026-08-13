@@ -6,7 +6,7 @@ import type { RequestContext } from "@/kernel/auth/context";
 export async function StoreView({ ctx }: { ctx: RequestContext }) {
   const db = scoped(ctx);
 
-  const [pendingPOs, recentGrns, lowStockCount, stockBalances] = await Promise.all([
+  const result = await Promise.all([
     db.purchaseOrder.count({
       where: { organizationId: ctx.orgId, status: { in: ["SENT", "PARTIAL"] } },
     }),
@@ -34,7 +34,9 @@ export async function StoreView({ ctx }: { ctx: RequestContext }) {
       orderBy: { quantity: "asc" },
       take: 8,
     }),
-  ]);
+  ] as const).catch(() => null);
+  if (!result) return <DbOffline />;
+  const [pendingPOs, recentGrns, lowStockCount, stockBalances] = result;
 
   return (
     <div className="space-y-4">
@@ -87,6 +89,10 @@ export async function StoreView({ ctx }: { ctx: RequestContext }) {
       </div>
     </div>
   );
+}
+
+function DbOffline() {
+  return <p className="text-[13px] text-text-dim p-4">Database offline — start Docker to load real data.</p>;
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone?: "warn" }) {

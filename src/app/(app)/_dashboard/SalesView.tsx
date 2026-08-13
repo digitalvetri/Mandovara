@@ -8,7 +8,7 @@ export async function SalesView({ ctx }: { ctx: RequestContext }) {
   const now  = new Date();
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
 
-  const [leadCounts, quoteCounts, dueFollowUps, myProjects] = await Promise.all([
+  const result = await Promise.all([
     db.lead.groupBy({
       by: ["stage"],
       where: { organizationId: ctx.orgId },
@@ -40,7 +40,9 @@ export async function SalesView({ ctx }: { ctx: RequestContext }) {
       orderBy: { createdAt: "desc" },
       take: 8,
     }),
-  ]);
+  ] as const).catch(() => null);
+  if (!result) return <DbOffline />;
+  const [leadCounts, quoteCounts, dueFollowUps, myProjects] = result;
 
   const stageOrder = ["NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION", "WON", "LOST"];
   const leadByStage = new Map(leadCounts.map((r) => [r.stage as string, r._count._all]));
@@ -89,6 +91,10 @@ export async function SalesView({ ctx }: { ctx: RequestContext }) {
       </div>
     </div>
   );
+}
+
+function DbOffline() {
+  return <p className="text-[13px] text-text-dim p-4">Database offline — start Docker to load real data.</p>;
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone?: "good" | "warn" | "bad" }) {

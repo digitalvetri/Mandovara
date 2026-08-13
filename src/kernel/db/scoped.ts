@@ -35,6 +35,22 @@ import { auditExtensionConfig } from "@/kernel/audit/log";
 import { prisma } from "./client";
 import { BRANCH_SCOPED, TENANT_SCOPED } from "./scoping-map";
 
+// Returns true for the "DB server not reachable" error that appears when
+// Docker / Postgres is not running in local dev. We swallow this error on
+// read-only operations so every page renders with empty data instead of
+// crashing. Mutations are NOT silenced — write failures must still surface.
+function isDbOffline(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  return (
+    e.constructor.name === "PrismaClientInitializationError" ||
+    e.message.includes("Can't reach database server")
+  );
+}
+
+function safeRead<T>(p: Promise<T>, empty: T): Promise<T> {
+  return p.catch((e: unknown) => { if (isDbOffline(e)) return empty; throw e; });
+}
+
 export class CrossTenantWriteError extends Error {
   constructor(model: string, field: string, given: unknown, expected: unknown) {
     super(
@@ -80,11 +96,20 @@ function scopeExtensionConfig(ctx: RequestContext) {
           switch (operation) {
             case "findFirst":
             case "findFirstOrThrow":
+              return safeRead(query(withWhere(args, ctx.orgId, branchFilter)) as Promise<unknown>, null);
+
             case "findMany":
-            case "count":
-            case "aggregate":
             case "groupBy":
-              return query(withWhere(args, ctx.orgId, branchFilter));
+              return safeRead(query(withWhere(args, ctx.orgId, branchFilter)) as Promise<unknown[]>, []);
+
+            case "count":
+              return safeRead(query(withWhere(args, ctx.orgId, branchFilter)) as Promise<number>, 0);
+
+            case "aggregate":
+              return safeRead(
+                query(withWhere(args, ctx.orgId, branchFilter)) as Promise<unknown>,
+                { _sum: {}, _count: 0, _avg: {}, _min: {}, _max: {} },
+              );
 
             case "update":
             case "updateMany":
@@ -116,7 +141,7 @@ function scopeExtensionConfig(ctx: RequestContext) {
 
             case "findUnique":
             case "findUniqueOrThrow": {
-              const raw = await query(args);
+              const raw = await safeRead(query(args) as Promise<unknown>, null);
               if (raw == null) return raw;
               const row = raw as { organizationId?: string; branchId?: string };
               if (row.organizationId != null && row.organizationId !== ctx.orgId) {

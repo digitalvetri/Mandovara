@@ -14,8 +14,9 @@ import { EditableField } from "../_components/EditableField";
 export const dynamic = "force-dynamic";
 
 const SOURCE_LABEL: Record<string, string> = {
-  WEBSITE: "Website", REFERRAL: "Referral", WHATSAPP: "WhatsApp",
-  WALK_IN: "Walk-in", EXHIBITION: "Exhibition", COLD_CALL: "Cold call", OTHER: "Other",
+  WALK_IN: "Walk-in", PHONE: "Phone", WHATSAPP: "WhatsApp", WEBSITE: "Website",
+  INSTAGRAM: "Instagram", ARCHITECT_REFERRAL: "Architect Referral", CLIENT_REFERRAL: "Client Referral",
+  EXHIBITION: "Exhibition", OTHER: "Other",
 };
 
 const SOURCE_OPTIONS = LEAD_SOURCES.map((s) => ({
