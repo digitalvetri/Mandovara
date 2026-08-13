@@ -12,6 +12,7 @@ const bannedPrismaImport = {
   name: "@prisma/client",
   message:
     "Rule 1 & 10: import Prisma only through src/kernel/db. Use `import { db } from '@/kernel/db/scoped'`.",
+  allowTypeImports: true,
 };
 
 const bannedUSLocaleSyntax = {
