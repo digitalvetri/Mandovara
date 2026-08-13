@@ -2,6 +2,7 @@ import type { ProjectStage } from "@/modules/projects/schema";
 
 const TONE: Record<ProjectStage, string> = {
   ENQUIRY:       "bg-text-dim/12 text-text-dim",
+  SITE_VISIT:    "bg-info/15 text-info",
   MEASUREMENT:   "bg-info/15 text-info",
   QUOTATION:     "bg-warn/15 text-warn",
   ORDERED:       "bg-warn/15 text-warn",
@@ -13,9 +14,9 @@ const TONE: Record<ProjectStage, string> = {
   CANCELLED:     "bg-bad/12 text-bad line-through",
 };
 const LABEL: Record<ProjectStage, string> = {
-  ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
-  ORDERED: "Ordered", PROCUREMENT: "Procurement", MAKE: "Make",
-  INSTALLATION: "Installation", SNAGGING: "Snagging",
+  ENQUIRY: "Enquiry", SITE_VISIT: "Site Visit", MEASUREMENT: "Measurement",
+  QUOTATION: "Quotation", ORDERED: "Ordered", PROCUREMENT: "Procurement",
+  MAKE: "Make", INSTALLATION: "Installation", SNAGGING: "Snagging",
   COMPLETED: "Completed", CANCELLED: "Cancelled",
 };
 

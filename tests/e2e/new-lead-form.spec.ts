@@ -1,23 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-// Auth: set dev_uid cookie so middleware passes and devContext() picks up the first OWNER
-test.use({
-  storageState: {
-    cookies: [
-      {
-        name: "dev_uid",
-        value: "playwright-dev-owner",
-        domain: "localhost",
-        path: "/",
-        httpOnly: true,
-        secure: false,
-        sameSite: "Lax",
-      },
-    ],
-    origins: [],
-  },
-});
-
 // Helper selectors — EntityForm.Field uses <div> labels, not <label htmlFor>
 // so we match by the input's `name` attribute (set by react-hook-form's register())
 const sel = {
