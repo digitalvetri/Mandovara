@@ -33,6 +33,8 @@ export interface LeadDetail extends LeadRow {
   convertedClientId: string | null;
   lostReason: string | null;
   nextActionAt: Date | null;
+  ownerName: string;
+  budgetRangeSlug: string | null;
 }
 
 export interface ListLeadsResult {
@@ -86,16 +88,45 @@ export async function listLeads(
 export async function getLead(ctx: RequestContext, id: string): Promise<LeadDetail | null> {
   requirePermission(ctx, "lead.view");
   const db = scoped(ctx);
-  return db.lead.findUnique({
+  const lead = await db.lead.findUnique({
     where: { id },
     select: {
       id: true, number: true, name: true, mobile: true, email: true,
       source: true, stage: true, requirement: true,
-      budgetMin: true, budgetMax: true,
+      budgetMin: true, budgetMax: true, siteAddress: true,
       ownerId: true, createdAt: true,
       convertedClientId: true, lostReason: true, nextActionAt: true,
     },
   });
+  if (!lead) return null;
+
+  const owner = await db.user.findUnique({
+    where: { id: lead.ownerId },
+    select: { name: true },
+  });
+
+  const addr = lead.siteAddress as Record<string, unknown> | null;
+  const budgetRangeSlug = typeof addr?.budgetRange === "string" ? addr.budgetRange : null;
+
+  return {
+    id: lead.id,
+    number: lead.number,
+    name: lead.name,
+    mobile: lead.mobile,
+    email: lead.email,
+    source: lead.source,
+    stage: lead.stage,
+    requirement: lead.requirement,
+    budgetMin: lead.budgetMin,
+    budgetMax: lead.budgetMax,
+    ownerId: lead.ownerId,
+    createdAt: lead.createdAt,
+    convertedClientId: lead.convertedClientId,
+    lostReason: lead.lostReason,
+    nextActionAt: lead.nextActionAt,
+    ownerName: owner?.name ?? "—",
+    budgetRangeSlug,
+  };
 }
 
 export interface SalesUserOption {

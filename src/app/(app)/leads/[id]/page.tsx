@@ -4,7 +4,7 @@ import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
-import { LEAD_SOURCES } from "@/modules/leads/schema";
+import { LEAD_SOURCES, BUDGET_RANGES } from "@/modules/leads/schema";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
 import { ConvertButton } from "../_components/ConvertButton";
@@ -24,6 +24,8 @@ const SOURCE_OPTIONS = LEAD_SOURCES.map((s) => ({
   label: SOURCE_LABEL[s] ?? s,
 }));
 
+const BUDGET_OPTIONS = BUDGET_RANGES.map((r) => ({ value: r.value, label: r.label }));
+
 export default async function LeadDetailPage({
   params,
 }: { params: Promise<{ id: string }> }) {
@@ -39,10 +41,10 @@ export default async function LeadDetailPage({
   const createdDate = lead.createdAt.toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
   });
-  const budgetRupees = lead.budgetMax
-    ? String(Number(lead.budgetMax) / 100)
-    : "";
   const budgetDisplay = lead.budgetMax ? formatINR(lead.budgetMax) : "";
+  const budgetLabel = lead.budgetRangeSlug
+    ? (BUDGET_RANGES.find((r) => r.value === lead.budgetRangeSlug)?.label ?? lead.budgetRangeSlug)
+    : "";
   const isConverted = lead.convertedClientId != null;
 
   return (
@@ -121,12 +123,14 @@ export default async function LeadDetailPage({
               />
               <EditableField
                 leadId={lead.id}
-                field="expectedValue"
-                value={budgetRupees}
-                displayValue={budgetDisplay}
-                label="Expected value"
-                placeholder="Add expected value"
+                field="budgetRange"
+                value={lead.budgetRangeSlug ?? ""}
+                displayValue={budgetLabel}
+                label="Budget range"
+                placeholder="Select budget range"
                 icon={<IndianRupee size={14} strokeWidth={1.75} />}
+                variant="select"
+                options={BUDGET_OPTIONS}
                 readOnly={isConverted}
               />
               <EditableField
@@ -216,9 +220,9 @@ export default async function LeadDetailPage({
               At a glance
             </div>
             <dl className="space-y-3 text-[13px]">
-              <Row k="Expected value" v={budgetDisplay || "—"} />
+              <Row k="Expected value" v={budgetLabel || budgetDisplay || "—"} />
               <Row k="Source" v={SOURCE_LABEL[lead.source] ?? lead.source} />
-              <Row k="Owner" v={lead.ownerId ? "Assigned" : "Unassigned"} />
+              <Row k="Owner" v={lead.ownerName} />
               <Row k="Created" v={createdDate} />
             </dl>
           </div>

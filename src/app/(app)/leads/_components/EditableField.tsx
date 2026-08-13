@@ -9,7 +9,7 @@ type Option = { value: string; label: string };
 
 interface Props {
   leadId: string;
-  field: "name" | "mobile" | "email" | "companyName" | "source" | "expectedValue" | "requirement";
+  field: "name" | "mobile" | "email" | "source" | "budgetRange" | "requirement";
   value: string;
   displayValue?: string;
   placeholder?: string;

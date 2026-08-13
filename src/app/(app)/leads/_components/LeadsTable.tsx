@@ -32,7 +32,7 @@ export function LeadsTable({ rows }: { rows: LeadRow[] }) {
           <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
             <Th>Name</Th>
             <Th>Mobile</Th>
-            <Th>Company</Th>
+            <Th>Email</Th>
             <Th>Source</Th>
             <Th>Status</Th>
             <Th align="right">Expected</Th>
@@ -51,7 +51,7 @@ export function LeadsTable({ rows }: { rows: LeadRow[] }) {
                 )}
               </Td>
               <Td><span className="tabular">{r.mobile}</span></Td>
-              <Td className="text-text-dim">—</Td>
+              <Td className="text-text-dim">{r.email ?? "—"}</Td>
               <Td className="text-text-dim">{SOURCE_LABEL[r.source] ?? r.source}</Td>
               <Td><StatusPill status={r.stage} /></Td>
               <Td align="right"><span className="tabular text-text">{r.budgetMax ? formatINR(r.budgetMax) : "—"}</span></Td>
