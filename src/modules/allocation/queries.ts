@@ -70,28 +70,37 @@ export async function listOpenOrderLines(
         where:  { colourwayId: { not: null } },
         select: {
           id: true, colourwayId: true, quantity: true, unit: true,
-          colourway: {
-            select: {
-              code: true, colourName: true,
-            },
-          },
-          allocations: {
-            select: { quantity: true, dyeLot: true },
-          },
+          colourway: { select: { code: true, colourName: true } },
         },
       },
     },
   });
 
+  // Fetch allocations separately — Allocation.orderLineId is a plain string, no FK relation
+  const allLineIds = orders.flatMap((o) => o.lines.map((l) => l.id));
+  const allAllocations = allLineIds.length > 0
+    ? await db.allocation.findMany({
+        where:  { orderLineId: { in: allLineIds } },
+        select: { orderLineId: true, quantity: true, dyeLot: true },
+      })
+    : [];
+  const allocByLine = new Map<string, typeof allAllocations>();
+  for (const a of allAllocations) {
+    const arr = allocByLine.get(a.orderLineId) ?? [];
+    arr.push(a);
+    allocByLine.set(a.orderLineId, arr);
+  }
+
   const rows: OpenOrderLineRow[] = [];
   for (const o of orders) {
     for (const line of o.lines) {
       if (!line.colourwayId || !line.colourway) continue;
+      const lineAllocs = allocByLine.get(line.id) ?? [];
       const ordered   = Number(line.quantity);
-      const allocated = line.allocations.reduce((s, a) => s + Number(a.quantity), 0);
+      const allocated = lineAllocs.reduce((s, a) => s + Number(a.quantity), 0);
       const needed    = ordered - allocated;
       if (needed <= 0.001) continue;
-      const lots = [...new Set(line.allocations.map((a) => a.dyeLot).filter(Boolean) as string[])];
+      const lots = [...new Set(lineAllocs.map((a) => a.dyeLot).filter(Boolean) as string[])];
       rows.push({
         id:               line.id,
         orderId:          o.id,
