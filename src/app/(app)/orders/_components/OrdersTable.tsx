@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
@@ -6,6 +9,7 @@ import type { OrderRow } from "@/modules/orders/queries";
 import { StatusPill } from "./StatusPill";
 
 export function OrdersTable({ rows }: { rows: OrderRow[] }) {
+  const router = useRouter();
   if (rows.length === 0) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-16 text-center">
@@ -36,9 +40,17 @@ export function OrdersTable({ rows }: { rows: OrderRow[] }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-rule/70 last:border-0 hover:bg-surface-hover transition-colors">
+            <tr
+              key={r.id}
+              onClick={() => router.push(`/orders/${r.id}` as Route)}
+              className="border-b border-rule/70 last:border-0 hover:bg-surface-hover transition-colors cursor-pointer"
+            >
               <Td>
-                <Link href={`/orders/${r.id}` as Route} className="text-text hover:text-gold tabular">
+                <Link
+                  href={`/orders/${r.id}` as Route}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-text hover:text-gold tabular"
+                >
                   {r.number}
                 </Link>
               </Td>

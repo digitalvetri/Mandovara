@@ -2,7 +2,10 @@
 
 import { z } from "zod";
 
-export const CLIENT_TYPES = ["DEALER", "DISTRIBUTOR", "RETAIL", "PROJECT", "GOVERNMENT"] as const;
+export const CLIENT_TYPES = [
+  "HOMEOWNER", "ARCHITECT", "INTERIOR_DESIGNER",
+  "BUILDER", "COMMERCIAL", "GOVERNMENT", "DEALER",
+] as const;
 export const CLIENT_STATUSES = ["ACTIVE", "INACTIVE", "BLACKLISTED"] as const;
 
 export type ClientType = (typeof CLIENT_TYPES)[number];

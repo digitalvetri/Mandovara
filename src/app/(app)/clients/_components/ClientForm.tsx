@@ -17,8 +17,13 @@ interface ClientFormProps {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  DEALER: "Dealer", DISTRIBUTOR: "Distributor", RETAIL: "Retail",
-  PROJECT: "Project", GOVERNMENT: "Government",
+  HOMEOWNER:         "Homeowner",
+  ARCHITECT:         "Architect",
+  INTERIOR_DESIGNER: "Interior Designer",
+  BUILDER:           "Builder / Developer",
+  COMMERCIAL:        "Commercial",
+  GOVERNMENT:        "Government",
+  DEALER:            "Dealer",
 };
 
 export function ClientForm({ mode, initial }: ClientFormProps) {
@@ -32,7 +37,7 @@ export function ClientForm({ mode, initial }: ClientFormProps) {
     resolver: zodResolver(createClientSchema),
     defaultValues: {
       name:          initial?.name          ?? "",
-      type:          initial?.type          ?? "RETAIL",
+      type:          initial?.type          ?? "HOMEOWNER",
       primaryMobile: initial?.primaryMobile ?? "",
       primaryEmail:  initial?.primaryEmail  ?? "",
       gstin:         initial?.gstin         ?? "",
