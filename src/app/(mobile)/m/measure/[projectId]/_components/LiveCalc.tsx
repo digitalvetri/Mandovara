@@ -7,8 +7,8 @@
 
 import { useMemo } from "react";
 import { computeCalcResult, type CalcResultRow } from "@/modules/measurement/engine";
-import type { ItemDraft, Unit } from "../types";
-import { toMm } from "../unit-convert";
+import type { ItemDraft, Unit } from "./types";
+import { toMm } from "./unit-convert";
 
 interface LiveCalcProps {
   draft: ItemDraft;

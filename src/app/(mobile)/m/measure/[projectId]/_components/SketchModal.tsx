@@ -1,34 +1,29 @@
 "use client";
 
-// §5.4 Sketch canvas. Freehand over a blank canvas — no layers,
-// no shapes, no text. Executives draw bay windows, pillars, false-
-// ceiling steps. Anything richer is time taken from the offline
-// queue (spec §5.4 explicit).
-//
-// Pointer events so it works on touch and mouse. Undo and clear.
-// Saved as a data URL — the outbox drain uploads it later.
+// Freehand sketch overlay. Pointer events, 3 stroke widths, undo,
+// clear. Save closes the modal and returns a data URL to the item
+// screen. No layers, no shapes, no text (spec §5.4).
 
 import { useEffect, useRef, useState } from "react";
-import { PenTool, Undo2, Trash2, Check } from "lucide-react";
-import { StepShell } from "./StepShell";
+import { PenTool, Undo2, Trash2 } from "lucide-react";
+import { ModalShell } from "./ModalShell";
 
-interface SketchStepProps {
-  hasSketch:  boolean;
-  onCaptured: (key: string) => void;
-  onSkip:     () => void;
-  onBack:     () => void;
-  onNext:     () => void;
+interface SketchModalProps {
+  existing?: string;
+  onSave:    (dataUrl: string) => void;
+  onClear:   () => void;
+  onClose:   () => void;
 }
 
-type Point = { x: number; y: number };
+type Point  = { x: number; y: number };
 type Stroke = { points: Point[]; width: number };
 
-export function SketchStep({ hasSketch, onCaptured, onSkip, onBack, onNext }: SketchStepProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+export function SketchModal({ existing, onSave, onClear, onClose }: SketchModalProps) {
+  const canvasRef  = useRef<HTMLCanvasElement | null>(null);
   const strokesRef = useRef<Stroke[]>([]);
   const drawingRef = useRef<Stroke | null>(null);
   const [width, setWidth] = useState<number>(3);
-  const [dirty, setDirty] = useState(false);
+  const [, setTick]        = useState(0);       // force rerender for enable/disable
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -40,8 +35,12 @@ export function SketchStep({ hasSketch, onCaptured, onSkip, onBack, onNext }: Sk
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.scale(dpr, dpr);
-    redraw();
-  }, []);
+    if (existing) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      img.src = existing;
+    }
+  }, [existing]);
 
   function pointFromEvent(e: React.PointerEvent<HTMLCanvasElement>): Point {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -57,8 +56,6 @@ export function SketchStep({ hasSketch, onCaptured, onSkip, onBack, onNext }: Sk
   function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>): void {
     if (!drawingRef.current) return;
     drawingRef.current.points.push(pointFromEvent(e));
-    setDirty(true);
-    // Fast path — draw just the new segment
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     const s = drawingRef.current;
@@ -79,19 +76,19 @@ export function SketchStep({ hasSketch, onCaptured, onSkip, onBack, onNext }: Sk
     if (!drawingRef.current) return;
     strokesRef.current.push(drawingRef.current);
     drawingRef.current = null;
+    setTick((n) => n + 1);
   }
 
   function undo(): void {
     strokesRef.current.pop();
     redraw();
-    setDirty(strokesRef.current.length > 0);
+    setTick((n) => n + 1);
   }
 
   function clear(): void {
     strokesRef.current = [];
     redraw();
-    setDirty(false);
-    onCaptured("");
+    setTick((n) => n + 1);
   }
 
   function redraw(): void {
@@ -117,19 +114,39 @@ export function SketchStep({ hasSketch, onCaptured, onSkip, onBack, onNext }: Sk
 
   function save(): void {
     const canvas = canvasRef.current;
-    if (!canvas || !dirty) { onNext(); return; }
-    const url = canvas.toDataURL("image/png");
-    onCaptured(url);
-    onNext();
+    if (!canvas) return;
+    const empty = strokesRef.current.length === 0 && !existing;
+    if (empty) { onClose(); return; }
+    onSave(canvas.toDataURL("image/png"));
+    onClose();
   }
 
+  const hasDrawn = strokesRef.current.length > 0 || !!existing;
+
   return (
-    <StepShell
-      title="Sketch (optional)"
-      hint="Bay windows, pillars, false-ceiling steps — one quick outline goes a long way for the installer."
-      onBack={onBack}
-      onNext={dirty ? save : onSkip}
-      nextLabel={dirty ? "Save sketch" : (hasSketch ? "Continue" : "Skip")}
+    <ModalShell
+      title="Sketch"
+      onClose={onClose}
+      footer={
+        <div className="flex gap-2">
+          {hasDrawn && (
+            <button
+              type="button"
+              onClick={() => { onClear(); clear(); }}
+              className="min-h-[44px] px-3 rounded-[8px] border border-rule text-text-dim inline-flex items-center gap-1"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={save}
+            className="flex-1 min-h-[44px] rounded-[8px] bg-gold text-ink font-medium"
+          >
+            {hasDrawn ? "Save sketch" : "Skip"}
+          </button>
+        </div>
+      }
     >
       <div className="rounded-[10px] border border-rule bg-surface overflow-hidden">
         <canvas
@@ -159,31 +176,15 @@ export function SketchStep({ hasSketch, onCaptured, onSkip, onBack, onNext }: Sk
             <PenTool size={12 + w * 2} className="text-text-dim" />
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={undo}
-            disabled={strokesRef.current.length === 0}
-            className="min-h-[44px] px-3 rounded-[8px] border border-rule text-text-dim disabled:opacity-40 inline-flex items-center gap-1"
-          >
-            <Undo2 size={14} /> Undo
-          </button>
-          <button
-            type="button"
-            onClick={clear}
-            disabled={strokesRef.current.length === 0}
-            className="min-h-[44px] px-3 rounded-[8px] border border-rule text-text-dim disabled:opacity-40 inline-flex items-center gap-1"
-          >
-            <Trash2 size={14} /> Clear
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={undo}
+          disabled={strokesRef.current.length === 0}
+          className="ml-auto min-h-[44px] px-3 rounded-[8px] border border-rule text-text-dim disabled:opacity-40 inline-flex items-center gap-1"
+        >
+          <Undo2 size={14} /> Undo
+        </button>
       </div>
-
-      {hasSketch && !dirty && (
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-solid-tint px-2.5 py-1 text-[11.5px] text-solid-strong">
-          <Check size={12} /> Sketch attached
-        </div>
-      )}
-    </StepShell>
+    </ModalShell>
   );
 }

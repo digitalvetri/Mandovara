@@ -11,7 +11,7 @@ import { startMeasurementRound, createRoom } from "@/modules/measurement/actions
 import { attachDrainListeners, type DrainSummary } from "@/lib/measure-drain";
 import type { FieldProject, FieldRoom, ResumableRound } from "./types";
 import { QueueBanner } from "./QueueBanner";
-import { ItemFlow } from "./ItemFlow";
+import { ItemScreen } from "./ItemScreen";
 
 interface FieldShellProps {
   project:        FieldProject;
@@ -108,7 +108,7 @@ export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShe
       )}
 
       {round ? (
-        <ItemFlow
+        <ItemScreen
           projectId={project.id}
           measurementId={round.id}
           rooms={rooms}
