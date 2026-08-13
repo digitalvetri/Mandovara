@@ -9,7 +9,8 @@
 // hits IndexedDB, not the network.
 
 import { useEffect, useState } from "react";
-import { CircleDashed, CloudUpload, WifiOff } from "lucide-react";
+import Link from "next/link";
+import { CircleDashed, CloudUpload, WifiOff, AlertTriangle } from "lucide-react";
 import { countPending, listConflicts } from "@/lib/measure-outbox";
 import type { DrainSummary } from "@/lib/measure-drain";
 
@@ -65,9 +66,14 @@ export function QueueBanner({ projectId, drain }: QueueBannerProps) {
       <Icon size={14} className={pending > 0 && online ? "animate-pulse" : undefined} />
       <div className="text-[11.5px] tabular">{label}</div>
       {conflicts > 0 && (
-        <div className="ml-auto text-[11px] text-fault">
-          {conflicts} conflict{conflicts === 1 ? "" : "s"} · review later
-        </div>
+        <Link
+          href="/m/measure/conflicts"
+          className="ml-auto inline-flex items-center gap-1 rounded-full bg-fault/15 text-fault px-2 py-0.5 text-[11px] hover:bg-fault/25"
+        >
+          <AlertTriangle size={11} />
+          <span className="tabular">{conflicts}</span>
+          <span>conflict{conflicts === 1 ? "" : "s"} — review</span>
+        </Link>
       )}
     </div>
   );
