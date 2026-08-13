@@ -4,7 +4,9 @@ import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { shortNumber } from "@/lib/short-number";
 import { devContext } from "@/lib/dev-context";
-import { getProject } from "@/modules/projects/queries";
+import {
+  getProject, getProjectMilestones, getProjectTasks, getProjectSiteLogs,
+} from "@/modules/projects/queries";
 import type { ProjectMilestone, ProjectTask, ProjectSiteLog } from "@/modules/projects/queries";
 import { ProjectStatusPill } from "../_components/StatusPill";
 import { ProjectPanels } from "../_components/ProjectPanels";
@@ -19,9 +21,11 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const milestones: ProjectMilestone[] = [];
-  const tasks: ProjectTask[] = [];
-  const siteLogs: ProjectSiteLog[] = [];
+  const [milestones, tasks, siteLogs] = await Promise.all([
+    getProjectMilestones(ctx, id),
+    getProjectTasks(ctx, id),
+    getProjectSiteLogs(ctx, id),
+  ]);
 
   const completedMs = milestones.filter((m) => m.status === "COMPLETED").length;
   const completedBilling = milestones

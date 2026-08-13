@@ -10,8 +10,7 @@ import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { parseINR } from "@/kernel/money/format";
-import { allocateNumber, Prisma } from "@/kernel/numbering/series";
-import { financialYear } from "@/kernel/datetime";
+import { allocateNumber, yymmFromDate, Prisma } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import {
   createProjectSchema, setProjectStatusSchema,
@@ -46,27 +45,25 @@ export async function createProject(input: unknown): Promise<ActionResult<{ id: 
     select: { invoicePrefix: true },
   });
 
-  const start = new Date(d.startDate);
+  const yymm = yymmFromDate(new Date());
   const created = await withTransaction(async (tx: TxClient) => {
     const number = await allocateNumber(tx, {
-      orgId:         ctx.orgId,
-      branchId:      d.branchId,
-      docType:       "PROJECT",
-      financialYear: financialYear(start),
-      prefix:        `${branch.invoicePrefix}/PRJ`,
+      orgId:   ctx.orgId,
+      series:  "PRJ",
+      yymm,
+      prefix:  branch.invoicePrefix,
     });
     const project = await tx.project.create({
       data: {
-        orgId:         ctx.orgId,
-        branchId:      d.branchId,
+        organizationId: ctx.orgId,
+        branchId:       d.branchId,
         number,
-        name:          d.name,
-        clientId:      d.clientId,
-        startDate:     start,
-        ...(d.targetEndDate && { targetEndDate: new Date(d.targetEndDate) }),
-        status:        "PLANNING",
+        name:           d.name,
+        clientId:       d.clientId,
+        stage:          "ENQUIRY",
+        siteAddress:    {},
+        ownerId:        ctx.userId,
         orderValue,
-        createdById:   ctx.userId,
       },
       select: { id: true, number: true },
     });
@@ -86,10 +83,7 @@ export async function setProjectStatus(input: unknown): Promise<ActionResult<{ i
   const db = scoped(ctx);
   await db.project.update({
     where: { id },
-    data: {
-      status,
-      ...(status === "COMPLETED" && { actualEndDate: new Date() }),
-    },
+    data: { stage: status },
   });
   revalidatePath("/projects");
   revalidatePath(`/projects/${id}`);
@@ -145,17 +139,29 @@ export async function addTask(input: unknown): Promise<ActionResult<{ id: string
   const parsed = addTaskSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
   const d = parsed.data;
-  const db = scoped(ctx);
-  const created = await db.task.create({
-    data: {
-      projectId:   d.projectId,
-      title:       d.title,
-      description: emptyToNull(d.description),
-      priority:    d.priority,
-      status:      "TODO",
-      ...(d.dueDate && d.dueDate !== "" && { dueDate: new Date(d.dueDate) }),
-    },
-    select: { id: true },
+  const yymm = yymmFromDate(new Date());
+  const created = await withTransaction(async (tx: TxClient) => {
+    const number = await allocateNumber(tx, {
+      orgId:  ctx.orgId,
+      series: "TASK",
+      yymm,
+      prefix: "MDV",
+    });
+    return tx.task.create({
+      data: {
+        organizationId: ctx.orgId,
+        number,
+        projectId:      d.projectId,
+        title:          d.title,
+        description:    emptyToNull(d.description),
+        priority:       d.priority,
+        status:         "TODO",
+        assignedToId:   ctx.userId,
+        createdById:    ctx.userId,
+        ...(d.dueDate && d.dueDate !== "" && { dueAt: new Date(d.dueDate) }),
+      },
+      select: { id: true },
+    });
   });
   revalidatePath(`/projects/${d.projectId}`);
   return { ok: true, data: created };
@@ -191,11 +197,11 @@ export async function addSiteLog(input: unknown): Promise<ActionResult<{ id: str
   const db = scoped(ctx);
   const created = await db.siteLog.create({
     data: {
-      orgId:         ctx.orgId,
-      projectId:     d.projectId,
-      loggedAt:      new Date(d.loggedAt),
-      summary:       d.summary,
-      weather:       emptyToNull(d.weather),
+      projectId:    d.projectId,
+      loggedAt:     new Date(d.loggedAt),
+      summary:      d.summary,
+      weather:      emptyToNull(d.weather),
+      createdById:  ctx.userId,
       ...(d.manpowerCount != null && { manpowerCount: d.manpowerCount }),
     },
     select: { id: true },

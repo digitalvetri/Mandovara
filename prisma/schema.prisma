@@ -124,9 +124,12 @@ enum LeadSource {
   WHATSAPP
   WEBSITE
   INSTAGRAM
+  FACEBOOK
+  GOOGLE
   ARCHITECT_REFERRAL
   CLIENT_REFERRAL
   EXHIBITION
+  ADVERTISEMENT
   OTHER
 }
 
@@ -811,6 +814,8 @@ model Project {
   client       Client           @relation(fields: [clientId], references: [id])
   members      ProjectMember[]
   rooms        Room[]
+  milestones   Milestone[]
+  siteLogs     SiteLog[]
   siteVisits   SiteVisit[]
   measurements Measurement[]
   quotations   Quotation[]
@@ -823,6 +828,39 @@ model Project {
   @@unique([organizationId, number])
   @@index([organizationId, stage])
   @@index([organizationId, clientId])
+}
+
+model Milestone {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String
+  name           String
+  plannedDate    DateTime
+  actualDate     DateTime?
+  billingPct     Decimal  @db.Decimal(5, 2) @default(0)
+  order          Int      @default(0)
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
+model SiteLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String
+  loggedAt       DateTime
+  summary        String
+  weather        String?
+  manpowerCount  Int?
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
 }
 
 model ProjectMember {

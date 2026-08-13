@@ -7,18 +7,20 @@ import { z } from "zod";
 // Must match prisma/schema.prisma enum LeadSource exactly
 export const LEAD_SOURCES = [
   "WALK_IN", "PHONE", "WHATSAPP", "WEBSITE", "INSTAGRAM",
-  "ARCHITECT_REFERRAL", "CLIENT_REFERRAL", "EXHIBITION", "OTHER",
+  "FACEBOOK", "GOOGLE",
+  "ARCHITECT_REFERRAL", "CLIENT_REFERRAL", "EXHIBITION", "ADVERTISEMENT", "OTHER",
 ] as const;
 
-// Sources shown in the form (PDF-specified, mapped to DB enum values)
+// Sources shown in the new-lead form (PDF-specified order, mapped to DB enum values)
 export const LEAD_SOURCE_OPTIONS: { value: typeof LEAD_SOURCES[number]; label: string }[] = [
   { value: "WEBSITE",            label: "Website" },
   { value: "WHATSAPP",           label: "WhatsApp" },
   { value: "INSTAGRAM",          label: "Instagram" },
-  { value: "PHONE",              label: "Phone" },
-  { value: "WALK_IN",            label: "Walk-in" },
+  { value: "FACEBOOK",           label: "Facebook" },
+  { value: "GOOGLE",             label: "Google" },
   { value: "CLIENT_REFERRAL",    label: "Referral" },
-  { value: "ARCHITECT_REFERRAL", label: "Architect" },
+  { value: "WALK_IN",            label: "Walk-in" },
+  { value: "ADVERTISEMENT",      label: "Advertisement" },
   { value: "OTHER",              label: "Other" },
 ];
 
@@ -28,9 +30,12 @@ export const SOURCE_LABEL: Record<string, string> = {
   WHATSAPP:           "WhatsApp",
   WEBSITE:            "Website",
   INSTAGRAM:          "Instagram",
-  ARCHITECT_REFERRAL: "Architect",
+  FACEBOOK:           "Facebook",
+  GOOGLE:             "Google",
+  ARCHITECT_REFERRAL: "Architect Referral",
   CLIENT_REFERRAL:    "Referral",
   EXHIBITION:         "Exhibition",
+  ADVERTISEMENT:      "Advertisement",
   OTHER:              "Other",
 };
 
@@ -48,11 +53,15 @@ export const OPEN_LEAD_STATUSES = [
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 export type LeadStage  = (typeof LEAD_STATUSES)[number];
 
-// Project type options (stored in siteAddress JSON — no DB enum needed)
-export const PROJECT_TYPES = [
-  "Residential", "Commercial", "Office", "Villa", "Apartment", "Renovation", "Other",
-] as const;
-export type ProjectType = (typeof PROJECT_TYPES)[number];
+// Lead priority — stored in siteAddress JSON (not a DB column)
+export const LEAD_PRIORITIES = ["HOT", "WARM", "COLD"] as const;
+export type LeadPriority = (typeof LEAD_PRIORITIES)[number];
+
+export const LEAD_PRIORITY_OPTIONS: { value: LeadPriority; label: string; desc: string }[] = [
+  { value: "HOT",  label: "Hot",  desc: "Ready to decide now" },
+  { value: "WARM", label: "Warm", desc: "Interested, needs nurturing" },
+  { value: "COLD", label: "Cold", desc: "Early stage, low urgency" },
+];
 
 // Predefined budget ranges (mapped to budgetMin/budgetMax paise in the action)
 export const BUDGET_RANGES = [
@@ -65,44 +74,47 @@ export const BUDGET_RANGES = [
 ] as const;
 export type BudgetRange = (typeof BUDGET_RANGES)[number]["value"];
 
+// Project type options (stored in siteAddress JSON — no DB enum needed)
+export const PROJECT_TYPES = [
+  "Residential", "Commercial", "Office", "Villa", "Apartment", "Renovation", "Other",
+] as const;
+export type ProjectType = (typeof PROJECT_TYPES)[number];
+
 // E.164-lite: +91 followed by 10 digits, or 10 digits (auto-prefixed later).
 const mobileRegex = /^(\+91)?\d{10}$/;
 
 export const createLeadSchema = z.object({
-  // Contact
-  name:          z.string().trim().min(2, "Customer name is required").max(120),
-  mobile:        z.string().trim().regex(mobileRegex, "10-digit mobile, optionally +91-prefixed"),
-  altMobile:     z.string().trim().regex(mobileRegex, "10-digit mobile, optionally +91-prefixed")
-                   .optional().or(z.literal("")),
-  email:         z.string().trim().email("Not a valid email").optional().or(z.literal("")),
+  // Customer information
+  name:        z.string().trim().min(2, "Customer name is required").max(120),
+  mobile:      z.string().trim().regex(mobileRegex, "10-digit mobile, optionally +91-prefixed"),
+  altMobile:   z.string().trim().regex(mobileRegex, "10-digit mobile, optionally +91-prefixed")
+                 .optional().or(z.literal("")),
+  email:       z.string().trim().email("Not a valid email").optional().or(z.literal("")),
+  city:        z.string().trim().max(100).optional().or(z.literal("")),
+  pincode:     z.string().trim().regex(/^\d{6}$/, "Enter a 6-digit pincode")
+                 .optional().or(z.literal("")),
 
-  // Location
-  city:          z.string().trim().min(1, "City is required").max(100),
-  pincode:       z.string().trim().regex(/^\d{6}$/, "Enter a 6-digit pincode")
-                   .optional().or(z.literal("")),
-  siteAddress:   z.string().trim().min(1, "Site address is required").max(500),
+  // Enquiry
+  requirement: z.string().trim().max(2000).optional().or(z.literal("")),
+  source:      z.enum(LEAD_SOURCES, { error: "Select a lead source" }),
+  priority:    z.enum(LEAD_PRIORITIES),
 
-  // Project
-  projectName:   z.string().trim().min(1, "Project name is required").max(200),
-  projectType:   z.enum(PROJECT_TYPES, { error: "Select a project type" }),
-  budgetRange:   z.enum(BUDGET_RANGES.map((r) => r.value) as [BudgetRange, ...BudgetRange[]])
-                   .optional().or(z.literal("")),
+  // Budget (kept for EditableField on detail page)
+  budgetRange: z.enum(BUDGET_RANGES.map((r) => r.value) as [BudgetRange, ...BudgetRange[]])
+                 .optional().or(z.literal("")),
 
-  // Lead meta
-  source:        z.enum(LEAD_SOURCES, { error: "Select a lead source" }),
-  ownerId:       z.string().trim().min(1, "Assigned sales executive is required"),
-  requirement:   z.string().trim().min(1, "Requirements field is required").max(2000),
+  // Assignment
+  ownerId:     z.string().trim().min(1, "Assigned sales executive is required"),
 
   // Branch (used server-side for number prefix only)
-  branchId:      z.string().cuid().optional().or(z.literal("")),
+  branchId:    z.string().cuid().optional().or(z.literal("")),
 });
 
 export const updateLeadSchema = createLeadSchema.partial().extend({
-  id:            z.string().cuid(),
-  // Allow clearing optional fields
-  altMobile:     z.string().trim().optional().or(z.literal("")),
-  pincode:       z.string().trim().optional().or(z.literal("")),
-  budgetRange:   z.string().trim().optional().or(z.literal("")),
+  id:          z.string().cuid(),
+  altMobile:   z.string().trim().optional().or(z.literal("")),
+  pincode:     z.string().trim().optional().or(z.literal("")),
+  budgetRange: z.string().trim().optional().or(z.literal("")),
 });
 
 export const statusChangeSchema = z

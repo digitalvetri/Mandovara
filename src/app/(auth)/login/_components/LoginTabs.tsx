@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { devLogin, devLoginByCredential } from "@/lib/dev-auth";
 import {
   Crown, Users, Palette, Briefcase, Ruler, Package,
@@ -36,6 +36,7 @@ function blurStyle(e: React.FocusEvent<HTMLInputElement>) {
 
 export function LoginCard() {
   const router = useRouter();
+  const params = useSearchParams();
   const [pending, start]            = useTransition();
   const [error, setError]           = useState<string | null>(null);
   const [credential, setCredential] = useState("");
@@ -44,7 +45,11 @@ export function LoginCard() {
   const [showRoles, setShowRoles]   = useState(false);
   const [showCreds, setShowCreds]   = useState(false);
 
-  function navigate() { router.push("/"); router.refresh(); }
+  function navigate() {
+    const dest = params.get("from") ?? "/";
+    router.push(dest);
+    router.refresh();
+  }
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();

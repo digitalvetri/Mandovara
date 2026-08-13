@@ -3,7 +3,7 @@
 import { z } from "zod";
 
 export const PROJECT_STAGES = [
-  "ENQUIRY", "MEASUREMENT", "QUOTATION", "ORDERED", "PROCUREMENT",
+  "ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION", "ORDERED", "PROCUREMENT",
   "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED", "CANCELLED",
 ] as const;
 
@@ -19,7 +19,7 @@ export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
 export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "DONE", "BLOCKED"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export const TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+export const TASK_PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/);

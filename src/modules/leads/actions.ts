@@ -76,13 +76,11 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
         budgetMax,
         requirement: emptyToNull(data.requirement),
         siteAddress: {
-          text:        data.siteAddress,
-          city:        data.city,
+          city:        data.city ?? null,
           pincode:     emptyToNull(data.pincode),
           altMobile:   emptyToNull(data.altMobile),
-          projectName: data.projectName,
-          projectType: data.projectType,
           budgetRange: emptyToNull(data.budgetRange),
+          priority:    data.priority,
         },
       },
       select: { id: true, source: true, mobile: true },
@@ -123,20 +121,17 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
   });
   const existingAddr = (existing?.siteAddress ?? {}) as Record<string, unknown>;
 
-  const hasSiteFields = rest.siteAddress != null || rest.city != null ||
-    rest.pincode != null || rest.altMobile != null ||
-    rest.projectName != null || rest.projectType != null || rest.budgetRange != null;
+  const hasSiteFields = rest.city != null || rest.pincode != null ||
+    rest.altMobile != null || rest.budgetRange != null || rest.priority != null;
 
   const mergedAddr = hasSiteFields
     ? {
         ...existingAddr,
-        ...(rest.siteAddress   != null && { text:        rest.siteAddress }),
-        ...(rest.city          != null && { city:        rest.city }),
-        ...(rest.pincode       != null && { pincode:     emptyToNull(rest.pincode) }),
-        ...(rest.altMobile     != null && { altMobile:   emptyToNull(rest.altMobile) }),
-        ...(rest.projectName   != null && { projectName: rest.projectName }),
-        ...(rest.projectType   != null && { projectType: rest.projectType }),
-        ...(rest.budgetRange   != null && { budgetRange: emptyToNull(rest.budgetRange) }),
+        ...(rest.city       != null && { city:       rest.city }),
+        ...(rest.pincode    != null && { pincode:    emptyToNull(rest.pincode) }),
+        ...(rest.altMobile  != null && { altMobile:  emptyToNull(rest.altMobile) }),
+        ...(rest.budgetRange!= null && { budgetRange: emptyToNull(rest.budgetRange) }),
+        ...(rest.priority   != null && { priority:   rest.priority }),
       }
     : undefined;
 
@@ -210,12 +205,14 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id
 // Keep old name as alias so any existing callers don't break
 export const changeLeadStatus = changeLeadStage;
 
-export async function convertLead(input: unknown): Promise<ActionResult<{ clientId: string }>> {
+export async function convertLead(
+  input: unknown,
+): Promise<ActionResult<{ clientId: string; projectId: string | null }>> {
   const ctx = await devContext();
   requirePermission(ctx, "lead.convert");
 
   const parsed = convertLeadSchema.safeParse(input);
-  if (!parsed.success) return zodError<{ clientId: string }>(parsed.error);
+  if (!parsed.success) return zodError<{ clientId: string; projectId: string | null }>(parsed.error);
   const { id } = parsed.data;
 
   const db = scoped(ctx);
@@ -224,11 +221,18 @@ export async function convertLead(input: unknown): Promise<ActionResult<{ client
     select: {
       id: true, name: true, mobile: true, email: true,
       stage: true, convertedClientId: true,
+      siteAddress: true, architectId: true,
     },
   });
 
+  // Idempotent: already converted — return existing client + first linked project
   if (lead.convertedClientId != null) {
-    return { ok: true, data: { clientId: lead.convertedClientId } };
+    const existingProject = await db.project.findFirst({
+      where: { clientId: lead.convertedClientId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    return { ok: true, data: { clientId: lead.convertedClientId, projectId: existingProject?.id ?? null } };
   }
   if (lead.stage === "LOST") {
     return { ok: false, error: "This lead is marked lost and cannot be converted." };
@@ -236,14 +240,19 @@ export async function convertLead(input: unknown): Promise<ActionResult<{ client
 
   const yymm = yymmFromDate(new Date());
 
-  const clientId = await withTransaction(async (tx: TxClient) => {
-    const code = await allocateNumber(tx, {
-      orgId:  ctx.orgId,
-      series: "CLI",
-      yymm,
-      prefix: "MDV",
-    });
+  // Get first branch for the org (outside the tx to avoid holding the lock longer)
+  const branch = await db.branch.findFirstOrThrow({
+    select: { id: true, invoicePrefix: true },
+  });
 
+  const addr = lead.siteAddress as Record<string, unknown> | null;
+  const projectName = (typeof addr?.projectName === "string" && addr.projectName)
+    ? addr.projectName
+    : lead.name;
+
+  const result = await withTransaction(async (tx: TxClient) => {
+    // 1. Allocate and create Client
+    const code = await allocateNumber(tx, { orgId: ctx.orgId, series: "CLI", yymm, prefix: "MDV" });
     const client = await tx.client.create({
       data: {
         organizationId: ctx.orgId,
@@ -257,18 +266,42 @@ export async function convertLead(input: unknown): Promise<ActionResult<{ client
       select: { id: true },
     });
 
+    // 2. Allocate and create Project linked to the new Client
+    const projNumber = await allocateNumber(tx, {
+      orgId:  ctx.orgId,
+      series: "PRJ",
+      yymm,
+      prefix: branch.invoicePrefix,
+    });
+    const project = await tx.project.create({
+      data: {
+        organizationId: ctx.orgId,
+        branchId:       branch.id,
+        number:         projNumber,
+        name:           projectName,
+        clientId:       client.id,
+        stage:          "ENQUIRY",
+        siteAddress:    addr ?? {},
+        ownerId:        ctx.userId,
+        ...(lead.architectId && { architectId: lead.architectId }),
+      },
+      select: { id: true },
+    });
+
+    // 3. Mark lead as WON + store the client link
     await tx.lead.update({
       where: { id: lead.id },
       data: { stage: "WON", convertedClientId: client.id },
     });
 
-    return client.id;
+    return { clientId: client.id, projectId: project.id };
   });
 
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   revalidatePath("/clients");
-  return { ok: true, data: { clientId } };
+  revalidatePath("/projects");
+  return { ok: true, data: result };
 }
 
 // ── helpers ──────────────────────────────────────────────────────────

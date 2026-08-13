@@ -163,6 +163,55 @@ export type ProjectSiteLog = {
   manpowerCount: number | null;
 };
 
+export async function getProjectMilestones(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<ProjectMilestone[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  const rows = await db.milestone.findMany({
+    where: { projectId },
+    orderBy: { order: "asc" },
+    select: {
+      id: true, name: true, order: true, plannedDate: true,
+      actualDate: true, billingPct: true, status: true,
+    },
+  });
+  return rows.map((r) => ({ ...r, billingPct: r.billingPct.toString() }));
+}
+
+export async function getProjectTasks(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<ProjectTask[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  const rows = await db.task.findMany({
+    where: { projectId },
+    orderBy: { id: "asc" },
+    select: {
+      id: true, title: true, description: true,
+      status: true, priority: true, dueAt: true, completedAt: true,
+    },
+  });
+  return rows.map((r) => ({ ...r, dueDate: r.dueAt }));
+}
+
+export async function getProjectSiteLogs(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<ProjectSiteLog[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  return db.siteLog.findMany({
+    where: { projectId },
+    orderBy: { loggedAt: "desc" },
+    select: {
+      id: true, loggedAt: true, summary: true, weather: true, manpowerCount: true,
+    },
+  });
+}
+
 export interface ClientPickerRow {
   id: string; name: string; mobile: string;
 }

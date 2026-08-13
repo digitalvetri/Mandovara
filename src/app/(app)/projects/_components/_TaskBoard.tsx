@@ -17,7 +17,7 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Proj
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [priority, setPriority] = useState<(typeof TASK_PRIORITIES)[number]>("MEDIUM");
+  const [priority, setPriority] = useState<(typeof TASK_PRIORITIES)[number]>("NORMAL");
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -117,7 +117,7 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Proj
 }
 
 function PriorityDot({ p }: { p: string }) {
-  const tone = p === "URGENT" ? "bg-bad" : p === "HIGH" ? "bg-warn" : p === "MEDIUM" ? "bg-accent/60" : "bg-text-faint";
+  const tone = p === "URGENT" ? "bg-bad" : p === "HIGH" ? "bg-warn" : p === "NORMAL" ? "bg-accent/60" : "bg-text-faint";
   return (
     <span className="inline-flex items-center gap-1 text-[10.5px] text-text-dim">
       <span className={`h-2 w-2 rounded-full ${tone}`} />

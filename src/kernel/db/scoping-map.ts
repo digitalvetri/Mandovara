@@ -20,7 +20,10 @@ export const TENANT_SCOPED = new Set<string>([
   // CRM
   "Lead", "Client", "ContactPerson", "Architect", "ArchitectCommission",
   // projects
-  "Project", "Room", "Measurement", "MeasurementItem", "CalcResult",
+  "Project", "ProjectMember", "Room", "Milestone", "SiteLog",
+  "Measurement", "MeasurementItem", "CalcResult",
+  // collaboration (tasks linked to projects)
+  "Task",
   // commerce
   "Quotation", "Order",
   // procurement & stock

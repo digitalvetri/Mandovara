@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ThreeCanvas } from "./_components/ThreeCanvas";
@@ -145,7 +146,9 @@ export default async function LoginPage() {
 
         {/* Form — centred vertically */}
         <div className="flex-1 flex items-center justify-center px-8 xl:px-12 py-10">
-          <LoginCard />
+          <Suspense>
+            <LoginCard />
+          </Suspense>
         </div>
       </div>
     </div>

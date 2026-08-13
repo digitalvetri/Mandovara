@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Phone, Mail, Compass, IndianRupee, ClipboardList } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
+import { scoped } from "@/kernel/db/scoped";
 import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
 import { LEAD_SOURCES, BUDGET_RANGES } from "@/modules/leads/schema";
@@ -32,11 +33,24 @@ export default async function LeadDetailPage({
   const { id } = await params;
   const ctx = await devContext();
 
+  const db = scoped(ctx);
   const [lead, followUps] = await Promise.all([
     getLead(ctx, id),
     listFollowUpsForLead(ctx, id),
   ]);
   if (!lead) notFound();
+
+  // If the lead was already converted, find the first linked project so we can
+  // show "Open project →" instead of "Open client →"
+  let convertedProjectId: string | null = null;
+  if (lead.convertedClientId) {
+    const proj = await db.project.findFirst({
+      where: { clientId: lead.convertedClientId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    convertedProjectId = proj?.id ?? null;
+  }
 
   const createdDate = lead.createdAt.toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
@@ -72,6 +86,7 @@ export default async function LeadDetailPage({
               id={lead.id}
               status={lead.stage}
               convertedClientId={lead.convertedClientId}
+              convertedProjectId={convertedProjectId}
             />
           </div>
         </div>

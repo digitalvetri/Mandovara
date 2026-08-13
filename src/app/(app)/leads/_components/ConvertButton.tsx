@@ -10,20 +10,25 @@ interface Props {
   id: string;
   status: string;
   convertedClientId: string | null;
+  convertedProjectId?: string | null;
 }
 
-export function ConvertButton({ id, status, convertedClientId }: Props) {
+export function ConvertButton({ id, status, convertedClientId, convertedProjectId }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   if (convertedClientId) {
+    const href = convertedProjectId
+      ? (`/projects/${convertedProjectId}` as Route)
+      : (`/clients/${convertedClientId}` as Route);
+    const label = convertedProjectId ? "Open project →" : "Open client →";
     return (
       <Link
-        href={`/clients/${convertedClientId}` as Route}
+        href={href}
         className="h-[30px] inline-flex items-center px-3 rounded-[6px] bg-accent/12 text-accent text-[11.5px] font-medium hover:bg-accent/20 transition-colors"
       >
-        Open client →
+        {label}
       </Link>
     );
   }
@@ -38,7 +43,10 @@ export function ConvertButton({ id, status, convertedClientId }: Props) {
         setError(res.error ?? "Could not convert lead");
         return;
       }
-      router.push(`/clients/${res.data.clientId}` as Route);
+      const dest = res.data.projectId
+        ? `/projects/${res.data.projectId}`
+        : `/clients/${res.data.clientId}`;
+      router.push(dest as Route);
       router.refresh();
     });
   }
