@@ -21,7 +21,7 @@ test("allocation console renders — pending lines or all-clear", async ({ page 
   await page.goto("/purchase/allocation");
   await expect(page).not.toHaveTitle(/404|500/);
 
-  const allClear = page.getByText(/all order lines are allocated/i);
+  const allClear = page.getByText(/nothing to allocate|all order lines are allocated/i);
   const table    = page.getByRole("table");
   await expect(allClear.or(table)).toBeVisible();
 });

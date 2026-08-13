@@ -49,3 +49,4 @@ test-results/
 
 # verification screenshots (root only)
 /*.png
+tests/e2e/.auth/

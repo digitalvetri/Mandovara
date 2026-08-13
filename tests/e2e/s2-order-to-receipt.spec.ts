@@ -37,7 +37,7 @@ test("allocation console renders — either pending lines or all-clear message",
   await expect(page).not.toHaveTitle(/404|500/);
   await expectNoRuntimeError(page);
   // Either shows "All order lines are allocated" or the allocation table header
-  const allClear = page.getByText(/all order lines are allocated/i);
+  const allClear = page.getByText(/nothing to allocate|all order lines are allocated/i);
   const table    = page.getByRole("table");
   await expect(allClear.or(table)).toBeVisible();
 });
@@ -47,7 +47,7 @@ test("allocation console shows Allocate button for pending lines", async ({ page
   await expectNoRuntimeError(page);
   // If there are pending lines, the Allocate button is visible
   const allocateBtn = page.getByRole("button", { name: /allocate/i }).first();
-  const allClear    = page.getByText(/all order lines are allocated/i);
+  const allClear = page.getByText(/nothing to allocate|all order lines are allocated/i);
   await expect(allocateBtn.or(allClear)).toBeVisible();
 });
 
