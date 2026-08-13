@@ -1,7 +1,7 @@
 // §12.2 Scenario 3 — dashboard, admin, HR, automation and reporting pages.
 //
 // These pages were not covered by s1/s2 but call query modules that had
-// @ts-nocheck covering schema mismatches (admin/queries, employees/queries).
+// ts-nocheck directives covering schema mismatches (admin/queries, employees/queries).
 // This spec extends the runtime-error net to every list page in the app.
 
 import { test, expect, type Page } from "@playwright/test";

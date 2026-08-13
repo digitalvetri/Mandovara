@@ -11,7 +11,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
-const ORDER_ID         = process.env["E2E_ORDER_ID"];
+const _ORDER_ID        = process.env["E2E_ORDER_ID"];
 const MAKE_JOB_ID      = process.env["E2E_MAKE_JOB_ID"];
 const INSTALL_VISIT_ID = process.env["E2E_INSTALL_VISIT_ID"];
 

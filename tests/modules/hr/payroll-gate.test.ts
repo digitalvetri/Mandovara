@@ -24,7 +24,7 @@ import {
   type SalaryStructure,
   type StatutorySlabInput,
 } from "../../../src/kernel/payroll/compute";
-import { runPayroll, approvePayroll } from "../../../src/modules/payroll/actions";
+import { runPayroll as _runPayroll, approvePayroll as _approvePayroll } from "../../../src/modules/payroll/actions";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ const db = new PrismaClient();
 let orgId:    string;
 let branchId: string;
 let userId:   string;
-let ctx:      RequestContext;
+let _ctx:     RequestContext;
 
 const employeeIds: string[] = [];
 let slabs: StatutorySlabInput[];
@@ -89,7 +89,7 @@ beforeAll(async () => {
   });
   userId = user.id;
 
-  ctx = {
+  _ctx = {
     orgId, userId,
     branchIds:   [branchId],
     branchScope: "ALL" as const,

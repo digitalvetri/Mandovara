@@ -7,9 +7,8 @@
 // in the database — a "number collision" at the DB unique index would throw.
 
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
-import { Decimal } from "@prisma/client/runtime/library";
 import { PrismaClient } from "@prisma/client";
-import { allocateNumber, yymmFromDate } from "../../../src/kernel/numbering/series";
+import { allocateNumber } from "../../../src/kernel/numbering/series";
 import { withTransaction } from "../../../src/kernel/db/transaction";
 
 const db    = new PrismaClient();

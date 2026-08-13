@@ -27,7 +27,7 @@ let measurementItemId: string;
 let quotationId: string;
 let quotationLineId: string;
 let orderId: string;
-let orderLineId: string;
+let _orderLineId: string;
 
 const V1_PANELS = 5;
 // Decimal("2760.00").toString() → "2760" (trailing zeros stripped by Decimal.js)
@@ -201,7 +201,7 @@ beforeAll(async () => {
       amount: 77280n,
     },
   });
-  orderLineId = orderLine.id;
+  _orderLineId = orderLine.id;
 }, 30_000);
 
 describe("Phase 5 gate: make job cut list from frozen snapshot", () => {

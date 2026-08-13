@@ -27,7 +27,7 @@ let ctx:       RequestContext;
 const INV_TOTALS = [10_000_000n, 5_000_000n, 2_500_000n] as const; // 1L, 50k, 25k
 const RECEIPT_AMOUNT = 15_000_000n; // 1.5L — covers first two fully, 25k residual
 
-let invoiceIds: string[] = [];
+const invoiceIds: string[] = [];
 let receiptId:  string;
 
 beforeAll(async () => {
@@ -294,7 +294,6 @@ describe("Phase 6 gate: project profitability reconciles to the paisa", () => {
 
     const RATE_PAISE = 50_000n; // ₹500/m
     const QTY_M      = new Decimal("10.000"); // 10 metres
-    const EXPECTED_COGS = 500_000n; // 10 × 50,000
 
     // ISSUE_TO_MAKE: cost
     await db.stockMove.create({
