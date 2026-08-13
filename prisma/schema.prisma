@@ -1068,7 +1068,6 @@ model OrderLine {
 
   order     Order        @relation(fields: [orderId], references: [id])
   colourway Colourway?   @relation("OrderLineColourway", fields: [colourwayId], references: [id])
-  allocations Allocation[]
 
   @@index([orderId])
 }
@@ -1238,8 +1237,6 @@ model Allocation {
   overrideReason   String?
   overrideById     String?
   createdAt        DateTime @default(now())
-
-  orderLine OrderLine @relation(fields: [orderLineId], references: [id])
 
   @@index([organizationId, orderLineId])
 }
