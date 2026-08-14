@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import type { Route } from "next";
+import { Zap } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { AgeingBars } from "@/components/data/AgeingBars";
@@ -29,6 +32,15 @@ export default async function ClientDetailPage({
         title={client.name}
         eyebrow={`${client.type} · ${client.mobile} · Since ${client.createdAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}`}
       />
+
+      <div className="flex justify-end pb-3">
+        <Link
+          href={`/quotations/quick?client=${client.id}` as Route}
+          className="inline-flex items-center gap-1.5 rounded-[8px] bg-gold px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-gold-strong transition-colors"
+        >
+          <Zap size={13} /> New quick quote
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 space-y-4">
