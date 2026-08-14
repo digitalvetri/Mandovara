@@ -160,46 +160,19 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
   );
 }
 
-// ── Actual Mandovara leaf logo — replicates the teal plant icon on mandovara.com
-export function MandovaraLeafIcon({ size = 36 }: { size?: number }) {
+// The actual Mandovara mark — a chromakeyed PNG extracted from the
+// owner's brand file (public/mandovara-mark.png, transparent BG).
+// See scripts/extract-logo-mark.mts for the extraction pipeline.
+// Same API as the previous SVG icon so every caller keeps working.
+export function MandovaraLeafIcon({ size = 36 }: { size?: number; colour?: string }) {
   return (
-    <svg
+    <img
+      src="/mandovara-mark.png"
+      alt=""
+      aria-hidden
       width={size}
       height={size}
-      viewBox="0 0 40 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      {/* Outer left leaf */}
-      <path
-        d="M20 36 C 14 26 8 18 11 6 C 17 8 21 20 20 36 Z"
-        fill="#2BA89A"
-        opacity="0.60"
-      />
-      {/* Inner left leaf */}
-      <path
-        d="M20 36 C 17 24 13 16 16 7 C 20 9 21 22 20 36 Z"
-        fill="#2BA89A"
-        opacity="0.85"
-      />
-      {/* Center stem / main leaf */}
-      <path
-        d="M20 36 C 20 24 19 15 20 4 C 21 15 20 24 20 36 Z"
-        fill="#2BA89A"
-      />
-      {/* Inner right leaf */}
-      <path
-        d="M20 36 C 23 24 27 16 24 7 C 20 9 19 22 20 36 Z"
-        fill="#2BA89A"
-        opacity="0.85"
-      />
-      {/* Outer right leaf */}
-      <path
-        d="M20 36 C 26 26 32 18 29 6 C 23 8 19 20 20 36 Z"
-        fill="#2BA89A"
-        opacity="0.60"
-      />
-    </svg>
+      style={{ width: size, height: size, objectFit: "contain" }}
+    />
   );
 }
