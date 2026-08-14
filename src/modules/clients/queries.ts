@@ -29,6 +29,8 @@ export interface ClientRow {
   city: string | null;
   outstanding: bigint;
   createdAt: Date;
+  projectCount: number;
+  latestProject: { name: string; stage: string; orderValue: bigint; ownerName: string } | null;
 }
 
 export interface ListClientsResult {
@@ -98,11 +100,15 @@ export async function listClients(
   ]);
 
   const clientIds = rows.map((r) => r.id);
-  const outstanding = await outstandingByClient(ctx, clientIds);
+  const [outstanding, projects] = await Promise.all([
+    outstandingByClient(ctx, clientIds),
+    projectsByClient(ctx, clientIds),
+  ]);
 
   return {
     rows: rows.map((r) => {
       const addr = r.billingAddress as { city?: string } | null;
+      const proj = projects.get(r.id);
       return {
         id: r.id, code: r.code, name: r.name, type: r.type,
         mobile: r.mobile, email: r.email ?? null,
@@ -112,6 +118,8 @@ export async function listClients(
         city: addr?.city ?? null,
         outstanding: outstanding.get(r.id) ?? 0n,
         createdAt: r.createdAt,
+        projectCount: proj?.count ?? 0,
+        latestProject: proj?.latest ?? null,
       };
     }),
     total, page, pageSize,
@@ -148,6 +156,8 @@ export async function getClient(ctx: RequestContext, id: string): Promise<Client
     city: addr?.city ?? null,
     createdAt: row.createdAt,
     outstanding: ageing.total,
+    projectCount: 0,
+    latestProject: null,
     contacts: row.contacts,
     ageing,
   };
@@ -179,6 +189,37 @@ function orderFor(sort: ListClientsQuery["sort"]): { [k: string]: "asc" | "desc"
     case "recent":
     default:            return { createdAt: "desc" };
   }
+}
+
+interface ProjectSummary {
+  count: number;
+  latest: { name: string; stage: string; orderValue: bigint; ownerName: string } | null;
+}
+
+async function projectsByClient(ctx: RequestContext, clientIds: string[]): Promise<Map<string, ProjectSummary>> {
+  if (clientIds.length === 0) return new Map();
+  const db = scoped(ctx);
+  const projs = await db.project.findMany({
+    where: { clientId: { in: clientIds } },
+    select: { clientId: true, name: true, stage: true, orderValue: true, ownerId: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const ownerIds = [...new Set(projs.map((p) => p.ownerId))];
+  const users = ownerIds.length > 0
+    ? await db.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })
+    : [];
+  const ownerMap = new Map(users.map((u) => [u.id, u.name]));
+  const map = new Map<string, ProjectSummary>();
+  for (const p of projs) {
+    const s = map.get(p.clientId);
+    const ownerName = ownerMap.get(p.ownerId) ?? "—";
+    if (!s) {
+      map.set(p.clientId, { count: 1, latest: { name: p.name, stage: p.stage, orderValue: p.orderValue, ownerName } });
+    } else {
+      s.count += 1;
+    }
+  }
+  return map;
 }
 
 // Valid InvoiceStatus values that represent money still owed — no "OVERDUE" enum value exists.
