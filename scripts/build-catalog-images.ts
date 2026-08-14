@@ -188,23 +188,27 @@ function matchOnce(
   const keyTokens = new Set(key.split("-").filter((t) => t.length >= 2));
   if (keyTokens.size === 0) return null;
 
-  // Fuzzy fallback: only multi-token designs, and only when at least
-  // TWO of the design's tokens appear in the PDF key. This blocks
-  // "silver" alone from claiming SILVER-OAK when the PDF is
-  // silver-moon-xviii, and blocks "garden" alone from stealing
-  // SQUARE GARDEN when the PDF is mallow-garden. Single-token
-  // designs (VIBE, HAPPY) rely on the exact-match branch above.
-  const REQUIRED_SCORE = 2;
+  // Fuzzy fallback rules:
+  //   - Multi-token design: needs ≥2 of its unique tokens present in
+  //     the PDF key. Blocks "silver" alone from stealing SILVER-OAK,
+  //     "garden" alone from stealing SQUARE GARDEN.
+  //   - Single-token design: needs its one token (≥3 chars) present
+  //     in the PDF key. Lets "astra-fedora-wallpapers-gni-korea"
+  //     link to the ASTRA design.
+  // Prefer higher score first, then higher ratio, so multi-token
+  // matches beat coincidental single-token hits.
   let bestKey: string | null = null;
   let bestScore = 0;
   let bestRatio = 0;
   for (const [k, _] of map.entries()) {
-    // Dedupe design tokens so a repeated word ("WALL INDEX WALL COVERING")
-    // can't inflate the overlap score.
     const designTokens = [...new Set(k.split("-").filter((t) => t.length >= 2))];
-    if (designTokens.length < 2) continue;
+    if (designTokens.length === 0) continue;
     const score = designTokens.filter((t) => keyTokens.has(t)).length;
-    if (score < REQUIRED_SCORE) continue;
+    if (designTokens.length >= 2 && score < 2) continue;
+    if (designTokens.length === 1) {
+      const only = designTokens[0]!;
+      if (only.length < 3 || !keyTokens.has(only)) continue;
+    }
     const ratio = score / designTokens.length;
     if (score > bestScore || (score === bestScore && ratio > bestRatio)) {
       bestKey = k;
