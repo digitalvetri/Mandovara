@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { ImageOff } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
@@ -7,6 +8,7 @@ import { shortNumber } from "@/lib/short-number";
 import {
   leadsBySource, invoiceAgeing, topClientsByRevenue, projectMarginTop,
 } from "@/modules/reports/queries";
+import { catalogImageCoverage } from "@/modules/catalog/image-coverage";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +20,12 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export default async function ReportsPage() {
   const ctx = await devContext();
-  const [leads, ageing, topClients, margins] = await Promise.all([
+  const [leads, ageing, topClients, margins, imageCoverage] = await Promise.all([
     leadsBySource(ctx),
     invoiceAgeing(ctx),
     topClientsByRevenue(ctx, 10),
     projectMarginTop(ctx, 10),
+    catalogImageCoverage(ctx, { pageSize: 1 }),
   ]);
 
   const totalAgeingAmount = ageing.reduce((s, b) => s + b.amount, 0n);
@@ -36,6 +39,26 @@ export default async function ReportsPage() {
         title="Reports"
         eyebrow="Aggregated views across the live data — no export yet, just what's true right now."
       />
+
+      <Link
+        href={"/reports/catalog-images" as Route}
+        className="mb-4 rounded-[14px] bg-surface border border-rule p-4 flex items-center gap-4 hover:bg-surface-hover transition-colors group"
+      >
+        <div className="h-10 w-10 rounded-[8px] bg-heat/15 grid place-items-center text-heat shrink-0">
+          <ImageOff size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] text-text group-hover:text-accent transition-colors">
+            Catalog image coverage
+          </div>
+          <div className="text-[11.5px] text-text-dim">
+            {imageCoverage.withoutImage} of {imageCoverage.totalColourways} SKUs still missing a cover image
+            {" · "}
+            <span className="tabular">{(imageCoverage.coveragePct * 100).toFixed(1)}% covered</span>
+          </div>
+        </div>
+        <div className="text-[11px] text-text-dim shrink-0">Open →</div>
+      </Link>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-10">
         {/* ── Leads by source ─────────────────────────────────── */}
