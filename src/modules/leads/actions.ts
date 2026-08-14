@@ -247,9 +247,12 @@ export async function convertLead(
   const yymm = yymmFromDate(new Date());
 
   // Get first branch for the org (outside the tx to avoid holding the lock longer)
-  const branch = await db.branch.findFirstOrThrow({
+  const branch = await db.branch.findFirst({
     select: { id: true, invoicePrefix: true },
   });
+  if (!branch) {
+    return { ok: false, error: "No branch is configured for this organisation. Add one in Settings before converting a lead." };
+  }
 
   const addr = lead.siteAddress as Record<string, unknown> | null;
   const projectName = (typeof addr?.projectName === "string" && addr.projectName)
