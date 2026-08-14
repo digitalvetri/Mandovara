@@ -604,6 +604,10 @@ model Design {
   thicknessMm     Decimal?      @db.Decimal(6, 2)
   areaPerBoxSqft  Decimal?      @db.Decimal(10, 3)
   tileSizeMm      String?
+  // Full supplier catalogue PDF for this design's series. Rendered
+  // in the PDP as a browser-native flip-through viewer so the user
+  // can page through every pattern before quoting.
+  catalogPdfKey   String?
   specs           Json
   hsn             String
   gstRate         Decimal       @db.Decimal(5, 2)

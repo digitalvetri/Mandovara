@@ -21,6 +21,7 @@ import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { getProduct } from "@/modules/products/queries";
 import { StatusPill } from "../_components/StatusPill";
+import { CatalogueViewer } from "./_components/CatalogueViewer";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export default async function ProductDetailPage({
           </div>
 
           {/* CTA */}
-          <div className="pt-1">
+          <div className="pt-1 space-y-2">
             <Link
               href={"/quotations/quick" as Route}
               className="group inline-flex items-center justify-center gap-2 w-full h-[48px] px-5 rounded-[10px] bg-gold text-ink font-display text-[15px] font-medium tracking-[-0.005em] hover:bg-gold-strong transition-colors"
@@ -138,8 +139,13 @@ export default async function ProductDetailPage({
               Add to Quote
               <ArrowRight size={16} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5" />
             </Link>
-            <p className="mt-2 text-[11px] text-text-faint text-center">
-              Picks a client, adds this SKU as a preliminary line.
+            {product.catalogPdfKey && (
+              <CatalogueViewer pdfKey={product.catalogPdfKey} designName={product.name} />
+            )}
+            <p className="text-[11px] text-text-faint text-center">
+              {product.catalogPdfKey
+                ? "Browse every pattern in the supplier's book, then pick and quote."
+                : "Picks a client, adds this SKU as a preliminary line."}
             </p>
           </div>
 

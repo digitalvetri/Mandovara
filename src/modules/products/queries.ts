@@ -39,7 +39,6 @@ const DYE_LOT_SENSITIVE = new Set<string>([
   "CURTAIN_FABRIC", "SHEER", "UPHOLSTERY_FABRIC",
 ]);
 
-const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface ListProductsQuery {
   search?:        string;
@@ -73,7 +72,7 @@ export interface ProductRow {
   hex:           string | null;
   inStock:       boolean;
   dyeLotHint:    string | null;   // short lot label to render in the pin
-  isNew:         boolean;         // Design.createdAt within NEW_WINDOW_MS
+  isNew:         boolean;         // reserved for a future NEW pill; always false until Design.createdAt exists
   updatedAt:     Date;
 }
 
@@ -139,8 +138,6 @@ export async function listProducts(
     priceRange(ctx),
   ]);
 
-  const now = Date.now();
-
   const rows: ProductRow[] = result.designs.flatMap((design) =>
     design.colourways.map((cw) => {
       const prices = cw.prices ?? [];
@@ -171,9 +168,8 @@ export async function listProducts(
         }
       }
 
-      const isNew =
-        typeof design.createdAt !== "undefined" &&
-        now - new Date(design.createdAt).getTime() < NEW_WINDOW_MS;
+      // Design has no createdAt column — see note in getProduct.
+      const isNew = false;
 
       const familyLabel = FAMILY_LABEL[design.family] ?? design.family;
       const brandName   = design.collection.brand.name;
@@ -336,6 +332,7 @@ export interface ProductDetail {
   cost:          bigint | null;
   imageKey:      string | null;
   hex:           string | null;
+  catalogPdfKey: string | null;   // /catalog/pdfs/{slug}.pdf when the full supplier PDF is attached
   inStock:       boolean;
   dyeLotHint:    string | null;
   isNew:         boolean;
@@ -364,7 +361,7 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
       design: {
         select: {
           id: true, name: true, family: true, hsn: true, gstRate: true, isActive: true,
-          createdAt: true, specs: true,
+          specs: true, catalogPdfKey: true,
           rollWidthMm: true, rollLengthM: true, fabricWidthMm: true,
           patternRepeatMm: true, patternMatch: true, railroadable: true,
           gsm: true, thicknessMm: true, areaPerBoxSqft: true, tileSizeMm: true,
@@ -414,7 +411,10 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
     else if (lots.length > 1) dyeLotHint = "MIX";
   }
 
-  const isNew = now.getTime() - new Date(cw.design.createdAt).getTime() < NEW_WINDOW_MS;
+  // Design has no createdAt column in the schema so "NEW" pill is
+  // always false on the PDP for now. Add a column via migration if
+  // this ever becomes a real requirement.
+  const isNew = false;
 
   const attributes: DesignSpecEntry[] = [];
   if (cw.design.rollWidthMm)     attributes.push({ key: "rollWidth",     label: "Roll width",     value: `${cw.design.rollWidthMm} mm` });
@@ -465,6 +465,7 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
     trackSerial:   false,
     imageKey:      cw.imageKey,
     hex:           cw.hex,
+    catalogPdfKey: cw.design.catalogPdfKey ?? null,
     inStock,
     dyeLotHint,
     isNew,
