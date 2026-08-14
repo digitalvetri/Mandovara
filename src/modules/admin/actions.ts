@@ -26,12 +26,12 @@ const createUserSchema = z.object({
   mobile:    z.string().trim().regex(mobileRegex, "10-digit mobile"),
   email:     z.string().trim().email().optional().or(z.literal("")),
   roleId:    z.enum(APP_ROLE_VALUES),
-  branchIds: z.array(z.string().cuid()).min(1, "Assign at least one branch"),
+  branchIds: z.array(z.string().min(1)).min(1, "Assign at least one branch"),
   locale:    z.enum(["en", "ta"]).default("en"),
 });
 
 const updateCompanySchema = z.object({
-  orgId:        z.string().cuid(),
+  orgId:        z.string().min(1),
   name:         z.string().trim().min(2).max(200),
   gstin:        z.string().trim().optional().or(z.literal("")),
   fyStartMonth: z.number().int().min(1).max(12),

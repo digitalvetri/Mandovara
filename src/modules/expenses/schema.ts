@@ -11,7 +11,7 @@ export type ApprovalState = (typeof APPROVAL_STATES)[number];
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Must be YYYY-MM-DD");
 
 export const createProjectExpenseSchema = z.object({
-  projectId:   z.string().cuid("projectId required"),
+  projectId:   z.string().min(1, "projectId required"),
   head:        z.enum(EXPENSE_HEADS),
   description: z.string().trim().min(3).max(300),
   amount:      z.string().regex(/^\d+$/, "Amount must be positive paise integer"),
@@ -20,7 +20,7 @@ export const createProjectExpenseSchema = z.object({
 });
 
 export const approveExpenseSchema = z.object({
-  id:    z.string().cuid(),
+  id:    z.string().min(1),
   state: z.enum(["APPROVED", "REJECTED"]),
   note:  z.string().max(300).optional(),
 });

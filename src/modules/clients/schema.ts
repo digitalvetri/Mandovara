@@ -43,11 +43,11 @@ export const createClientSchema = z.object({
 });
 
 export const updateClientSchema = createClientSchema.partial().extend({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 export const setStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(CLIENT_STATUSES),
   reason: z.string().trim().max(500).optional(),
 }).refine(

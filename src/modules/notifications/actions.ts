@@ -20,7 +20,7 @@ export interface ActionResult<T = unknown> {
 }
 
 const markReadSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 export async function markNotificationRead(input: unknown): Promise<ActionResult<{ id: string }>> {

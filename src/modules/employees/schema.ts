@@ -18,17 +18,17 @@ export const createEmployeeSchema = z.object({
   code:         z.string().trim().max(20).optional().or(z.literal("")),
   designation:  z.string().trim().max(80).optional().or(z.literal("")),
   department:   z.string().trim().max(60).optional().or(z.literal("")),
-  branchId:     z.string().cuid("Pick a branch"),
+  branchId:     z.string().min(1, "Pick a branch"),
   joinDate:     isoDate,
   panNumber:    z.string().trim().regex(panRegex, "10-char PAN").optional().or(z.literal("")),
 });
 
 export const deleteEmployeeSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 export const setEmployeeStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(EMPLOYEE_STATUSES),
   exitDate: isoDate.optional().or(z.literal("")),
 });

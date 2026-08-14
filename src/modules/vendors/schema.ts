@@ -15,7 +15,7 @@ export const createVendorSchema = z.object({
 });
 
 export const updateVendorSchema = createVendorSchema.partial().extend({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 export type CreateVendorInput = z.infer<typeof createVendorSchema>;

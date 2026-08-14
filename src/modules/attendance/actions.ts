@@ -11,7 +11,7 @@ export interface ActionResult<T = unknown> {
 }
 
 const markPunchSchema = z.object({
-  employeeId: z.string().cuid(),
+  employeeId: z.string().min(1),
   date:       z.string().regex(/^\d{4}-\d{2}-\d{2}/),
   status:     z.enum(["PRESENT", "HALF_DAY", "ABSENT", "LEAVE", "HOLIDAY", "WEEK_OFF"]),
   inTime:     z.string().optional().or(z.literal("")),

@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { startInstallVisit, completeInstallVisit } from "@/modules/install/actions";
+import { startInstallVisit } from "@/modules/install/actions";
+import { completeInstallVisit } from "@/modules/install/compat-actions";
 
 interface Props {
   visitId: string;

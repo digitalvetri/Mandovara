@@ -3,10 +3,15 @@ import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
-import { listOrders } from "@/modules/orders/queries";
+import { listOrders, getOrderSummaryCounts } from "@/modules/orders/queries";
+import { listDispatches, getDispatchStatusCounts } from "@/modules/orders/dispatch-queries";
 import { ORDER_STATUSES, type OrderStatus } from "@/modules/orders/schema";
 import { OrderFilters } from "./_components/OrderFilters";
 import { OrdersTable } from "./_components/OrdersTable";
+import { OrderSummaryCards } from "./_components/OrderSummaryCards";
+import { OrderTabNav } from "./_components/OrderTabNav";
+import { DispatchHistoryTable } from "./_components/DispatchHistoryTable";
+import { DispatchSummaryCards } from "./_components/DispatchSummaryCards";
 
 export const dynamic = "force-dynamic";
 
@@ -15,23 +20,53 @@ interface SearchParams {
   status?: string;
   page?: string;
   sort?: string;
+  tab?: string;
 }
 
 export default async function OrdersPage({
   searchParams,
 }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
-  const ctx = await devContext();
+  const ctx    = await devContext();
+  const tab    = params.tab === "dispatch" ? "dispatch" : "orders";
+  const page   = parsePositiveInt(params.page) ?? 1;
 
-  const q = params.q?.trim();
+  // ── Dispatch tab ────────────────────────────────────────────────────────────
+  if (tab === "dispatch") {
+    const [dispatches, dispatchCounts, orderCounts] = await Promise.all([
+      listDispatches(ctx, { page, status: params.status }),
+      getDispatchStatusCounts(ctx),
+      getOrderSummaryCounts(ctx),
+    ]);
+    return (
+      <>
+        <Topbar
+          title="Sales Orders & Dispatch"
+          eyebrow={`${dispatchCounts.total} dispatch ${dispatchCounts.total === 1 ? "record" : "records"}`}
+          actions={
+            <Link href={"/orders/dispatch/new" as Route}>
+              <PrimaryButton>New Dispatch</PrimaryButton>
+            </Link>
+          }
+        />
+        <OrderTabNav active="dispatch" orderCount={orderCounts.open} dispatchCount={dispatchCounts.total} />
+        <DispatchSummaryCards counts={dispatchCounts} />
+        <DispatchHistoryTable rows={dispatches.rows} />
+        <Pager page={dispatches.page} pageSize={dispatches.pageSize} total={dispatches.total} />
+      </>
+    );
+  }
+
+  // ── Orders tab (default) ─────────────────────────────────────────────────────
+  const q      = params.q?.trim();
   const status = normaliseStatus(params.status);
-  const page = parsePositiveInt(params.page) ?? 1;
-  const sort = (params.sort as "recent" | "oldest" | "total" | undefined) ?? "recent";
+  const sort   = (params.sort as "recent" | "oldest" | "total" | undefined) ?? "recent";
 
-  const { rows, total, pageSize } = await listOrders(ctx, {
-    ...(q != null && { search: q }),
-    status, page, sort,
-  });
+  const [{ rows, total, pageSize }, counts, dispatchCounts] = await Promise.all([
+    listOrders(ctx, { ...(q != null && { search: q }), status, page, sort }),
+    getOrderSummaryCounts(ctx),
+    getDispatchStatusCounts(ctx),
+  ]);
 
   return (
     <>
@@ -44,6 +79,8 @@ export default async function OrdersPage({
           </Link>
         }
       />
+      <OrderTabNav active="orders" orderCount={counts.open} dispatchCount={dispatchCounts.total} />
+      <OrderSummaryCards counts={counts} />
       <OrderFilters />
       <OrdersTable rows={rows} />
       <Pager page={page} pageSize={pageSize} total={total} />
@@ -51,18 +88,22 @@ export default async function OrdersPage({
   );
 }
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
 function normaliseStatus(v: string | undefined): OrderStatus | "OPEN" | "ALL" {
   if (v == null || v === "") return "OPEN";
   if (v === "OPEN" || v === "ALL") return v;
   if ((ORDER_STATUSES as readonly string[]).includes(v)) return v as OrderStatus;
   return "OPEN";
 }
+
 function parsePositiveInt(v: string | undefined): number | null {
   if (v == null) return null;
   const n = Number(v);
   if (!Number.isFinite(n) || n < 1) return null;
   return Math.floor(n);
 }
+
 function eyebrowFor(status: string, q: string | undefined): string {
   const bits: string[] = [];
   bits.push(status === "OPEN" ? "open" : status === "ALL" ? "all statuses" : status.toLowerCase());

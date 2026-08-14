@@ -6,14 +6,14 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
+// recordFabricIssue, recordActualUsage → line-actions.ts
+// submitQC → qc-actions.ts
 import { requirePermission } from "@/kernel/rbac/guard";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import {
   createMakeJobSchema,
   advanceMakeJobStatusSchema,
-  recordFabricIssueSchema,
-  recordActualUsageSchema,
   MAKE_STATUS_NEXT,
 } from "./schema";
 
@@ -68,14 +68,11 @@ export async function createMakeJob(
     },
   });
 
-  const _project = await db.project.findUniqueOrThrow({
+  await db.project.findUniqueOrThrow({
     where: { id: order.projectId },
     select: { branchId: true },
   });
 
-  // Build calcSnapshot map: measurementItemId → frozen or live CalcResult data.
-  // Priority: frozen QuotationLine.calcSnapshot (sent quote) > live CalcResult.
-  // This ensures the cut list is identical to what was quoted (§7.7 rule 6 / §15.3).
   const snapMap = new Map<string, CalcSnap>();
   const roomLabelMap = new Map<string, string>();
 
@@ -91,7 +88,6 @@ export async function createMakeJob(
     }
   }
 
-  // Fill gaps with live CalcResult (for order lines with no frozen snapshot)
   const needLive = order.lines
     .filter((l) => l.measurementItemId && !snapMap.has(l.measurementItemId))
     .map((l) => l.measurementItemId!);
@@ -112,7 +108,6 @@ export async function createMakeJob(
     }
   }
 
-  // Fill room labels from MeasurementItem → Room
   const needLabels = order.lines
     .filter((l) => l.measurementItemId && !roomLabelMap.has(l.measurementItemId))
     .map((l) => l.measurementItemId!);
@@ -120,11 +115,7 @@ export async function createMakeJob(
   if (needLabels.length > 0) {
     const items = await db.measurementItem.findMany({
       where: { id: { in: needLabels } },
-      select: {
-        id: true,
-        label: true,
-        room: { select: { name: true } },
-      },
+      select: { id: true, label: true, room: { select: { name: true } } },
     });
     for (const item of items) {
       roomLabelMap.set(item.id, `${item.room.name} — ${item.label}`);
@@ -148,6 +139,7 @@ export async function createMakeJob(
         orderId: order.id,
         projectId: order.projectId,
         status: "QUEUED",
+        priority: d.priority ?? 0,
         ...(d.vendorId ? { vendorId: d.vendorId } : {}),
         ...(d.assignedToId ? { assignedToId: d.assignedToId } : {}),
         ...(targetDate ? { targetDate } : {}),
@@ -155,7 +147,6 @@ export async function createMakeJob(
       select: { id: true, number: true },
     });
 
-    // Create a MakeJobLine for each order line that carries material
     await tx.makeJobLine.createMany({
       data: order.lines.map((l) => {
         const snap = l.measurementItemId ? snapMap.get(l.measurementItemId) : undefined;
@@ -174,6 +165,18 @@ export async function createMakeJob(
           eyeletCount: snap?.eyeletCount ?? null,
         };
       }),
+    });
+
+    await tx.makeJobEvent.create({
+      data: {
+        organizationId: ctx.orgId,
+        makeJobId: job.id,
+        actorId: ctx.userId,
+        type: "STATUS_CHANGE",
+        fromStatus: null,
+        toStatus: "QUEUED",
+        payload: {},
+      },
     });
 
     return job;
@@ -200,6 +203,10 @@ export async function advanceMakeJobStatus(
   });
   if (!job) return { ok: false, error: "Make job not found" };
 
+  if (job.status === "QC") {
+    return { ok: false, error: "Use the QC form to record pass or fail — this determines the next status." };
+  }
+
   const nextStatus = MAKE_STATUS_NEXT[job.status];
   if (!nextStatus) {
     return { ok: false, error: `Job is already in ${job.status} — no next status` };
@@ -216,71 +223,21 @@ export async function advanceMakeJobStatus(
     select: { id: true, status: true },
   });
 
+  await db.makeJobEvent.create({
+    data: {
+      organizationId: ctx.orgId,
+      makeJobId,
+      actorId: ctx.userId,
+      type: "STATUS_CHANGE",
+      fromStatus: job.status,
+      toStatus: nextStatus,
+      payload: {},
+    },
+  });
+
   revalidatePath("/make");
   revalidatePath(`/make/${makeJobId}`);
   return { ok: true, data: { id: update.id, status: update.status } };
-}
-
-export async function recordFabricIssue(
-  input: unknown,
-): Promise<ActionResult<{ id: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "make.update");
-
-  const parsed = recordFabricIssueSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
-  const d = parsed.data;
-
-  const db = scoped(ctx);
-  const line = await db.makeJobLine.findUnique({
-    where: { id: d.makeJobLineId },
-    select: { id: true, makeJobId: true },
-  });
-  if (!line) return { ok: false, error: "Make job line not found" };
-
-  await db.makeJobLine.update({
-    where: { id: d.makeJobLineId },
-    data: {
-      fabricIssuedM: new Decimal(d.fabricIssuedM),
-      ...(d.liningIssuedM !== undefined
-        ? { liningIssuedM: new Decimal(d.liningIssuedM) }
-        : {}),
-    },
-  });
-
-  revalidatePath(`/make/${line.makeJobId}`);
-  return { ok: true, data: { id: d.makeJobLineId } };
-}
-
-export async function recordActualUsage(
-  input: unknown,
-): Promise<ActionResult<{ id: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "make.update");
-
-  const parsed = recordActualUsageSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
-  const d = parsed.data;
-
-  const db = scoped(ctx);
-  const line = await db.makeJobLine.findUnique({
-    where: { id: d.makeJobLineId },
-    select: { id: true, makeJobId: true },
-  });
-  if (!line) return { ok: false, error: "Make job line not found" };
-
-  await db.makeJobLine.update({
-    where: { id: d.makeJobLineId },
-    data: {
-      actualUsedM: new Decimal(d.actualUsedM),
-      wastageM: new Decimal(d.wastageM),
-      qcPassed: d.qcPassed,
-      qcNotes: d.qcNotes?.trim() || null,
-    },
-  });
-
-  revalidatePath(`/make/${line.makeJobId}`);
-  return { ok: true, data: { id: d.makeJobLineId } };
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

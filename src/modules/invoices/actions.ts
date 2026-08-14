@@ -173,7 +173,7 @@ export async function createInvoice(
     return inv;
   });
 
-  revalidatePath("/invoices");
+  revalidatePath("/invoicing");
   if (order.projectId) revalidatePath(`/projects/${order.projectId}`);
   return { ok: true, data: created };
 }
@@ -219,8 +219,8 @@ export async function cancelInvoice(
     data: { status: "CANCELLED", cancelledAt: new Date(), cancelReason: reason },
   });
 
-  revalidatePath("/invoices");
-  revalidatePath(`/invoices/${id}`);
+  revalidatePath("/invoicing");
+  revalidatePath(`/invoicing/${id}`);
   return { ok: true, data: { id } };
 }
 

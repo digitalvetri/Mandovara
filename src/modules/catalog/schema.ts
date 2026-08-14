@@ -40,12 +40,12 @@ export const BrandSchema = z.object({
   name: z.string().min(1).max(100),
   country: z.string().max(60).optional(),
   leadTimeDays: z.number().int().min(1).max(365).default(14),
-  vendorId: z.string().cuid().optional().nullable(),
+  vendorId: z.string().min(1).optional().nullable(),
   isActive: z.boolean().default(true),
 });
 
 export const CollectionSchema = z.object({
-  brandId: z.string().cuid(),
+  brandId: z.string().min(1),
   name: z.string().min(1).max(120),
   family: ProductFamilyEnum,
   seasonYear: z.number().int().min(2000).max(2100).optional().nullable(),
@@ -53,7 +53,7 @@ export const CollectionSchema = z.object({
 });
 
 export const DesignSchema = z.object({
-  collectionId: z.string().cuid(),
+  collectionId: z.string().min(1),
   code: z.string().min(1).max(60),
   name: z.string().min(1).max(120),
   family: ProductFamilyEnum,
@@ -74,7 +74,7 @@ export const DesignSchema = z.object({
 });
 
 export const ColourwaySchema = z.object({
-  designId: z.string().cuid(),
+  designId: z.string().min(1),
   code: z.string().min(1).max(60),
   colourName: z.string().min(1).max(80),
   hex: z
@@ -88,9 +88,9 @@ export const ColourwaySchema = z.object({
 });
 
 export const PriceSchema = z.object({
-  colourwayId: z.string().cuid(),
+  colourwayId: z.string().min(1),
   tier: z.enum(["COST", "MRP", "RETAIL", "ARCHITECT", "PROJECT"]),
-  clientId: z.string().cuid().optional().nullable(),
+  clientId: z.string().min(1).optional().nullable(),
   amount: z.bigint().positive(),
   minChargeSqft: z.number().positive().optional().nullable(),
   effectiveFrom: z.date(),
@@ -101,8 +101,8 @@ export const PriceSchema = z.object({
 export const DesignSearchParams = z.object({
   q: z.string().optional(),
   family: ProductFamilyEnum.optional(),
-  brandId: z.string().cuid().optional(),
-  collectionId: z.string().cuid().optional(),
+  brandId: z.string().min(1).optional(),
+  collectionId: z.string().min(1).optional(),
   inStock: z.boolean().optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(30),

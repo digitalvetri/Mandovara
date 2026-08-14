@@ -1,49 +1,76 @@
+import Link from "next/link";
+import type { Route } from "next";
+import { Scissors } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { listMakeJobs } from "@/modules/make/queries";
-import { MAKE_KANBAN_COLUMNS, MAKE_STATUS_LABELS } from "@/modules/make/schema";
+import { MAKE_KANBAN_COLUMNS, MAKE_STATUS_LABELS, MAKE_STATUS_COLORS, PRIORITY_LABELS } from "@/modules/make/schema";
 import type { MakeJobRow } from "@/modules/make/queries";
-import { Scissors } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-function statusColor(status: string) {
-  switch (status) {
-    case "QUEUED": return "bg-surface-2 text-text-muted";
-    case "CUTTING": return "bg-info/15 text-info";
-    case "STITCHING": return "bg-heat/15 text-heat";
-    case "FINISHING": return "bg-heat/15 text-heat";
-    case "QC": return "bg-gold-tint text-gold";
-    case "READY": return "bg-solid/15 text-solid";
-    case "DELIVERED": return "bg-solid/20 text-solid";
-    default: return "bg-surface-2 text-text-muted";
-  }
-}
+const PRIORITY_COLORS: Record<number, string> = {
+  0: "text-text-subtle",
+  1: "text-heat",
+  2: "text-fault font-semibold",
+};
 
 function MakeJobCard({ job }: { job: MakeJobRow }) {
+  const overdue =
+    job.targetDate && !job.completedAt && new Date(job.targetDate) < new Date();
+
   return (
-    <a
-      href={`/make/${job.id}`}
+    <Link
+      href={`/make/${job.id}` as Route}
       className="block bg-surface border border-border rounded-lg p-3 hover:border-gold/40 transition-colors"
     >
+      {/* Header row: number + priority */}
       <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="font-data text-[11px] text-text-muted">{job.number}</span>
-        {job.targetDate && (
-          <span className="font-data text-[10px] text-text-muted">
-            {new Date(job.targetDate).toLocaleDateString("en-IN", {
-              day: "2-digit", month: "short",
-            })}
+        <span className="font-data text-[10.5px] text-text-muted">{job.number}</span>
+        {job.priority > 0 && (
+          <span className={`text-[9.5px] uppercase tracking-wide ${PRIORITY_COLORS[job.priority] ?? ""}`}>
+            {PRIORITY_LABELS[job.priority]}
           </span>
         )}
       </div>
-      <div className="text-[13px] font-medium text-text truncate">{job.projectName}</div>
+
+      {/* Project + client */}
+      <div className="text-[12.5px] font-medium text-text truncate leading-snug">
+        {job.projectName}
+      </div>
       <div className="text-[11px] text-text-muted truncate">{job.clientName}</div>
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-[10px] text-text-subtle">{job.lineCount} line{job.lineCount !== 1 ? "s" : ""}</span>
-        {job.vendorName && (
-          <span className="text-[10px] text-text-muted truncate max-w-[80px]">{job.vendorName}</span>
+
+      {/* Sales order */}
+      <div className="mt-1 text-[10.5px] text-text-subtle tabular-nums">
+        {job.orderNumber}
+      </div>
+
+      {/* Measurement revision */}
+      {job.measurementRevision && (
+        <div className="mt-0.5 text-[10px] text-text-subtle truncate">
+          Rev: {job.measurementRevision}
+        </div>
+      )}
+
+      {/* Footer row */}
+      <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-subtle">
+            {job.lineCount} line{job.lineCount !== 1 ? "s" : ""}
+          </span>
+          {job.assignedToName && (
+            <span className="text-[10px] text-text-muted truncate max-w-[72px]">
+              · {job.assignedToName}
+            </span>
+          )}
+        </div>
+        {job.targetDate && (
+          <span className={`text-[10px] font-data ${overdue ? "text-fault" : "text-text-muted"}`}>
+            {new Date(job.targetDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+            {overdue ? " ⚠" : ""}
+          </span>
         )}
       </div>
-    </a>
+    </Link>
   );
 }
 
@@ -72,14 +99,13 @@ export default async function MakePage() {
         </div>
       </div>
 
-      {/* Kanban board */}
       <div className="flex gap-3 overflow-x-auto pb-4">
         {MAKE_KANBAN_COLUMNS.map((col) => {
           const jobs = byStatus.get(col) ?? [];
           return (
-            <div key={col} className="flex-shrink-0 w-[220px]">
+            <div key={col} className="flex-shrink-0 w-[224px]">
               <div className="flex items-center justify-between mb-2 px-1">
-                <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${statusColor(col)}`}>
+                <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${MAKE_STATUS_COLORS[col] ?? ""}`}>
                   {MAKE_STATUS_LABELS[col]}
                 </span>
                 <span className="text-[11px] text-text-muted font-data">{jobs.length}</span>

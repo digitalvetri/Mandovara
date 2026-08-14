@@ -22,7 +22,7 @@ const paiseStr = z.string().regex(/^-?\d+$/, "Must be an integer paise string");
 const decStr   = z.string().regex(/^\d+(\.\d+)?$/, "Must be a decimal string");
 
 export const invoiceLineInput = z.object({
-  orderLineId: z.string().cuid().optional(),
+  orderLineId: z.string().min(1).optional(),
   description: z.string().min(1).max(500),
   hsn:         z.string().min(2).max(8),
   quantity:    decStr,
@@ -37,8 +37,8 @@ export const invoiceLineInput = z.object({
 });
 
 export const createInvoiceSchema = z.object({
-  orderId:           z.string().cuid("orderId is required"),
-  branchId:          z.string().cuid("branchId is required"),
+  orderId:           z.string().min(1, "orderId is required"),
+  branchId:          z.string().min(1, "branchId is required"),
   type:              z.enum(INVOICE_TYPES).default("TAX"),
   date:              isoDate,
   dueDate:           isoDate,
@@ -47,7 +47,7 @@ export const createInvoiceSchema = z.object({
 });
 
 export const cancelInvoiceSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   reason: z.string().trim().min(5, "Cancellation reason required (min 5 chars)").max(500),
 });
 

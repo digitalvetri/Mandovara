@@ -11,18 +11,21 @@ export interface AgingBucket {
 }
 
 export interface OutstandingInvoiceRow {
-  id:          string;
-  number:      string;
-  date:        Date;
-  dueDate:     Date;
-  daysOverdue: number;
-  clientId:    string;
-  clientName:  string;
+  id:           string;
+  number:       string;
+  date:         Date;
+  dueDate:      Date;
+  daysOverdue:  number;
+  clientId:     string;
+  clientName:   string;
   clientMobile: string;
-  total:       bigint;
-  paid:        bigint;
-  outstanding: bigint;
-  status:      string;
+  projectId:    string | null;
+  projectName:  string | null;
+  total:        bigint;
+  paid:         bigint;
+  outstanding:  bigint;
+  status:       string;
+  bucketKey:    AgingBucket["key"];
 }
 
 export interface OutstandingClientRow {
@@ -35,31 +38,35 @@ export interface OutstandingClientRow {
 }
 
 export interface RecentReceiptRow {
-  id:         string;
-  number:     string;
-  date:       Date;
-  clientName: string;
-  mode:       string;
-  amount:     bigint;
+  id:          string;
+  number:      string;
+  date:        Date;
+  clientName:  string;
+  mode:        string;
+  amount:      bigint;
   unallocated: bigint;
 }
 
 export interface AccountsOverview {
-  invoiced:           bigint;
-  received:           bigint;
-  outstanding:        bigint;
-  overdue:            bigint;
-  onAccount:          bigint;
-  invoiceCount:       number;
-  paidCount:          number;
-  overdueCount:       number;
-  aging:              AgingBucket[];
+  invoiced:            bigint;
+  received:            bigint;
+  outstanding:         bigint;
+  overdue:             bigint;
+  customerCredit:      bigint;
+  invoiceCount:        number;
+  paidCount:           number;
+  overdueCount:        number;
+  aging:               AgingBucket[];
   outstandingInvoices: OutstandingInvoiceRow[];
-  topClients:         OutstandingClientRow[];
-  recentReceipts:     RecentReceiptRow[];
+  topClients:          OutstandingClientRow[];
+  recentReceipts:      RecentReceiptRow[];
+  activeBucket:        AgingBucket["key"] | null;
 }
 
-export async function loadAccountsOverview(ctx: RequestContext): Promise<AccountsOverview> {
+export async function loadAccountsOverview(
+  ctx: RequestContext,
+  opts: { bucketFilter?: AgingBucket["key"] } = {},
+): Promise<AccountsOverview> {
   requirePermission(ctx, "receipt.view");
   const db  = scoped(ctx);
   const now = new Date();
@@ -71,7 +78,7 @@ export async function loadAccountsOverview(ctx: RequestContext): Promise<Account
       orderBy: { dueDate: "asc" },
       select: {
         id: true, number: true, date: true, dueDate: true, status: true,
-        total: true, advanceAdjusted: true, clientId: true,
+        total: true, advanceAdjusted: true, clientId: true, projectId: true,
       },
     }),
     db.receipt.aggregate({
@@ -96,6 +103,16 @@ export async function loadAccountsOverview(ctx: RequestContext): Promise<Account
   });
   const clientMap = new Map(clients.map((c) => [c.id, c]));
 
+  // Batch-fetch project names
+  const allProjectIds = [...new Set(invoices.map((i) => i.projectId).filter(Boolean) as string[])];
+  const projects = allProjectIds.length > 0
+    ? await db.project.findMany({
+        where: { id: { in: allProjectIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const projectMap = new Map(projects.map((p) => [p.id, p]));
+
   // Batch-fetch allocation sums for all non-cancelled invoices
   const invoiceIds = invoices.map((i) => i.id);
   const allocationSums = invoiceIds.length > 0
@@ -111,11 +128,11 @@ export async function loadAccountsOverview(ctx: RequestContext): Promise<Account
   let paidCount = 0, overdueCount = 0;
 
   const buckets = new Map<AgingBucket["key"], AgingBucket>([
-    ["current", { key: "current", label: "Not yet due",     amount: 0n, count: 0 }],
-    ["d1_30",   { key: "d1_30",   label: "1–30 days",       amount: 0n, count: 0 }],
-    ["d31_60",  { key: "d31_60",  label: "31–60 days",      amount: 0n, count: 0 }],
-    ["d61_90",  { key: "d61_90",  label: "61–90 days",      amount: 0n, count: 0 }],
-    ["d90p",    { key: "d90p",    label: "Over 90 days",    amount: 0n, count: 0 }],
+    ["current", { key: "current", label: "Not yet due",  amount: 0n, count: 0 }],
+    ["d1_30",   { key: "d1_30",   label: "1–30 days",   amount: 0n, count: 0 }],
+    ["d31_60",  { key: "d31_60",  label: "31–60 days",  amount: 0n, count: 0 }],
+    ["d61_90",  { key: "d61_90",  label: "61–90 days",  amount: 0n, count: 0 }],
+    ["d90p",    { key: "d90p",    label: "Over 90 days", amount: 0n, count: 0 }],
   ]);
 
   const openRows: OutstandingInvoiceRow[] = [];
@@ -125,7 +142,8 @@ export async function loadAccountsOverview(ctx: RequestContext): Promise<Account
     invoiced += inv.total;
     const paid  = paidMap.get(inv.id) ?? 0n;
     const open  = computeOutstanding(inv.total, inv.advanceAdjusted, paid);
-    const client = clientMap.get(inv.clientId);
+    const client  = clientMap.get(inv.clientId);
+    const project = inv.projectId ? projectMap.get(inv.projectId) : undefined;
 
     if (open <= 0n) { paidCount += 1; continue; }
     outstandingTotal += open;
@@ -147,8 +165,11 @@ export async function loadAccountsOverview(ctx: RequestContext): Promise<Account
       id: inv.id, number: inv.number, date: inv.date, dueDate: inv.dueDate,
       daysOverdue: Math.max(0, days),
       clientId: inv.clientId, clientName: client?.name ?? "—", clientMobile: client?.mobile ?? "",
+      projectId: inv.projectId ?? null,
+      projectName: project?.name ?? null,
       total: inv.total, paid, outstanding: open,
       status: inv.status,
+      bucketKey,
     });
 
     const c = perClient.get(inv.clientId);
@@ -177,25 +198,30 @@ export async function loadAccountsOverview(ctx: RequestContext): Promise<Account
     .sort((a, b) => b.outstanding > a.outstanding ? 1 : b.outstanding < a.outstanding ? -1 : 0)
     .slice(0, 8);
 
-  const received  = receiptTotals._sum.amount ?? 0n;
-  const onAccount = receiptTotals._sum.unallocated ?? 0n;
+  const received       = receiptTotals._sum.amount ?? 0n;
+  const customerCredit = receiptTotals._sum.unallocated ?? 0n;
+
+  const filtered = opts.bucketFilter
+    ? openRows.filter((r) => r.bucketKey === opts.bucketFilter)
+    : openRows;
 
   return {
     invoiced,
     received,
     outstanding: outstandingTotal,
     overdue,
-    onAccount,
+    customerCredit,
     invoiceCount: invoices.length,
     paidCount,
     overdueCount,
     aging: [...buckets.values()],
-    outstandingInvoices: openRows.slice(0, 25),
+    outstandingInvoices: filtered.slice(0, 50),
     topClients,
     recentReceipts: recent.map((r) => ({
       id: r.id, number: r.number, date: r.date,
       clientName: clientMap.get(r.clientId)?.name ?? "—",
       mode: r.mode, amount: r.amount, unallocated: r.unallocated,
     })),
+    activeBucket: opts.bucketFilter ?? null,
   };
 }

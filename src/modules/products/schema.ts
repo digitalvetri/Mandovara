@@ -34,11 +34,11 @@ export const createProductSchema = z.object({
 });
 
 export const updateProductSchema = createProductSchema.partial().extend({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 export const setStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(PRODUCT_STATUSES),
 });
 

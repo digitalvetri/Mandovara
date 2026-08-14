@@ -9,14 +9,14 @@ export type ChequeStatus = (typeof CHEQUE_STATUSES)[number];
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Must be YYYY-MM-DD");
 
 export const receiptAllocationInput = z.object({
-  invoiceId: z.string().cuid(),
+  invoiceId: z.string().min(1),
   amount:    z.string().regex(/^\d+$/, "Amount must be positive paise integer"),
 });
 
 export const createReceiptSchema = z.object({
-  clientId:    z.string().cuid("Pick a client"),
-  projectId:   z.string().cuid().optional(),
-  branchId:    z.string().cuid("Pick a branch"),  // used for number prefix only, not stored
+  clientId:    z.string().min(1, "Pick a client"),
+  projectId:   z.string().min(1).optional(),
+  branchId:    z.string().min(1, "Pick a branch"),  // used for number prefix only, not stored
   date:        isoDate,
   mode:        z.enum(PAYMENT_MODES),
   reference:   z.string().trim().max(80).optional().or(z.literal("")),
@@ -26,7 +26,7 @@ export const createReceiptSchema = z.object({
 });
 
 export const bounceReceiptSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>;

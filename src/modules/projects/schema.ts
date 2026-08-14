@@ -26,32 +26,32 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/);
 
 export const createProjectSchema = z.object({
   name:          z.string().trim().min(2, "Name is required").max(200),
-  clientId:      z.string().cuid("Pick a client"),
-  branchId:      z.string().cuid("Pick a branch"),
+  clientId:      z.string().min(1, "Pick a client"),
+  branchId:      z.string().min(1, "Pick a branch"),
   startDate:     isoDate,
   targetEndDate: isoDate.optional(),
   orderValue:    z.string().trim().min(1, "Order value is required"),
 });
 
 export const setProjectStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(PROJECT_STAGES),
 });
 
 export const addMilestoneSchema = z.object({
-  projectId:   z.string().cuid(),
+  projectId:   z.string().min(1),
   name:        z.string().trim().min(1).max(200),
   plannedDate: isoDate,
   billingPct:  z.number().min(0).max(100),
 });
 
 export const setMilestoneStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(MILESTONE_STATUSES),
 });
 
 export const addTaskSchema = z.object({
-  projectId:   z.string().cuid(),
+  projectId:   z.string().min(1),
   title:       z.string().trim().min(1).max(200),
   description: z.string().trim().max(1000).optional().or(z.literal("")),
   priority:    z.enum(TASK_PRIORITIES),
@@ -59,12 +59,12 @@ export const addTaskSchema = z.object({
 });
 
 export const setTaskStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(TASK_STATUSES),
 });
 
 export const addSiteLogSchema = z.object({
-  projectId:     z.string().cuid(),
+  projectId:     z.string().min(1),
   summary:       z.string().trim().min(1).max(2000),
   weather:       z.string().trim().max(80).optional().or(z.literal("")),
   manpowerCount: z.number().int().min(0).optional(),
@@ -75,13 +75,13 @@ export const SNAG_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED"] as 
 export type SnagStatus = (typeof SNAG_STATUSES)[number];
 
 export const addSnagSchema = z.object({
-  projectId:   z.string().cuid(),
+  projectId:   z.string().min(1),
   location:    z.string().trim().min(1, "Where is it?").max(120),
   description: z.string().trim().min(1, "What's wrong?").max(1000),
 });
 
 export const setSnagStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(SNAG_STATUSES),
 });
 
@@ -94,7 +94,7 @@ export const EXPENSE_CATEGORIES = [
 ] as const;
 
 export const addProjectExpenseSchema = z.object({
-  projectId:   z.string().cuid(),
+  projectId:   z.string().min(1),
   category:    z.string().trim().min(1, "Category is required").max(60),
   amount:      z.string().trim().min(1, "Amount is required"),
   description: z.string().trim().max(500).optional().or(z.literal("")),
@@ -102,7 +102,7 @@ export const addProjectExpenseSchema = z.object({
 });
 
 export const setProjectExpenseStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(EXPENSE_STATUSES),
 });
 
@@ -129,7 +129,7 @@ const checklistItemSchema = z.object({
 });
 
 export const saveHandoverSchema = z.object({
-  projectId: z.string().cuid(),
+  projectId: z.string().min(1),
   // Object keyed by item key — validated as a plain map so future keys
   // don't need a schema bump. Unknown keys are dropped in the action.
   checklist: z.record(z.string(), checklistItemSchema),

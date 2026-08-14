@@ -8,6 +8,7 @@ import { devContext } from "@/lib/dev-context";
 import { getInvoice } from "@/modules/invoices/queries";
 import { IrnPill, StatusPill } from "../_components/StatusPill";
 import { CancelInvoiceButton } from "../_components/CancelInvoiceButton";
+import { PrintButton } from "../_components/PrintButton";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,40 @@ export default async function InvoiceDetailPage({
   const isOverdue = inv.status !== "PAID" && inv.status !== "CANCELLED" && overdueDays > 0;
   const canCancel = inv.status === "ISSUED" || inv.status === "DRAFT";
 
+  // WhatsApp pre-filled message
+  const waText = encodeURIComponent(
+    `Hi, please find your invoice ${inv.number} for ₹${(Number(inv.total) / 100).toLocaleString("en-IN")} dated ${formatDate(inv.date)}. Outstanding: ₹${(Number(inv.outstanding) / 100).toLocaleString("en-IN")} due ${formatDate(inv.dueDate)}. — Mandovara`,
+  );
+  const waHref = `https://wa.me/91${inv.clientMobile.replace(/\D/g, "")}?text=${waText}`;
+
   return (
     <>
       <Topbar
         title={inv.number}
         eyebrow={`${inv.clientName} · ${formatDate(inv.date)} → due ${formatDate(inv.dueDate)}${inv.orderNumber ? ` · from ${inv.orderNumber}` : ""}`}
+        actions={
+          <div className="flex items-center gap-2" data-no-print>
+            <PrintButton />
+            {inv.clientMobile && (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-rule bg-surface-2 text-text-dim text-[12px] hover:bg-surface hover:text-text transition-colors"
+              >
+                Send WhatsApp
+              </a>
+            )}
+            {inv.outstanding > 0n && (
+              <Link
+                href={`/accounts/new?clientId=${inv.clientId}` as Route}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-gold/20 border border-gold/40 text-gold text-[12px] font-medium hover:bg-gold/30 transition-colors"
+              >
+                Record Payment
+              </Link>
+            )}
+          </div>
+        }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">

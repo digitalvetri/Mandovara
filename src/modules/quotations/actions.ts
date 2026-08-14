@@ -321,7 +321,7 @@ export async function rejectQuotation(
   requirePermission(ctx, "quotation.approve");
 
   const parsed = z
-    .object({ id: z.string().cuid(), reason: z.string().trim().min(1).max(500) })
+    .object({ id: z.string().min(1), reason: z.string().trim().min(1).max(500) })
     .safeParse(input);
   if (!parsed.success) return { ok: false, error: "Reason is required" };
   const { id, reason } = parsed.data;
@@ -351,7 +351,7 @@ export async function updateQuotationLines(
 
   const parsed = z
     .object({
-      quotationId:       z.string().cuid(),
+      quotationId:       z.string().min(1),
       placeOfSupplyCode: z.string().length(2, "2-digit state code required"),
       lines:             z.array(quotationLineInput).min(1, "At least one line is required"),
     })

@@ -2,6 +2,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { loadPayroll } from "@/modules/payroll/queries";
+import { ApproveButton, SendPayslipButton } from "./_components/PayrollActions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +19,8 @@ export default async function PayrollPage() {
           <div className="font-display text-[22px] font-semibold">{p.runLabel}</div>
           <div className="mt-1 text-[12px] text-sidebar-dim">{p.runStatus}</div>
         </div>
-        {p.awaitingApproval && (
-          <button
-            type="button"
-            className="h-[38px] px-4 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:bg-accent-hover transition-colors"
-          >
-            Review &amp; Approve Run
-          </button>
+        {p.awaitingApproval && p.runId && (
+          <ApproveButton runId={p.runId} netFormatted={formatINR(p.net)} />
         )}
       </div>
 
@@ -55,7 +51,12 @@ export default async function PayrollPage() {
                 <Td align="right"><span className="tabular text-text">{formatINR(r.gross)}</span></Td>
                 <Td align="right"><span className="tabular text-bad">−{formatINR(r.deductions)}</span></Td>
                 <Td align="right"><span className="tabular text-text font-medium">{formatINR(r.netPay)}</span></Td>
-                <Td align="right"><a className="text-accent hover:underline text-[11.5px]">Send</a></Td>
+                <Td align="right">
+                  {p.hasRun && !p.awaitingApproval
+                    ? <SendPayslipButton payslipId={r.payslipId} employeeName={r.employeeName} />
+                    : <span className="text-text-dim text-[11px]">—</span>
+                  }
+                </Td>
               </tr>
             ))}
           </tbody>

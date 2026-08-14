@@ -13,9 +13,9 @@ export type SellUnit = (typeof SELL_UNITS)[number];
 const isoDate = z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}/));
 
 export const quotationLineInput = z.object({
-  colourwayId:       z.string().cuid().optional(),
-  serviceRateId:     z.string().cuid().optional(),
-  measurementItemId: z.string().cuid().optional(),
+  colourwayId:       z.string().min(1).optional(),
+  serviceRateId:     z.string().min(1).optional(),
+  measurementItemId: z.string().min(1).optional(),
   roomLabel:         z.string().trim().max(120).optional().or(z.literal("")),
   description:       z.string().trim().min(1, "Description required").max(500),
   quantity:          z.number().positive("Quantity must be > 0"),
@@ -28,9 +28,9 @@ export const quotationLineInput = z.object({
 });
 
 export const createQuotationSchema = z.object({
-  projectId:         z.string().cuid("Pick a project"),
-  clientId:          z.string().cuid().optional(),   // derived from project when omitted
-  branchId:          z.string().cuid("Pick a branch"),
+  projectId:         z.string().min(1, "Pick a project"),
+  clientId:          z.string().min(1).optional(),   // derived from project when omitted
+  branchId:          z.string().min(1, "Pick a branch"),
   date:              isoDate,
   validUntil:        isoDate,
   placeOfSupplyCode: z.string().length(2, "2-digit state code required"),
@@ -39,7 +39,7 @@ export const createQuotationSchema = z.object({
 });
 
 export const setStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(QUOTATION_STATUSES),
 });
 

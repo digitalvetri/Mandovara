@@ -153,7 +153,7 @@ export async function createReceipt(
   });
 
   revalidatePath("/receipts");
-  revalidatePath("/invoices");
+  revalidatePath("/invoicing");
   return { ok: true, data: { ...created, unallocated } };
 }
 
@@ -226,7 +226,7 @@ export async function bounceReceipt(
   });
 
   revalidatePath("/receipts");
-  revalidatePath("/invoices");
+  revalidatePath("/invoicing");
   return { ok: true, data: { id } };
 }
 

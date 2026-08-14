@@ -12,7 +12,7 @@ export interface ActionResult<T = unknown> {
 }
 
 const toggleSchema = z.object({
-  roleId: z.string().cuid(),
+  roleId: z.string().min(1),
   key:    z.string().min(3),
   grant:  z.boolean(),
 });

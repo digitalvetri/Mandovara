@@ -10,42 +10,36 @@ export interface InstallVisitRow {
   projectId: string;
   projectName: string;
   clientName: string;
-  crewName: string | null;
-  lineCount: number;
-  completedAt: Date | null;
-}
-
-export interface InstallLineDetail {
-  id: string;
-  orderLineId: string;
-  roomLabel: string;
-  description: string;
-  plannedQty: string;
-  installedQty: string;
-  dyeLotUsed: string | null;
-  issue: string | null;
-  colourwayCode: string | null;
-  colourName: string | null;
-}
-
-export interface InstallVisitDetail {
-  id: string;
-  number: string;
-  scheduledAt: Date;
-  startedAt: Date | null;
-  completedAt: Date | null;
-  status: InstallStatus;
-  notes: string | null;
-  clientSignatureKey: string | null;
-  projectId: string;
-  projectName: string;
-  clientName: string;
-  clientMobile: string;
   siteAddress: unknown;
   crewName: string | null;
+  lineCount: number;
+  snagCount: number;
+  completedAt: Date | null;
+  customerConfirmedAt: Date | null;
   orderId: string;
   orderNumber: string;
-  lines: InstallLineDetail[];
+}
+
+export interface InstallStatusCounts {
+  SCHEDULED: number;
+  ASSIGNED: number;
+  IN_PROGRESS: number;
+  COMPLETED: number;
+  SNAGGING: number;
+  CUSTOMER_CONFIRMED: number;
+  CLOSED: number;
+  total: number;
+}
+
+export interface EligibleOrder {
+  id: string;
+  number: string;
+  clientName: string;
+  projectName: string;
+  projectId: string;
+  status: string;
+  lineCount: number;
+  promisedInstallAt: Date | null;
 }
 
 export async function listInstallVisits(
@@ -55,162 +49,112 @@ export async function listInstallVisits(
   const visits = await db.installVisit.findMany({
     where: {
       organizationId: ctx.orgId,
+      kind: "INSTALL",
       ...(opts.status?.length ? { status: { in: opts.status } } : {}),
     },
     orderBy: [{ scheduledAt: "asc" }, { number: "asc" }],
     select: {
-      id: true,
-      number: true,
-      scheduledAt: true,
-      status: true,
-      projectId: true,
-      completedAt: true,
-      crewId: true,
-      _count: { select: { lines: true } },
+      id: true, number: true, scheduledAt: true, status: true,
+      projectId: true, orderId: true, crewId: true,
+      completedAt: true, customerConfirmedAt: true,
+      _count: { select: { lines: true, snags: true } },
     },
   });
 
   if (visits.length === 0) return [];
 
   const projectIds = [...new Set(visits.map((v) => v.projectId))];
-  const crewIds = [...new Set(visits.map((v) => v.crewId).filter(Boolean))] as string[];
+  const crewIds    = [...new Set(visits.map((v) => v.crewId).filter(Boolean))] as string[];
+  const orderIds   = [...new Set(visits.map((v) => v.orderId))];
 
-  const [projects, crews] = await Promise.all([
+  const [projects, crews, orders] = await Promise.all([
     db.project.findMany({
       where: { id: { in: projectIds } },
-      select: {
-        id: true,
-        name: true,
-        client: { select: { name: true } },
-      },
+      select: { id: true, name: true, siteAddress: true, client: { select: { name: true } } },
     }),
     crewIds.length > 0
-      ? db.installCrew.findMany({
-          where: { id: { in: crewIds } },
-          select: { id: true, name: true },
-        })
+      ? db.installCrew.findMany({ where: { id: { in: crewIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+    orderIds.length > 0
+      ? db.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, number: true } })
       : Promise.resolve([]),
   ]);
 
   const projectMap = new Map(projects.map((p) => [p.id, p]));
-  const crewMap = new Map(crews.map((c) => [c.id, c.name]));
+  const crewMap    = new Map(crews.map((c) => [c.id, c.name]));
+  const orderMap   = new Map(orders.map((o) => [o.id, o.number]));
 
   return visits.map((v) => {
     const project = projectMap.get(v.projectId);
     return {
-      id: v.id,
-      number: v.number,
-      scheduledAt: v.scheduledAt,
-      status: v.status,
-      projectId: v.projectId,
+      id: v.id, number: v.number, scheduledAt: v.scheduledAt, status: v.status,
+      projectId: v.projectId, orderId: v.orderId,
       projectName: project?.name ?? "—",
       clientName: project?.client.name ?? "—",
+      siteAddress: project?.siteAddress ?? null,
       crewName: v.crewId ? (crewMap.get(v.crewId) ?? null) : null,
       lineCount: v._count.lines,
+      snagCount: v._count.snags,
       completedAt: v.completedAt,
+      customerConfirmedAt: v.customerConfirmedAt,
+      orderNumber: orderMap.get(v.orderId) ?? "—",
     };
   });
 }
 
-export async function getInstallVisit(
-  ctx: RequestContext,
-  visitId: string,
-): Promise<InstallVisitDetail | null> {
-  const visit = await db.installVisit.findFirst({
-    where: { id: visitId, organizationId: ctx.orgId },
+export async function getInstallStatusCounts(ctx: RequestContext): Promise<InstallStatusCounts> {
+  const groups = await db.installVisit.groupBy({
+    by: ["status"],
+    where: { organizationId: ctx.orgId, kind: "INSTALL" },
+    _count: { id: true },
+  });
+  const counts: InstallStatusCounts = {
+    SCHEDULED: 0, ASSIGNED: 0, IN_PROGRESS: 0, COMPLETED: 0,
+    SNAGGING: 0, CUSTOMER_CONFIRMED: 0, CLOSED: 0, total: 0,
+  };
+  for (const g of groups) {
+    const k = g.status as keyof InstallStatusCounts;
+    if (k in counts && k !== "total") (counts as unknown as Record<string, number>)[k] = g._count.id;
+    counts.total += g._count.id;
+  }
+  return counts;
+}
+
+export async function listEligibleOrders(ctx: RequestContext): Promise<EligibleOrder[]> {
+  const orders = await db.order.findMany({
+    where: {
+      organizationId: ctx.orgId,
+      status: { in: ["CONFIRMED", "PROCUREMENT", "MAKE", "READY_TO_INSTALL"] },
+    },
+    orderBy: { date: "desc" },
+    take: 200,
     select: {
-      id: true,
-      number: true,
-      scheduledAt: true,
-      startedAt: true,
-      completedAt: true,
-      status: true,
-      notes: true,
-      clientSignatureKey: true,
-      projectId: true,
-      orderId: true,
-      crewId: true,
-      lines: {
-        orderBy: { id: "asc" },
-        select: {
-          id: true,
-          orderLineId: true,
-          roomLabel: true,
-          plannedQty: true,
-          installedQty: true,
-          dyeLotUsed: true,
-          issue: true,
-        },
-      },
+      id: true, number: true, status: true, promisedInstallAt: true,
+      project: { select: { id: true, name: true, client: { select: { name: true } } } },
+      _count: { select: { lines: true } },
     },
   });
-  if (!visit) return null;
 
-  const [project, crew, orderLines] = await Promise.all([
-    db.project.findUnique({
-      where: { id: visit.projectId },
-      select: {
-        name: true,
-        siteAddress: true,
-        client: { select: { name: true, mobile: true } },
-        orders: {
-          where: { id: visit.orderId },
-          select: { number: true },
-          take: 1,
+  const orderIds = orders.map((o) => o.id);
+  const existing = orderIds.length > 0
+    ? await db.installVisit.findMany({
+        where: {
+          organizationId: ctx.orgId, kind: "INSTALL",
+          orderId: { in: orderIds }, status: { not: "CANCELLED" },
         },
-      },
-    }),
-    visit.crewId
-      ? db.installCrew.findUnique({ where: { id: visit.crewId }, select: { name: true } })
-      : null,
-    db.orderLine.findMany({
-      where: { id: { in: visit.lines.map((l) => l.orderLineId) } },
-      select: { id: true, description: true, colourwayId: true },
-    }),
-  ]);
-
-  // Fetch colourways separately (OrderLine has no Prisma relation to Colourway)
-  const cwIds = [...new Set(orderLines.map((l) => l.colourwayId).filter(Boolean))] as string[];
-  const colourways = cwIds.length > 0
-    ? await db.colourway.findMany({ where: { id: { in: cwIds } }, select: { id: true, code: true, colourName: true } })
+        select: { orderId: true },
+      })
     : [];
-  const cwMap = new Map(colourways.map((c) => [c.id, c]));
+  const alreadyScheduled = new Set(existing.map((e) => e.orderId));
 
-  const orderLineMap = new Map(orderLines.map((l) => [l.id, l]));
-
-  return {
-    id: visit.id,
-    number: visit.number,
-    scheduledAt: visit.scheduledAt,
-    startedAt: visit.startedAt,
-    completedAt: visit.completedAt,
-    status: visit.status,
-    notes: visit.notes,
-    clientSignatureKey: visit.clientSignatureKey,
-    projectId: visit.projectId,
-    projectName: project?.name ?? "—",
-    clientName: project?.client.name ?? "—",
-    clientMobile: project?.client.mobile ?? "",
-    siteAddress: project?.siteAddress ?? null,
-    crewName: crew?.name ?? null,
-    orderId: visit.orderId,
-    orderNumber: project?.orders[0]?.number ?? "—",
-    lines: visit.lines.map((l) => {
-      const ol = orderLineMap.get(l.orderLineId);
-      return {
-        id: l.id,
-        orderLineId: l.orderLineId,
-        roomLabel: l.roomLabel,
-        description: ol?.description ?? "—",
-        plannedQty: l.plannedQty.toString(),
-        installedQty: l.installedQty.toString(),
-        dyeLotUsed: l.dyeLotUsed,
-        issue: l.issue,
-        colourwayCode: ol?.colourwayId ? (cwMap.get(ol.colourwayId)?.code ?? null) : null,
-        colourName: ol?.colourwayId ? (cwMap.get(ol.colourwayId)?.colourName ?? null) : null,
-      };
-    }),
-  };
+  return orders
+    .filter((o) => !alreadyScheduled.has(o.id))
+    .map((o) => ({
+      id: o.id, number: o.number, status: o.status,
+      clientName: o.project.client.name,
+      projectName: o.project.name, projectId: o.project.id,
+      lineCount: o._count.lines, promisedInstallAt: o.promisedInstallAt,
+    }));
 }
 
 export async function listInstallCrews(ctx: RequestContext) {

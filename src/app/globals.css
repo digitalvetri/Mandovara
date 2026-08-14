@@ -166,3 +166,9 @@ html, body {
   }
   .skeleton { animation: none; opacity: 0.6; }
 }
+
+@media print {
+  [data-no-print], nav, aside { display: none !important; }
+  body { background: white; color: black; }
+  .print\:block { display: block !important; }
+}

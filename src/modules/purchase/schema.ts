@@ -12,36 +12,36 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/);
 // ── PO creation ───────────────────────────────────────────────────────────────
 
 export const poLineInput = z.object({
-  colourwayId: z.string().cuid("Pick a colourway"),
+  colourwayId: z.string().min(1, "Pick a colourway"),
   unit:        z.enum(SELL_UNITS),
   quantity:    z.number().positive("Quantity must be > 0"),
   rate:        z.string().trim().min(1, "Rate is required"),   // INR string, parsed server-side
 });
 
 export const createPOSchema = z.object({
-  vendorId:   z.string().cuid("Pick a vendor"),
+  vendorId:   z.string().min(1, "Pick a vendor"),
   date:       isoDate,
   expectedAt: isoDate.optional(),
-  projectId:  z.string().cuid().optional(),
+  projectId:  z.string().min(1).optional(),
   lines:      z.array(poLineInput).min(1, "At least one line required"),
 });
 
 // ── Status transitions ────────────────────────────────────────────────────────
 
 export const setPOStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(["PENDING_APPROVAL", "APPROVED", "SENT", "CANCELLED"]),
 });
 
 export const rejectPOSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   reason: z.string().trim().min(1).max(500).optional(),
 });
 
 // ── GRN posting ───────────────────────────────────────────────────────────────
 
 export const grnLineInput = z.object({
-  colourwayId:  z.string().cuid(),
+  colourwayId:  z.string().min(1),
   quantity:     z.number().positive("Quantity must be > 0"),
   dyeLot:       z.string().trim().max(80).optional().or(z.literal("")),
   binLocation:  z.string().trim().max(120).optional().or(z.literal("")),
@@ -50,7 +50,7 @@ export const grnLineInput = z.object({
 });
 
 export const postGRNSchema = z.object({
-  purchaseOrderId: z.string().cuid(),
+  purchaseOrderId: z.string().min(1),
   receivedAt:      isoDate,
   invoiceRef:      z.string().trim().max(80).optional().or(z.literal("")),
   lines:           z.array(grnLineInput).min(1, "Receive at least one line"),

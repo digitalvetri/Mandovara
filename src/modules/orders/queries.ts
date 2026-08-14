@@ -1,7 +1,7 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
-import type { OrderStatus } from "./schema";
+import { ORDER_STATUSES, type OrderStatus } from "./schema";
 
 export interface ListOrdersQuery {
   search?: string;
@@ -30,6 +30,20 @@ export interface ListOrdersResult {
   pageSize: number;
 }
 
+export interface OrderStatusCounts {
+  byStatus: Record<OrderStatus, number>;
+  open:     number;
+  total:    number;
+}
+
+export interface InstallVisitSummary {
+  id:          string;
+  number:      string;
+  scheduledAt: Date;
+  status:      string;
+  completedAt: Date | null;
+}
+
 export interface OrderLineRow {
   id: string;
   lineNo: number;
@@ -44,6 +58,8 @@ export interface OrderLineRow {
   procuredQty: string;
   madeQty: string;
   installedQty: string;
+  dispatchedQty: string;
+  remainingQty: string;
 }
 
 export interface OrderDetail {
@@ -56,6 +72,9 @@ export interface OrderDetail {
   branchId: string;
   branchName: string;
   projectId: string;
+  projectNumber: string;
+  projectName: string;
+  salesExecName: string | null;
   date: Date;
   promisedInstallAt: Date | null;
   totalValue: bigint;
@@ -63,6 +82,11 @@ export interface OrderDetail {
   advanceReceived: bigint;
   quotationId: string | null;
   quotationNumber: string | null;
+  makeJobId: string | null;
+  makeJobStatus: string | null;
+  installVisits: InstallVisitSummary[];
+  invoicedTotal: bigint;
+  paidTotal: bigint;
   lines: OrderLineRow[];
 }
 
@@ -139,7 +163,10 @@ export async function getOrder(
       date: true, promisedInstallAt: true,
       totalValue: true, advanceRequired: true, advanceReceived: true,
       project: {
-        select: { client: { select: { id: true, name: true, mobile: true } } },
+        select: {
+          number: true, name: true, ownerId: true,
+          client: { select: { id: true, name: true, mobile: true } },
+        },
       },
       lines: {
         orderBy: { lineNo: "asc" },
@@ -154,17 +181,48 @@ export async function getOrder(
   });
   if (!row) return null;
 
-  const [branch, quotationNumber] = await Promise.all([
-    db.branch.findUniqueOrThrow({
-      where: { id: row.branchId },
-      select: { name: true },
-    }),
+  const [branch, quotationNumber, ownerUser, makeJob, installVisits, invoices, dispatchedLines] = await Promise.all([
+    db.branch.findUniqueOrThrow({ where: { id: row.branchId }, select: { name: true } }),
     row.quotationId
-      ? db.quotation
-          .findUnique({ where: { id: row.quotationId }, select: { number: true } })
-          .then((r) => r?.number ?? null)
+      ? db.quotation.findUnique({ where: { id: row.quotationId }, select: { number: true } }).then((r) => r?.number ?? null)
       : Promise.resolve(null),
+    db.user.findFirst({ where: { id: row.project.ownerId }, select: { name: true } }),
+    db.makeJob.findFirst({
+      where: { orderId: id },
+      orderBy: { number: "desc" },
+      select: { id: true, status: true },
+    }),
+    db.installVisit.findMany({
+      where: { orderId: id },
+      orderBy: { scheduledAt: "asc" },
+      select: { id: true, number: true, scheduledAt: true, status: true, completedAt: true },
+    }),
+    db.invoice.findMany({ where: { orderId: id }, select: { id: true, total: true } }),
+    db.installLine.findMany({
+      where: { visit: { orderId: id, status: { not: "CANCELLED" } } },
+      select: { orderLineId: true, plannedQty: true },
+    }),
   ]);
+
+  const dispatchedByLine = new Map<string, number>();
+  for (const dl of dispatchedLines) {
+    dispatchedByLine.set(
+      dl.orderLineId,
+      (dispatchedByLine.get(dl.orderLineId) ?? 0) + Number(dl.plannedQty),
+    );
+  }
+
+  const invoicedTotal = invoices.reduce((s, i) => s + i.total, 0n);
+
+  let paidTotal = 0n;
+  if (invoices.length > 0) {
+    const invoiceIds = invoices.map((i) => i.id);
+    const allocations = await db.receiptAllocation.findMany({
+      where: { invoiceId: { in: invoiceIds } },
+      select: { amount: true },
+    });
+    paidTotal = allocations.reduce((s, a) => s + a.amount, 0n);
+  }
 
   return {
     id: row.id,
@@ -176,6 +234,9 @@ export async function getOrder(
     branchId: row.branchId,
     branchName: branch.name,
     projectId: row.projectId,
+    projectNumber: row.project.number,
+    projectName: row.project.name,
+    salesExecName: ownerUser?.name ?? null,
     date: row.date,
     promisedInstallAt: row.promisedInstallAt,
     totalValue: row.totalValue,
@@ -183,22 +244,55 @@ export async function getOrder(
     advanceReceived: row.advanceReceived,
     quotationId: row.quotationId,
     quotationNumber,
-    lines: row.lines.map((l) => ({
-      id: l.id,
-      lineNo: l.lineNo,
-      description: l.description,
-      colourwayId: l.colourwayId,
-      serviceRateId: l.serviceRateId,
-      measurementItemId: l.measurementItemId,
-      quantity: l.quantity.toString(),
-      unit: l.unit,
-      rate: l.rate,
-      amount: l.amount,
-      procuredQty: l.procuredQty.toString(),
-      madeQty: l.madeQty.toString(),
-      installedQty: l.installedQty.toString(),
-    })),
+    makeJobId: makeJob?.id ?? null,
+    makeJobStatus: makeJob?.status ?? null,
+    installVisits,
+    invoicedTotal,
+    paidTotal,
+    lines: row.lines.map((l) => {
+      const dispatched = dispatchedByLine.get(l.id) ?? 0;
+      const remaining  = Math.max(0, Number(l.quantity) - dispatched);
+      return {
+        id: l.id,
+        lineNo: l.lineNo,
+        description: l.description,
+        colourwayId: l.colourwayId,
+        serviceRateId: l.serviceRateId,
+        measurementItemId: l.measurementItemId,
+        quantity: l.quantity.toString(),
+        unit: l.unit,
+        rate: l.rate,
+        amount: l.amount,
+        procuredQty: l.procuredQty.toString(),
+        madeQty: l.madeQty.toString(),
+        installedQty: l.installedQty.toString(),
+        dispatchedQty: dispatched.toFixed(2),
+        remainingQty:  remaining.toFixed(2),
+      };
+    }),
   };
+}
+
+export async function getOrderSummaryCounts(
+  ctx: RequestContext,
+): Promise<OrderStatusCounts> {
+  requirePermission(ctx, "order.view");
+  const db = scoped(ctx);
+
+  const groups = await db.order.groupBy({ by: ["status"], _count: { id: true } });
+
+  const byStatus = Object.fromEntries(
+    ORDER_STATUSES.map((s) => [s, 0]),
+  ) as Record<OrderStatus, number>;
+
+  let total = 0;
+  for (const g of groups) {
+    byStatus[g.status as OrderStatus] = g._count.id;
+    total += g._count.id;
+  }
+
+  const open = total - (byStatus.COMPLETED ?? 0) - (byStatus.CANCELLED ?? 0) - (byStatus.DRAFT ?? 0);
+  return { byStatus, open, total };
 }
 
 export async function listAcceptedQuotations(

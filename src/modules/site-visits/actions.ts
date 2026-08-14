@@ -21,16 +21,16 @@ const VISIT_STATUSES = ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "R
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}T/);
 
 const createVisitSchema = z.object({
-  projectId:    z.string().cuid().optional(),
-  leadId:       z.string().cuid().optional(),
+  projectId:    z.string().min(1).optional(),
+  leadId:       z.string().min(1).optional(),
   purpose:      z.enum(VISIT_PURPOSES),
   scheduledAt:  isoDate,
-  assignedToId: z.string().cuid("Assign to a team member"),
+  assignedToId: z.string().min(1, "Assign to a team member"),
   observations: z.string().trim().max(2000).optional(),
 });
 
 const updateVisitStatusSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   status: z.enum(VISIT_STATUSES),
   observations: z.string().trim().max(2000).optional(),
   customerNotes: z.string().trim().max(2000).optional(),

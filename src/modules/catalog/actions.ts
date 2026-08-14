@@ -234,11 +234,11 @@ export async function setPrice(input: unknown): Promise<ActionResult<{ id: strin
 // ── Sample library ────────────────────────────────────────────────────────────
 
 const IssueSampleSchema = z.object({
-  sampleBookId: z.string().cuid(),
+  sampleBookId: z.string().min(1),
   issuedToType: z.enum(["CLIENT", "ARCHITECT", "STAFF"]),
-  clientId: z.string().cuid().optional().nullable(),
-  architectId: z.string().cuid().optional().nullable(),
-  userId: z.string().cuid().optional().nullable(),
+  clientId: z.string().min(1).optional().nullable(),
+  architectId: z.string().min(1).optional().nullable(),
+  userId: z.string().min(1).optional().nullable(),
   dueAt: z.date(),
   depositAmount: z.bigint().min(0n).default(0n),
   notes: z.string().max(500).optional(),

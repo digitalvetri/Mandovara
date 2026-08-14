@@ -107,11 +107,11 @@ export const createLeadSchema = z.object({
   ownerId:     z.string().trim().optional().or(z.literal("")),
 
   // Branch (used server-side for number prefix only)
-  branchId:    z.string().cuid().optional().or(z.literal("")),
+  branchId:    z.string().min(1).optional().or(z.literal("")),
 });
 
 export const updateLeadSchema = createLeadSchema.partial().extend({
-  id:          z.string().cuid(),
+  id:          z.string().min(1),
   altMobile:   z.string().trim().optional().or(z.literal("")),
   pincode:     z.string().trim().optional().or(z.literal("")),
   budgetRange: z.string().trim().optional().or(z.literal("")),
@@ -119,7 +119,7 @@ export const updateLeadSchema = createLeadSchema.partial().extend({
 
 export const statusChangeSchema = z
   .object({
-    id:         z.string().cuid(),
+    id:         z.string().min(1),
     to:         z.enum(LEAD_STATUSES),
     lostReason: z.string().trim().max(500).optional(),
   })
@@ -129,7 +129,7 @@ export const statusChangeSchema = z
   );
 
 export const convertLeadSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 export type CreateLeadInput   = z.infer<typeof createLeadSchema>;

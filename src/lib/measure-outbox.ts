@@ -158,7 +158,7 @@ export function clientCuid(): string {
   return "c" + t + r1 + r2;
 }
 
-/** Type-safe cuid regex — matches @/schema.string().cuid() */
+/** Type-safe cuid regex — matches @/schema.string().min(1) */
 export function isClientCuid(s: string): boolean {
   return /^c[0-9a-z]{20,}$/i.test(s);
 }

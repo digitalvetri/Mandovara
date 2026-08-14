@@ -40,7 +40,7 @@ const toggleRuleSchema = z.object({
 });
 
 const sendMessageSchema = z.object({
-  templateId:      z.string().cuid(),
+  templateId:      z.string().min(1),
   toMobile:        z.string().min(10).max(15),
   idempotencyKey:  z.string().min(8).max(120),
   refType:         z.string().optional(),

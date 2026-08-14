@@ -238,17 +238,27 @@ enum MakeJobStatus {
   STITCHING
   FINISHING
   QC
+  REWORK
   READY
   DELIVERED
 }
 
+enum VisitKind {
+  DISPATCH
+  INSTALL
+}
+
 enum InstallStatus {
   SCHEDULED
+  ASSIGNED
   IN_PROGRESS
   COMPLETED
   PARTIAL
   RESCHEDULED
   CANCELLED
+  CUSTOMER_CONFIRMED
+  SNAGGING
+  CLOSED
 }
 
 enum SnagStatus {
@@ -1291,14 +1301,32 @@ model MakeJob {
   vendorId       String?
   status         MakeJobStatus @default(QUEUED)
   assignedToId   String?
+  priority       Int           @default(0)
   targetDate     DateTime?
   startedAt      DateTime?
   completedAt    DateTime?
 
-  lines MakeJobLine[]
+  lines  MakeJobLine[]
+  events MakeJobEvent[]
 
   @@unique([organizationId, number])
   @@index([organizationId, status])
+}
+
+model MakeJobEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  makeJobId      String
+  actorId        String
+  type           String   // STATUS_CHANGE | QC_PASS | QC_FAIL | FABRIC_ISSUED | NOTE
+  fromStatus     String?
+  toStatus       String?
+  payload        Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  job MakeJob @relation(fields: [makeJobId], references: [id])
+
+  @@index([makeJobId, createdAt])
 }
 
 model MakeJobLine {
@@ -1343,12 +1371,15 @@ model InstallVisit {
   number               String
   projectId            String
   orderId              String
+  kind                 VisitKind     @default(DISPATCH)
   crewId               String?
   assignedToId         String?
+  assignedAt           DateTime?
   scheduledAt          DateTime
   status               InstallStatus @default(SCHEDULED)
   startedAt            DateTime?
   completedAt          DateTime?
+  customerConfirmedAt  DateTime?
   checklist            Json?
   clientSignatureKey   String?
   clientFeedbackRating Int?
@@ -1356,11 +1387,14 @@ model InstallVisit {
   rescheduleReason     String?
   notes                String?
 
-  project Project       @relation(fields: [projectId], references: [id])
+  project Project             @relation(fields: [projectId], references: [id])
   lines   InstallLine[]
+  events  InstallVisitEvent[]
+  snags   Snag[]
 
   @@unique([organizationId, number])
   @@index([organizationId, scheduledAt, status])
+  @@index([organizationId, kind, status])
 }
 
 model InstallLine {
@@ -1381,10 +1415,27 @@ model InstallLine {
   @@index([installVisitId])
 }
 
+model InstallVisitEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  visitId        String
+  actorId        String
+  type           String   // STATUS_CHANGE | SNAG_RAISED | SNAG_RESOLVED | NOTE
+  fromStatus     String?
+  toStatus       String?
+  payload        Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  visit InstallVisit @relation(fields: [visitId], references: [id])
+
+  @@index([visitId, createdAt])
+}
+
 model Snag {
   id             String     @id @default(cuid())
   organizationId String
   projectId      String
+  installVisitId String?
   roomLabel      String?
   raisedById     String
   raisedAt       DateTime   @default(now())
@@ -1395,9 +1446,11 @@ model Snag {
   resolvedAt     DateTime?
   resolutionNote String?
 
-  project Project @relation(fields: [projectId], references: [id])
+  project      Project       @relation(fields: [projectId], references: [id])
+  installVisit InstallVisit? @relation(fields: [installVisitId], references: [id])
 
   @@index([organizationId, status])
+  @@index([installVisitId])
 }
 
 // ─── MONEY ───────────────────────────────────────────────────────────────────

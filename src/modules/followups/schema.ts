@@ -13,9 +13,9 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/);
 export const createFollowUpSchema = z.object({
   dueAt:       isoDate,
   note:        z.string().trim().max(500).optional().or(z.literal("")),
-  leadId:      z.string().cuid().optional().or(z.literal("")),
-  clientId:    z.string().cuid().optional().or(z.literal("")),
-  quotationId: z.string().cuid().optional().or(z.literal("")),
+  leadId:      z.string().min(1).optional().or(z.literal("")),
+  clientId:    z.string().min(1).optional().or(z.literal("")),
+  quotationId: z.string().min(1).optional().or(z.literal("")),
 }).refine(
   (v) =>
     (v.leadId && v.leadId !== "") ||
@@ -27,13 +27,13 @@ export const createFollowUpSchema = z.object({
 // §11 acceptance: cannot close without outcome. Enforced here at the type
 // level — the caller MUST send an outcome and the server MUST have one.
 export const completeFollowUpSchema = z.object({
-  id:      z.string().cuid(),
+  id:      z.string().min(1),
   outcome: z.enum(FOLLOWUP_OUTCOMES),
   note:    z.string().trim().max(500).optional().or(z.literal("")),
 });
 
 export const rescheduleFollowUpSchema = z.object({
-  id:    z.string().cuid(),
+  id:    z.string().min(1),
   dueAt: isoDate,
   note:  z.string().trim().max(500).optional().or(z.literal("")),
 });

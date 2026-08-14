@@ -23,17 +23,18 @@ import {
 } from "./_receipt-primitives";
 
 interface Props {
-  clients: ClientForReceiptOption[];
-  branches: BranchOption[];
+  clients:          ClientForReceiptOption[];
+  branches:         BranchOption[];
+  initialClientId?: string;
 }
 
-export function ReceiptRecorder({ clients, branches }: Props) {
+export function ReceiptRecorder({ clients, branches, initialClientId }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const [clientId, setClientId] = useState<string>("");
+  const [clientId, setClientId] = useState<string>(initialClientId ?? "");
   const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
   const [date, setDate] = useState<string>(iso(new Date()));
   const [mode, setMode] = useState<PaymentMode>("UPI");
@@ -215,7 +216,7 @@ export function ReceiptRecorder({ clients, branches }: Props) {
               Cancel
             </button>
             <button type="submit"
-                    disabled={pending || totalPaise <= 0n || over > 0n || allocatedPaise === 0n}
+                    disabled={pending || totalPaise <= 0n || over > 0n || !clientId}
                     className="h-[36px] px-5 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:bg-accent-hover disabled:opacity-60 transition-colors">
               {pending ? "Saving…" : "Record receipt"}
             </button>
@@ -236,7 +237,7 @@ export function ReceiptRecorder({ clients, branches }: Props) {
             </div>
           </dl>
           <p className="mt-3 text-[10.5px] text-text-faint">
-            Residual stays on the receipt as unallocated and can be applied later.
+            Unallocated amount is saved as customer credit and can be applied to future invoices.
           </p>
         </div>
       </div>

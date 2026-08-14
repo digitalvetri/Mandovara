@@ -16,7 +16,7 @@ export interface ActionResult<T = unknown> {
 const SELL_UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT"] as const;
 
 const requestLineInput = z.object({
-  colourwayId:  z.string().cuid().optional(),
+  colourwayId:  z.string().min(1).optional(),
   freeTextItem: z.string().trim().max(300).optional(),
   quantity:     z.number().positive("Quantity must be > 0"),
   unit:         z.enum(SELL_UNITS),
@@ -25,18 +25,18 @@ const requestLineInput = z.object({
 });
 
 const createRequestSchema = z.object({
-  projectId: z.string().cuid().optional(),
+  projectId: z.string().min(1).optional(),
   reason:    z.string().trim().min(3, "Reason is required").max(500),
   neededBy:  z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   lines:     z.array(requestLineInput).min(1, "Add at least one line"),
 });
 
 const approveSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().min(1),
 });
 
 const rejectSchema = z.object({
-  id:     z.string().cuid(),
+  id:     z.string().min(1),
   reason: z.string().trim().min(3, "Reason is required").max(500),
 });
 
