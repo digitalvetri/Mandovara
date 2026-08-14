@@ -3,6 +3,7 @@
 // `expectedValue`), `mobile`, `email` — no companyName, no updatedAt, no stateCode.
 
 import { scoped } from "@/kernel/db/scoped";
+import { prisma } from "@/kernel/db/client";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
@@ -119,11 +120,13 @@ export async function listLeads(
     db.followUp.findMany({
       where: { refType: "LEAD", refId: { in: leadIds }, completedAt: { not: null } },
       orderBy: { completedAt: "desc" },
+      take: leadIds.length * 3,   // at most 3 completed entries per lead to find the latest
       select: { refId: true, completedAt: true },
     }),
     db.followUp.findMany({
       where: { refType: "LEAD", refId: { in: leadIds }, completedAt: null },
       orderBy: { dueAt: "asc" },
+      take: leadIds.length,       // one pending follow-up per lead is all we need
       select: { refId: true, dueAt: true },
     }),
   ]);
@@ -217,30 +220,39 @@ export async function getLeadSummaryCounts(ctx: RequestContext): Promise<LeadSum
   requirePermission(ctx, "lead.view");
   const db = scoped(ctx);
   const now = new Date();
-  const [total, newLeads, contacted, qualified, followUp, won, lost] = await Promise.all([
-    db.lead.count(),
-    db.lead.count({ where: { stage: "NEW" } }),
-    db.lead.count({ where: { stage: "CONTACTED" } }),
-    db.lead.count({ where: { stage: "QUALIFIED" } }),
-    db.followUp.count({
-      where: { refType: "LEAD", completedAt: null, dueAt: { lte: now } },
-    }),
-    db.lead.count({ where: { stage: "WON" } }),
-    db.lead.count({ where: { stage: "LOST" } }),
+
+  // Single groupBy replaces 6 separate COUNT queries
+  const [stageCounts, followUp] = await Promise.all([
+    db.lead.groupBy({ by: ["stage"], _count: { id: true } }),
+    db.followUp.count({ where: { refType: "LEAD", completedAt: null, dueAt: { lte: now } } }),
   ]);
-  return { total, newLeads, contacted, qualified, followUp, won, lost };
+
+  const m = new Map(stageCounts.map((s) => [s.stage, s._count.id]));
+  const total = stageCounts.reduce((sum, s) => sum + s._count.id, 0);
+  return {
+    total,
+    newLeads:  m.get("NEW")       ?? 0,
+    contacted: m.get("CONTACTED") ?? 0,
+    qualified: m.get("QUALIFIED") ?? 0,
+    followUp,
+    won:  m.get("WON")  ?? 0,
+    lost: m.get("LOST") ?? 0,
+  };
 }
 
 export async function getLeadCities(ctx: RequestContext): Promise<string[]> {
   requirePermission(ctx, "lead.view");
-  const db = scoped(ctx);
-  const rows = await db.lead.findMany({ select: { siteAddress: true } });
-  const cities = new Set<string>();
-  for (const r of rows) {
-    const addr = r.siteAddress as Record<string, unknown> | null;
-    if (typeof addr?.city === "string" && addr.city) cities.add(addr.city);
-  }
-  return [...cities].sort();
+  // $queryRaw for DISTINCT on a JSON field — Prisma groupBy can't target JSON paths.
+  // organizationId is applied manually; RLS is the second wall.
+  const rows = await prisma.$queryRaw<{ city: string }[]>`
+    SELECT DISTINCT "siteAddress"->>'city' AS city
+    FROM "Lead"
+    WHERE "organizationId" = ${ctx.orgId}
+      AND "siteAddress"->>'city' IS NOT NULL
+      AND "siteAddress"->>'city' != ''
+    ORDER BY city
+  `;
+  return rows.map((r) => r.city);
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
