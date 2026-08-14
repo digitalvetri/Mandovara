@@ -5,8 +5,8 @@ test.describe("Lead List — Phase 2 PDF spec", () => {
     await page.goto("/leads");
 
     // 7 summary cards per PDF spec.
-    // "Follow-up" is unique to summary cards — no status tab with that exact label.
-    await expect(page.getByText("Follow-up")).toBeVisible();
+    // exact: true avoids matching "Next Follow-up" in the always-rendered table header.
+    await expect(page.getByText("Follow-up", { exact: true })).toBeVisible();
     // "Total" appears only in the first summary card.
     await expect(page.getByText("Total", { exact: true }).first()).toBeVisible();
     // "Won" exists as both a summary-card span and a status-tab button.
