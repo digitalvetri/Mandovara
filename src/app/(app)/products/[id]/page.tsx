@@ -74,6 +74,19 @@ export default async function ProductDetailPage({
         </div>
 
         <aside className="space-y-4 h-fit">
+          {product.imageKey ? (
+            <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
+              <img src={product.imageKey} alt={product.name} className="w-full h-auto block" />
+            </div>
+          ) : (
+            <div
+              className="rounded-[14px] border border-rule flex items-center justify-center h-[220px] text-[10.5px] uppercase tracking-[0.14em] text-ink/60"
+              style={{ background: product.hex ?? "var(--color-gold)" }}
+            >
+              No cover image yet
+            </div>
+          )}
+
           <div className="rounded-[14px] bg-surface border border-rule p-5">
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Current prices</div>
             <ul className="space-y-2 text-[12.5px]">

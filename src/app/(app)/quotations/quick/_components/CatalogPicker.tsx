@@ -78,13 +78,22 @@ export function CatalogPicker({ onPick, onClose }: CatalogPickerProps) {
                   <button
                     type="button"
                     onClick={() => { onPick(r); onClose(); }}
-                    className="w-full text-left px-4 py-3 grid grid-cols-[3px_1fr_auto_auto] gap-3 items-center hover:bg-surface-hover"
+                    className="w-full text-left px-4 py-3 grid grid-cols-[48px_1fr_auto_auto] gap-3 items-center hover:bg-surface-hover"
                   >
-                    <div
-                      className="self-stretch rounded-[2px]"
-                      style={{ background: r.hex ?? "var(--color-gold)" }}
-                      aria-hidden
-                    />
+                    {r.imageUrl ? (
+                      <img
+                        src={r.imageUrl}
+                        alt=""
+                        className="h-[48px] w-[48px] object-cover rounded-[6px] border border-rule"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div
+                        className="h-[48px] w-[48px] rounded-[6px] border border-rule"
+                        style={{ background: r.hex ?? "var(--color-gold)" }}
+                        aria-hidden
+                      />
+                    )}
                     <div className="min-w-0">
                       <div className="text-[13px] text-text truncate">{r.displayName}</div>
                       <div className="text-[10.5px] text-text-dim truncate">

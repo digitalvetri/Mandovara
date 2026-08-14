@@ -171,6 +171,8 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
     minStock:      null,
     trackBatch:    false,
     trackSerial:   false,
+    imageKey:      cw.imageKey,
+    hex:           cw.hex,
     prices:        activePrices.map((p) => ({
       tier:          p.tier,
       amount:        p.amount,
@@ -196,6 +198,8 @@ export interface ProductDetail {
   cost:          bigint | null;
   reorderLevel:  string | null;
   minStock:      string | null;
+  imageKey:      string | null;
+  hex:           string | null;
   trackBatch:    boolean;
   trackSerial:   boolean;
   prices:        { tier: string; amount: bigint; effectiveFrom: Date }[];

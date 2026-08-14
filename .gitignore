@@ -28,6 +28,10 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# catalog images built from owner PDFs — regenerated locally via
+# scripts/build-catalog-images.ts, not tracked
+public/catalog/
 next-env.d.ts
 
 # vercel
