@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Phone, Mail, Compass, IndianRupee, ClipboardList } from "lucide-react";
+import { Phone, Mail, Compass, IndianRupee, ClipboardList, Paperclip } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
@@ -10,16 +10,17 @@ import { QuotationsInlineTable } from "@/components/data/QuotationsInlineTable";
 import { LEAD_SOURCES, BUDGET_RANGES } from "@/modules/leads/schema";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
-import { ConvertButton } from "../_components/ConvertButton";
 import { LeadFollowUpForm } from "../_components/LeadFollowUpForm";
 import { EditableField } from "../_components/EditableField";
+import { LeadActionBar } from "../_components/LeadActionBar";
 
 export const dynamic = "force-dynamic";
 
 const SOURCE_LABEL: Record<string, string> = {
   WALK_IN: "Walk-in", PHONE: "Phone", WHATSAPP: "WhatsApp", WEBSITE: "Website",
   INSTAGRAM: "Instagram", ARCHITECT_REFERRAL: "Architect Referral", CLIENT_REFERRAL: "Client Referral",
-  EXHIBITION: "Exhibition", OTHER: "Other",
+  EXHIBITION: "Exhibition", FACEBOOK: "Facebook", GOOGLE: "Google", ADVERTISEMENT: "Advertisement",
+  OTHER: "Other",
 };
 
 const SOURCE_OPTIONS = LEAD_SOURCES.map((s) => ({
@@ -42,8 +43,6 @@ export default async function LeadDetailPage({
   ]);
   if (!lead) notFound();
 
-  // If the lead was already converted, find the first linked project so we can
-  // show "Open project →" instead of "Open client →"
   let convertedProjectId: string | null = null;
   if (lead.convertedClientId) {
     const proj = await db.project.findFirst({
@@ -54,9 +53,6 @@ export default async function LeadDetailPage({
     convertedProjectId = proj?.id ?? null;
   }
 
-  // Quotations flow via the converted client (§ product flow). Leads that
-  // never converted have no quotations yet — the table renders an empty
-  // state with a "+ New quotation" CTA once the lead is a client.
   const quotations = lead.convertedClientId
     ? await listQuotationsForClient(ctx, lead.convertedClientId)
     : [];
@@ -72,7 +68,7 @@ export default async function LeadDetailPage({
 
   return (
     <>
-      {/* ── Hero: editable title, breadcrumb, status, primary actions ── */}
+      {/* ── Hero ── */}
       <div className="pt-5 pb-4">
         <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim mb-2">
           Leads · Created {createdDate}
@@ -89,17 +85,19 @@ export default async function LeadDetailPage({
               readOnly={isConverted}
             />
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="shrink-0">
             <StatusPill status={lead.stage} />
-            <ConvertButton
-              id={lead.id}
-              status={lead.stage}
-              convertedClientId={lead.convertedClientId}
-              convertedProjectId={convertedProjectId}
-            />
           </div>
         </div>
       </div>
+
+      {/* ── Action Bar ── */}
+      <LeadActionBar
+        leadId={lead.id}
+        stage={lead.stage}
+        convertedClientId={lead.convertedClientId}
+        convertedProjectId={convertedProjectId}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         {/* ── Main column ─────────────────────────────────────── */}
@@ -110,7 +108,7 @@ export default async function LeadDetailPage({
             </div>
           )}
 
-          {/* At-a-glance pills — every field click-to-edit (locked when converted) */}
+          {/* Editable info card */}
           <div className="rounded-[14px] bg-surface border border-rule p-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
               <EditableField
@@ -170,35 +168,34 @@ export default async function LeadDetailPage({
             </div>
           </div>
 
-          {/* Status quick-change bar — hidden once converted (status is WON) */}
+          {/* Status quick-change — hidden once converted */}
           {!isConverted && (
-            <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
-                  Move status
-                </div>
-                <StatusChanger id={lead.id} current={lead.stage} />
-              </div>
+            <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center gap-3 flex-wrap">
+              <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">Move status</div>
+              <StatusChanger id={lead.id} current={lead.stage} />
             </div>
           )}
 
-          {/* Quick add follow-up — still allowed on converted leads */}
-          <LeadFollowUpForm leadId={lead.id} />
-
-          {/* Activity timeline */}
+          {/* Quotations */}
           <QuotationsInlineTable
             rows={quotations}
             emptyHint={
               isConverted
-                ? "No quotations yet. Send one to move this project forward."
+                ? "No quotations yet. Use Quick Quote above to create one."
                 : "Convert this lead to a client first, then send a quotation."
             }
             {...(isConverted ? { seeAllHref: "/quotations" as const } : {})}
           />
 
+          {/* Follow-up & Activity — anchor for the action bar */}
+          <div id="follow-up" className="rounded-[14px] bg-surface border border-rule p-6 scroll-mt-4">
+            <LeadFollowUpForm leadId={lead.id} />
+          </div>
+
+          {/* Timeline */}
           <div className="rounded-[14px] bg-surface border border-rule p-6">
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
-              Follow-ups ({followUps.length})
+              Follow-ups &amp; activity ({followUps.length})
             </div>
             {followUps.length === 0 ? (
               <div className="text-[12.5px] text-text-faint">
@@ -224,7 +221,9 @@ export default async function LeadDetailPage({
                     <div className="min-w-0 flex-1">
                       <div className="text-[13.5px] text-text">{f.note ?? "Untitled follow-up"}</div>
                       <div className="text-[11.5px] text-text-dim mt-0.5 tabular">
-                        Due {f.dueAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}
+                        Due {f.dueAt.toLocaleDateString("en-IN", {
+                          day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+                        })}
                         {f.outcome ? ` · ${f.outcome.toLowerCase()}` : ""}
                       </div>
                     </div>
@@ -244,6 +243,22 @@ export default async function LeadDetailPage({
                 ))}
               </ul>
             )}
+          </div>
+
+          {/* Documents — anchor for the action bar */}
+          <div id="documents" className="rounded-[14px] bg-surface border border-rule p-6 scroll-mt-4">
+            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
+              Documents
+            </div>
+            <div className="flex flex-col items-center py-6 gap-3 text-center">
+              <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center">
+                <Paperclip size={18} strokeWidth={1.5} className="text-text-dim" />
+              </div>
+              <div className="text-[13px] text-text-dim">No documents yet</div>
+              <p className="text-[11.5px] text-text-faint max-w-[260px]">
+                Attach drawings, client approvals, site photos, and contracts here.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -275,7 +290,6 @@ export default async function LeadDetailPage({
     </>
   );
 }
-
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
