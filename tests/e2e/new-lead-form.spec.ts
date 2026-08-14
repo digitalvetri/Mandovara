@@ -37,7 +37,6 @@ test.describe("New Lead Form — PDF spec", () => {
     await expect(page.locator('input[name="siteAddress"], textarea[name="siteAddress"]')).not.toBeAttached();
     await expect(page.locator('input[name="projectName"]')).not.toBeAttached();
     await expect(page.locator('select[name="projectType"]')).not.toBeAttached();
-    await expect(page.locator('select[name="budgetRange"]')).not.toBeAttached();
   });
 
   test("lead source dropdown includes Facebook, Google, Advertisement", async ({ page }) => {

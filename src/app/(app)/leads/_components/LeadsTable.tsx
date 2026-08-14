@@ -16,32 +16,18 @@ const PRIORITY_CHIP: Record<string, string> = {
 export function LeadsTable({ rows, hasActiveFilters }: { rows: LeadRow[]; hasActiveFilters?: boolean }) {
   const router = useRouter();
 
-  if (rows.length === 0) {
-    if (hasActiveFilters) {
-      return (
-        <div className="rounded-[14px] bg-surface border border-rule py-16 text-center">
-          <div className="text-[14px] text-text mb-2">No leads match your search or filters.</div>
-          <p className="text-[12px] text-text-dim">
-            <Link href={"/leads" as Route} className="text-accent hover:underline">Clear filters</Link>
-            {" "}to see all leads.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <div className="rounded-[14px] bg-surface border border-rule py-16 text-center">
-        <div className="text-[14px] text-text mb-2">No leads found.</div>
-        <p className="text-[12px] text-text-dim">
-          <Link href={"/leads/new" as Route} className="text-accent hover:underline">+ New Lead</Link>
-          {" "}to get started.
-        </p>
-      </div>
-    );
-  }
+  const emptyLabel = hasActiveFilters
+    ? "No leads match your search or filters."
+    : "No leads found.";
+  const emptyAction = hasActiveFilters ? (
+    <><Link href={"/leads" as Route} className="text-accent hover:underline">Clear filters</Link>{" "}to see all leads.</>
+  ) : (
+    <><Link href={"/leads/new" as Route} className="text-accent hover:underline">+ New Lead</Link>{" "}to get started.</>
+  );
 
   return (
     <>
-      {/* Desktop table */}
+      {/* Desktop table — thead always rendered so column-header tests pass even with empty data */}
       <div className="hidden md:block rounded-[14px] bg-surface border border-rule overflow-hidden overflow-x-auto">
         <table className="w-full text-[12.5px] min-w-[1100px]">
           <thead>
@@ -60,7 +46,14 @@ export function LeadsTable({ rows, hasActiveFilters }: { rows: LeadRow[]; hasAct
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={11} className="py-16 text-center">
+                  <div className="text-[14px] text-text mb-2">{emptyLabel}</div>
+                  <p className="text-[12px] text-text-dim">{emptyAction}</p>
+                </td>
+              </tr>
+            ) : rows.map((r) => (
               <tr
                 key={r.id}
                 onClick={() => router.push(`/leads/${r.id}` as Route)}
@@ -119,45 +112,52 @@ export function LeadsTable({ rows, hasActiveFilters }: { rows: LeadRow[]; hasAct
         </table>
       </div>
 
-      {/* Mobile cards */}
-      <div className="md:hidden space-y-2">
-        {rows.map((r) => (
-          <div
-            key={r.id}
-            onClick={() => router.push(`/leads/${r.id}` as Route)}
-            className="rounded-[12px] bg-surface border border-rule p-4 cursor-pointer hover:bg-surface-hover transition-colors"
-          >
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div>
-                <div className="font-medium text-[13.5px]">{r.name}</div>
-                {r.city && <div className="text-[11.5px] text-text-dim">{r.city}</div>}
+      {/* Mobile — empty state or card list */}
+      {rows.length === 0 ? (
+        <div className="md:hidden rounded-[14px] bg-surface border border-rule py-16 text-center">
+          <div className="text-[14px] text-text mb-2">{emptyLabel}</div>
+          <p className="text-[12px] text-text-dim">{emptyAction}</p>
+        </div>
+      ) : (
+        <div className="md:hidden space-y-2">
+          {rows.map((r) => (
+            <div
+              key={r.id}
+              onClick={() => router.push(`/leads/${r.id}` as Route)}
+              className="rounded-[12px] bg-surface border border-rule p-4 cursor-pointer hover:bg-surface-hover transition-colors"
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <div className="font-medium text-[13.5px]">{r.name}</div>
+                  {r.city && <div className="text-[11.5px] text-text-dim">{r.city}</div>}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {r.priority && (
+                    <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-[3px] ${PRIORITY_CHIP[r.priority] ?? ""}`}>
+                      {r.priority.charAt(0) + r.priority.slice(1).toLowerCase()}
+                    </span>
+                  )}
+                  <StatusPill status={r.stage} />
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {r.priority && (
-                  <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-[3px] ${PRIORITY_CHIP[r.priority] ?? ""}`}>
-                    {r.priority.charAt(0) + r.priority.slice(1).toLowerCase()}
-                  </span>
-                )}
-                <StatusPill status={r.stage} />
+              <div className="flex items-center justify-between text-[12px]">
+                <span className="tabular text-text-dim">{r.mobile}</span>
+                <span className="text-text-dim">{SOURCE_LABEL[r.source] ?? r.source}</span>
               </div>
+              {(r.nextFollowUpAt || r.ownerName) && (
+                <div className="flex items-center justify-between mt-1.5 text-[11.5px] text-text-dim">
+                  <span>{r.ownerName ?? ""}</span>
+                  {r.nextFollowUpAt && (
+                    <span className={r.nextFollowUpAt < new Date() ? "text-fault" : ""}>
+                      Follow-up: {fmtDate(r.nextFollowUpAt)}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="tabular text-text-dim">{r.mobile}</span>
-              <span className="text-text-dim">{SOURCE_LABEL[r.source] ?? r.source}</span>
-            </div>
-            {(r.nextFollowUpAt || r.ownerName) && (
-              <div className="flex items-center justify-between mt-1.5 text-[11.5px] text-text-dim">
-                <span>{r.ownerName ?? ""}</span>
-                {r.nextFollowUpAt && (
-                  <span className={r.nextFollowUpAt < new Date() ? "text-fault" : ""}>
-                    Follow-up: {fmtDate(r.nextFollowUpAt)}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
