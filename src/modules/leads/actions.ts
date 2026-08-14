@@ -37,6 +37,7 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
 
   // Resolve number prefix from the branch (or fall back to "MDV")
   const db = scoped(ctx);
+  try {
   let prefix = "MDV";
   if (data.branchId) {
     const branch = await db.branch.findUnique({
@@ -102,6 +103,7 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
   await flush();
   revalidatePath("/leads");
   return { ok: true, data: { id: created.id } };
+  } catch (e) { return dbError(e); }
 }
 
 export async function updateLead(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -113,7 +115,7 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
   const { id, ...rest } = parsed.data;
 
   const db = scoped(ctx);
-
+  try {
   // Read existing siteAddress so we can merge partial updates
   const existing = await db.lead.findUnique({
     where: { id },
@@ -157,6 +159,7 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   return { ok: true, data: { id } };
+  } catch (e) { return dbError(e); }
 }
 
 export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -169,6 +172,7 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id
 
   const { publish, flush } = collectEvents();
 
+  try {
   await withTransaction(async (tx: TxClient) => {
     const before = await tx.lead.findUniqueOrThrow({
       where: { id },
@@ -200,6 +204,7 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   return { ok: true, data: { id } };
+  } catch (e) { return dbError(e); }
 }
 
 // Keep old name as alias so any existing callers don't break
@@ -216,6 +221,7 @@ export async function convertLead(
   const { id } = parsed.data;
 
   const db = scoped(ctx);
+  try {
   const lead = await db.lead.findUniqueOrThrow({
     where: { id },
     select: {
@@ -302,6 +308,7 @@ export async function convertLead(
   revalidatePath("/clients");
   revalidatePath("/projects");
   return { ok: true, data: result };
+  } catch (e) { return dbError(e); }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -315,6 +322,16 @@ function zodError<T>(err: z.ZodError): ActionResult<T> {
     if (!fieldErrors[p]) fieldErrors[p] = iss.message;
   }
   return { ok: false, error: "Validation failed", fieldErrors };
+}
+
+function dbError<T>(e: unknown): ActionResult<T> {
+  if (e instanceof Error && (
+    e.constructor.name === "PrismaClientInitializationError" ||
+    e.message.includes("Can't reach database server")
+  )) {
+    return { ok: false, error: "Database is unavailable. Please ensure the database server is running and try again." };
+  }
+  throw e;
 }
 
 function normaliseMobile(m: string): string {
