@@ -104,7 +104,7 @@ export const createLeadSchema = z.object({
                  .optional().or(z.literal("")),
 
   // Assignment
-  ownerId:     z.string().trim().min(1, "Assigned sales executive is required"),
+  ownerId:     z.string().trim().optional().or(z.literal("")),
 
   // Branch (used server-side for number prefix only)
   branchId:    z.string().cuid().optional().or(z.literal("")),

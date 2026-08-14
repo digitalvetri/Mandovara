@@ -202,16 +202,12 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         </select>
       </EntityForm.Field>
 
-      <EntityForm.Field label="Assigned Sales Executive" error={errors.ownerId?.message} required span={2}>
+      <EntityForm.Field label="Assigned Sales Executive" error={errors.ownerId?.message} hint="Leave blank to assign to yourself" span={2}>
         <select {...register("ownerId")} className={fc} defaultValue="">
-          <option value="" disabled>Select sales executive</option>
-          {salesUsers.length > 0 ? (
-            salesUsers.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))
-          ) : (
-            <option disabled value="">No users available</option>
-          )}
+          <option value="">Unassigned (defaults to you)</option>
+          {salesUsers.map((u) => (
+            <option key={u.id} value={u.id}>{u.name}</option>
+          ))}
         </select>
       </EntityForm.Field>
     </EntityForm>
