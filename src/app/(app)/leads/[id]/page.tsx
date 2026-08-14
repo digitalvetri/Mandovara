@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Phone, Mail, Compass, IndianRupee, ClipboardList, Paperclip } from "lucide-react";
+import { Paperclip } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
@@ -12,6 +12,7 @@ import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
 import { LeadFollowUpForm } from "../_components/LeadFollowUpForm";
 import { EditableField } from "../_components/EditableField";
+import { LeadDetailsCard } from "../_components/LeadDetailsCard";
 import { LeadActionBar } from "../_components/LeadActionBar";
 
 export const dynamic = "force-dynamic";
@@ -109,64 +110,20 @@ export default async function LeadDetailPage({
           )}
 
           {/* Editable info card */}
-          <div className="rounded-[14px] bg-surface border border-rule p-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-              <EditableField
-                leadId={lead.id}
-                field="mobile"
-                value={lead.mobile.replace(/^\+91/, "")}
-                displayValue={lead.mobile}
-                label="Mobile"
-                placeholder="Add mobile"
-                icon={<Phone size={14} strokeWidth={1.75} />}
-                variant="tel"
-                readOnly={isConverted}
-              />
-              <EditableField
-                leadId={lead.id}
-                field="email"
-                value={lead.email ?? ""}
-                label="Email"
-                placeholder="Add email"
-                icon={<Mail size={14} strokeWidth={1.75} />}
-                variant="email"
-                readOnly={isConverted}
-              />
-              <EditableField
-                leadId={lead.id}
-                field="source"
-                value={lead.source}
-                displayValue={SOURCE_LABEL[lead.source] ?? lead.source}
-                label="Source"
-                icon={<Compass size={14} strokeWidth={1.75} />}
-                variant="select"
-                options={SOURCE_OPTIONS}
-                readOnly={isConverted}
-              />
-              <EditableField
-                leadId={lead.id}
-                field="budgetRange"
-                value={lead.budgetRangeSlug ?? ""}
-                displayValue={budgetLabel}
-                label="Budget range"
-                placeholder="Select budget range"
-                icon={<IndianRupee size={14} strokeWidth={1.75} />}
-                variant="select"
-                options={BUDGET_OPTIONS}
-                readOnly={isConverted}
-              />
-              <EditableField
-                leadId={lead.id}
-                field="requirement"
-                value={lead.requirement ?? ""}
-                label="Requirement"
-                placeholder="What are they asking about?"
-                icon={<ClipboardList size={14} strokeWidth={1.75} />}
-                variant="textarea"
-                readOnly={isConverted}
-              />
-            </div>
-          </div>
+          <LeadDetailsCard
+            leadId={lead.id}
+            mobile={lead.mobile.replace(/^\+91/, "")}
+            mobileFull={lead.mobile}
+            email={lead.email ?? ""}
+            source={lead.source}
+            sourceLabel={SOURCE_LABEL[lead.source] ?? lead.source}
+            budgetRange={lead.budgetRangeSlug ?? ""}
+            budgetLabel={budgetLabel}
+            requirement={lead.requirement ?? ""}
+            sourceOptions={SOURCE_OPTIONS}
+            budgetOptions={BUDGET_OPTIONS}
+            isConverted={isConverted}
+          />
 
           {/* Status quick-change — hidden once converted */}
           {!isConverted && (
