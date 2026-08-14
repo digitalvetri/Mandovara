@@ -62,8 +62,10 @@ export interface QuotationDetail {
   clientId: string;
   clientName: string;
   clientMobile: string;
+  clientEmail: string | null;
   clientGstin: string | null;
   projectId: string;
+  projectName: string;
   date: Date;
   validUntil: Date;
   taxableAmount: bigint;
@@ -138,7 +140,8 @@ export async function getQuotation(
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
       project: {
         select: {
-          client: { select: { id: true, name: true, mobile: true, gstin: true } },
+          name: true,
+          client: { select: { id: true, name: true, mobile: true, email: true, gstin: true } },
         },
       },
       lines: {
@@ -171,7 +174,9 @@ export async function getQuotation(
     clientId: row.clientId,
     clientName: row.project.client.name,
     clientMobile: row.project.client.mobile,
+    clientEmail: row.project.client.email,
     clientGstin: row.project.client.gstin,
+    projectName: row.project.name,
     projectId: row.projectId,
     date: row.date,
     validUntil: row.validUntil,
@@ -203,6 +208,52 @@ export async function getQuotation(
       isOptional: l.isOptional,
     })),
   };
+}
+
+export interface QuotationInlineRow {
+  id:         string;
+  number:     string;
+  revision:   number;
+  date:       Date;
+  status:     string;
+  total:      bigint;
+  lineCount:  number;
+  projectId:  string;
+  projectName: string;
+}
+
+/** Small-table list for embedding in a client detail or lead detail
+ *  page. Newest first, no pagination — a client with 200 quotes is
+ *  rare enough to add a "See all" link at the bottom instead. */
+export async function listQuotationsForClient(
+  ctx:      RequestContext,
+  clientId: string,
+  limit = 20,
+): Promise<QuotationInlineRow[]> {
+  requirePermission(ctx, "quotation.view");
+  const db = scoped(ctx);
+  const rows = await db.quotation.findMany({
+    where:   { clientId },
+    orderBy: [{ date: "desc" }, { revision: "desc" }],
+    take:    limit,
+    select: {
+      id: true, number: true, revision: true, date: true,
+      status: true, total: true,
+      project: { select: { id: true, name: true } },
+      _count:  { select: { lines: true } },
+    },
+  });
+  return rows.map((r) => ({
+    id:          r.id,
+    number:      r.number,
+    revision:    r.revision,
+    date:        r.date,
+    status:      r.status,
+    total:       r.total,
+    lineCount:   r._count.lines,
+    projectId:   r.project.id,
+    projectName: r.project.name,
+  }));
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

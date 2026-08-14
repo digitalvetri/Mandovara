@@ -33,8 +33,10 @@ export interface SerializedQuotation {
   clientId: string;
   clientName: string;
   clientMobile: string;
+  clientEmail: string | null;
   clientGstin: string | null;
   projectId: string;
+  projectName: string;
   date: string;
   validUntil: string;
   taxableAmountStr: string;

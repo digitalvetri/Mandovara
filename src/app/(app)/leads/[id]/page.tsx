@@ -5,6 +5,8 @@ import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
+import { listQuotationsForClient } from "@/modules/quotations/queries";
+import { QuotationsInlineTable } from "@/components/data/QuotationsInlineTable";
 import { LEAD_SOURCES, BUDGET_RANGES } from "@/modules/leads/schema";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
@@ -51,6 +53,13 @@ export default async function LeadDetailPage({
     });
     convertedProjectId = proj?.id ?? null;
   }
+
+  // Quotations flow via the converted client (§ product flow). Leads that
+  // never converted have no quotations yet — the table renders an empty
+  // state with a "+ New quotation" CTA once the lead is a client.
+  const quotations = lead.convertedClientId
+    ? await listQuotationsForClient(ctx, lead.convertedClientId)
+    : [];
 
   const createdDate = lead.createdAt.toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
@@ -177,6 +186,16 @@ export default async function LeadDetailPage({
           <LeadFollowUpForm leadId={lead.id} />
 
           {/* Activity timeline */}
+          <QuotationsInlineTable
+            rows={quotations}
+            emptyHint={
+              isConverted
+                ? "No quotations yet. Send one to move this project forward."
+                : "Convert this lead to a client first, then send a quotation."
+            }
+            {...(isConverted ? { seeAllHref: "/quotations" as const } : {})}
+          />
+
           <div className="rounded-[14px] bg-surface border border-rule p-6">
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
               Follow-ups ({followUps.length})
@@ -246,9 +265,10 @@ export default async function LeadDetailPage({
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-2">
               Linked records
             </div>
-            <div className="text-[12.5px] text-text-faint">
-              No quotations or orders yet.
-            </div>
+            <dl className="space-y-2 text-[12.5px]">
+              <Row k="Quotations" v={quotations.length ? String(quotations.length) : "—"} />
+              <Row k="Project" v={convertedProjectId ? "1" : "—"} />
+            </dl>
           </div>
         </aside>
       </div>

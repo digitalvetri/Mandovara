@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { AgeingBars } from "@/components/data/AgeingBars";
+import { QuotationsInlineTable } from "@/components/data/QuotationsInlineTable";
 import { devContext } from "@/lib/dev-context";
 import { getClient } from "@/modules/clients/queries";
+import { listQuotationsForClient } from "@/modules/quotations/queries";
 import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,7 @@ export default async function ClientDetailPage({
   const ctx = await devContext();
   const client = await getClient(ctx, id);
   if (!client) notFound();
+  const quotations = await listQuotationsForClient(ctx, client.id);
 
   const addr = client.billingAddress as {
     line1?: string; line2?: string; city?: string; pincode?: string; stateCode?: string;
@@ -42,6 +45,8 @@ export default async function ClientDetailPage({
               <div className="text-[12px] text-text-faint">No billing address on file.</div>
             )}
           </div>
+
+          <QuotationsInlineTable rows={quotations} seeAllHref="/quotations" />
 
           <ClientFollowUpForm clientId={client.id} />
 

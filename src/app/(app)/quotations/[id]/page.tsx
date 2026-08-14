@@ -5,6 +5,7 @@ import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { getQuotation, type QuotationDetail } from "@/modules/quotations/queries";
 import { QuotationWorkspace } from "./_components/QuotationWorkspace";
+import { SendActions } from "./_components/SendActions";
 import type { SerializedQuotation } from "./_types";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,10 @@ function serializeQuotation(q: QuotationDetail): SerializedQuotation {
     clientId: q.clientId,
     clientName: q.clientName,
     clientMobile: q.clientMobile,
+    clientEmail: q.clientEmail,
     clientGstin: q.clientGstin,
     projectId: q.projectId,
+    projectName: q.projectName,
     date: q.date.toISOString(),
     validUntil: q.validUntil.toISOString(),
     taxableAmountStr: q.taxableAmount.toString(),
@@ -73,6 +76,16 @@ export default async function QuotationDetailPage({
       <Topbar
         title={q.number}
         eyebrow={`${q.clientName} · ${q.clientMobile} · ${formatDate(q.date)} → valid until ${formatDate(q.validUntil)}`}
+      />
+      <SendActions
+        quotationId={serialized.id}
+        quotationNumber={serialized.number}
+        clientName={serialized.clientName}
+        clientMobile={serialized.clientMobile}
+        clientEmail={serialized.clientEmail}
+        totalStr={serialized.totalStr}
+        validUntilIso={serialized.validUntil}
+        status={serialized.status}
       />
       <QuotationWorkspace quotation={serialized} canApprove={canApprove} />
     </>

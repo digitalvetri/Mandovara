@@ -10,8 +10,6 @@
 //
 // Run:  pnpm tsx scripts/bootstrap-admin.ts
 
-/* eslint-disable no-console */
-
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
