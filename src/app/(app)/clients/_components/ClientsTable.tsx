@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Phone, MessageCircle, ArrowUpRight, Briefcase } from "lucide-react";
-import { formatINR } from "@/kernel/money/format";
 import type { ClientRow } from "@/modules/clients/queries";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -23,19 +22,6 @@ const TYPE_STYLE: Record<string, string> = {
   DEALER:            "bg-warn/12 text-warn",
 };
 
-const STAGE_LABEL: Record<string, string> = {
-  ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
-  ORDERED: "Ordered", PROCUREMENT: "Procurement", MAKE: "Make",
-  INSTALLATION: "Installation", SNAGGING: "Snagging",
-  COMPLETED: "Completed", CANCELLED: "Cancelled",
-};
-
-const STAGE_CLS: Record<string, string> = {
-  ENQUIRY: "text-accent", MEASUREMENT: "text-warn", QUOTATION: "text-info",
-  ORDERED: "text-good", PROCUREMENT: "text-warn", MAKE: "text-warn",
-  INSTALLATION: "text-good", SNAGGING: "text-heat",
-  COMPLETED: "text-solid", CANCELLED: "text-text-faint",
-};
 
 function fmtMobile(m: string): string {
   const d = m.replace(/^\+91/, "").replace(/\D/g, "");
@@ -70,21 +56,19 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
   }
 
   return (
-    <div className="rounded-[14px] border border-rule overflow-hidden divide-y divide-rule/50">
+    <div className="flex flex-col gap-2">
       {rows.map((r) => {
-        const typeStyle  = TYPE_STYLE[r.type] ?? "bg-text-dim/12 text-text-dim";
-        const typeLabel  = TYPE_LABEL[r.type] ?? r.type;
-        const proj       = r.latestProject;
-        const stageLabel = proj ? (STAGE_LABEL[proj.stage] ?? proj.stage) : null;
-        const stageCls   = proj ? (STAGE_CLS[proj.stage] ?? "text-text-dim") : "";
-        const initial    = proj?.ownerName && proj.ownerName !== "—"
+        const typeStyle = TYPE_STYLE[r.type] ?? "bg-text-dim/12 text-text-dim";
+        const typeLabel = TYPE_LABEL[r.type] ?? r.type;
+        const proj      = r.latestProject;
+        const initial   = proj?.ownerName && proj.ownerName !== "—"
           ? proj.ownerName.charAt(0).toUpperCase() : null;
 
         return (
           <div
             key={r.id}
             onClick={() => router.push(`/clients/${r.id}` as Route)}
-            className="flex items-center gap-5 px-5 py-[18px] bg-surface hover:bg-surface-hover transition-colors cursor-pointer"
+            className="flex items-center gap-5 px-5 py-[18px] bg-surface border border-rule rounded-[14px] hover:bg-surface-hover transition-colors cursor-pointer"
           >
             {/* ── Identity ─────────────────────────────────────── */}
             <div className="flex-1 min-w-0">
@@ -120,29 +104,6 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
                 )}
               </div>
 
-              {/* Latest project strip */}
-              {proj && (
-                <div className="flex items-center gap-2 mt-1.5 text-[11.5px] text-text-dim flex-wrap">
-                  <span className="font-medium text-text truncate max-w-[200px]">{proj.name}</span>
-                  {stageLabel && (
-                    <span className={`text-[10px] font-semibold uppercase tracking-[0.07em] ${stageCls}`}>
-                      {stageLabel}
-                    </span>
-                  )}
-                  {proj.orderValue > 0n && (
-                    <>
-                      <Sep />
-                      <span className="tabular font-data text-[11px]">{formatINR(proj.orderValue)}</span>
-                    </>
-                  )}
-                  {proj.ownerName && proj.ownerName !== "—" && (
-                    <>
-                      <Sep />
-                      <span>{proj.ownerName}</span>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* ── Owner avatar ─────────────────────────────────── */}

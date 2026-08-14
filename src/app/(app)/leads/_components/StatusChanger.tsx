@@ -6,7 +6,7 @@ import { LEAD_STATUSES } from "@/modules/leads/schema";
 import { changeLeadStatus } from "@/modules/leads/actions";
 
 const LABEL: Record<string, string> = {
-  NEW: "New", CONTACTED: "Contacted",
+  NEW: "New", CONTACTED: "Contacted", QUALIFIED: "Qualified",
   MEASUREMENT_SCHEDULED: "Meas. Scheduled", VISIT_SCHEDULED: "Visit Scheduled",
   MEASURED: "Measured", QUOTED: "Quoted",
   NEGOTIATION: "Negotiation", WON: "Won", LOST: "Lost",
