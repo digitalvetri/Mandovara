@@ -141,7 +141,7 @@ export function QuotationBuilder({ projectId, branches }: Props) {
             <thead>
               <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
                 <Th width={28}>#</Th>
-                <Th>Description · Measurement ID</Th>
+                <Th>Description</Th>
                 <Th width={85}>Room</Th>
                 <Th width={75}>Qty</Th>
                 <Th width={90}>Unit</Th>
@@ -159,11 +159,6 @@ export function QuotationBuilder({ projectId, branches }: Props) {
                   <Td>
                     <input value={l.description} onChange={set(i, "description")}
                            placeholder="e.g. Main curtain — Master bedroom" className={cel} />
-                    {fieldErrors[`lines.${i}.measurementItemId`] && (
-                      <div className="mt-0.5 text-[10.5px] text-fault">{fieldErrors[`lines.${i}.measurementItemId`]}</div>
-                    )}
-                    <input value={l.measurementItemId} onChange={set(i, "measurementItemId")}
-                           placeholder="Measurement ID (M2M required)" className={`${cel} mt-1 text-[11px] font-data`} />
                   </Td>
                   <Td>
                     <input value={l.roomLabel} onChange={set(i, "roomLabel")}

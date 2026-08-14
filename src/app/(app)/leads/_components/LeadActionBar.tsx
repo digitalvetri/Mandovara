@@ -42,8 +42,9 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
 
   function doQuickQuote() {
     if (busy) return;
-    if (convertedProjectId) {
-      router.push(`/quotations/new?project=${convertedProjectId}` as Route);
+    // If already converted, go straight to quick-quote with the client ID
+    if (convertedClientId) {
+      router.push(`/quotations/quick?client=${convertedClientId}` as Route);
       return;
     }
     setError(null);
@@ -55,10 +56,7 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
         setPendingAction(null);
         return;
       }
-      const dest = res.data.projectId
-        ? `/quotations/new?project=${res.data.projectId}`
-        : "/quotations/new";
-      router.push(dest as Route);
+      router.push(`/quotations/quick?client=${res.data.clientId}` as Route);
     });
   }
 

@@ -2,7 +2,9 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Search, LogOut } from "lucide-react";
+import Link from "next/link";
+import type { Route } from "next";
+import { Menu, Search, LogOut, CalendarDays } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ThemeToggle";
@@ -118,6 +120,16 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
 
         {/* Notification bell */}
         <NotificationBell />
+
+        {/* Follow-up calendar */}
+        <Link
+          href={"/calendar" as Route}
+          title="Follow-up Calendar"
+          aria-label="Open follow-up calendar"
+          className="h-[38px] w-[38px] grid place-items-center rounded-[8px] text-text-dim hover:text-accent hover:bg-surface transition-colors"
+        >
+          <CalendarDays size={16} strokeWidth={1.6} />
+        </Link>
 
         {/* Theme toggle */}
         <ThemeToggle />
