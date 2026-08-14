@@ -11,6 +11,7 @@ export const ProductFamilyEnum = z.enum([
   "FLOORING",
   "CARPET_ROLL",
   "CARPET_TILE",
+  "RUG",
   "UPHOLSTERY_FABRIC",
   "FOAM_FILLING",
   "VERTICAL_GARDEN",
