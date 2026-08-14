@@ -17,8 +17,6 @@
 // After running, open the quick-quote picker (/quotations/quick?client=<id>)
 // — the catalog picker will search across every colourway added here.
 
-/* eslint-disable no-console */
-
 import { PrismaClient, type SellUnit } from "@prisma/client";
 
 // ── Types ────────────────────────────────────────────────────────

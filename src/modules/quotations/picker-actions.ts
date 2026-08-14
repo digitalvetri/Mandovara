@@ -4,25 +4,15 @@
 // colourways; return one row per colourway with everything the line
 // needs (id, display name, sellUnit, gstRate, and a default rate
 // from RETAIL or MRP price, else 0).
+//
+// Types live in ./picker-types (this file is "use server" so it can
+// only export async functions).
 
 import { z } from "zod";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
-
-export interface PickerRow {
-  colourwayId:  string;
-  designId:     string;
-  displayName:  string;    // "Design name — Colourway"
-  brandName:    string;
-  code:         string;
-  sellUnit:     string;    // METRE/ROLL/SQFT/BOX/PIECE...
-  hsn:          string;
-  gstRate:      number;
-  family:       string;
-  ratePaise:    string;    // BigInt as string, "0" when no price set
-  hex:          string | null;
-}
+import type { PickerRow } from "./picker-types";
 
 const querySchema = z.object({
   q:       z.string().trim().max(120).optional(),
@@ -33,7 +23,7 @@ const querySchema = z.object({
 export async function searchColourwaysForPicker(input: unknown): Promise<PickerRow[]> {
   const ctx = await devContext();
   requirePermission(ctx, "catalog.view");
-  const parsed = querySchema.safeParse(input);
+  const parsed = querySchema.safeParse(input ?? {});
   if (!parsed.success) return [];
   const { q, brandId, limit } = parsed.data;
 
@@ -59,9 +49,9 @@ export async function searchColourwaysForPicker(input: unknown): Promise<PickerR
       collection: { select: { brand: { select: { name: true } } } },
       colourways: {
         where: cw,
-        take:  4,   // most designs have a handful of colourways
+        take:  4,
         select: {
-          id: true, code: true, colourName: true, hex: true, sellUnit: true,
+          id: true, code: true, colourName: true, hex: true, imageKey: true, sellUnit: true,
           prices: {
             where: {
               tier: { in: ["RETAIL", "MRP"] },
@@ -93,6 +83,7 @@ export async function searchColourwaysForPicker(input: unknown): Promise<PickerR
         family:      d.family,
         ratePaise:   rate.toString(),
         hex:         c.hex,
+        imageUrl:    c.imageKey,
       });
     }
   }

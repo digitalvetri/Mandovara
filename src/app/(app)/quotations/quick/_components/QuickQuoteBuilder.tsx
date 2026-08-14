@@ -12,7 +12,7 @@ import type { Route } from "next";
 import { Plus, Loader2 } from "lucide-react";
 import { formatINR, parseINR } from "@/kernel/money/format";
 import { createQuickQuote } from "@/modules/quotations/quick-actions";
-import type { PickerRow } from "@/modules/quotations/picker-actions";
+import type { PickerRow } from "@/modules/quotations/picker-types";
 import { CatalogPicker } from "./CatalogPicker";
 import { LineRow } from "./LineRow";
 import { type LineDraft, emptyLine, runningTotals } from "./line-utils";

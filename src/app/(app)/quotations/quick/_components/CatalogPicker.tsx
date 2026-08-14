@@ -7,7 +7,8 @@
 
 import { useEffect, useState } from "react";
 import { Search, Loader2, X } from "lucide-react";
-import { searchColourwaysForPicker, type PickerRow } from "@/modules/quotations/picker-actions";
+import { searchColourwaysForPicker } from "@/modules/quotations/picker-actions";
+import type { PickerRow } from "@/modules/quotations/picker-types";
 import { formatINR } from "@/kernel/money/format";
 
 interface CatalogPickerProps {

@@ -37,6 +37,12 @@ export default async function ProductDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-[10px] border border-info/30 bg-info/8 px-4 py-3 text-[12px] text-text">
+            Read-only view for now — this page still uses the legacy product
+            schema. Edits do not persist yet. Prices, images, and HSN can be
+            updated by re-running <span className="tabular text-text-dim">scripts/add-catalog.ts</span>.
+          </div>
+
           <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Status</div>

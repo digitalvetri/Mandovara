@@ -10,7 +10,7 @@
 // on-site round can be added later and will supersede the
 // preliminary via the standard revision chain.
 
-import { z } from "zod";
+import type { z } from "zod";
 import { Decimal } from "@prisma/client/runtime/library";
 import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
@@ -22,37 +22,7 @@ import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import { computeCalcResult } from "@/modules/measurement/engine";
 import type { ActionResult } from "./actions";
-
-const idField = z.string().min(20).max(64);
-const mm      = z.number().positive().max(20_000);
-
-const quickLineSchema = z.object({
-  roomName:    z.string().trim().min(1).max(80),
-  label:       z.string().trim().min(1).max(120),
-  widthMm:     mm,
-  heightMm:    mm,
-  quantity:    z.number().positive().max(999),
-  colourwayId: idField,
-  ratePaise:   z.string().min(1),                // BigInt as string
-  discountPct: z.number().min(0).max(100).default(0),
-  description: z.string().trim().max(240).optional(),
-});
-export type QuickLineInput = z.infer<typeof quickLineSchema>;
-
-export const quickQuoteSchema = z.object({
-  clientId:     idField,
-  projectId:    idField.optional(),
-  newProjectName: z.string().trim().min(1).max(120).optional(),
-  branchId:     idField,
-  validForDays: z.number().int().positive().max(365).default(30),
-  discountPct:  z.number().min(0).max(100).default(0),
-  termsText:    z.string().trim().max(2000).optional(),
-  lines:        z.array(quickLineSchema).min(1).max(50),
-}).refine((d) => d.projectId || d.newProjectName, {
-  message: "Either projectId or newProjectName is required.",
-  path:    ["projectId"],
-});
-export type QuickQuoteInput = z.infer<typeof quickQuoteSchema>;
+import { quickQuoteSchema } from "./quick-schemas";
 
 export async function createQuickQuote(
   input: unknown,
