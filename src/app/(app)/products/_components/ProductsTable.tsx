@@ -17,6 +17,10 @@ export function ProductsTable({
   const columns = useMemo<readonly Column<ProductRow>[]>(() => {
     const base: Column<ProductRow>[] = [
       {
+        key: "thumb", header: "", width: "72px",
+        render: (r) => <Thumb src={r.imageKey} hex={r.hex} alt={r.name} />,
+      },
+      {
         key: "code", header: "Code",
         render: (r) => <span className="text-text tabular">{r.code}</span>,
       },
@@ -45,6 +49,7 @@ export function ProductsTable({
       rows={rows}
       rowKey={(r) => r.id}
       rowHref={(r) => `/products/${r.id}`}
+      swatch={(r) => r.hex ?? undefined}
       ariaLabel="Products"
       emptyState={
         <EmptyState
@@ -59,6 +64,30 @@ export function ProductsTable({
           }
         />
       }
+    />
+  );
+}
+
+// 40px catalog thumbnail — image when the colourway has one, otherwise a
+// hex-tinted tile (falls back to the neutral surface if hex is null too).
+// Design system §6.1: "swatch chip carrying the actual colourway hex or
+// swatch image, on the left edge of every catalog row."
+function Thumb({ src, hex, alt }: { src: string | null; hex: string | null; alt: string }) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        className="block h-14 w-14 rounded-[6px] object-contain border border-rule bg-ink"
+      />
+    );
+  }
+  return (
+    <span
+      className="block h-14 w-14 rounded-[6px] border border-rule"
+      style={{ background: hex ?? "var(--color-surface-hover)" }}
+      aria-label={alt}
     />
   );
 }

@@ -6,11 +6,36 @@
 import { requirePermission, can } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { scoped } from "@/kernel/db/scoped";
-import { searchDesigns, listBrands } from "@/modules/catalog/queries";
+import { searchDesigns } from "@/modules/catalog/queries";
+import { ProductFamilyEnum } from "@/modules/catalog/schema";
+
+// Product-family labels used in the category dropdown. Trade-friendly
+// names — the enum key (CARPET_ROLL) is invisible in the UI.
+const FAMILY_LABEL: Readonly<Record<string, string>> = {
+  CURTAIN_FABRIC: "Curtains",
+  SHEER: "Sheer Curtains",
+  LINING: "Curtain Lining",
+  BLIND: "Blinds",
+  WALLPAPER: "Wallpaper",
+  FLOORING: "Flooring",
+  CARPET_ROLL: "Carpets",
+  CARPET_TILE: "Carpet Tiles",
+  RUG: "Rugs",
+  UPHOLSTERY_FABRIC: "Upholstery Fabric",
+  FOAM_FILLING: "Foam & Filling",
+  VERTICAL_GARDEN: "Vertical Garden",
+  INTERIOR_FILM: "Interior Films",
+  MURAL: "Murals & Art",
+  HARDWARE_TRACK: "Curtain Tracks",
+  HARDWARE_ROD: "Curtain Rods",
+  MOTOR: "Motors",
+  ACCESSORY: "Accessories",
+  SERVICE: "Services",
+};
 
 export interface ListProductsQuery {
   search?: string;
-  categoryId?: string | "ALL";    // treated as brandId in catalog
+  categoryId?: string | "ALL";    // product family enum value (WALLPAPER, BLIND, …)
   status?: string | "ALL";        // "ACTIVE" | "INACTIVE" | "ALL"
   page?: number;
   pageSize?: number;
@@ -28,6 +53,8 @@ export interface ProductRow {
   status: string;
   mrp: bigint | null;
   cost: bigint | null;
+  imageKey: string | null;
+  hex: string | null;
   updatedAt: Date;
 }
 
@@ -58,15 +85,20 @@ export async function listProducts(
   const pageSize = Math.min(q.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const page = Math.max(1, q.page ?? 1);
 
-  // Parallelize: design search + brand list run concurrently
-  const [result, brands] = await Promise.all([
+  // categoryId now carries a product-family enum value (WALLPAPER, BLIND, …).
+  const familyFilter = q.categoryId && q.categoryId !== "ALL"
+    ? (ProductFamilyEnum.safeParse(q.categoryId).success ? q.categoryId : undefined)
+    : undefined;
+
+  // Parallelize: design search + family counts run concurrently
+  const [result, families] = await Promise.all([
     searchDesigns(ctx, {
       q: q.search,
-      brandId: q.categoryId && q.categoryId !== "ALL" ? q.categoryId : undefined,
+      family: familyFilter,
       page,
       pageSize,
     }),
-    listBrands(ctx),
+    familyCounts(ctx),
   ]);
 
   const rows: ProductRow[] = result.designs.flatMap((design) =>
@@ -81,34 +113,45 @@ export async function listProducts(
         id:           cw.id,
         code:         cw.code,
         name:         `${design.name} — ${cw.colourName}`,
-        categoryName: `${design.collection.brand.name} › ${design.collection.name}`,
+        categoryName: FAMILY_LABEL[design.family] ?? design.family,
         hsn:          design.hsn,
         uom:          cw.sellUnit,
         gstRate:      Number(design.gstRate),
         status:       design.isActive && cw.isActive ? "ACTIVE" : "INACTIVE",
         mrp,
         cost,
+        imageKey:     cw.imageKey ?? null,
+        hex:          cw.hex ?? null,
         updatedAt:    new Date(),
       };
     }),
   );
-  const categories: CategoryOption[] = brands.map((b) => ({
-    id:           b.id,
-    name:         b.name,
-    productCount: b._count.collections,
-  }));
 
-  return { rows, total: result.total, page, pageSize, categories };
+  return { rows, total: result.total, page, pageSize, categories: families };
 }
 
 export async function listCategories(ctx: RequestContext): Promise<CategoryOption[]> {
   requirePermission(ctx, "catalog.view");
-  const brands = await listBrands(ctx);
-  return brands.map((b) => ({
-    id:           b.id,
-    name:         b.name,
-    productCount: b._count.collections,
-  }));
+  return familyCounts(ctx);
+}
+
+// Family-level counts for the /products category dropdown.
+// Groups Designs by their ProductFamily and returns one CategoryOption per
+// family that actually has designs in the DB — no empty categories.
+async function familyCounts(ctx: RequestContext): Promise<CategoryOption[]> {
+  const db = scoped(ctx);
+  const rows = await db.design.groupBy({
+    by: ["family"],
+    _count: { _all: true },
+    where: { isActive: true },
+  });
+  return rows
+    .map((r) => ({
+      id:           r.family,
+      name:         FAMILY_LABEL[r.family] ?? r.family,
+      productCount: r._count._all,
+    }))
+    .sort((a, b) => b.productCount - a.productCount);
 }
 
 // Read a single "product" — the Colourway is the sellable SKU per
@@ -129,7 +172,7 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
       imageKey: true, hex: true,
       design: {
         select: {
-          name: true, hsn: true, gstRate: true, isActive: true,
+          name: true, family: true, hsn: true, gstRate: true, isActive: true,
           collection: {
             select: {
               name: true,

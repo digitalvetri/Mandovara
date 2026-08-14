@@ -1,44 +1,40 @@
-// Bulk-seed the real Mandovara catalog from the owner's spreadsheet.
+// Import the WALLAPPER STOCK LIST xlsx into the Mandovara catalog.
 //
-// Source: "CATALOGUE LIST.xlsx" (owner-provided, 2026-08-14). One
-// sheet per product family, each row a catalogue name from the
-// showroom sample library. Roughly 700 catalogues in total.
+// Source: c:/Users/Administrator/Downloads/product catalog/WALLAPPER STOCK LIST (2) (2) (4).xlsx
+// (owner-provided, 2026-08-14). Same shape as the earlier CATALOGUE
+// LIST.xlsx but with more sheets and slightly different naming.
 //
-// Structure written:
-//   Brand: "Mandovara Studio"
-//     Collection per family sheet (Wallpaper / Curtain Main / etc.)
-//       Design per catalogue name  (Faith / Athena / Modelica / …)
-//         Colourway "Standard"  (hex fallback tinted per family)
-//           Price row  (RETAIL, family-default rate)
+// One sheet per product family, each row a catalogue name from the
+// showroom sample library. Writes:
+//   Brand:   "Mandovara Studio"
+//     Collection per family sheet (Wallpaper / Curtain Main / …)
+//       Design per catalogue name (HAPPY / DUBAI / …)
+//         Colourway "Standard" with a family-tinted hex fallback
+//           Price row (RETAIL, family-default rate)
 //
-// Idempotent — every write goes through upsert on the schema's
-// unique key. Safe to re-run when the xlsx grows.
+// Idempotent — every write is upsert on the schema's unique key.
+// Skips stock sheets (MANDOVARA STOCK, BRAHMOS, FLOOR TILE, TRACK
+// STOCK) and the sub-headers inside the BLINDS sheet.
 //
-// Images are NOT set. The drive folders that hold the PDFs don't
-// serve renderable image URLs to anonymous viewers; each Colourway
-// keeps the family-hex swatch until images are pushed to Supabase
-// Storage or public/catalog/ and linked back to imageKey.
+// After this, run scripts/fetch-mandovara-images.ts to populate
+// imageKey from mandovara.com where available.
 //
-// Run:  pnpm tsx scripts/add-catalog-xlsx.ts
+// Run:  pnpm tsx scripts/import-wallpaper-stock.ts
 
 import { PrismaClient, type SellUnit } from "@prisma/client";
 import * as XLSX from "xlsx";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
-// ── Paths ────────────────────────────────────────────────────────
-
-const XLSX_PATH = "c:\\Users\\Administrator\\Downloads\\product catalog\\CATALOGUE LIST.xlsx";
+const XLSX_PATH = "c:\\Users\\Administrator\\Downloads\\product catalog\\WALLAPPER STOCK LIST (2) (2) (4).xlsx";
 
 if (!existsSync(XLSX_PATH)) {
   console.error(`Not found: ${XLSX_PATH}`);
   process.exit(1);
 }
 
-// ── Family mapping per sheet ─────────────────────────────────────
-
 interface FamilyDefaults {
-  collectionName: string;      // human-readable collection name shown in the app
-  family:         string;      // matches ProductFamily enum
+  collectionName: string;
+  family:         string;
   sellUnit:       SellUnit;
   hsn:            string;
   gstRatePct:     number;
@@ -46,40 +42,41 @@ interface FamilyDefaults {
   hex:            string;
 }
 
+// Sheet names in THIS xlsx. Matches "WOODEN FLOORINGS" (plural),
+// "CUSTOMISED WALLPAPER" (spelled out), and the new
+// "CURTAIN MAIN SHEER" sheet.
 const SHEET_TO_FAMILY: Record<string, FamilyDefaults> = {
   "WALLPAPER":            { collectionName: "Wallpaper",            family: "WALLPAPER",         sellUnit: "ROLL",  hsn: "4814", gstRatePct: 12, ratePaise: 250000n,  hex: "#D9C9B4" },
-  "CUSTOMISED WP":        { collectionName: "Customised Wallpaper", family: "WALLPAPER",         sellUnit: "ROLL",  hsn: "4814", gstRatePct: 12, ratePaise: 450000n,  hex: "#B7A891" },
+  "CUSTOMISED WALLPAPER": { collectionName: "Customised Wallpaper", family: "WALLPAPER",         sellUnit: "ROLL",  hsn: "4814", gstRatePct: 12, ratePaise: 450000n,  hex: "#B7A891" },
   "CURTAIN MAIN":         { collectionName: "Curtain Main",         family: "CURTAIN_FABRIC",    sellUnit: "METRE", hsn: "5407", gstRatePct: 12, ratePaise: 120000n,  hex: "#C8B79A" },
   "CURTAIN SHEER":        { collectionName: "Curtain Sheer",        family: "SHEER",             sellUnit: "METRE", hsn: "5407", gstRatePct: 12, ratePaise: 60000n,   hex: "#EFE9DC" },
-  // "CURTAIN MAIN & SHEER" is the same collection the WALLAPPER STOCK LIST
-  // xlsx calls "CURTAIN MAIN SHEER" — the ampersand is the only difference.
-  "CURTAIN MAIN & SHEER": { collectionName: "Curtain Main + Sheer", family: "CURTAIN_FABRIC",    sellUnit: "METRE", hsn: "5407", gstRatePct: 12, ratePaise: 90000n,   hex: "#DED2BA" },
+  "CURTAIN MAIN SHEER":   { collectionName: "Curtain Main + Sheer", family: "CURTAIN_FABRIC",    sellUnit: "METRE", hsn: "5407", gstRatePct: 12, ratePaise: 90000n,   hex: "#DED2BA" },
   "FABRIC":               { collectionName: "Upholstery Fabric",    family: "UPHOLSTERY_FABRIC", sellUnit: "METRE", hsn: "5407", gstRatePct: 12, ratePaise: 80000n,   hex: "#A78568" },
-  "WOODEN FLOORING":      { collectionName: "Wooden Flooring",      family: "FLOORING",          sellUnit: "BOX",   hsn: "4409", gstRatePct: 12, ratePaise: 720000n,  hex: "#8B6845" },
+  "WOODEN FLOORINGS":     { collectionName: "Wooden Flooring",      family: "FLOORING",          sellUnit: "BOX",   hsn: "4409", gstRatePct: 12, ratePaise: 720000n,  hex: "#8B6845" },
   "CARPETS":              { collectionName: "Carpets",              family: "CARPET_ROLL",       sellUnit: "SQFT",  hsn: "5703", gstRatePct: 12, ratePaise: 20000n,   hex: "#6E4C34" },
   "BLINDS":               { collectionName: "Blinds",               family: "BLIND",             sellUnit: "SQFT",  hsn: "6303", gstRatePct: 12, ratePaise: 30000n,   hex: "#B8B0A2" },
-  // PAMPLETS is a mixed set of pamphlet-style samples the owner
-  // classified as curtain fabric on 2026-08-14.
-  "PAMPLETS":             { collectionName: "Pamplets",             family: "CURTAIN_FABRIC",    sellUnit: "METRE", hsn: "5407", gstRatePct: 12, ratePaise: 100000n,  hex: "#C8B79A" },
 };
 
-// Stock/inventory sheets. Everything else is a catalogue sheet.
+// Stock sheets, hardware sheets, and the ambiguous PAMPLETS sheet.
+// PAMPLETS mixes curtains and other families — parked until the
+// owner tags each row.
 const SKIP_SHEETS = new Set([
-  "MANDOVARA STOCK",       // per-SKU stock, not catalogue names
-  "BRAHMOS 4.8.26",        // per-SKU stock for one catalogue
-  "FLOOR TILE 4.8.26",     // per-SKU stock
-  "TRACK STOCK",           // hardware inventory, not a design catalogue
+  "MANDOVARA STOCK",
+  "BRAHMOS 4.8.26",
+  "FLOOR TILE 4.8.26",
+  "TRACK STOCK",
+  "PAMPLETS",
 ]);
 
 const BRAND_NAME = "Mandovara Studio";
-
-// ── Helpers ──────────────────────────────────────────────────────
 
 function slugCode(name: string, i: number): string {
   const s = name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "-").slice(0, 14);
   return `${s}-${String(i + 1).padStart(3, "0")}`;
 }
 
+// Reject blank cells, dash-only rows, standalone integers (index-only),
+// and the sub-header text that appears inside the BLINDS sheet.
 function cleanName(raw: unknown): string | null {
   if (raw == null) return null;
   const s = String(raw).trim();
@@ -87,16 +84,24 @@ function cleanName(raw: unknown): string | null {
   if (s === "-") return null;
   if (/^no code no$/i.test(s)) return null;
   if (/^\d+$/.test(s)) return null;
+  if (/^blinds in pamplets$/i.test(s)) return null;
+  if (/^s\.?\s*no\.?$/i.test(s)) return null;
+  if (/^catal[a-z]*\s+names?$/i.test(s)) return null;
   return s.replace(/\s+/g, " ");
 }
 
-// ── Runner ───────────────────────────────────────────────────────
+function pickNameColumn(sample: Record<string, unknown> | undefined): string | null {
+  if (!sample) return null;
+  return Object.keys(sample).find((k) =>
+    /^CATAL[A-Z]*\s+NAMES?$/i.test(k.trim()),
+  ) ?? null;
+}
 
 async function main(): Promise<void> {
   const db = new PrismaClient();
   try {
     const org = await db.organization.findFirst({ where: { name: "Mandovara" }, select: { id: true } });
-    if (!org) throw new Error("Run scripts/bootstrap-admin.ts first — no Mandovara organization found.");
+    if (!org) throw new Error("No Mandovara organization found. Run scripts/bootstrap-admin.ts first.");
 
     const brand = await db.brand.upsert({
       where:  { organizationId_name: { organizationId: org.id, name: BRAND_NAME } },
@@ -105,7 +110,7 @@ async function main(): Promise<void> {
     });
     console.log(`Brand: ${brand.name} (${brand.id})`);
 
-    const wb = XLSX.readFile(XLSX_PATH);
+    const wb = XLSX.read(readFileSync(XLSX_PATH));
     let totalDesigns = 0, totalCw = 0, totalPrices = 0, totalSkipped = 0;
     const now = new Date();
 
@@ -125,13 +130,18 @@ async function main(): Promise<void> {
         create: { organizationId: org.id, brandId: brand.id, name: cfg.collectionName, family: cfg.family as never },
       });
 
+      const seenNames = new Set<string>();
       let addedInSheet = 0, skippedInSheet = 0;
       for (let i = 0; i < rows.length; i++) {
         const raw = rows[i]![nameKey];
         const name = cleanName(raw);
         if (!name) { skippedInSheet += 1; continue; }
-        const code = slugCode(name, i);
+        // De-duplicate names within a single sheet (BLINDS sheet has HUSKY, CORBIT twice etc.)
+        const nameKey2 = name.toUpperCase();
+        if (seenNames.has(nameKey2)) { skippedInSheet += 1; continue; }
+        seenNames.add(nameKey2);
 
+        const code = slugCode(name, i);
         const design = await db.design.upsert({
           where:  { organizationId_collectionId_code: { organizationId: org.id, collectionId: collection.id, code } },
           update: { name, family: cfg.family as never, hsn: cfg.hsn, gstRate: cfg.gstRatePct },
@@ -143,7 +153,7 @@ async function main(): Promise<void> {
             family:         cfg.family as never,
             hsn:            cfg.hsn,
             gstRate:        cfg.gstRatePct,
-            specs:          { sourcedFrom: "CATALOGUE LIST.xlsx", sourcedOn: "2026-08-14", sheet: sheetName },
+            specs:          { sourcedFrom: "WALLAPPER STOCK LIST.xlsx", sourcedOn: "2026-08-14", sheet: sheetName },
           },
         });
         totalDesigns += 1;
@@ -166,7 +176,7 @@ async function main(): Promise<void> {
 
         const existingPrice = await db.price.findFirst({
           where:  { colourwayId: cw.id, tier: "RETAIL", effectiveTo: null },
-          select: { id: true, amount: true },
+          select: { id: true },
         });
         if (!existingPrice) {
           await db.price.create({
@@ -182,28 +192,19 @@ async function main(): Promise<void> {
         }
       }
       totalSkipped += skippedInSheet;
-      console.log(`  ${sheetName.padEnd(20)}  → ${cfg.collectionName.padEnd(22)}  ${String(addedInSheet).padStart(4)} added, ${skippedInSheet} skipped`);
+      console.log(`  ${sheetName.padEnd(22)} → ${cfg.collectionName.padEnd(22)} ${String(addedInSheet).padStart(4)} added · ${skippedInSheet} skipped`);
     }
 
     console.log("\n" + "─".repeat(60));
     console.log(`  Designs upserted:      ${totalDesigns}`);
     console.log(`  Colourways upserted:   ${totalCw}`);
     console.log(`  New price rows:        ${totalPrices}`);
-    console.log(`  Rows skipped (empty/duplicate): ${totalSkipped}`);
+    console.log(`  Rows skipped (empty/duplicate/sub-header): ${totalSkipped}`);
     console.log("─".repeat(60));
-    console.log("\n✓ Catalog seeded. Every catalogue is browseable from /products and searchable in the quick-quote picker.");
+    console.log("\n✓ Catalog seeded. Next: pnpm tsx scripts/fetch-mandovara-images.ts");
   } finally {
     await db.$disconnect();
   }
-}
-
-function pickNameColumn(sample: Record<string, unknown> | undefined): string | null {
-  if (!sample) return null;
-  const keys = Object.keys(sample);
-  // Accept the various header spellings the owner uses — CATALOGUE
-  // NAME / CATALOGUE NAMES / CATALOGE NAME (typo, missing U) all
-  // resolve to the same column.
-  return keys.find((k) => /^CATAL[A-Z]*\s+NAMES?$/i.test(k.trim())) ?? null;
 }
 
 main().catch((e) => {

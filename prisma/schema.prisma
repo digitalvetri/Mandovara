@@ -44,6 +44,7 @@ enum ProductFamily {
   FLOORING
   CARPET_ROLL
   CARPET_TILE
+  RUG                 // area rugs (Rug Way etc.) — distinct from wall-to-wall carpet rolls
   UPHOLSTERY_FABRIC
   FOAM_FILLING
   VERTICAL_GARDEN
