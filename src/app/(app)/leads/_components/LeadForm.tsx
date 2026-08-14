@@ -9,6 +9,7 @@ import {
   createLeadSchema,
   LEAD_SOURCE_OPTIONS,
   LEAD_PRIORITY_OPTIONS,
+  BUDGET_RANGES,
   type CreateLeadInput,
 } from "@/modules/leads/schema";
 import { createLead } from "@/modules/leads/actions";
@@ -198,6 +199,15 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         <select {...register("priority")} className={fc}>
           {LEAD_PRIORITY_OPTIONS.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
+      </EntityForm.Field>
+
+      <EntityForm.Field label="Budget Range" error={errors.budgetRange?.message}>
+        <select {...register("budgetRange")} className={fc} defaultValue="">
+          <option value="">Not specified</option>
+          {BUDGET_RANGES.map((r) => (
+            <option key={r.value} value={r.value}>{r.label}</option>
           ))}
         </select>
       </EntityForm.Field>

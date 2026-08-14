@@ -86,12 +86,13 @@ export function EditableField({
             <select
               ref={inputRef as React.RefObject<HTMLSelectElement>}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => { setDraft(e.target.value); }}
               onBlur={save}
               onKeyDown={onKey}
               disabled={pending}
               className={inputCls}
             >
+              <option value="">— Not set —</option>
               {options.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
