@@ -140,6 +140,7 @@ export async function seedMasters(db: PrismaClient, seed?: number): Promise<Seed
       phone:       "+91 8940430051",
       email:       "mandovara22@gmail.com",
       website:     "https://mandovara.com",
+      logoKey:     "/mandovara-logo.jpg",
       fyStartMonth: 4,
       settings: {
         wastage: {

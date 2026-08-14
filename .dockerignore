@@ -1,0 +1,40 @@
+# Everything below is excluded from the Docker build context. Keeps
+# the image small and prevents leaking dev-only files or secrets.
+
+# Build artefacts + package manager cache
+.next
+node_modules
+.turbo
+.vercel
+
+# Version control + editor
+.git
+.gitignore
+.vscode
+.idea
+
+# Local dev data
+data-sync
+public/catalog
+
+# Testing
+tests
+test-results
+playwright-report
+coverage
+
+# Docs + specs (image doesn't need them)
+docs
+*.md
+!README.md
+
+# Environment / secrets — provisioned by Coolify env vars, never baked in
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+
+# OS + logs
+.DS_Store
+*.log
