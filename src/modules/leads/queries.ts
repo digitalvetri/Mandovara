@@ -1,4 +1,4 @@
-// Leads repository — read side. All queries go through db.scoped(ctx).
+// Leads repository — read side. All queries go through scoped(ctx).
 // Schema reference: Lead has `stage LeadStage` (not `status`), `budgetMin`/`budgetMax` (not
 // `expectedValue`), `mobile`, `email` — no companyName, no updatedAt, no stateCode.
 
@@ -9,6 +9,12 @@ import type { RequestContext } from "@/kernel/auth/context";
 export interface ListLeadsQuery {
   search?: string;
   stage?: string | "OPEN" | "ALL";
+  priority?: string;
+  source?: string;
+  ownerId?: string;
+  city?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   pageSize?: number;
   sort?: "recent" | "oldest" | "name" | "value";
@@ -27,6 +33,12 @@ export interface LeadRow {
   budgetMax: bigint | null;
   ownerId: string;
   createdAt: Date;
+  // enriched — always populated by listLeads; optional so getLead can reuse type
+  city?: string | null;
+  priority?: string | null;
+  ownerName?: string;
+  lastContactedAt?: Date | null;
+  nextFollowUpAt?: Date | null;
 }
 
 export interface LeadDetail extends LeadRow {
@@ -44,12 +56,23 @@ export interface ListLeadsResult {
   pageSize: number;
 }
 
+export interface LeadSummaryCounts {
+  total: number;
+  newLeads: number;
+  contacted: number;
+  qualified: number;
+  followUp: number;   // pending follow-ups (due date <= now, not completed)
+  won: number;
+  lost: number;
+}
+
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 
 // Valid LeadStage values per schema enum, excluding WON and LOST
 const OPEN_STAGES = [
-  "NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION",
+  "NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED",
+  "VISIT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION",
 ] as const;
 
 export async function listLeads(
@@ -66,7 +89,7 @@ export async function listLeads(
   const where = buildWhere(q);
   const orderBy = orderFor(q.sort);
 
-  const [rows, total] = await Promise.all([
+  const [rawRows, total] = await Promise.all([
     db.lead.findMany({
       where,
       orderBy,
@@ -77,10 +100,62 @@ export async function listLeads(
         source: true, stage: true, requirement: true,
         budgetMin: true, budgetMax: true,
         ownerId: true, createdAt: true,
+        siteAddress: true,
       },
     }),
     db.lead.count({ where }),
   ]);
+
+  if (rawRows.length === 0) return { rows: [], total, page, pageSize };
+
+  const leadIds = rawRows.map((r) => r.id);
+  const ownerIds = [...new Set(rawRows.map((r) => r.ownerId))];
+
+  const [owners, lastContacted, nextPending] = await Promise.all([
+    db.user.findMany({
+      where: { id: { in: ownerIds } },
+      select: { id: true, name: true },
+    }),
+    db.followUp.findMany({
+      where: { refType: "LEAD", refId: { in: leadIds }, completedAt: { not: null } },
+      orderBy: { completedAt: "desc" },
+      select: { refId: true, completedAt: true },
+    }),
+    db.followUp.findMany({
+      where: { refType: "LEAD", refId: { in: leadIds }, completedAt: null },
+      orderBy: { dueAt: "asc" },
+      select: { refId: true, dueAt: true },
+    }),
+  ]);
+
+  const ownerNameMap = new Map(owners.map((o) => [o.id, o.name] as const));
+  const lastContactedMap = new Map<string, Date>();
+  for (const f of lastContacted) {
+    if (!lastContactedMap.has(f.refId) && f.completedAt) {
+      lastContactedMap.set(f.refId, f.completedAt);
+    }
+  }
+  const nextFollowUpMap = new Map<string, Date>();
+  for (const f of nextPending) {
+    if (!nextFollowUpMap.has(f.refId)) {
+      nextFollowUpMap.set(f.refId, f.dueAt);
+    }
+  }
+
+  const rows: LeadRow[] = rawRows.map((r) => {
+    const addr = r.siteAddress as Record<string, unknown> | null;
+    return {
+      id: r.id, number: r.number, name: r.name, mobile: r.mobile, email: r.email,
+      source: r.source, stage: r.stage, requirement: r.requirement,
+      budgetMin: r.budgetMin, budgetMax: r.budgetMax,
+      ownerId: r.ownerId, createdAt: r.createdAt,
+      city: typeof addr?.city === "string" && addr.city ? addr.city : null,
+      priority: typeof addr?.priority === "string" ? addr.priority : null,
+      ownerName: ownerNameMap.get(r.ownerId) ?? "—",
+      lastContactedAt: lastContactedMap.get(r.id) ?? null,
+      nextFollowUpAt: nextFollowUpMap.get(r.id) ?? null,
+    };
+  });
 
   return { rows, total, page, pageSize };
 }
@@ -109,23 +184,16 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
   const budgetRangeSlug = typeof addr?.budgetRange === "string" ? addr.budgetRange : null;
 
   return {
-    id: lead.id,
-    number: lead.number,
-    name: lead.name,
-    mobile: lead.mobile,
-    email: lead.email,
-    source: lead.source,
-    stage: lead.stage,
-    requirement: lead.requirement,
-    budgetMin: lead.budgetMin,
-    budgetMax: lead.budgetMax,
-    ownerId: lead.ownerId,
-    createdAt: lead.createdAt,
+    id: lead.id, number: lead.number, name: lead.name, mobile: lead.mobile, email: lead.email,
+    source: lead.source, stage: lead.stage, requirement: lead.requirement,
+    budgetMin: lead.budgetMin, budgetMax: lead.budgetMax,
+    ownerId: lead.ownerId, createdAt: lead.createdAt,
     convertedClientId: lead.convertedClientId,
-    lostReason: lead.lostReason,
-    nextActionAt: lead.nextActionAt,
+    lostReason: lead.lostReason, nextActionAt: lead.nextActionAt,
     ownerName: owner?.name ?? "—",
     budgetRangeSlug,
+    city: typeof addr?.city === "string" && addr.city ? addr.city : null,
+    priority: typeof addr?.priority === "string" ? addr.priority : null,
   };
 }
 
@@ -145,28 +213,84 @@ export async function listSalesUsers(ctx: RequestContext): Promise<SalesUserOpti
   return rows.map((u) => ({ id: u.id, name: u.name, role: u.role }));
 }
 
+export async function getLeadSummaryCounts(ctx: RequestContext): Promise<LeadSummaryCounts> {
+  requirePermission(ctx, "lead.view");
+  const db = scoped(ctx);
+  const now = new Date();
+  const [total, newLeads, contacted, qualified, followUp, won, lost] = await Promise.all([
+    db.lead.count(),
+    db.lead.count({ where: { stage: "NEW" } }),
+    db.lead.count({ where: { stage: "CONTACTED" } }),
+    db.lead.count({ where: { stage: "QUALIFIED" } }),
+    db.followUp.count({
+      where: { refType: "LEAD", completedAt: null, dueAt: { lte: now } },
+    }),
+    db.lead.count({ where: { stage: "WON" } }),
+    db.lead.count({ where: { stage: "LOST" } }),
+  ]);
+  return { total, newLeads, contacted, qualified, followUp, won, lost };
+}
+
+export async function getLeadCities(ctx: RequestContext): Promise<string[]> {
+  requirePermission(ctx, "lead.view");
+  const db = scoped(ctx);
+  const rows = await db.lead.findMany({ select: { siteAddress: true } });
+  const cities = new Set<string>();
+  for (const r of rows) {
+    const addr = r.siteAddress as Record<string, unknown> | null;
+    if (typeof addr?.city === "string" && addr.city) cities.add(addr.city);
+  }
+  return [...cities].sort();
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 type WhereInput = Record<string, unknown>;
 
 function buildWhere(q: ListLeadsQuery): WhereInput {
-  const where: WhereInput = {};
-  if (q.search && q.search.trim().length > 0) {
+  const conditions: WhereInput[] = [];
+
+  if (q.search?.trim()) {
     const s = q.search.trim();
-    where["OR"] = [
-      { name:   { contains: s, mode: "insensitive" } },
-      { mobile: { contains: s } },
-      { email:  { contains: s, mode: "insensitive" } },
-    ];
+    conditions.push({
+      OR: [
+        { name:   { contains: s, mode: "insensitive" } },
+        { mobile: { contains: s } },
+        { email:  { contains: s, mode: "insensitive" } },
+        { number: { contains: s, mode: "insensitive" } },
+      ],
+    });
   }
+
   if (q.stage && q.stage !== "ALL") {
     if (q.stage === "OPEN") {
-      where["stage"] = { in: [...OPEN_STAGES] };
+      conditions.push({ stage: { in: [...OPEN_STAGES] } });
     } else {
-      where["stage"] = q.stage;
+      conditions.push({ stage: q.stage });
     }
   }
-  return where;
+
+  if (q.priority) {
+    conditions.push({ siteAddress: { path: ["priority"], equals: q.priority } });
+  }
+
+  if (q.source) conditions.push({ source: q.source });
+  if (q.ownerId) conditions.push({ ownerId: q.ownerId });
+
+  if (q.city) {
+    conditions.push({ siteAddress: { path: ["city"], equals: q.city } });
+  }
+
+  if (q.dateFrom || q.dateTo) {
+    const dateFilter: Record<string, Date> = {};
+    if (q.dateFrom) dateFilter.gte = new Date(q.dateFrom);
+    if (q.dateTo)   dateFilter.lte = new Date(q.dateTo);
+    conditions.push({ createdAt: dateFilter });
+  }
+
+  if (conditions.length === 0) return {};
+  if (conditions.length === 1) return conditions[0]!;
+  return { AND: conditions };
 }
 
 function orderFor(sort: ListLeadsQuery["sort"]): { [k: string]: "asc" | "desc" } {

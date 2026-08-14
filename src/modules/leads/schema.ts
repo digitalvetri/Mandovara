@@ -41,12 +41,12 @@ export const SOURCE_LABEL: Record<string, string> = {
 
 // Must match prisma/schema.prisma enum LeadStage exactly
 export const LEAD_STATUSES = [
-  "NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED",
+  "NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED",
   "MEASURED", "QUOTED", "NEGOTIATION", "WON", "LOST",
 ] as const;
 
 export const OPEN_LEAD_STATUSES = [
-  "NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED",
+  "NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED",
   "MEASURED", "QUOTED", "NEGOTIATION",
 ] as const;
 

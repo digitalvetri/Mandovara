@@ -5,6 +5,7 @@ import type { LeadStage } from "@/modules/leads/schema";
 const TONE: Record<LeadStage, string> = {
   NEW:                    "bg-accent/12 text-accent",
   CONTACTED:              "bg-warn/15 text-warn",
+  QUALIFIED:              "bg-info/15 text-info",
   MEASUREMENT_SCHEDULED:  "bg-warn/15 text-warn",
   VISIT_SCHEDULED:        "bg-warn/15 text-warn",
   MEASURED:               "bg-info/15 text-info",
@@ -17,8 +18,9 @@ const TONE: Record<LeadStage, string> = {
 const LABEL: Record<LeadStage, string> = {
   NEW:                    "New",
   CONTACTED:              "Contacted",
+  QUALIFIED:              "Qualified",
   MEASUREMENT_SCHEDULED:  "Meas. Scheduled",
-  VISIT_SCHEDULED:        "Visit Scheduled",
+  VISIT_SCHEDULED:        "Site Visit",
   MEASURED:               "Measured",
   QUOTED:                 "Quoted",
   NEGOTIATION:            "Negotiation",
