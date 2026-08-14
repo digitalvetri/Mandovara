@@ -75,7 +75,7 @@ export async function searchDesigns(
         colourways: {
           where: { isActive: true },
           select: {
-            id: true, code: true, colourName: true, hex: true, sellUnit: true, isActive: true,
+            id: true, code: true, colourName: true, hex: true, imageKey: true, sellUnit: true, isActive: true,
             stock: {
               select: { dyeLot: true, quantity: true, reserved: true },
             },
