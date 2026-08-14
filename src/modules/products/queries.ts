@@ -112,7 +112,6 @@ export async function listProducts(
 ): Promise<ListProductsResult> {
   requirePermission(ctx, "catalog.view");
   const canSeeCost = can(ctx, "catalog.viewCost");
-  const db = scoped(ctx);
 
   const pageSize = Math.min(q.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const page = Math.max(1, q.page ?? 1);

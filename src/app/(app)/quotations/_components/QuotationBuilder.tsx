@@ -41,7 +41,6 @@ export function QuotationBuilder({ projectId, branches }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const today = new Date();
   const nextMonth = new Date(); nextMonth.setDate(today.getDate() + 30);
@@ -82,7 +81,7 @@ export function QuotationBuilder({ projectId, branches }: Props) {
   }
 
   function onSave() {
-    setServerError(null); setFieldErrors({});
+    setServerError(null);
     const valid = lines.filter((l) => l.description.trim() && l.rate.trim());
     if (!valid.length) { setServerError("Add at least one line with description and rate."); return; }
     if (!branchId) { setServerError("Select a branch."); return; }
@@ -104,7 +103,6 @@ export function QuotationBuilder({ projectId, branches }: Props) {
       });
       if (!res.ok) {
         setServerError(res.error ?? "Could not create quotation");
-        if (res.fieldErrors) setFieldErrors(res.fieldErrors);
         return;
       }
       router.push(`/quotations/${res.data!.id}` as Route);

@@ -3,40 +3,11 @@
 import { useState, useEffect, useCallback, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { ChevronLeft, ChevronRight, Plus, X, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { createFollowUp } from "@/modules/followups/actions";
 import { FollowUpItem, type CalendarItem } from "./FollowUpItem";
-
-// ── date helpers ──────────────────────────────────────────────────────────────
-
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-function startOfDay(d: Date): Date   { const c=new Date(d); c.setHours(0,0,0,0); return c; }
-function startOfMonth(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), 1); }
-function endOfMonth(d: Date): Date   { return new Date(d.getFullYear(), d.getMonth()+1, 0); }
-function startOfWeek(d: Date): Date  { const c=new Date(d); c.setDate(d.getDate()-d.getDay()); return startOfDay(c); }
-function addDays(d: Date, n: number): Date { const c=new Date(d); c.setDate(c.getDate()+n); return c; }
-function addMonths(d: Date, n: number): Date { return new Date(d.getFullYear(), d.getMonth()+n, 1); }
-function sameDay(a: Date, b: Date): boolean { return iso(a) === iso(b); }
-
-function buildMonthGrid(anchor: Date): Date[] {
-  const first = startOfMonth(anchor);
-  const start = addDays(first, -first.getDay());
-  return Array.from({ length: 42 }, (_, i) => addDays(start, i));
-}
-function buildWeek(anchor: Date): Date[] {
-  const s = startOfWeek(anchor);
-  return Array.from({ length: 7 }, (_, i) => addDays(s, i));
-}
-
-type View = "month" | "week" | "day";
-interface Lead { id: string; name: string; mobile: string; }
-
-const DAY_ABBR = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-
-// ── CalendarView ──────────────────────────────────────────────────────────────
-
+import { type View, type Lead, DAY_ABBR, iso, startOfDay, startOfMonth, endOfMonth, startOfWeek, addDays, addMonths, sameDay, buildMonthGrid, buildWeek } from "./calendarUtils";
+import { DayDetail } from "./DayDetail";
 export function CalendarView() {
   const today = startOfDay(new Date());
   const [view, setView]       = useState<View>("month");
@@ -50,7 +21,6 @@ export function CalendarView() {
   const [createError, setCreateError] = useState<string|null>(null);
   const [, startTx] = useTransition();
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchItems = useCallback(async () => {
     let from: string, to: string;
     if (view === "month") {
@@ -72,7 +42,6 @@ export function CalendarView() {
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
-  // ── Item map ────────────────────────────────────────────────────────────────
   const byDay = new Map<string, CalendarItem[]>();
   for (const it of items) {
     const k = it.dueAt.slice(0,10);
@@ -81,7 +50,6 @@ export function CalendarView() {
   }
   const selectedItems = byDay.get(iso(selected)) ?? [];
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
   function navLabel(): string {
     if (view === "month") return anchor.toLocaleDateString("en-IN", { month:"long", year:"numeric" });
     if (view === "week") {
@@ -106,7 +74,6 @@ export function CalendarView() {
     setAnchor(view==="month" ? startOfMonth(today) : view==="week" ? startOfWeek(today) : today);
   }
 
-  // ── Create ─────────────────────────────────────────────────────────────────
   async function openCreate() {
     setCreating(true); setCreateError(null);
     if (leads.length === 0) {
@@ -128,14 +95,12 @@ export function CalendarView() {
     });
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   const btnBase = "h-[34px] px-3.5 rounded-[7px] text-[12px] font-medium transition-colors";
 
   return (
     <div className="space-y-4 pb-10">
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 justify-between">
-        {/* View tabs */}
         <div className="flex items-center gap-0.5 bg-surface-2 rounded-[8px] p-0.5 border border-rule">
           {(["month","week","day"] as View[]).map(v => (
             <button key={v} type="button" onClick={() => {
@@ -149,8 +114,6 @@ export function CalendarView() {
             </button>
           ))}
         </div>
-
-        {/* Nav */}
         <div className="flex items-center gap-2">
           <button type="button" onClick={navPrev}
                   className="h-[34px] w-[34px] grid place-items-center rounded-[7px] bg-surface border border-rule text-text-dim hover:text-text hover:bg-surface-hover transition-colors">
@@ -162,8 +125,6 @@ export function CalendarView() {
             <ChevronRight size={15} />
           </button>
         </div>
-
-        {/* Right actions */}
         <div className="flex items-center gap-2">
           <button type="button" onClick={goToday}
                   className={`${btnBase} bg-surface border border-rule text-text-dim hover:text-text hover:bg-surface-hover`}>
@@ -179,7 +140,6 @@ export function CalendarView() {
       {/* ── Month view ──────────────────────────────────────────────────────── */}
       {view === "month" && (
         <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-          {/* Day-of-week header */}
           <div className="grid grid-cols-7 border-b border-rule">
             {DAY_ABBR.map(d => (
               <div key={d} className="h-9 flex items-center justify-center text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
@@ -187,7 +147,6 @@ export function CalendarView() {
               </div>
             ))}
           </div>
-          {/* Grid cells */}
           <div className="grid grid-cols-7 divide-x divide-rule border-b border-rule">
             {buildMonthGrid(anchor).map(d => {
               const inMonth = d.getMonth() === anchor.getMonth();
@@ -205,7 +164,6 @@ export function CalendarView() {
                     isSel  ? "bg-accent text-white font-semibold" :
                     isToday? "text-accent font-semibold" : "text-text-dim",
                   ].join(" ")}>{d.getDate()}</span>
-                  {/* Item pills */}
                   <div className="mt-0.5 space-y-0.5">
                     {dayItems.slice(0,2).map(it => (
                       <div key={it.id} className={["text-[10px] truncate rounded-[3px] px-1 py-0.5 leading-tight",
@@ -224,7 +182,6 @@ export function CalendarView() {
               );
             })}
           </div>
-          {/* Day detail panel */}
           <DayDetail day={selected} items={selectedItems} loading={loading} onRefresh={fetchItems} />
         </div>
       )}
@@ -318,40 +275,11 @@ export function CalendarView() {
         </div>
       )}
 
-      {/* ── All follow-ups link ─────────────────────────────────────────────── */}
       <div className="text-right">
         <Link href={"/followups" as Route} className="text-[12px] text-text-dim hover:text-accent transition-colors">
           All follow-ups →
         </Link>
       </div>
-    </div>
-  );
-}
-
-// ── DayDetail ─────────────────────────────────────────────────────────────────
-
-function DayDetail({ day, items, loading, onRefresh }: {
-  day: Date; items: CalendarItem[]; loading: boolean; onRefresh: () => void;
-}) {
-  const isToday = sameDay(day, startOfDay(new Date()));
-  return (
-    <div>
-      <div className="flex items-center justify-between px-5 py-3 border-t border-rule/60">
-        <div className="text-[12px] font-semibold text-text">
-          {isToday && <span className="text-accent mr-1.5">Today ·</span>}
-          {day.toLocaleDateString("en-IN",{ weekday:"long", day:"numeric", month:"long" })}
-        </div>
-        <span className="text-[11px] text-text-faint">
-          {loading ? "Loading…" : `${items.length} follow-up${items.length===1?"":"s"}`}
-        </span>
-      </div>
-      {!loading && items.length === 0 && (
-        <div className="px-5 pb-5 flex flex-col items-center py-8 text-center gap-2">
-          <CalendarDays size={28} strokeWidth={1.25} className="text-text-faint" />
-          <p className="text-[12.5px] text-text-dim">Nothing scheduled for this day.</p>
-        </div>
-      )}
-      {items.map(it => <FollowUpItem key={it.id} item={it} onRescheduled={onRefresh} />)}
     </div>
   );
 }
