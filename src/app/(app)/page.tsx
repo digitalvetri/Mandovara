@@ -10,6 +10,8 @@ const STUB_DASHBOARD: DashboardData = {
   overdueInvoices: 0n, overdueInvoicesCount: 0, overdueBadge: 0,
   revenueByMonth: [], projectStages: [], siteVisits: [], activity: [],
 };
+import Link from "next/link";
+import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { KpiCard } from "./_dashboard/KpiCard";
 import { RevenueChart } from "./_dashboard/RevenueChart";
@@ -95,7 +97,11 @@ export default async function DashboardPage() {
       <Topbar
         title="Dashboard"
         eyebrow={`Studio at a glance · ${todayEyebrow()}`}
-        actions={<PrimaryButton>New Quote</PrimaryButton>}
+        actions={
+          <Link href={"/quotations/quick" as Route}>
+            <PrimaryButton>New Quote</PrimaryButton>
+          </Link>
+        }
         showSchedule
       />
 
