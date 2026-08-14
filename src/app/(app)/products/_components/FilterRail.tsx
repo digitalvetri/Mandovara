@@ -1,0 +1,250 @@
+"use client";
+
+// Left-hand filter rail on /products.
+// Structured like a library card-catalogue drawer: each section has a
+// small serif eyebrow + mono count, sections separated by hairline
+// dividers. Every filter mirrors a URL param so state survives reload.
+//
+// Sections:
+//   • Search (debounced 180ms)
+//   • Category (family — mutually exclusive)
+//   • Brand (mutually exclusive; only shown when 2+ brands exist)
+//   • Price band (two-input min/max in ₹)
+//   • In stock only (toggle)
+
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import type { Route } from "next";
+import { Search, X } from "lucide-react";
+import type { BrandOption, CategoryOption, PriceBand } from "@/modules/products/queries";
+
+interface Props {
+  categories: CategoryOption[];
+  brands:     BrandOption[];
+  priceBand:  PriceBand;
+}
+
+export function FilterRail({ categories, brands, priceBand }: Props) {
+  const router   = useRouter();
+  const pathname = usePathname();
+  const params   = useSearchParams();
+
+  const q          = params.get("q") ?? "";
+  const categoryId = params.get("categoryId") ?? "ALL";
+  const brandId    = params.get("brandId") ?? "ALL";
+  const inStock    = params.get("inStock") === "1";
+  const priceMin   = params.get("priceMin") ?? "";
+  const priceMax   = params.get("priceMax") ?? "";
+
+  const [search, setSearch] = useState(q);
+  useEffect(() => setSearch(q), [q]);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function push(next: URLSearchParams) {
+    next.delete("page");
+    const s = next.toString();
+    router.push((s.length > 0 ? `${pathname}?${s}` : pathname) as Route);
+  }
+  function setParam(key: string, value: string | null) {
+    const next = new URLSearchParams(params.toString());
+    if (value == null || value === "" || value === "ALL") next.delete(key);
+    else next.set(key, value);
+    push(next);
+  }
+  function onSearchChange(next: string) {
+    setSearch(next);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const p = new URLSearchParams(params.toString());
+      if (next.trim()) p.set("q", next.trim()); else p.delete("q");
+      p.delete("page");
+      router.replace(`${pathname}?${p.toString()}` as Route);
+    }, 180);
+  }
+
+  const rupeeMin = Math.floor(Number(priceBand.minPaise) / 100);
+  const rupeeMax = Math.ceil(Number(priceBand.maxPaise) / 100);
+
+  return (
+    <aside className="w-full lg:w-[240px] shrink-0 lg:sticky lg:top-4 self-start">
+      {/* Search */}
+      <div className="flex items-center gap-2 h-[38px] px-3 rounded-[8px] bg-surface border border-rule focus-within:border-accent">
+        <Search size={14} className="text-text-dim shrink-0" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search catalogue…"
+          className="flex-1 bg-transparent text-[12.5px] text-text placeholder:text-text-faint outline-none"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => onSearchChange("")}
+            aria-label="Clear search"
+            className="text-text-faint hover:text-text transition-colors"
+          >
+            <X size={13} />
+          </button>
+        )}
+      </div>
+
+      <div className="mt-4 rounded-[14px] bg-surface border border-rule overflow-hidden">
+        <Section title="Category" count={categories.length}>
+          <FilterButton
+            active={categoryId === "ALL"}
+            label="All categories"
+            count={categories.reduce((s, c) => s + c.productCount, 0)}
+            onClick={() => setParam("categoryId", null)}
+          />
+          {categories.map((c) => (
+            <FilterButton
+              key={c.id}
+              active={categoryId === c.id}
+              label={c.name}
+              count={c.productCount}
+              onClick={() => setParam("categoryId", c.id)}
+            />
+          ))}
+        </Section>
+
+        {brands.length >= 2 && (
+          <Section title="Brand" count={brands.length}>
+            <FilterButton
+              active={brandId === "ALL"}
+              label="All brands"
+              count={brands.reduce((s, b) => s + b.productCount, 0)}
+              onClick={() => setParam("brandId", null)}
+            />
+            {brands.map((b) => (
+              <FilterButton
+                key={b.id}
+                active={brandId === b.id}
+                label={b.name}
+                count={b.productCount}
+                onClick={() => setParam("brandId", b.id)}
+              />
+            ))}
+          </Section>
+        )}
+
+        <Section title="Price band" count={null} caption={`₹${rupeeMin.toLocaleString("en-IN")} – ₹${rupeeMax.toLocaleString("en-IN")}`}>
+          <PriceInputs
+            initialMin={priceMin}
+            initialMax={priceMax}
+            onApply={(min, max) => {
+              const p = new URLSearchParams(params.toString());
+              if (min) p.set("priceMin", min); else p.delete("priceMin");
+              if (max) p.set("priceMax", max); else p.delete("priceMax");
+              push(p);
+            }}
+          />
+        </Section>
+
+        <Section title="Stock" count={null}>
+          <label className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-text cursor-pointer hover:bg-surface-hover transition-colors">
+            <input
+              type="checkbox"
+              checked={inStock}
+              onChange={(e) => setParam("inStock", e.target.checked ? "1" : null)}
+              className="h-[14px] w-[14px] accent-accent"
+            />
+            In stock only
+          </label>
+        </Section>
+      </div>
+    </aside>
+  );
+}
+
+function Section({
+  title, count, caption, children,
+}: {
+  title: string;
+  count: number | null;
+  caption?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-b border-rule/60 last:border-0">
+      <div className="px-4 pt-3.5 pb-2 flex items-baseline justify-between">
+        <div className="font-display text-[10.5px] uppercase tracking-[0.16em] text-text-dim font-normal">
+          {title}
+        </div>
+        {count != null && (
+          <div className="tabular text-[10.5px] text-text-faint">{count}</div>
+        )}
+        {caption && (
+          <div className="tabular text-[10px] text-text-faint">{caption}</div>
+        )}
+      </div>
+      <div className="pb-2">{children}</div>
+    </section>
+  );
+}
+
+function FilterButton({
+  active, label, count, onClick,
+}: {
+  active: boolean;
+  label:  string;
+  count:  number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center justify-between gap-2 px-4 py-1.5 text-[12px] transition-colors ${
+        active
+          ? "bg-gold/12 text-text"
+          : "text-text-dim hover:bg-surface-hover hover:text-text"
+      }`}
+    >
+      <span className="truncate text-left">{label}</span>
+      <span className={`tabular text-[10.5px] shrink-0 ${active ? "text-accent" : "text-text-faint"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function PriceInputs({
+  initialMin, initialMax, onApply,
+}: {
+  initialMin: string;
+  initialMax: string;
+  onApply: (min: string, max: string) => void;
+}) {
+  const [min, setMin] = useState(initialMin);
+  const [max, setMax] = useState(initialMax);
+  useEffect(() => setMin(initialMin), [initialMin]);
+  useEffect(() => setMax(initialMax), [initialMax]);
+  return (
+    <div className="px-4 py-2 flex items-center gap-2">
+      <PriceField value={min} onChange={setMin} placeholder="Min" />
+      <span className="text-text-faint text-[11px]">to</span>
+      <PriceField value={max} onChange={setMax} placeholder="Max" />
+      <button
+        type="button"
+        onClick={() => onApply(min.trim(), max.trim())}
+        className="ml-1 h-[26px] px-2 rounded-[6px] bg-gold text-ink text-[10px] font-semibold uppercase tracking-[0.1em] hover:bg-gold-strong transition-colors"
+      >
+        Apply
+      </button>
+    </div>
+  );
+}
+
+function PriceField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full min-w-0 h-[26px] px-2 rounded-[6px] bg-ink border border-rule text-[11px] text-text placeholder:text-text-faint tabular outline-none focus:border-accent"
+    />
+  );
+}

@@ -54,7 +54,7 @@ export async function listCollections(ctx: RequestContext, brandId: string) {
 
 export async function searchDesigns(
   ctx: RequestContext,
-  params: DesignSearchParamsInput,
+  params: DesignSearchParamsInput & { priceMinPaise?: bigint; priceMaxPaise?: bigint },
 ) {
   const db = scoped(ctx);
   const showCost = can(ctx, "catalog.viewCost");
@@ -98,10 +98,40 @@ export async function searchDesigns(
   return { designs, total, page: params.page, pageSize: params.pageSize };
 }
 
-function buildDesignWhere(ctx: RequestContext, params: DesignSearchParamsInput) {
+interface DesignWhereExtras {
+  priceMinPaise?: bigint;
+  priceMaxPaise?: bigint;
+}
+
+function buildDesignWhere(
+  ctx: RequestContext,
+  params: DesignSearchParamsInput & DesignWhereExtras,
+) {
   const and: object[] = [];
 
   if (params.family) and.push({ family: params.family });
+
+  // Price band filter — matches designs whose Standard colourway has any
+  // active RETAIL/MRP price row within [priceMinPaise, priceMaxPaise].
+  if (params.priceMinPaise != null || params.priceMaxPaise != null) {
+    const amountFilter: Record<string, bigint> = {};
+    if (params.priceMinPaise != null) amountFilter["gte"] = params.priceMinPaise;
+    if (params.priceMaxPaise != null) amountFilter["lte"] = params.priceMaxPaise;
+    and.push({
+      colourways: {
+        some: {
+          prices: {
+            some: {
+              tier: { in: ["RETAIL", "MRP"] },
+              amount: amountFilter,
+              effectiveFrom: { lte: new Date() },
+              OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+            },
+          },
+        },
+      },
+    });
+  }
   if (params.brandId) and.push({ collection: { brandId: params.brandId } });
   if (params.collectionId) and.push({ collectionId: params.collectionId });
   if (params.inStock) and.push({ colourways: { some: { stock: { some: { quantity: { gt: 0 } } } } } });

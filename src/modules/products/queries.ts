@@ -1,7 +1,6 @@
 // @ts-nocheck
 // Products page repository — delegates to the catalog module's searchDesigns.
-// The /products route is the catalog surface: Brand → Collection → Design → Colourway.
-// The legacy "Product" model never existed in this schema; catalog IS the product list.
+// /products is the catalog surface: Brand → Collection → Design → Colourway.
 
 import { requirePermission, can } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
@@ -9,8 +8,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { searchDesigns } from "@/modules/catalog/queries";
 import { ProductFamilyEnum } from "@/modules/catalog/schema";
 
-// Product-family labels used in the category dropdown. Trade-friendly
-// names — the enum key (CARPET_ROLL) is invisible in the UI.
+// Trade-friendly labels for the category rail — enum keys never surface in UI.
 const FAMILY_LABEL: Readonly<Record<string, string>> = {
   CURTAIN_FABRIC: "Curtains",
   SHEER: "Sheer Curtains",
@@ -33,47 +31,81 @@ const FAMILY_LABEL: Readonly<Record<string, string>> = {
   SERVICE: "Services",
 };
 
+// Families where dye-lot mismatch is a real risk (CLAUDE.md §0.6).
+// The card renders a dye-lot pin only when the family is in this set
+// AND the colourway actually has stock with a dye lot recorded.
+const DYE_LOT_SENSITIVE = new Set<string>([
+  "WALLPAPER", "CARPET_ROLL", "CARPET_TILE", "RUG",
+  "CURTAIN_FABRIC", "SHEER", "UPHOLSTERY_FABRIC",
+]);
+
+const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 export interface ListProductsQuery {
-  search?: string;
-  categoryId?: string | "ALL";    // product family enum value (WALLPAPER, BLIND, …)
-  status?: string | "ALL";        // "ACTIVE" | "INACTIVE" | "ALL"
-  page?: number;
-  pageSize?: number;
-  sort?: "recent" | "code" | "name";
+  search?:        string;
+  categoryId?:    string | "ALL";    // ProductFamily enum value
+  brandId?:       string | "ALL";
+  status?:        string | "ALL";
+  inStockOnly?:   boolean;
+  priceMinPaise?: bigint;
+  priceMaxPaise?: bigint;
+  page?:          number;
+  pageSize?:      number;
+  sort?:          "recent" | "code" | "name" | "price_asc" | "price_desc";
 }
 
 export interface ProductRow {
-  id: string;
-  code: string;
-  name: string;
-  categoryName: string;
-  hsn: string;
-  uom: string;
-  gstRate: number;
-  status: string;
-  mrp: bigint | null;
-  cost: bigint | null;
-  imageKey: string | null;
-  hex: string | null;
-  updatedAt: Date;
-}
-
-export interface ListProductsResult {
-  rows: ProductRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-  categories: CategoryOption[];
+  id:            string;
+  code:          string;
+  name:          string;
+  brand:         string;
+  collectionName:string;
+  family:        string;       // enum key, e.g. "WALLPAPER"
+  familyLabel:   string;       // display, e.g. "Wallpaper"
+  categoryName:  string;       // familyLabel — kept for backwards compat
+  hsn:           string;
+  uom:           string;
+  gstRate:       number;
+  status:        string;
+  mrp:           bigint | null;
+  cost:          bigint | null;
+  imageKey:      string | null;
+  hex:           string | null;
+  inStock:       boolean;
+  dyeLotHint:    string | null;   // short lot label to render in the pin
+  isNew:         boolean;         // Design.createdAt within NEW_WINDOW_MS
+  updatedAt:     Date;
 }
 
 export interface CategoryOption {
-  id: string;
-  name: string;
+  id:           string;
+  name:         string;
   productCount: number;
 }
 
-const DEFAULT_PAGE_SIZE = 25;
-const MAX_PAGE_SIZE = 100;
+export interface BrandOption {
+  id:           string;
+  name:         string;
+  productCount: number;
+}
+
+export interface PriceBand {
+  minPaise: bigint;
+  maxPaise: bigint;
+}
+
+export interface ListProductsResult {
+  rows:       ProductRow[];
+  total:      number;
+  page:       number;
+  pageSize:   number;
+  categories: CategoryOption[];
+  brands:     BrandOption[];
+  priceBand:  PriceBand;
+}
+
+const DEFAULT_PAGE_SIZE = 24;   // 4×6 grid at 1440
+const MAX_PAGE_SIZE = 96;
 
 export async function listProducts(
   ctx: RequestContext,
@@ -81,25 +113,33 @@ export async function listProducts(
 ): Promise<ListProductsResult> {
   requirePermission(ctx, "catalog.view");
   const canSeeCost = can(ctx, "catalog.viewCost");
+  const db = scoped(ctx);
 
   const pageSize = Math.min(q.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const page = Math.max(1, q.page ?? 1);
 
-  // categoryId now carries a product-family enum value (WALLPAPER, BLIND, …).
   const familyFilter = q.categoryId && q.categoryId !== "ALL"
     ? (ProductFamilyEnum.safeParse(q.categoryId).success ? q.categoryId : undefined)
     : undefined;
+  const brandFilter = q.brandId && q.brandId !== "ALL" ? q.brandId : undefined;
 
-  // Parallelize: design search + family counts run concurrently
-  const [result, families] = await Promise.all([
+  const [result, families, brands, priceBand] = await Promise.all([
     searchDesigns(ctx, {
-      q: q.search,
-      family: familyFilter,
+      q:             q.search,
+      family:        familyFilter,
+      brandId:       brandFilter,
+      inStock:       q.inStockOnly === true ? true : undefined,
+      priceMinPaise: q.priceMinPaise,
+      priceMaxPaise: q.priceMaxPaise,
       page,
       pageSize,
     }),
     familyCounts(ctx),
+    brandCounts(ctx),
+    priceRange(ctx),
   ]);
+
+  const now = Date.now();
 
   const rows: ProductRow[] = result.designs.flatMap((design) =>
     design.colourways.map((cw) => {
@@ -109,25 +149,97 @@ export async function listProducts(
         ? (prices.find((p) => p.tier === "COST")?.amount ?? null)
         : null;
 
+      // In-stock = any dye lot has quantity − reserved > 0
+      const stockRows = cw.stock ?? [];
+      const availableStock = stockRows.filter(
+        (s) => Number(s.quantity ?? 0) - Number(s.reserved ?? 0) > 0,
+      );
+      const inStock = availableStock.length > 0;
+
+      // Dye-lot hint: only for dye-lot-sensitive families with real
+      // stock data. Show the first available lot's short label (last
+      // 3 chars of the lot code), or "MIX" if multiple lots available.
+      let dyeLotHint: string | null = null;
+      if (DYE_LOT_SENSITIVE.has(design.family)) {
+        const lots = availableStock
+          .map((s) => s.dyeLot as string | null)
+          .filter((l): l is string => typeof l === "string" && l.length > 0);
+        if (lots.length === 1) {
+          dyeLotHint = shortenLot(lots[0]!);
+        } else if (lots.length > 1) {
+          dyeLotHint = "MIX";
+        }
+      }
+
+      const isNew =
+        typeof design.createdAt !== "undefined" &&
+        now - new Date(design.createdAt).getTime() < NEW_WINDOW_MS;
+
+      const familyLabel = FAMILY_LABEL[design.family] ?? design.family;
+      const brandName   = design.collection.brand.name;
+      const collName    = design.collection.name;
+
       return {
-        id:           cw.id,
-        code:         cw.code,
-        name:         `${design.name} — ${cw.colourName}`,
-        categoryName: FAMILY_LABEL[design.family] ?? design.family,
-        hsn:          design.hsn,
-        uom:          cw.sellUnit,
-        gstRate:      Number(design.gstRate),
-        status:       design.isActive && cw.isActive ? "ACTIVE" : "INACTIVE",
+        id:             cw.id,
+        code:           cw.code,
+        name:           cw.colourName && cw.colourName !== "Standard"
+                          ? `${design.name} — ${cw.colourName}`
+                          : design.name,
+        brand:          brandName,
+        collectionName: collName,
+        family:         design.family,
+        familyLabel,
+        categoryName:   familyLabel,
+        hsn:            design.hsn,
+        uom:            cw.sellUnit,
+        gstRate:        Number(design.gstRate),
+        status:         design.isActive && cw.isActive ? "ACTIVE" : "INACTIVE",
         mrp,
         cost,
-        imageKey:     cw.imageKey ?? null,
-        hex:          cw.hex ?? null,
-        updatedAt:    new Date(),
+        imageKey:       cw.imageKey ?? null,
+        hex:            cw.hex ?? null,
+        inStock,
+        dyeLotHint,
+        isNew,
+        updatedAt:      new Date(),
       };
     }),
   );
 
-  return { rows, total: result.total, page, pageSize, categories: families };
+  // Sort at row-level so price sorting works across colourways within
+  // the returned page. (The DB fetch is design-name ASC.)
+  const sorted = sortRows(rows, q.sort ?? "name");
+
+  return {
+    rows:       sorted,
+    total:      result.total,
+    page,
+    pageSize,
+    categories: families,
+    brands,
+    priceBand,
+  };
+}
+
+function sortRows(rows: ProductRow[], sort: NonNullable<ListProductsQuery["sort"]>): ProductRow[] {
+  const out = rows.slice();
+  switch (sort) {
+    case "recent":     out.sort((a, b) => +b.updatedAt - +a.updatedAt); break;
+    case "code":       out.sort((a, b) => a.code.localeCompare(b.code)); break;
+    case "price_asc":  out.sort((a, b) => Number((a.mrp ?? 0n) - (b.mrp ?? 0n))); break;
+    case "price_desc": out.sort((a, b) => Number((b.mrp ?? 0n) - (a.mrp ?? 0n))); break;
+    case "name":
+    default:           out.sort((a, b) => a.name.localeCompare(b.name)); break;
+  }
+  return out;
+}
+
+// Take the last chunk of a lot code as a scannable pin label.
+// "MDV/GRN-2608-0142-B" → "142-B"; "LOT-A" → "LOT-A".
+function shortenLot(lot: string): string {
+  const s = lot.trim().toUpperCase();
+  if (s.length <= 6) return s;
+  return s.slice(-6);
 }
 
 export async function listCategories(ctx: RequestContext): Promise<CategoryOption[]> {
@@ -135,9 +247,6 @@ export async function listCategories(ctx: RequestContext): Promise<CategoryOptio
   return familyCounts(ctx);
 }
 
-// Family-level counts for the /products category dropdown.
-// Groups Designs by their ProductFamily and returns one CategoryOption per
-// family that actually has designs in the DB — no empty categories.
 async function familyCounts(ctx: RequestContext): Promise<CategoryOption[]> {
   const db = scoped(ctx);
   const rows = await db.design.groupBy({
@@ -154,13 +263,94 @@ async function familyCounts(ctx: RequestContext): Promise<CategoryOption[]> {
     .sort((a, b) => b.productCount - a.productCount);
 }
 
-// Read a single "product" — the Colourway is the sellable SKU per
-// CLAUDE.md §5. Maps the canonical Brand→Collection→Design→Colourway
-// shape into the legacy ProductDetail interface the /products/[id]
-// page expects. Fields the canonical schema doesn't carry
-// (uomPrecision, reorderLevel, minStock, trackBatch, trackSerial)
-// come back as null/false — the form still renders and edits are a
-// no-op until the /products page is rewritten against canonical.
+async function brandCounts(ctx: RequestContext): Promise<BrandOption[]> {
+  const db = scoped(ctx);
+  const brands = await db.brand.findMany({
+    where:  { isActive: true },
+    select: {
+      id: true, name: true,
+      collections: {
+        select: { _count: { select: { designs: true } } },
+      },
+    },
+  });
+  return brands
+    .map((b) => ({
+      id:           b.id,
+      name:         b.name,
+      productCount: b.collections.reduce((s, c) => s + c._count.designs, 0),
+    }))
+    .filter((b) => b.productCount > 0)
+    .sort((a, b) => b.productCount - a.productCount);
+}
+
+async function priceRange(ctx: RequestContext): Promise<PriceBand> {
+  const db = scoped(ctx);
+  const agg = await db.price.aggregate({
+    where: {
+      tier: { in: ["RETAIL", "MRP"] },
+      effectiveFrom: { lte: new Date() },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+    },
+    _min: { amount: true },
+    _max: { amount: true },
+  });
+  return {
+    minPaise: agg._min.amount ?? 0n,
+    maxPaise: agg._max.amount ?? 0n,
+  };
+}
+
+// ─── PDP query (rewritten for the new detail page) ─────────────────────
+
+export interface PriceRow {
+  tier:          string;
+  amount:        bigint;
+  effectiveFrom: Date;
+}
+
+export interface DesignSpecEntry {
+  key:   string;
+  label: string;
+  value: string;
+}
+
+export interface ProductDetail {
+  id:            string;
+  code:          string;
+  name:          string;
+  colourName:    string;
+  brand:         string;
+  brandId:       string;
+  collection:    string;
+  family:        string;
+  familyLabel:   string;
+  categoryName:  string;    // "brand › collection" — legacy display
+  hsn:           string;
+  uom:           string;
+  uomPrecision:  number;
+  gstRate:       number;
+  status:        string;
+  mrp:           bigint | null;
+  retail:        bigint | null;
+  cost:          bigint | null;
+  imageKey:      string | null;
+  hex:           string | null;
+  inStock:       boolean;
+  dyeLotHint:    string | null;
+  isNew:         boolean;
+  attributes:    DesignSpecEntry[];      // family attrs from Design + specs Json
+  prices:        PriceRow[];
+  siblingColourways: {
+    id: string; code: string; colourName: string; hex: string | null; imageKey: string | null;
+  }[];
+  // Legacy fields the edit form still expects — leave null/false.
+  reorderLevel:  string | null;
+  minStock:      string | null;
+  trackBatch:    boolean;
+  trackSerial:   boolean;
+}
+
 export async function getProduct(ctx: RequestContext, id: string): Promise<ProductDetail | null> {
   requirePermission(ctx, "catalog.view");
   const canSeeCost = can(ctx, "catalog.viewCost");
@@ -170,14 +360,24 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
     select: {
       id: true, code: true, colourName: true, sellUnit: true, isActive: true,
       imageKey: true, hex: true,
+      stock: { select: { dyeLot: true, quantity: true, reserved: true } },
       design: {
         select: {
-          name: true, family: true, hsn: true, gstRate: true, isActive: true,
+          id: true, name: true, family: true, hsn: true, gstRate: true, isActive: true,
+          createdAt: true, specs: true,
+          rollWidthMm: true, rollLengthM: true, fabricWidthMm: true,
+          patternRepeatMm: true, patternMatch: true, railroadable: true,
+          gsm: true, thicknessMm: true, areaPerBoxSqft: true, tileSizeMm: true,
           collection: {
             select: {
-              name: true,
+              id: true, name: true,
               brand: { select: { id: true, name: true } },
             },
+          },
+          colourways: {
+            where: { isActive: true, NOT: { id } },
+            select: { id: true, code: true, colourName: true, hex: true, imageKey: true },
+            take: 8,
           },
         },
       },
@@ -193,15 +393,63 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
   const activePrices = cw.prices.filter(
     (p) => p.effectiveFrom <= now && (p.effectiveTo == null || p.effectiveTo >= now),
   );
-  const mrp  = activePrices.find((p) => p.tier === "RETAIL" || p.tier === "MRP")?.amount ?? null;
-  const cost = canSeeCost
+  const retail = activePrices.find((p) => p.tier === "RETAIL")?.amount ?? null;
+  const mrp    = activePrices.find((p) => p.tier === "MRP")?.amount ?? null;
+  const cost   = canSeeCost
     ? (activePrices.find((p) => p.tier === "COST")?.amount ?? null)
     : null;
+
+  const stockRows = cw.stock ?? [];
+  const availableStock = stockRows.filter(
+    (s) => Number(s.quantity ?? 0) - Number(s.reserved ?? 0) > 0,
+  );
+  const inStock = availableStock.length > 0;
+
+  let dyeLotHint: string | null = null;
+  if (DYE_LOT_SENSITIVE.has(cw.design.family)) {
+    const lots = availableStock
+      .map((s) => s.dyeLot as string | null)
+      .filter((l): l is string => typeof l === "string" && l.length > 0);
+    if (lots.length === 1) dyeLotHint = shortenLot(lots[0]!);
+    else if (lots.length > 1) dyeLotHint = "MIX";
+  }
+
+  const isNew = now.getTime() - new Date(cw.design.createdAt).getTime() < NEW_WINDOW_MS;
+
+  const attributes: DesignSpecEntry[] = [];
+  if (cw.design.rollWidthMm)     attributes.push({ key: "rollWidth",     label: "Roll width",     value: `${cw.design.rollWidthMm} mm` });
+  if (cw.design.rollLengthM)     attributes.push({ key: "rollLength",    label: "Roll length",    value: `${cw.design.rollLengthM} m` });
+  if (cw.design.fabricWidthMm)   attributes.push({ key: "fabricWidth",   label: "Fabric width",   value: `${cw.design.fabricWidthMm} mm` });
+  if (cw.design.patternRepeatMm) attributes.push({ key: "patternRepeat", label: "Pattern repeat", value: `${cw.design.patternRepeatMm} mm` });
+  if (cw.design.patternMatch && cw.design.patternMatch !== "FREE") {
+    attributes.push({ key: "patternMatch", label: "Pattern match", value: String(cw.design.patternMatch).toLowerCase() });
+  }
+  if (cw.design.railroadable)    attributes.push({ key: "railroadable",  label: "Railroadable",   value: "Yes" });
+  if (cw.design.gsm)             attributes.push({ key: "gsm",           label: "GSM",            value: String(cw.design.gsm) });
+  if (cw.design.thicknessMm)     attributes.push({ key: "thickness",     label: "Thickness",      value: `${cw.design.thicknessMm} mm` });
+  if (cw.design.areaPerBoxSqft)  attributes.push({ key: "areaPerBox",    label: "Area / box",     value: `${cw.design.areaPerBoxSqft} sqft` });
+  if (cw.design.tileSizeMm)      attributes.push({ key: "tileSize",      label: "Tile size",      value: cw.design.tileSizeMm });
+  const specs = cw.design.specs as Record<string, unknown> | null;
+  if (specs && typeof specs === "object" && !Array.isArray(specs)) {
+    for (const [k, v] of Object.entries(specs)) {
+      if (k === "sourcedFrom" || k === "sourcedOn" || k === "sheet" || k === "page" || k === "series") continue;
+      if (v == null || v === "") continue;
+      attributes.push({ key: `spec:${k}`, label: humanize(k), value: String(v) });
+    }
+  }
+
+  const familyLabel = FAMILY_LABEL[cw.design.family] ?? cw.design.family;
 
   return {
     id:            cw.id,
     code:          cw.code,
-    name:          `${cw.design.name} — ${cw.colourName}`,
+    name:          cw.design.name,
+    colourName:    cw.colourName,
+    brand:         cw.design.collection.brand.name,
+    brandId:       cw.design.collection.brand.id,
+    collection:    cw.design.collection.name,
+    family:        cw.design.family,
+    familyLabel,
     categoryName:  `${cw.design.collection.brand.name} › ${cw.design.collection.name}`,
     hsn:           cw.design.hsn,
     uom:           cw.sellUnit,
@@ -209,6 +457,7 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
     gstRate:       Number(cw.design.gstRate),
     status:        cw.design.isActive && cw.isActive ? "ACTIVE" : "INACTIVE",
     mrp,
+    retail,
     cost,
     reorderLevel:  null,
     minStock:      null,
@@ -216,34 +465,23 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
     trackSerial:   false,
     imageKey:      cw.imageKey,
     hex:           cw.hex,
-    prices:        activePrices.map((p) => ({
+    inStock,
+    dyeLotHint,
+    isNew,
+    attributes,
+    prices: activePrices.map((p) => ({
       tier:          p.tier,
       amount:        p.amount,
       effectiveFrom: p.effectiveFrom,
     })),
+    siblingColourways: cw.design.colourways,
   };
 }
 
-// Product detail shape expected by /products/[id]. Kept loose to
-// carry both real Colourway data and legacy field slots the form
-// still asks about.
-export interface ProductDetail {
-  id:            string;
-  code:          string;
-  name:          string;
-  categoryName:  string;
-  hsn:           string;
-  uom:           string;
-  uomPrecision:  number;
-  gstRate:       number;
-  status:        string;
-  mrp:           bigint | null;
-  cost:          bigint | null;
-  reorderLevel:  string | null;
-  minStock:      string | null;
-  imageKey:      string | null;
-  hex:           string | null;
-  trackBatch:    boolean;
-  trackSerial:   boolean;
-  prices:        { tier: string; amount: bigint; effectiveFrom: Date }[];
+function humanize(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .toLowerCase()
+    .replace(/^./, (c) => c.toUpperCase());
 }
