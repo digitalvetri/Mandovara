@@ -74,7 +74,8 @@ RUN mkdir -p /opt/prisma-cli \
  && chown -R nextjs:nodejs /opt/prisma-cli
 
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY --chown=nextjs:nodejs scripts/check-empty.mjs /app/check-empty.mjs
+COPY --chown=nextjs:nodejs scripts/check-empty.mjs      /app/check-empty.mjs
+COPY --chown=nextjs:nodejs scripts/wipe-demo-data.mjs   /app/scripts/wipe-demo-data.mjs
 RUN chmod +x /app/docker-entrypoint.sh
 
 USER nextjs

@@ -16,6 +16,15 @@ if [ $? -ne 0 ]; then
   echo "✗ prisma migrate deploy failed — aborting"; exit 1
 fi
 
+# One-shot wipe of demo/transactional data. Set WIPE_DEMO_DATA=true in
+# Coolify env, redeploy, wipe runs, then remove the env var to prevent
+# re-wipe on next container restart. Non-fatal on error (server should
+# still start).
+if [ "${WIPE_DEMO_DATA:-false}" = "true" ]; then
+  echo "→ WIPE_DEMO_DATA=true — running scripts/wipe-demo-data.mjs"
+  node /app/scripts/wipe-demo-data.mjs || echo "→ wipe failed, continuing anyway"
+fi
+
 echo "→ Checking DB state..."
 CHECK=$(node /app/check-empty.mjs 2>&1)
 CHECK_EXIT=$?

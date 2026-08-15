@@ -25,22 +25,31 @@ async function main(): Promise<void> {
   process.stdout.write("Seed: catalog (brands → collections → designs → colourways)...\n");
   const catalog = await seedCatalog(db, masters.orgId);
 
-  process.stdout.write("Seed: customers (clients, architects)...\n");
-  const customers = await seedCustomers(db, masters.orgId);
+  // Demo customers + transactions are gated behind SEED_DEMO_DATA.
+  // Fresh deploys land clean by default — no fake leads, clients,
+  // projects, quotations, orders, invoices, etc. Set the env var to
+  // opt back in for local dev / demos.
+  const seedDemo = process.env["SEED_DEMO_DATA"] === "true";
+  if (seedDemo) {
+    process.stdout.write("Seed: customers (clients, architects)...\n");
+    const customers = await seedCustomers(db, masters.orgId);
 
-  process.stdout.write("Seed: transactions (projects, rooms, measurements, quotes, orders)...\n");
-  await seedTransactions(db, {
-    orgId: masters.orgId,
-    branchId: masters.branchId,
-    userByRole: masters.userByRole,
-    employeeIds: masters.employeeIds,
-    vendorIds: masters.vendorIds,
-    colourwayIds: catalog.colourwayIds,
-    colourwayMeta: catalog.colourwayMeta,
-    sampleBookIds: catalog.sampleBookIds,
-    clientIds: customers.clientIds,
-    architectIds: customers.architectIds,
-  });
+    process.stdout.write("Seed: transactions (projects, rooms, measurements, quotes, orders)...\n");
+    await seedTransactions(db, {
+      orgId: masters.orgId,
+      branchId: masters.branchId,
+      userByRole: masters.userByRole,
+      employeeIds: masters.employeeIds,
+      vendorIds: masters.vendorIds,
+      colourwayIds: catalog.colourwayIds,
+      colourwayMeta: catalog.colourwayMeta,
+      sampleBookIds: catalog.sampleBookIds,
+      clientIds: customers.clientIds,
+      architectIds: customers.architectIds,
+    });
+  } else {
+    process.stdout.write("Seed: SKIPPING demo customers + transactions (SEED_DEMO_DATA not set).\n");
+  }
 
   process.stdout.write("Seed: bumping NumberSequence past inserted rows...\n");
   await bumpNumberSequences(db, masters.orgId);
