@@ -17,10 +17,13 @@
 //     so the ledger stays honest.
 
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
+import { Prisma } from "@/kernel/numbering/series";
 import { prisma } from "@/kernel/db/client";
 import { STOCK_IMPORT_ROWS, type StockImportRow } from "@/modules/stock-import/data";
+
+// Prisma.Decimal is the runtime Decimal ctor exported through the Prisma
+// namespace — avoids a second import of @prisma/client/runtime/library.
+const { Decimal } = Prisma;
 
 export const runtime  = "nodejs";
 export const dynamic  = "force-dynamic";
