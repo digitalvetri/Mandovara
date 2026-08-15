@@ -63,17 +63,6 @@ export const LEAD_PRIORITY_OPTIONS: { value: LeadPriority; label: string; desc: 
   { value: "COLD", label: "Cold", desc: "Early stage, low urgency" },
 ];
 
-// Predefined budget ranges (mapped to budgetMin/budgetMax paise in the action)
-export const BUDGET_RANGES = [
-  { value: "under-5L",   label: "Under ₹5 Lakhs" },
-  { value: "5L-10L",     label: "₹5L – ₹10L" },
-  { value: "10L-25L",    label: "₹10L – ₹25L" },
-  { value: "25L-50L",    label: "₹25L – ₹50L" },
-  { value: "50L-1Cr",    label: "₹50L – ₹1 Crore" },
-  { value: "above-1Cr",  label: "Above ₹1 Crore" },
-] as const;
-export type BudgetRange = (typeof BUDGET_RANGES)[number]["value"];
-
 // Project type options (stored in siteAddress JSON — no DB enum needed)
 export const PROJECT_TYPES = [
   "Residential", "Commercial", "Office", "Villa", "Apartment", "Renovation", "Other",
@@ -93,15 +82,15 @@ export const createLeadSchema = z.object({
   city:        z.string().trim().max(100).optional().or(z.literal("")),
   pincode:     z.string().trim().regex(/^\d{6}$/, "Enter a 6-digit pincode")
                  .optional().or(z.literal("")),
+  address:     z.string().trim().max(500).optional().or(z.literal("")),
 
   // Enquiry
   requirement: z.string().trim().max(2000).optional().or(z.literal("")),
   source:      z.enum(LEAD_SOURCES, { error: "Select a lead source" }),
   priority:    z.enum(LEAD_PRIORITIES),
 
-  // Budget (kept for EditableField on detail page)
-  budgetRange: z.enum(BUDGET_RANGES.map((r) => r.value) as [BudgetRange, ...BudgetRange[]])
-                 .optional().or(z.literal("")),
+  // Budget — free-form rupee amount e.g. "250000" or "2,50,000"
+  estimatedBudget: z.string().trim().max(20).optional().or(z.literal("")),
 
   // Assignment
   ownerId:     z.string().trim().optional().or(z.literal("")),
@@ -111,10 +100,10 @@ export const createLeadSchema = z.object({
 });
 
 export const updateLeadSchema = createLeadSchema.partial().extend({
-  id:          z.string().min(1),
-  altMobile:   z.string().trim().optional().or(z.literal("")),
-  pincode:     z.string().trim().optional().or(z.literal("")),
-  budgetRange: z.string().trim().optional().or(z.literal("")),
+  id:              z.string().min(1),
+  altMobile:       z.string().trim().optional().or(z.literal("")),
+  pincode:         z.string().trim().optional().or(z.literal("")),
+  estimatedBudget: z.string().trim().optional().or(z.literal("")),
 });
 
 export const statusChangeSchema = z

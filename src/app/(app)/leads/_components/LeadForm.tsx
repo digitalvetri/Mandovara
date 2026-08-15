@@ -9,7 +9,6 @@ import {
   createLeadSchema,
   LEAD_SOURCE_OPTIONS,
   LEAD_PRIORITY_OPTIONS,
-  BUDGET_RANGES,
   type CreateLeadInput,
 } from "@/modules/leads/schema";
 import { createLead } from "@/modules/leads/actions";
@@ -174,6 +173,15 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         <input type="hidden" {...register("branchId")} />
       )}
 
+      <EntityForm.Field label="Site Address" error={errors.address?.message} span={2}>
+        <textarea
+          {...register("address")}
+          rows={2}
+          className={`${fc} h-auto py-2 resize-y`}
+          placeholder="Flat/House no., Street, Area, Landmark… (optional)"
+        />
+      </EntityForm.Field>
+
       {/* ── Enquiry Details ─────────────────────────────────────── */}
       <EntityForm.Field label="Basic Requirement" error={errors.requirement?.message} span={2}>
         <textarea
@@ -203,13 +211,17 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         </select>
       </EntityForm.Field>
 
-      <EntityForm.Field label="Budget Range" error={errors.budgetRange?.message}>
-        <select {...register("budgetRange")} className={fc} defaultValue="">
-          <option value="">Not specified</option>
-          {BUDGET_RANGES.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
+      <EntityForm.Field label="Estimated Budget" error={errors.estimatedBudget?.message}
+        hint="Enter exact amount in ₹ (optional)">
+        <div className="flex items-center h-[38px] border border-rule rounded-[8px] bg-surface focus-within:border-accent transition-colors overflow-hidden">
+          <span className="px-3 text-[13px] text-text-dim shrink-0 border-r border-rule h-full flex items-center">₹</span>
+          <input
+            {...register("estimatedBudget")}
+            className="flex-1 h-full px-3 bg-transparent text-[13px] text-text tabular-nums outline-none"
+            inputMode="numeric"
+            placeholder="e.g. 2,50,000"
+          />
+        </div>
       </EntityForm.Field>
 
       <EntityForm.Field label="Assigned Sales Executive" error={errors.ownerId?.message} hint="Leave blank to assign to yourself" span={2}>

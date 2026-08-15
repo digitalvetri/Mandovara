@@ -17,7 +17,6 @@ import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import {
   createLeadSchema, updateLeadSchema, statusChangeSchema, convertLeadSchema,
-  type BudgetRange,
 } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -61,7 +60,7 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
       prefix,
     });
 
-    const [budgetMin, budgetMax] = parseBudgetRange(data.budgetRange as BudgetRange | undefined);
+    const budgetPaise = parseRupeesInput(data.estimatedBudget);
 
     const lead = await tx.lead.create({
       data: {
@@ -73,15 +72,15 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
         source:      data.source,
         stage:       "NEW",
         ownerId:     data.ownerId ?? ctx.userId,
-        budgetMin,
-        budgetMax,
+        budgetMin:   null,
+        budgetMax:   budgetPaise,
         requirement: emptyToNull(data.requirement),
         siteAddress: {
-          city:        data.city ?? null,
-          pincode:     emptyToNull(data.pincode),
-          altMobile:   emptyToNull(data.altMobile),
-          budgetRange: emptyToNull(data.budgetRange),
-          priority:    data.priority,
+          city:      data.city ?? null,
+          pincode:   emptyToNull(data.pincode),
+          altMobile: emptyToNull(data.altMobile),
+          address:   emptyToNull(data.address),
+          priority:  data.priority,
         },
       },
       select: { id: true, source: true, mobile: true },
@@ -124,22 +123,22 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
   const existingAddr = (existing?.siteAddress ?? {}) as Record<string, unknown>;
 
   const hasSiteFields = rest.city != null || rest.pincode != null ||
-    rest.altMobile != null || rest.budgetRange != null || rest.priority != null;
+    rest.altMobile != null || rest.address != null || rest.priority != null;
 
   const mergedAddr = hasSiteFields
     ? {
         ...existingAddr,
-        ...(rest.city       != null && { city:       rest.city }),
-        ...(rest.pincode    != null && { pincode:    emptyToNull(rest.pincode) }),
-        ...(rest.altMobile  != null && { altMobile:  emptyToNull(rest.altMobile) }),
-        ...(rest.budgetRange!= null && { budgetRange: emptyToNull(rest.budgetRange) }),
-        ...(rest.priority   != null && { priority:   rest.priority }),
+        ...(rest.city      != null && { city:      rest.city }),
+        ...(rest.pincode   != null && { pincode:   emptyToNull(rest.pincode) }),
+        ...(rest.altMobile != null && { altMobile: emptyToNull(rest.altMobile) }),
+        ...(rest.address   != null && { address:   emptyToNull(rest.address) }),
+        ...(rest.priority  != null && { priority:  rest.priority }),
       }
     : undefined;
 
-  const [budgetMin, budgetMax] = rest.budgetRange != null
-    ? parseBudgetRange(rest.budgetRange as BudgetRange)
-    : [undefined, undefined];
+  const budgetPaise = rest.estimatedBudget != null
+    ? parseRupeesInput(rest.estimatedBudget)
+    : undefined;
 
   await db.lead.update({
     where: { id },
@@ -150,8 +149,7 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
       ...(rest.source      != null && { source:      rest.source }),
       ...(rest.ownerId     != null && { ownerId:     rest.ownerId }),
       ...(rest.requirement != null && { requirement: emptyToNull(rest.requirement) }),
-      ...(budgetMin        != null && { budgetMin }),
-      ...(budgetMax        != null && { budgetMax }),
+      ...(budgetPaise      !== undefined && { budgetMin: null, budgetMax: budgetPaise }),
       ...(mergedAddr       != null && { siteAddress: mergedAddr }),
     },
   });
@@ -382,18 +380,11 @@ function emptyToNull(v: string | undefined | null): string | null {
   return t.length === 0 ? null : t;
 }
 
-// Maps a predefined budget range slug to [budgetMin, budgetMax] in paise.
-// 1 lakh = 1,00,000 rupees = 1,00,00,000 paise (10_000_000n).
-const L = 10_000_000n; // 1 lakh in paise
-const CR = 1_000_000_000n; // 1 crore in paise
-function parseBudgetRange(range: BudgetRange | string | undefined | null): [bigint | null, bigint | null] {
-  switch (range) {
-    case "under-5L":  return [null,    5n * L];
-    case "5L-10L":    return [5n * L,  10n * L];
-    case "10L-25L":   return [10n * L, 25n * L];
-    case "25L-50L":   return [25n * L, 50n * L];
-    case "50L-1Cr":   return [50n * L, CR];
-    case "above-1Cr": return [CR,      null];
-    default:          return [null,    null];
-  }
+// Parses a user-entered rupee string ("250000" or "2,50,000") to paise.
+function parseRupeesInput(v: string | undefined | null): bigint | null {
+  if (!v || v.trim() === "") return null;
+  const clean = v.trim().replace(/[,₹\s]/g, "");
+  const num = parseInt(clean, 10);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return BigInt(num) * 100n;
 }

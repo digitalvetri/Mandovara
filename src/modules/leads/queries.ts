@@ -47,8 +47,6 @@ export interface LeadDetail extends LeadRow {
   lostReason: string | null;
   nextActionAt: Date | null;
   ownerName: string;
-  budgetRangeSlug: string | null;
-  /** Human-readable site address joined from the JSON blob, or null if empty. */
   siteAddress: string | null;
 }
 
@@ -186,8 +184,6 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
   });
 
   const addr = lead.siteAddress as Record<string, unknown> | null;
-  const budgetRangeSlug = typeof addr?.budgetRange === "string" ? addr.budgetRange : null;
-  const siteAddressStr = joinAddress(addr);
 
   return {
     id: lead.id, number: lead.number, name: lead.name, mobile: lead.mobile, email: lead.email,
@@ -197,10 +193,9 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
     convertedClientId: lead.convertedClientId,
     lostReason: lead.lostReason, nextActionAt: lead.nextActionAt,
     ownerName: owner?.name ?? "—",
-    budgetRangeSlug,
-    siteAddress: siteAddressStr,
     city: typeof addr?.city === "string" && addr.city ? addr.city : null,
     priority: typeof addr?.priority === "string" ? addr.priority : null,
+    siteAddress: typeof addr?.address === "string" && addr.address ? addr.address : null,
   };
 }
 
