@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
-  Boxes, Send, Briefcase, Scissors, Wrench, Receipt, Wallet,
+  Boxes, Send, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler,
   type LucideIcon,
@@ -46,7 +46,6 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Sales Orders & Dispatch", href: "/orders",       icon: Send      },
       { label: "Measurements",            href: "/measurements", icon: Ruler     },
-      { label: "Make (Cut & Stitch)",     href: "/make",         icon: Scissors  },
       { label: "Installation",            href: "/install",      icon: Wrench    },
     ],
   },
