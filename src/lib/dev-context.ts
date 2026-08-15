@@ -75,7 +75,7 @@ async function buildContext(userId: string): Promise<RequestContext | null> {
 }
 
 export const devContext = cache(async (): Promise<RequestContext> => {
-  if (process.env["NODE_ENV"] === "production") {
+  if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_DEV_AUTH"] !== "true") {
     throw new Error("devContext() called in production — refuse.");
   }
 
