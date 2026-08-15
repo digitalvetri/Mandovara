@@ -141,8 +141,15 @@ export type ProjectMilestone = {
   order: number;
   plannedDate: Date;
   actualDate: Date | null;
+  /** Legacy % — kept for callers not yet migrated. New UI reads billingWeightPct. */
   billingPct: string;
+  billingWeightPct: string | null;
   status: string;
+  templateCode: string | null;
+  family: string | null;
+  autoCompleted: boolean;
+  sourceEvent: string | null;
+  completedAt: Date | null;
 };
 
 export type ProjectTask = {
@@ -175,9 +182,15 @@ export async function getProjectMilestones(
     select: {
       id: true, name: true, order: true, plannedDate: true,
       actualDate: true, billingPct: true, status: true,
+      templateCode: true, family: true, autoCompleted: true,
+      sourceEvent: true, completedAt: true, billingWeightPct: true,
     },
   });
-  return rows.map((r) => ({ ...r, billingPct: r.billingPct.toString() }));
+  return rows.map((r) => ({
+    ...r,
+    billingPct: r.billingPct.toString(),
+    billingWeightPct: r.billingWeightPct ? r.billingWeightPct.toString() : null,
+  }));
 }
 
 export async function getProjectTasks(
@@ -210,6 +223,203 @@ export async function getProjectSiteLogs(
       id: true, loggedAt: true, summary: true, weather: true, manpowerCount: true,
     },
   });
+}
+
+// ── Redesign — measurement rounds shown on the project detail page ──
+export type ProjectMeasurementRow = {
+  id: string;
+  number: string;
+  visitedAt: Date;
+  status: string; // MeasurementStatus
+  revision: number;
+  supersedesId: string | null;
+  measuredByName: string;
+  itemCount: number;
+  roomsCovered: number;
+};
+
+export async function getProjectMeasurements(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<ProjectMeasurementRow[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  const rows = await db.measurement.findMany({
+    where:   { projectId },
+    orderBy: [{ revision: "desc" }, { visitedAt: "desc" }],
+    select: {
+      id: true, number: true, visitedAt: true, status: true, revision: true,
+      supersedesId: true, measuredById: true,
+      _count: { select: { items: true } },
+      items: { select: { roomId: true }, distinct: ["roomId"] },
+    },
+  });
+  // Measurement has no `measuredBy` relation defined in schema — fetch
+  // the measurer names in one round-trip and stitch them in.
+  const measurerIds = Array.from(new Set(rows.map((r) => r.measuredById)));
+  const measurers = measurerIds.length === 0 ? [] :
+    await db.user.findMany({
+      where:  { id: { in: measurerIds } },
+      select: { id: true, name: true },
+    });
+  const nameById = new Map(measurers.map((u) => [u.id, u.name]));
+  return rows.map((r) => ({
+    id: r.id,
+    number: r.number,
+    visitedAt: r.visitedAt,
+    status: r.status,
+    revision: r.revision,
+    supersedesId: r.supersedesId,
+    measuredByName: nameById.get(r.measuredById) ?? "—",
+    itemCount: r._count.items,
+    roomsCovered: new Set(r.items.map((i) => i.roomId)).size,
+  }));
+}
+
+// ── Redesign — money block. Loader-gated on permission so the row IDs
+// and paisa values never even leave the DB for roles that shouldn't see
+// them (Rule 8: cost/margin stripped server-side, never CSS-hidden).
+export type ProjectMoney = {
+  orderValue: bigint;
+  advanceReceived: bigint;
+  advanceRequired: bigint;
+  outstanding: bigint;
+  invoiceTotal: bigint;
+  receiptTotal: bigint;
+};
+
+export function canViewProjectMoney(ctx: RequestContext): boolean {
+  return (
+    ctx.permissions.has("order.viewMargin") ||
+    ctx.permissions.has("invoice.viewMargin") ||
+    ctx.permissions.has("client.viewOutstanding")
+  );
+}
+
+export async function getProjectMoney(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<ProjectMoney | null> {
+  if (!canViewProjectMoney(ctx)) return null;
+  const db = scoped(ctx);
+  const [order, advances, invoices, receipts] = await Promise.all([
+    db.order.aggregate({
+      where: { projectId },
+      _sum:  { totalValue: true, advanceRequired: true, advanceReceived: true },
+    }),
+    db.advance.aggregate({ where: { projectId }, _sum: { amount: true } }),
+    db.invoice.aggregate({ where: { projectId }, _sum: { total: true } }),
+    db.receipt.aggregate({ where: { projectId }, _sum: { amount: true } }),
+  ]);
+  const orderValue      = order._sum.totalValue      ?? 0n;
+  const advanceReq      = order._sum.advanceRequired ?? 0n;
+  const advanceRecvOrd  = order._sum.advanceReceived ?? 0n;
+  const advanceRecvOwn  = advances._sum.amount       ?? 0n;
+  const invoiceTotal    = invoices._sum.total        ?? 0n;
+  const receiptTotal    = receipts._sum.amount       ?? 0n;
+  return {
+    orderValue,
+    advanceReceived: advanceRecvOrd > 0n ? advanceRecvOrd : advanceRecvOwn,
+    advanceRequired: advanceReq,
+    outstanding:     invoiceTotal - receiptTotal,
+    invoiceTotal,
+    receiptTotal,
+  };
+}
+
+// ── Redesign — team (owner + measurers + installers on the project).
+// Simple list; the right-rail card renders name + role-on-project.
+export type ProjectTeamRow = {
+  userId: string;
+  name: string;
+  role: string;
+  isOwner: boolean;
+};
+
+export async function getProjectTeam(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<ProjectTeamRow[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  const project = await db.project.findUnique({
+    where:  { id: projectId },
+    select: {
+      ownerId: true,
+      members: { select: { userId: true, roleOnProject: true } },
+    },
+  });
+  if (!project) return [];
+
+  // Neither Project.owner nor ProjectMember.user is a defined Prisma
+  // relation — fetch every referenced user in one query and stitch.
+  const userIds = Array.from(
+    new Set([project.ownerId, ...project.members.map((m) => m.userId)]),
+  );
+  const users = userIds.length === 0 ? [] :
+    await db.user.findMany({
+      where:  { id: { in: userIds } },
+      select: { id: true, name: true, role: true },
+    });
+  const byId = new Map(users.map((u) => [u.id, u]));
+
+  const rows: ProjectTeamRow[] = [];
+  const ownerUser = byId.get(project.ownerId);
+  rows.push({
+    userId:  project.ownerId,
+    name:    ownerUser?.name ?? "—",
+    role:    ownerUser?.role ?? "OWNER",
+    isOwner: true,
+  });
+  for (const m of project.members) {
+    if (m.userId === project.ownerId) continue;
+    const u = byId.get(m.userId);
+    rows.push({
+      userId:  m.userId,
+      name:    u?.name ?? "—",
+      role:    m.roleOnProject ?? u?.role ?? "MEMBER",
+      isOwner: false,
+    });
+  }
+  return rows;
+}
+
+// ── Redesign — quotation / order summary tile on the project page.
+export type ProjectQuoteOrderSummary = {
+  quotations: { id: string; number: string; status: string; total: bigint; date: Date }[];
+  order: { id: string; number: string; status: string; totalValue: bigint; date: Date } | null;
+};
+
+export async function getProjectQuoteOrderSummary(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<ProjectQuoteOrderSummary> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  const [quotations, order] = await Promise.all([
+    db.quotation.findMany({
+      where:   { projectId },
+      orderBy: { date: "desc" },
+      take:    3,
+      select:  { id: true, number: true, status: true, total: true, date: true },
+    }),
+    db.order.findFirst({
+      where:   { projectId },
+      orderBy: { date: "desc" },
+      select:  { id: true, number: true, status: true, totalValue: true, date: true },
+    }),
+  ]);
+  return { quotations, order };
+}
+
+// ── Redesign — has-rooms flag for the "needs rooms" gate on the button.
+export async function getProjectRoomCount(
+  ctx: RequestContext,
+  projectId: string,
+): Promise<number> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  return db.room.count({ where: { projectId } });
 }
 
 export interface ClientPickerRow {

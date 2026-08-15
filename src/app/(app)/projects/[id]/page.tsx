@@ -1,3 +1,16 @@
+// Project detail — redesigned per docs/BUILD-SPEC.md project-detail.
+//
+// Layout (§1):
+//   ┌ header: project number · name · stage stepper · figures
+//   │
+//   ├ 2-col grid
+//   │   left  : Next Action · Milestones · Measurements · Quote/Order · Collapsed tasks + logs
+//   │   right : Client · Site · Money (permission-gated) · Team  (sticky)
+//
+// Data (§7 — money block gate): getProjectMoney() returns null when the
+// user's permissions don't cover margin/outstanding, so the row IDs and
+// paisa values never leave the DB for those roles.
+
 import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
@@ -6,9 +19,15 @@ import { shortNumber } from "@/lib/short-number";
 import { devContext } from "@/lib/dev-context";
 import {
   getProject, getProjectMilestones, getProjectTasks, getProjectSiteLogs,
+  getProjectMeasurements, getProjectMoney, getProjectTeam,
 } from "@/modules/projects/queries";
-import { ProjectStatusPill } from "../_components/StatusPill";
-import { ProjectPanels } from "../_components/ProjectPanels";
+import { resolveNextAction } from "@/modules/projects/next-action";
+import { StageStepper } from "../_components/StageStepper";
+import { MilestonesPanel } from "../_components/MilestonesPanel";
+import { MeasurementsSection } from "../_components/MeasurementsSection";
+import { RightRail } from "../_components/RightRail";
+import { CollapsedPanels } from "../_components/CollapsedPanels";
+import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
 
 export const dynamic = "force-dynamic";
 
@@ -20,75 +39,74 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const [milestones, tasks, siteLogs] = await Promise.all([
+  const [milestones, tasks, siteLogs, rounds, money, team] = await Promise.all([
     getProjectMilestones(ctx, id),
     getProjectTasks(ctx, id),
     getProjectSiteLogs(ctx, id),
+    getProjectMeasurements(ctx, id),
+    getProjectMoney(ctx, id),
+    getProjectTeam(ctx, id),
   ]);
 
-  const completedMs = milestones.filter((m) => m.status === "COMPLETED").length;
-  const completedBilling = milestones
-    .filter((m) => m.status === "COMPLETED")
-    .reduce((s, m) => s + Number(m.billingPct), 0);
+  const action = resolveNextAction(ctx, { id: p.id, stage: p.stage });
+  const receivedTotal = money?.receiptTotal ?? 0n;
+  const pctCompleteHeader = milestones.length > 0
+    ? Math.round(
+        (milestones.filter((m) => m.status === "COMPLETED").length /
+         milestones.length) * 100,
+      )
+    : 0;
 
   return (
     <>
       <Topbar
-        title={p.name}
-        eyebrow={`${shortNumber(p.number, "P-")} · ${p.clientName} · ${formatDate(p.createdAt)}${p.expectedInstallAt ? ` → ${formatDate(p.expectedInstallAt)}` : ""}`}
+        title=""
+        eyebrow=""
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-[14px] bg-surface border border-rule p-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Stage</div>
-              <ProjectStatusPill status={p.stage} />
-            </div>
-            <div className="text-[11.5px] text-text-dim tabular">
-              {completedMs}/{milestones.length} milestones · {completedBilling}% billable
-            </div>
-          </div>
-
-          <ProjectPanels
-            projectId={p.id}
-            milestones={milestones}
-            tasks={tasks}
-            siteLogs={siteLogs}
-          />
+      {/* ── Header ────────────────────────────────────────────────── */}
+      <div className="mb-6 rounded-[14px] border border-rule bg-surface p-6">
+        <div className="mb-1 flex items-baseline gap-3 text-[11px] uppercase tracking-[0.14em] text-text-dim">
+          <span className="tabular-nums">{shortNumber(p.number, "P-")}</span>
+          <span aria-hidden>·</span>
+          <span>{formatDate(p.createdAt)}</span>
         </div>
 
-        <aside className="space-y-4 h-fit">
-          <div className="rounded-[14px] bg-surface border border-rule p-5">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Contract</div>
-            <dl className="space-y-2 text-[12.5px]">
-              <div className="flex items-baseline justify-between">
-                <dt className="text-text-dim text-[11.5px]">Order value</dt>
-                <dd className="font-display text-[22px] font-semibold text-text tabular-nums">{formatINR(p.orderValue)}</dd>
-              </div>
-            </dl>
-          </div>
+        <h1 className="font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.015em] text-text">
+          {p.name}
+        </h1>
 
-          <div className="rounded-[14px] bg-surface border border-rule p-5">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Party + branch</div>
-            <dl className="space-y-3 text-[12.5px]">
-              <Row k="Client" v={p.clientName} />
-              <Row k="Mobile" v={p.clientMobile} mono />
-              <Row k="Created" v={formatDate(p.createdAt)} />
-              <Row k="Expected install" v={p.expectedInstallAt ? formatDate(p.expectedInstallAt) : "—"} />
-            </dl>
-          </div>
-        </aside>
+        <div className="mt-4">
+          <StageStepper stage={p.stage} />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[12.5px] tabular-nums text-text-dim">
+          <HeaderStat k="Order value" v={formatINR(p.orderValue)} />
+          {money && <HeaderStat k="Received" v={formatINR(receivedTotal)} />}
+          <HeaderStat k="Progress" v={`${pctCompleteHeader}%`} />
+        </div>
+      </div>
+
+      {/* ── Body — 2-column grid ────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-4">
+          <StartMeasurementFlow projectId={p.id} action={action} />
+          <MilestonesPanel milestones={milestones} orderValue={p.orderValue} />
+          <MeasurementsSection projectId={p.id} rounds={rounds} />
+          <CollapsedPanels projectId={p.id} tasks={tasks} siteLogs={siteLogs} />
+        </div>
+
+        <RightRail project={p} money={money} team={team} />
       </div>
     </>
   );
 }
 
-function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
+function HeaderStat({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-text-dim text-[11.5px]">{k}</dt>
-      <dd className={`text-text text-right ${mono ? "tabular" : ""}`}>{v}</dd>
-    </div>
+    <span className="inline-flex items-baseline gap-2">
+      <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-subtle">{k}</span>
+      <span className="text-text">{v}</span>
+    </span>
   );
 }

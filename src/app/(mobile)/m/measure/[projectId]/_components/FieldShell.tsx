@@ -49,8 +49,12 @@ export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShe
         projectId: project.id,
         visitedAt: new Date(),
       });
-      if (!res.ok || !res.data) {
-        setError(res.error ?? "Could not start round");
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      if (res.needsRooms) {
+        setError("Add at least one room before starting a round.");
         return;
       }
       setRound({

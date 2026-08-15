@@ -31,8 +31,12 @@ export function NewRoundButton({ projectId }: NewRoundButtonProps) {
         visitedAt: new Date(visitedAt),
         notes: notes.trim() || undefined,
       });
-      if (!res.ok || !res.data) {
-        setError(res.error ?? "Could not start round");
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      if (res.needsRooms) {
+        setError("This project has no rooms yet. Add at least one room from the project page before measuring.");
         return;
       }
       router.push(`/projects/${projectId}/measurements/${res.data.id}` as Route);

@@ -26,21 +26,72 @@ import {
 } from "./schema";
 import { type ActionResult, zodError, canEditRound } from "./actions-shared";
 
+// Result shape:
+//   - ok + data + resumed  → caller may navigate to the round
+//   - ok + needsRooms       → caller opens the room-setup sheet first
+//   - !ok                   → error string, caller shows it
+// The discriminant lets callers exhaust cases explicitly instead of
+// juggling empty strings.
+export type StartRoundOutcome =
+  | { ok: true; needsRooms: true }
+  | { ok: true; needsRooms?: false; data: { id: string; number: string; resumed: boolean } }
+  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
 export async function startMeasurementRound(
   input: unknown,
-): Promise<ActionResult<{ id: string; number: string }>> {
+): Promise<StartRoundOutcome> {
   const ctx = await devContext();
-  requirePermission(ctx, "measurement.create");
+  // Scoped perms — `.create.any` (measurement team, designer) OR `.create.own`
+  // (sales for their own visits). Legacy flat `measurement.create` still
+  // grants during migration but new callers rely on the scoped keys.
+  const canCreate =
+    ctx.permissions.has("measurement.create.any") ||
+    ctx.permissions.has("measurement.create.own") ||
+    ctx.permissions.has("measurement.create");
+  if (!canCreate) {
+    // Preserve the standard ForbiddenError shape so existing catchers
+    // (route boundary, tests) see the same 403 semantics.
+    requirePermission(ctx, "measurement.create.any");
+  }
   const parsed = startRoundSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) {
+    const z = zodError(parsed.error);
+    return { ok: false, error: z.error ?? "Validation failed", fieldErrors: z.fieldErrors };
+  }
   const d = parsed.data;
 
   const db = scoped(ctx);
   const project = await db.project.findUnique({
     where:  { id: d.projectId },
-    select: { id: true, branchId: true },
+    select: {
+      id: true, branchId: true,
+      rooms: { select: { id: true }, take: 1 },
+    },
   });
   if (!project) return { ok: false, error: "Project not found" };
+
+  // Rooms guard — you cannot measure without at least one room. Signal
+  // needsRooms and let the UI open the room-setup sheet before navigating
+  // (spec §4).
+  if (project.rooms.length === 0) {
+    return { ok: true, needsRooms: true };
+  }
+
+  // Resume existing DRAFT by the same user — never create a second one.
+  // Prevents "I clicked start twice" from splitting the round in two
+  // separate numbered documents (spec §4 rule 3).
+  const existingDraft = await db.measurement.findFirst({
+    where:  { projectId: d.projectId, measuredById: ctx.userId, status: "DRAFT" },
+    orderBy: { visitedAt: "desc" },
+    select: { id: true, number: true },
+  });
+  if (existingDraft) {
+    return {
+      ok: true,
+      data: { id: existingDraft.id, number: existingDraft.number, resumed: true },
+    };
+  }
+
   const branch = await db.branch.findUnique({
     where:  { id: project.branchId },
     select: { invoicePrefix: true },
@@ -70,7 +121,7 @@ export async function startMeasurementRound(
   });
 
   revalidatePath(`/projects/${d.projectId}/measurements`);
-  return { ok: true, data: round };
+  return { ok: true, data: { ...round, resumed: false } };
 }
 
 export async function submitMeasurementRound(
