@@ -30,26 +30,11 @@ test("purchase orders list loads", async ({ page }) => {
   await expect(page.getByText(/purchase/i).first()).toBeVisible();
 });
 
-// ── Allocation console ────────────────────────────────────────────────────────
-
-test("allocation console renders — either pending lines or all-clear message", async ({ page }) => {
-  await page.goto("/purchase/allocation");
-  await expect(page).not.toHaveTitle(/404|500/);
-  await expectNoRuntimeError(page);
-  // Either shows "All order lines are allocated" or the allocation table header
-  const allClear = page.getByText(/nothing to allocate|all order lines are allocated/i);
-  const table    = page.getByRole("table");
-  await expect(allClear.or(table)).toBeVisible();
-});
-
-test("allocation console shows Allocate button for pending lines", async ({ page }) => {
-  await page.goto("/purchase/allocation");
-  await expectNoRuntimeError(page);
-  // If there are pending lines, the Allocate button is visible
-  const allocateBtn = page.getByRole("button", { name: /allocate/i }).first();
-  const allClear = page.getByText(/nothing to allocate|all order lines are allocated/i);
-  await expect(allocateBtn.or(allClear)).toBeVisible();
-});
+// ── Allocation console — UI removed. Backend actions + Prisma models
+//    remain as safe scaffolding; only the /purchase/allocation route is
+//    gone. Dye-lot allocation logic is still covered at the module
+//    level in tests/kernel/concurrency/stock-issue.test.ts and the
+//    mixed-lot integration test in tests/integration/.
 
 // ── Make (cut & stitch) ───────────────────────────────────────────────────────
 

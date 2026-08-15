@@ -37,7 +37,6 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Product Catalog",    href: "/products",            icon: Package },
       { label: "Purchase & Vendors", href: "/purchase",            icon: Truck   },
-      { label: "Allocate Stock",     href: "/purchase/allocation", icon: Boxes   },
       { label: "Stock & Dye Lots",   href: "/inventory",           icon: Boxes   },
     ],
   },
