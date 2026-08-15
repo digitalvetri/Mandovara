@@ -68,7 +68,16 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
       });
       if (!res.ok || !res.data) { setError(res.error ?? "Could not convert lead"); return; }
       onClose();
-      router.push(`/clients/${res.data.clientId}` as Route);
+      // Send the user straight to the newly-created project with a
+      // `?wizard=schedule-visit` flag that auto-opens the Schedule
+      // Visit sheet on landing. That turns "convert + capture project
+      // details + schedule measurement" into one continuous flow.
+      // Falls back to the client page if no project was created (rare —
+      // usually only on re-conversion of an already-converted lead).
+      const target: Route = res.data.projectId
+        ? (`/projects/${res.data.projectId}?wizard=schedule-visit` as Route)
+        : (`/clients/${res.data.clientId}` as Route);
+      router.push(target);
     });
   }
 

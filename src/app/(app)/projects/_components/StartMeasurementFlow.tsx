@@ -8,8 +8,15 @@
 //
 // Kept as one client component so the server page.tsx can stay a plain
 // Server Component and pass a fully-resolved NextAction down as data.
+//
+// URL wizard flags (post-conversion continuous flow, spec-detail §4):
+//   ?wizard=schedule-visit → auto-opens the Schedule Visit sheet on
+//     mount. ConvertLeadModal redirects here so users don't have to
+//     hunt for "what's next" after converting a lead.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import type { Route } from "next";
 import { NextActionCard } from "./NextActionCard";
 import { OpenOnPhoneModal } from "./OpenOnPhoneModal";
 import { RoomSetupSheet } from "./RoomSetupSheet";
@@ -23,9 +30,28 @@ interface Props {
 }
 
 export function StartMeasurementFlow({ projectId, action, currentUserId }: Props) {
+  const router     = useRouter();
+  const pathname   = usePathname();
+  const params     = useSearchParams();
   const [showQr, setShowQr] = useState(false);
   const [needsRoomsOpen, setNeedsRoomsOpen] = useState(false);
   const [scheduleVisitOpen, setScheduleVisitOpen] = useState(false);
+
+  // Post-conversion wizard entry: land here from ConvertLeadModal with
+  // ?wizard=schedule-visit and we pop the sheet automatically. Clear
+  // the param afterwards so a page reload doesn't repeat it. A ref
+  // guards against the effect double-firing after the URL replace
+  // triggers a re-render.
+  const wizardFired = useRef(false);
+  useEffect(() => {
+    if (wizardFired.current) return;
+    if (params.get("wizard") !== "schedule-visit") return;
+    wizardFired.current = true;
+    setScheduleVisitOpen(true);
+    const sp = new URLSearchParams(params.toString());
+    sp.delete("wizard");
+    router.replace(`${pathname}${sp.toString() ? `?${sp}` : ""}` as Route);
+  }, [params, pathname, router]);
 
   return (
     <>
