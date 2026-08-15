@@ -1,10 +1,18 @@
 // Stock issue — deducts quantity from StockBalance and appends a StockMove.
-// Used by the Make module (Phase 5) to record fabric issued to a tailor.
-// Uses SELECT FOR UPDATE to serialise concurrent issues for the same lot.
+// Used by the Make module (Phase 5) to record fabric issued to a tailor,
+// and by the Install module for material taken to site. Uses SELECT FOR
+// UPDATE to serialise concurrent issues for the same lot.
+//
+// Returns a ReorderCrossing so the caller can publish `stock.belowReorder`
+// AFTER commit if the SKU dropped through its threshold on this issue.
+// See kernel/inventory/reorder.ts — the doc contract is: caller opens the
+// transaction, calls issueStock inside it, then calls
+// emitBelowReorderIfCrossed(...) after the transaction returns.
 
 import { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import type { TxClient } from "@/kernel/db/transaction";
+import { checkReorderCrossing, type ReorderCrossing } from "./reorder";
 
 export class NegativeStockError extends Error {
   constructor(
@@ -23,16 +31,25 @@ export interface IssueStockParams {
   dyeLot:         string | null;
   quantity:       Decimal;
   rate:           bigint;
+  /**
+   * The StockMove enum type — MAKE for tailor issues, SITE for install
+   * pickups. Required (no default) so the install path can't silently log
+   * as MAKE.
+   */
+  type:           "ISSUE_TO_MAKE" | "ISSUE_TO_SITE";
   refType:        string;   // "MAKE_JOB" | "INSTALL" | "TEST"
   refId:          string;
   createdById:    string;
   occurredAt:     Date;
 }
 
-export async function issueStock(tx: TxClient, params: IssueStockParams): Promise<void> {
+export async function issueStock(
+  tx: TxClient,
+  params: IssueStockParams,
+): Promise<ReorderCrossing> {
   const {
     organizationId, colourwayId, dyeLot, quantity,
-    rate, refType, refId, createdById, occurredAt,
+    rate, type, refType, refId, createdById, occurredAt,
   } = params;
 
   const lotFilter =
@@ -65,7 +82,7 @@ export async function issueStock(tx: TxClient, params: IssueStockParams): Promis
       organizationId,
       colourwayId,
       dyeLot,
-      type: "ISSUE_TO_MAKE",
+      type,
       quantity,
       rate,
       refType,
@@ -79,4 +96,7 @@ export async function issueStock(tx: TxClient, params: IssueStockParams): Promis
     where: { id: locked[0]!.id },
     data: { quantity: { decrement: quantity } },
   });
+
+  // Signed applied delta: an issue is outward, so netDelta = −quantity.
+  return checkReorderCrossing(tx, colourwayId, quantity.negated());
 }

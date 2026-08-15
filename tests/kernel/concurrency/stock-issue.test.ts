@@ -79,6 +79,7 @@ describe("stock issue - 50 parallel issues never oversell", () => {
               dyeLot: null,
               quantity: PER_ISSUE,
               rate: 500_00n,
+              type: "ISSUE_TO_MAKE",
               refType: "TEST",
               refId: `test-issue-${i}`,
               createdById: A.userId,

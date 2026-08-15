@@ -21,6 +21,10 @@ import { scoped } from "@/kernel/db/scoped";
 import { prisma } from "@/kernel/db/client";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { bus } from "@/kernel/events/bus";
+import {
+  checkReorderCrossing,
+  emitBelowReorderIfCrossed,
+} from "@/kernel/inventory/reorder";
 import { devContext } from "@/lib/dev-context";
 import { adjustStockSchema, setReorderLevelSchema } from "./schema";
 
@@ -43,7 +47,7 @@ export async function adjustStock(input: unknown): Promise<ActionResult<{ id: st
   const db = scoped(ctx);
   const cw = await db.colourway.findUnique({
     where:  { id: d.colourwayId },
-    select: { id: true, sellUnit: true, reorderLevel: true, isActive: true },
+    select: { id: true, sellUnit: true, isActive: true },
   });
   if (!cw) return { ok: false, error: "Product not found" };
   if (!cw.isActive) return { ok: false, error: "Product is inactive" };
@@ -53,7 +57,7 @@ export async function adjustStock(input: unknown): Promise<ActionResult<{ id: st
   const ratePaise = typeof d.ratePaise === "bigint" ? d.ratePaise
                   : d.ratePaise ? BigInt(d.ratePaise) : 0n;
 
-  const { moveId, newOnHand, wasHealthy, isNowLow } = await withTransaction(async (tx: TxClient) => {
+  const { moveId, crossing } = await withTransaction(async (tx: TxClient) => {
     // Compound unique key requires string, not string|null, at the TS
     // layer even though PG accepts NULL. Fall back to findFirst.
     const existing = await tx.stockBalance.findFirst({
@@ -112,36 +116,21 @@ export async function adjustStock(input: unknown): Promise<ActionResult<{ id: st
       });
     }
 
-    // Compute the SKU's total on-hand (across dye lots) to decide the
-    // low-stock crossing. Read AFTER the upsert.
-    const allLots = await tx.stockBalance.findMany({
-      where:  { colourwayId: cw.id },
-      select: { quantity: true },
-    });
-    const totalOnHand = allLots.reduce((s, b) => s + Number(b.quantity), 0);
-    const reorder = cw.reorderLevel == null ? null : Number(cw.reorderLevel);
-    const wasHealthy = reorder == null || (totalOnHand - Number(deltaDec)) > reorder;
-    const isNowLow   = reorder != null && totalOnHand <= reorder;
-
-    return { moveId: move.id, newOnHand: String(totalOnHand), wasHealthy, isNowLow };
+    // Signed applied delta = deltaDec (positive = inward, negative = outward).
+    const crossing = await checkReorderCrossing(tx, cw.id, deltaDec);
+    return { moveId: move.id, crossing };
   });
 
   // Fire the event AFTER commit — bus handlers create notifications.
-  if (wasHealthy && isNowLow) {
-    await bus.publish({
-      type:         "stock.belowReorder",
-      orgId:        ctx.orgId,
-      actorId:      ctx.userId,
-      occurredAt:   new Date(),
-      productId:    cw.id,
-      warehouseId:  "",              // legacy shape — kept for handler compatibility
-      currentQty:   newOnHand,
-      reorderLevel: String(cw.reorderLevel ?? 0),
-    });
-  }
+  await emitBelowReorderIfCrossed({
+    orgId:       ctx.orgId,
+    actorId:     ctx.userId,
+    colourwayId: cw.id,
+    crossing,
+  });
 
   revalidatePath("/inventory");
-  return { ok: true, data: { id: moveId, newOnHand } };
+  return { ok: true, data: { id: moveId, newOnHand: crossing.currentQty } };
 }
 
 export async function setReorderLevel(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -166,7 +155,9 @@ export async function setReorderLevel(input: unknown): Promise<ActionResult<{ id
   });
 
   // If the new threshold puts current on-hand at/below it, fire the
-  // low-stock event so the notification lands.
+  // low-stock event so the notification lands. This is NOT a "crossing"
+  // (quantity didn't move) so it doesn't use checkReorderCrossing —
+  // setting a threshold above current stock always notifies.
   if (d.level != null) {
     const bals = await prisma.stockBalance.findMany({
       where:  { colourwayId: d.colourwayId },
