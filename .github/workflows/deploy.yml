@@ -1,0 +1,75 @@
+name: Deploy to Coolify
+
+# Chains after the CI workflow — only deploys when typecheck, lint,
+# tests and build all pass on main. Coolify's own webhook endpoint
+# would deploy immediately on push without any gate, which risks
+# shipping broken code. Going through Actions keeps CI gating intact.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: ["main"]
+    types: [completed]
+
+jobs:
+  deploy:
+    name: Trigger Coolify deployment
+    runs-on: ubuntu-latest
+    # Only fire when CI succeeded. The workflow_run trigger fires on
+    # both success and failure — we filter here.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: POST /api/v1/deploy?uuid=...
+        env:
+          COOLIFY_URL:      ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN:    ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+          COMMIT_SHA:       ${{ github.event.workflow_run.head_sha }}
+          COMMIT_MSG:       ${{ github.event.workflow_run.head_commit.message }}
+        run: |
+          set -euo pipefail
+          echo "→ Triggering Coolify deploy for $COMMIT_SHA"
+          echo "  $COMMIT_MSG" | head -1
+
+          # Ask Coolify to pull + rebuild. force=true tells it to build
+          # from source even if the image cache says nothing changed —
+          # cheap when nothing did, and closes the "why isn't my change
+          # showing?" class of confusion.
+          RESPONSE=$(curl -sS -f -X POST \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$COOLIFY_APP_UUID&force=true" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN")
+
+          echo "→ Coolify response:"
+          echo "$RESPONSE"
+
+          # Extract the deployment UUID so the workflow log doubles as
+          # a permalink to the build.
+          DEP=$(echo "$RESPONSE" | python3 -c 'import sys, json; print(json.load(sys.stdin)["deployments"][0]["deployment_uuid"])')
+          echo "→ Deployment queued: $DEP"
+          echo "→ Log URL: $COOLIFY_URL/project/p118chljg5wzdas0f2a8hm0y/environment/production/application/$COOLIFY_APP_UUID/deployment/$DEP"
+
+      - name: Wait for deploy to finish
+        env:
+          COOLIFY_URL:   ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          set -euo pipefail
+          # Poll the application-status endpoint until it settles.
+          # Docker rebuild typically 2-4 min on cached layers; hard cap
+          # at 15 min so a wedged build fails the workflow instead of
+          # hanging forever.
+          END=$(( $(date +%s) + 900 ))
+          while [ "$(date +%s)" -lt "$END" ]; do
+            STATUS=$(curl -sS -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              "$COOLIFY_URL/api/v1/applications/$COOLIFY_APP_UUID" \
+              | python3 -c 'import sys, json; print(json.load(sys.stdin)["status"])')
+            echo "[$(date +%H:%M:%S)] status=$STATUS"
+            case "$STATUS" in
+              running:*|exited:*) echo "→ Deploy settled: $STATUS"; exit 0 ;;
+              *)                  sleep 20 ;;
+            esac
+          done
+          echo "✗ Deploy did not settle within 15 minutes"
+          exit 1
