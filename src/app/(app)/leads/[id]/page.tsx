@@ -6,7 +6,7 @@ import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
 import { listQuotationsForClient } from "@/modules/quotations/queries";
 import { QuotationsInlineTable } from "@/components/data/QuotationsInlineTable";
-import { LEAD_SOURCES, BUDGET_RANGES } from "@/modules/leads/schema";
+import { LEAD_SOURCES } from "@/modules/leads/schema";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
 import { LeadFollowUpForm } from "../_components/LeadFollowUpForm";
@@ -27,8 +27,6 @@ const SOURCE_OPTIONS = LEAD_SOURCES.map((s) => ({
   value: s,
   label: SOURCE_LABEL[s] ?? s,
 }));
-
-const BUDGET_OPTIONS = BUDGET_RANGES.map((r) => ({ value: r.value, label: r.label }));
 
 export default async function LeadDetailPage({
   params,
@@ -60,9 +58,9 @@ export default async function LeadDetailPage({
   const createdDate = lead.createdAt.toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
   });
-  const budgetDisplay = lead.budgetMax ? formatINR(lead.budgetMax) : "";
-  const budgetLabel = lead.budgetRangeSlug
-    ? (BUDGET_RANGES.find((r) => r.value === lead.budgetRangeSlug)?.label ?? lead.budgetRangeSlug)
+  const budgetDisplayStr = lead.budgetMax ? formatINR(lead.budgetMax) : "";
+  const budgetEditStr = lead.budgetMax != null
+    ? String(Number(lead.budgetMax) / 100)
     : "";
   const isConverted = lead.convertedClientId != null;
 
@@ -119,11 +117,10 @@ export default async function LeadDetailPage({
             email={lead.email ?? ""}
             source={lead.source}
             sourceLabel={SOURCE_LABEL[lead.source] ?? lead.source}
-            budgetRange={lead.budgetRangeSlug ?? ""}
-            budgetLabel={budgetLabel}
+            budgetDisplayStr={budgetDisplayStr}
+            budgetEditStr={budgetEditStr}
             requirement={lead.requirement ?? ""}
             sourceOptions={SOURCE_OPTIONS}
-            budgetOptions={BUDGET_OPTIONS}
             isConverted={isConverted}
           />
 
@@ -216,10 +213,16 @@ export default async function LeadDetailPage({
               At a glance
             </div>
             <dl className="space-y-3 text-[13px]">
-              <Row k="Expected value" v={budgetLabel || budgetDisplay || "—"} />
+              <Row k="Estimated budget" v={budgetDisplayStr || "—"} />
               <Row k="Source" v={SOURCE_LABEL[lead.source] ?? lead.source} />
               <Row k="Owner" v={lead.ownerName} />
               <Row k="Created" v={createdDate} />
+              {lead.siteAddress && (
+                <div>
+                  <dt className="text-text-dim mb-1">Site address</dt>
+                  <dd className="text-text whitespace-pre-wrap leading-snug">{lead.siteAddress}</dd>
+                </div>
+              )}
             </dl>
           </div>
 
