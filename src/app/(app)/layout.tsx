@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SidebarShell } from "@/components/layout/SidebarShell";
-import { CommandPalette } from "@/components/search/CommandPalette";
 import { devContext } from "@/lib/dev-context";
 import { prisma } from "@/kernel/db/client";
 
@@ -34,7 +33,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="md:pl-[240px] pt-[60px]">
         <div className="w-full px-4 sm:px-6 md:px-8 xl:px-10">{children}</div>
       </main>
-      <CommandPalette />
     </div>
   );
 }

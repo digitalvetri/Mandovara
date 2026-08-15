@@ -4,10 +4,11 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
-import { Menu, Search, LogOut, CalendarDays } from "lucide-react";
+import { Menu, LogOut, CalendarDays } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ThemeToggle";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 
 interface Props {
   userName: string;
@@ -34,12 +35,6 @@ function initials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2) || "?";
-}
-
-function openSearch() {
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true, bubbles: true }),
-  );
 }
 
 export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
@@ -99,22 +94,8 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
       {/* ── Right panel: search + actions + user ── */}
       <div className="flex-1 flex items-center gap-2 px-4 md:px-5 min-w-0">
 
-        {/* Search pill */}
-        <button
-          type="button"
-          onClick={openSearch}
-          title="Search — Ctrl K"
-          aria-label="Open command palette"
-          className="flex items-center gap-2.5 h-[38px] flex-1 max-w-[440px] px-3.5 rounded-[10px] text-left bg-surface border border-rule hover:border-accent/40 transition-all group"
-        >
-          <Search size={13.5} strokeWidth={1.8} className="shrink-0 text-text-dim" />
-          <span className="flex-1 text-[12.5px] text-text-dim truncate">
-            Search projects, clients, designs…
-          </span>
-          <kbd className="hidden sm:inline-flex items-center text-[9.5px] px-1.5 py-[3px] rounded-[5px] text-text-dim bg-surface-2 border border-rule">
-            Ctrl K
-          </kbd>
-        </button>
+        {/* Inline global search */}
+        <GlobalSearch />
 
         <div className="flex-1" />
 
