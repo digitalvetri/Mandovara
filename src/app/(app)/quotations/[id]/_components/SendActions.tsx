@@ -62,27 +62,27 @@ export function SendActions({
   }
 
   return (
-    <div className="rounded-[14px] bg-surface border border-rule p-4 mb-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mr-1">
+    <div className="rounded-[14px] bg-surface border border-rule p-5 mb-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="text-[13px] text-text-dim font-medium mr-1">
           Send to client
         </div>
 
         {mailtoHref ? (
           <a
             href={mailtoHref}
-            className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule px-3 py-1.5 text-[12px] text-text hover:border-gold hover:text-gold transition-colors"
+            className="inline-flex items-center gap-2 rounded-[9px] border border-rule px-4 py-2.5 text-[13.5px] text-text hover:border-gold hover:text-gold transition-colors"
           >
-            <Mail size={13} />
+            <Mail size={15} />
             Email
-            <ExternalLink size={10} className="opacity-60" />
+            <ExternalLink size={12} className="opacity-60" />
           </a>
         ) : (
           <span
-            className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule/50 px-3 py-1.5 text-[12px] text-text-faint cursor-not-allowed"
+            className="inline-flex items-center gap-2 rounded-[9px] border border-rule/50 px-4 py-2.5 text-[13.5px] text-text-faint cursor-not-allowed"
             title="Client has no email on file"
           >
-            <Mail size={13} /> Email
+            <Mail size={15} /> Email
           </span>
         )}
 
@@ -90,25 +90,25 @@ export function SendActions({
           href={waHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule px-3 py-1.5 text-[12px] text-text hover:border-gold hover:text-gold transition-colors"
+          className="inline-flex items-center gap-2 rounded-[9px] border border-rule px-4 py-2.5 text-[13.5px] text-text hover:border-gold hover:text-gold transition-colors"
         >
-          <MessageCircle size={13} />
+          <MessageCircle size={15} />
           WhatsApp
-          <ExternalLink size={10} className="opacity-60" />
+          <ExternalLink size={12} className="opacity-60" />
         </a>
 
         <button
           type="button"
           onClick={copyLink}
-          className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule px-3 py-1.5 text-[12px] text-text-dim hover:text-text hover:border-gold transition-colors"
+          className="inline-flex items-center gap-2 rounded-[9px] border border-rule px-4 py-2.5 text-[13.5px] text-text-dim hover:text-text hover:border-gold transition-colors"
         >
-          {copied ? <Check size={13} className="text-good" /> : <Copy size={13} />}
+          {copied ? <Check size={15} className="text-good" /> : <Copy size={15} />}
           {copied ? "Copied" : "Copy link"}
         </button>
 
-        <div className="ml-auto flex items-center gap-3 text-[10.5px] text-text-dim">
-          <span className="tabular">
-            To: <span className="text-text">{clientName}</span>
+        <div className="ml-auto flex items-center gap-3 text-[13px] text-text-dim">
+          <span>
+            To: <span className="text-text font-medium">{clientName}</span>
             {clientEmail ? ` · ${clientEmail}` : ""}
             {" · "}<span className="tabular">{clientMobile}</span>
           </span>
@@ -116,7 +116,7 @@ export function SendActions({
       </div>
 
       {status === "DRAFT" && (
-        <div className="mt-2 text-[10.5px] text-text-faint">
+        <div className="mt-3 text-[12.5px] text-text-faint">
           Tip: mark the quotation as SENT after you fire the link — the client-side
           view uses that to reset overdue reminders.
         </div>

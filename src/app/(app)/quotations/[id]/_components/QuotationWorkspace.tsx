@@ -3,20 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Save } from "lucide-react";
-import { StatusPill } from "../../_components/StatusPill";
-import { StatusChanger } from "../../_components/StatusChanger";
 import { updateQuotationLines } from "@/modules/quotations/actions";
 import type { EditLine } from "./QuotePreviewA4";
 import type { SerializedQuotation } from "../_types";
 import {
   SELL_UNITS, UNIT_SHORT, newKey, INPUT, INPUT_SM,
-  fmtRupee, lineAmt, computeTotals, initLines,
-  TRow, PreviewPanel,
+  fmtRupee, lineAmt, computeTotals, initLines, TRow,
 } from "./workspace-helpers";
 
 export function QuotationWorkspace({
   quotation,
-  canApprove,
+  canApprove: _canApprove,
 }: {
   quotation: SerializedQuotation;
   canApprove: boolean;
@@ -76,208 +73,215 @@ export function QuotationWorkspace({
   }
 
   return (
-    <div
-      className="flex -mx-4 sm:-mx-6 md:-mx-8 xl:-mx-10 border-t border-rule"
-      style={{ height: "calc(100svh - 90px)", overflow: "hidden" }}
-    >
-      {/* ── LEFT: Line editor ─────────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
+    <div className="rounded-[18px] bg-surface border border-rule overflow-hidden">
 
-        {/* Status strip */}
-        <div className="flex items-center justify-between gap-3 px-5 h-11 border-b border-rule bg-surface shrink-0">
-          <div className="flex items-center gap-2.5">
-            <StatusPill status={quotation.status} />
-            {quotation.revision > 0 && <span className="text-[11px] text-text-dim tabular">R{quotation.revision}</span>}
-            <span className="text-[11px] text-text-dim hidden sm:inline">
-              · <span className="tabular">{lines.length} line{lines.length !== 1 ? "s" : ""}</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {saveErr && <span className="text-[11px] text-fault truncate max-w-[180px]">{saveErr}</span>}
-            {saved && !saving && !saveErr && <span className="text-[11px] text-solid">Saved ✓</span>}
-            {isDraft && (
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-1.5 h-[30px] px-3 rounded-[7px] text-[12px] font-medium text-white transition-colors disabled:opacity-60"
-                style={{ background: saving ? "#5A9A95" : "linear-gradient(135deg, #2BA89A 0%, #1A8A7E 100%)" }}
-              >
-                <Save size={12} strokeWidth={2.2} />
-                {saving ? "Saving…" : "Save Lines"}
-              </button>
-            )}
-            <StatusChanger id={quotation.id} current={quotation.status} canApprove={canApprove} />
+      {/* ── Section header ────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4 px-7 py-4 border-b border-rule">
+        <div>
+          <div className="text-[14px] font-semibold text-text">Line Items</div>
+          <div className="text-[12.5px] text-text-dim mt-0.5">
+            {lines.length} line{lines.length !== 1 ? "s" : ""}
           </div>
         </div>
-
-        {/* Scrollable lines area */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 pt-4 pb-2">
-          <table className="w-full text-[12px] border-collapse" style={{ minWidth: "680px" }}>
-            <thead>
-              <tr className="text-[10px] uppercase tracking-[0.11em] text-text-dim border-b border-rule">
-                <th className="text-left pb-2 pr-2 w-[30px]">#</th>
-                <th className="text-left pb-2 pr-2">Description / Room</th>
-                <th className="text-right pb-2 pr-2 w-[68px]">Qty</th>
-                <th className="text-left pb-2 pr-2 w-[76px]">Unit</th>
-                <th className="text-right pb-2 pr-2 w-[90px]">Rate ₹</th>
-                <th className="text-right pb-2 pr-2 w-[56px]">GST %</th>
-                <th className="text-right pb-2 pr-2 w-[56px]">Disc %</th>
-                <th className="text-right pb-2 w-[90px]">Amount</th>
-                {isDraft && <th className="w-[32px]" />}
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l, idx) => {
-                const { amount } = lineAmt(l);
-                return (
-                  <tr key={l._key} className="border-b border-rule/40 group align-top">
-                    <td className="py-1.5 pr-2 pt-2">
-                      <span className="tabular text-text-dim text-[11px]">{idx + 1}</span>
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      {isDraft ? (
-                        <div className="space-y-1">
-                          <input
-                            type="text"
-                            value={l.description}
-                            placeholder="Item description…"
-                            onChange={(e) => update(l._key, { description: e.target.value })}
-                            className={INPUT}
-                          />
-                          <input
-                            type="text"
-                            value={l.roomLabel}
-                            placeholder="Room (optional)"
-                            onChange={(e) => update(l._key, { roomLabel: e.target.value })}
-                            className={INPUT_SM}
-                          />
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="text-text">{l.description}</div>
-                          {l.roomLabel && <div className="text-[11px] text-text-dim mt-0.5">{l.roomLabel}</div>}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2 pt-2">
-                      {isDraft ? (
-                        <input type="number" min="0" step="any" value={l.quantity}
-                          onChange={(e) => update(l._key, { quantity: e.target.value })}
-                          className={`${INPUT} text-right`} />
-                      ) : (
-                        <span className="tabular block text-right">{l.quantity}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2 pt-2">
-                      {isDraft ? (
-                        <select value={l.unit} onChange={(e) => update(l._key, { unit: e.target.value })}
-                          className={`${INPUT} px-1.5 pr-0`}>
-                          {SELL_UNITS.map((u) => <option key={u} value={u}>{UNIT_SHORT[u]}</option>)}
-                        </select>
-                      ) : (
-                        <span className="text-text-dim">{UNIT_SHORT[l.unit] ?? l.unit}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2 pt-2">
-                      {isDraft ? (
-                        <input type="number" min="0" step="any" value={l.rate}
-                          onChange={(e) => update(l._key, { rate: e.target.value })}
-                          className={`${INPUT} text-right`} />
-                      ) : (
-                        <span className="tabular block text-right">₹{l.rate}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2 pt-2">
-                      {isDraft ? (
-                        <input type="number" min="0" max="28" step="0.5" value={l.gstRate}
-                          onChange={(e) => update(l._key, { gstRate: e.target.value })}
-                          className={`${INPUT} text-right`} />
-                      ) : (
-                        <span className="tabular block text-right">{l.gstRate}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-2 pt-2">
-                      {isDraft ? (
-                        <input type="number" min="0" max="100" step="any" value={l.discountPct}
-                          onChange={(e) => update(l._key, { discountPct: e.target.value })}
-                          className={`${INPUT} text-right`} />
-                      ) : (
-                        <span className="tabular block text-right">{l.discountPct}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pt-2 text-right">
-                      <span className="tabular font-medium text-text">{fmtRupee(amount)}</span>
-                    </td>
-                    {isDraft && (
-                      <td className="py-1.5 pt-2 pl-1">
-                        <button
-                          type="button"
-                          onClick={() => removeLine(l._key)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 flex items-center justify-center rounded-[5px] text-text-dim hover:text-fault hover:bg-fault/10"
-                        >
-                          <Trash2 size={12} strokeWidth={2} />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {isDraft && (
+        {isDraft && (
+          <div className="flex items-center gap-2.5 shrink-0">
+            {saveErr && (
+              <span className="text-[12.5px] text-fault max-w-[200px] truncate">{saveErr}</span>
+            )}
+            {saved && !saving && !saveErr && (
+              <span className="text-[12.5px] text-solid">Saved ✓</span>
+            )}
             <button
               type="button"
-              onClick={addLine}
-              className="mt-3 flex items-center gap-1.5 h-8 px-3 rounded-[7px] text-[12px] text-text-dim hover:text-[#2BA89A] border border-dashed border-rule hover:border-[#2BA89A] transition-colors"
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 h-9 px-5 rounded-[9px] text-[13px] font-medium text-white transition-colors disabled:opacity-60"
+              style={{ background: saving ? "#5A9A95" : "linear-gradient(135deg, #2BA89A 0%, #1A8A7E 100%)" }}
             >
-              <Plus size={13} strokeWidth={2} />
-              Add line
+              <Save size={13} strokeWidth={2.2} />
+              {saving ? "Saving…" : "Save Lines"}
             </button>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
-        {/* Totals footer */}
-        <div className="border-t border-rule bg-surface px-5 py-3 shrink-0">
-          <div className="flex items-end justify-between gap-4">
-            {isDraft && (
-              <div className="flex items-center gap-2">
-                <label className="text-[10px] text-text-dim uppercase tracking-[0.1em]">Supply state</label>
-                <input
-                  type="text"
-                  maxLength={2}
-                  value={posCode}
-                  onChange={(e) => setPosCode(e.target.value.toUpperCase())}
-                  className="h-6 w-10 px-1.5 rounded-[4px] border border-rule bg-transparent text-[11px] tabular text-text text-center outline-none focus:border-[#2BA89A] transition-colors"
-                />
-                <span className="text-[10px] text-text-dim">{isIntraState ? "· intra-state" : "· inter-state"}</span>
-              </div>
+      {/* ── Table ─────────────────────────────────────────────────────── */}
+      <div className="px-7 pt-6 pb-4 overflow-x-auto">
+        <table className="w-full text-[13.5px] border-collapse" style={{ minWidth: "760px" }}>
+          <thead>
+            <tr className="text-[11px] uppercase tracking-[0.1em] text-text-dim border-b-2 border-rule">
+              <th className="text-left pb-3 pr-3 w-[44px]">#</th>
+              <th className="text-left pb-3 pr-4">Description / Room</th>
+              <th className="text-right pb-3 pr-3 w-[80px]">Qty</th>
+              <th className="text-left pb-3 pr-3 w-[90px]">Unit</th>
+              <th className="text-right pb-3 pr-3 w-[112px]">Rate (₹)</th>
+              <th className="text-right pb-3 pr-3 w-[70px]">GST %</th>
+              <th className="text-right pb-3 pr-3 w-[88px]">Discount %</th>
+              <th className="text-right pb-3 w-[112px]">Amount</th>
+              {isDraft && <th className="w-[44px]" />}
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((l, idx) => {
+              const { amount } = lineAmt(l);
+              return (
+                <tr key={l._key} className="border-b border-rule/50 group">
+                  <td className="py-5 pr-3 align-top">
+                    <span className="tabular text-text-dim text-[12.5px] mt-1.5 block">{idx + 1}</span>
+                  </td>
+                  <td className="py-5 pr-4 align-top">
+                    {isDraft ? (
+                      <div className="space-y-2.5">
+                        <input
+                          type="text"
+                          value={l.description}
+                          placeholder="Item description…"
+                          onChange={(e) => update(l._key, { description: e.target.value })}
+                          className={INPUT}
+                        />
+                        <input
+                          type="text"
+                          value={l.roomLabel}
+                          placeholder="Room (optional)"
+                          onChange={(e) => update(l._key, { roomLabel: e.target.value })}
+                          className={INPUT_SM}
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-[14.5px] text-text font-medium leading-snug">
+                          {l.description}
+                        </div>
+                        {l.roomLabel && (
+                          <div className="text-[12.5px] text-text-dim mt-1.5">{l.roomLabel}</div>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-5 pr-3 align-top">
+                    {isDraft ? (
+                      <input type="number" min="0" step="any" value={l.quantity}
+                        onChange={(e) => update(l._key, { quantity: e.target.value })}
+                        className={`${INPUT} text-right`} />
+                    ) : (
+                      <span className="tabular block text-right text-[14px] mt-1">{l.quantity}</span>
+                    )}
+                  </td>
+                  <td className="py-5 pr-3 align-top">
+                    {isDraft ? (
+                      <select value={l.unit} onChange={(e) => update(l._key, { unit: e.target.value })}
+                        className={`${INPUT} px-2`}>
+                        {SELL_UNITS.map((u) => <option key={u} value={u}>{UNIT_SHORT[u]}</option>)}
+                      </select>
+                    ) : (
+                      <span className="text-[13.5px] text-text-dim mt-1 block">
+                        {UNIT_SHORT[l.unit] ?? l.unit}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-5 pr-3 align-top">
+                    {isDraft ? (
+                      <input type="number" min="0" step="any" value={l.rate}
+                        onChange={(e) => update(l._key, { rate: e.target.value })}
+                        className={`${INPUT} text-right`} />
+                    ) : (
+                      <span className="tabular block text-right text-[14px] mt-1">₹{l.rate}</span>
+                    )}
+                  </td>
+                  <td className="py-5 pr-3 align-top">
+                    {isDraft ? (
+                      <input type="number" min="0" max="28" step="0.5" value={l.gstRate}
+                        onChange={(e) => update(l._key, { gstRate: e.target.value })}
+                        className={`${INPUT} text-right`} />
+                    ) : (
+                      <span className="tabular block text-right text-[14px] mt-1">{l.gstRate}%</span>
+                    )}
+                  </td>
+                  <td className="py-5 pr-3 align-top">
+                    {isDraft ? (
+                      <input type="number" min="0" max="100" step="any" value={l.discountPct}
+                        onChange={(e) => update(l._key, { discountPct: e.target.value })}
+                        className={`${INPUT} text-right`} />
+                    ) : (
+                      <span className="tabular block text-right text-[14px] mt-1">{l.discountPct}%</span>
+                    )}
+                  </td>
+                  <td className="py-5 align-top text-right">
+                    <span className="tabular font-semibold text-[15px] text-text mt-1 block">
+                      {fmtRupee(amount)}
+                    </span>
+                  </td>
+                  {isDraft && (
+                    <td className="py-5 align-top pl-2">
+                      <button
+                        type="button"
+                        onClick={() => removeLine(l._key)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity mt-1 h-8 w-8 flex items-center justify-center rounded-[6px] text-text-dim hover:text-fault hover:bg-fault/10"
+                      >
+                        <Trash2 size={14} strokeWidth={2} />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {isDraft && (
+          <button
+            type="button"
+            onClick={addLine}
+            className="mt-5 flex items-center gap-2 h-10 px-5 rounded-[8px] text-[13px] text-text-dim hover:text-accent border border-dashed border-rule hover:border-accent transition-colors"
+          >
+            <Plus size={14} strokeWidth={2} />
+            Add line
+          </button>
+        )}
+      </div>
+
+      {/* ── Totals ────────────────────────────────────────────────────── */}
+      <div className="border-t border-rule bg-surface px-7 py-6">
+        <div className="flex items-start justify-between gap-8 flex-wrap">
+          {isDraft && (
+            <div className="flex flex-col gap-2.5 pt-1">
+              <label className="text-[11.5px] uppercase tracking-[0.1em] text-text-dim">
+                Place of supply (state code)
+              </label>
+              <input
+                type="text"
+                maxLength={2}
+                value={posCode}
+                onChange={(e) => setPosCode(e.target.value.toUpperCase())}
+                className="h-10 w-16 px-3 rounded-[7px] border border-rule bg-transparent text-[14px] tabular text-text text-center outline-none focus:border-accent transition-colors"
+              />
+              <span className="text-[12.5px] text-text-dim">
+                {isIntraState ? "Intra-state — CGST + SGST" : "Inter-state — IGST"}
+              </span>
+            </div>
+          )}
+          <div className="ml-auto space-y-3.5 min-w-[280px]">
+            <TRow k="Taxable amount" v={totals.taxable} />
+            {isIntraState ? (
+              <>
+                <TRow k="CGST" v={totals.cgst} />
+                <TRow k="SGST" v={totals.sgst} />
+              </>
+            ) : (
+              <TRow k="IGST" v={totals.igst} />
             )}
-            <div className="ml-auto space-y-1.5 text-[12px] min-w-[220px]">
-              <TRow k="Taxable" v={totals.taxable} />
-              {isIntraState ? (
-                <><TRow k="CGST" v={totals.cgst} /><TRow k="SGST" v={totals.sgst} /></>
-              ) : (
-                <TRow k="IGST" v={totals.igst} />
-              )}
-              {Math.abs(totals.roundOff) > 0.004 && <TRow k="Round-off" v={totals.roundOff} />}
-              <div className="pt-1.5 border-t border-rule flex justify-between items-baseline">
-                <span className="font-semibold text-text text-[12px]">Grand Total</span>
-                <span className="font-display text-[20px] font-semibold text-text tabular">{fmtRupee(totals.total)}</span>
-              </div>
+            {Math.abs(totals.roundOff) > 0.004 && (
+              <TRow k="Round-off" v={totals.roundOff} />
+            )}
+            <div className="pt-4 border-t-2 border-rule flex justify-between items-baseline gap-8">
+              <span className="font-semibold text-[15px] text-text">Total (incl. GST)</span>
+              <span className="font-display text-[30px] font-semibold text-text tabular">
+                {fmtRupee(totals.total)}
+              </span>
             </div>
           </div>
         </div>
       </div>
-
-      {/* ── RIGHT: Live HTML preview ────────────────────────────── */}
-      <PreviewPanel
-        quotation={quotation}
-        lines={lines}
-        totals={totals}
-        isIntraState={isIntraState}
-      />
     </div>
   );
 }

@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/Topbar";
-import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { getQuotation, type QuotationDetail } from "@/modules/quotations/queries";
+import { QuotationHeader } from "./_components/QuotationHeader";
 import { QuotationWorkspace } from "./_components/QuotationWorkspace";
-import { SendActions } from "./_components/SendActions";
 import type { SerializedQuotation } from "./_types";
 
 export const dynamic = "force-dynamic";
@@ -74,19 +73,10 @@ export default async function QuotationDetailPage({
   return (
     <>
       <Topbar
-        title={q.number}
-        eyebrow={`${q.clientName} · ${q.clientMobile} · ${formatDate(q.date)} → valid until ${formatDate(q.validUntil)}`}
+        title={serialized.number}
+        eyebrow={serialized.projectName}
       />
-      <SendActions
-        quotationId={serialized.id}
-        quotationNumber={serialized.number}
-        clientName={serialized.clientName}
-        clientMobile={serialized.clientMobile}
-        clientEmail={serialized.clientEmail}
-        totalStr={serialized.totalStr}
-        validUntilIso={serialized.validUntil}
-        status={serialized.status}
-      />
+      <QuotationHeader quotation={serialized} canApprove={canApprove} />
       <QuotationWorkspace quotation={serialized} canApprove={canApprove} />
     </>
   );
