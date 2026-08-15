@@ -7,7 +7,7 @@
 
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve } from "node:path";
 
 function step(label: string, cmd: string): void {
   console.log(`\n▶ ${label}`);
