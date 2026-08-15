@@ -1,10 +1,27 @@
+// Invoicing landing page — redesigned to match the reference:
+//   ┌ Invoices · N shown             + New Invoice
+//   ├ 4 KPI tiles
+//   ├ single search
+//   └ one-line invoice rows
+//
+// Filter chips (status, sort) still live in URL params, driven by
+// InvoiceFilters — kept as a thin secondary row so the header stays
+// clean. The "+ New Invoice" button routes to /orders because in
+// Mandovara's model an invoice is always minted from an Order (via
+// CreateInvoiceButton on the orders page).
+
+import Link from "next/link";
+import type { Route } from "next";
+import { Plus } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
-import { listInvoices } from "@/modules/invoices/queries";
+import { getInvoiceKpis, listInvoices } from "@/modules/invoices/queries";
 import { INVOICE_STATUSES, type InvoiceStatus } from "@/modules/invoices/schema";
 import { InvoiceFilters } from "./_components/InvoiceFilters";
-import { InvoicesTable } from "./_components/InvoicesTable";
+import { InvoiceKpiCards } from "./_components/InvoiceKpiCards";
+import { InvoicesList } from "./_components/InvoicesList";
+import { InvoiceSearchBar } from "./_components/InvoiceSearchBar";
 
 export const dynamic = "force-dynamic";
 
@@ -21,24 +38,49 @@ export default async function InvoicingPage({
   const params = await searchParams;
   const ctx = await devContext();
 
-  const q = params.q?.trim();
+  const q      = params.q?.trim();
   const status = normaliseStatus(params.status);
-  const page = parsePositiveInt(params.page) ?? 1;
-  const sort = (params.sort as "recent" | "oldest" | "total" | "duesoon" | undefined) ?? "recent";
+  const page   = parsePositiveInt(params.page) ?? 1;
+  const sort   = (params.sort as "recent" | "oldest" | "total" | "duesoon" | undefined) ?? "recent";
 
-  const { rows, total, pageSize } = await listInvoices(ctx, {
-    ...(q != null && { search: q }),
-    status, page, sort,
-  });
+  const [{ rows, total, pageSize }, kpis] = await Promise.all([
+    listInvoices(ctx, {
+      ...(q != null && { search: q }),
+      status, page, sort,
+    }),
+    getInvoiceKpis(ctx),
+  ]);
 
   return (
     <>
-      <Topbar
-        title="Invoicing & GST"
-        eyebrow={`${total} invoice${total === 1 ? "" : "s"} · ${eyebrowFor(status, q)}`}
-      />
+      <Topbar title="" eyebrow="" />
+
+      {/* ── Header ──────────────────────────────────────────── */}
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <div>
+          <h1 className="font-display text-[28px] font-semibold leading-none text-text">Invoices</h1>
+          <div className="mt-1 text-[11.5px] text-text-dim tabular-nums">
+            {total} {total === 1 ? "shown" : "shown"}
+          </div>
+        </div>
+        <Link
+          href={"/orders" as Route}
+          className="inline-flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-[12.5px] font-semibold text-ink transition-colors hover:bg-gold-strong"
+        >
+          <Plus size={13} strokeWidth={2.4} />
+          New Invoice
+        </Link>
+      </div>
+
+      {/* ── KPI tiles ───────────────────────────────────────── */}
+      <InvoiceKpiCards kpis={kpis} />
+
+      {/* ── Search + filter row ─────────────────────────────── */}
+      <InvoiceSearchBar />
       <InvoiceFilters />
-      <InvoicesTable rows={rows} />
+
+      {/* ── Rows ────────────────────────────────────────────── */}
+      <InvoicesList rows={rows} />
       <Pager page={page} pageSize={pageSize} total={total} />
     </>
   );
@@ -55,13 +97,4 @@ function parsePositiveInt(v: string | undefined): number | null {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 1) return null;
   return Math.floor(n);
-}
-function eyebrowFor(status: string, q: string | undefined): string {
-  const bits: string[] = [];
-  bits.push(status === "OUTSTANDING" ? "outstanding"
-          : status === "ALL"          ? "all statuses"
-          : status === "PARTIALLY_PAID" ? "partially paid"
-          : status.toLowerCase());
-  if (q) bits.push(`matching "${q}"`);
-  return bits.join(" · ");
 }

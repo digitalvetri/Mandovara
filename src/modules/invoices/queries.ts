@@ -167,6 +167,55 @@ export async function listInvoices(
   return { rows, total, page, pageSize };
 }
 
+// ── Redesign — KPI tiles on the invoicing landing page ──
+// One aggregate roundtrip that covers everything the header tiles need,
+// so the page loader stays one Promise.all wide instead of five.
+export interface InvoiceKpis {
+  taxInvoiceCount: number;
+  invoicedNet: bigint;      // sum of taxable amount (excl. GST) on ACTIVE tax invoices
+  invoicedGross: bigint;    // sum of total on ACTIVE tax invoices
+  outstanding: bigint;      // total - advanceAdjusted - receiptAllocations, only >0
+  creditNoteCount: number;
+}
+
+export async function getInvoiceKpis(ctx: RequestContext): Promise<InvoiceKpis> {
+  requirePermission(ctx, "invoice.view");
+  const db = scoped(ctx);
+
+  const [taxInvoices, creditNotes, allocations] = await Promise.all([
+    db.invoice.findMany({
+      where:  { status: { notIn: ["CANCELLED", "DRAFT"] }, type: "TAX" },
+      select: { id: true, total: true, taxableAmount: true, advanceAdjusted: true },
+    }),
+    db.invoice.count({ where: { type: "CREDIT_NOTE", status: { not: "CANCELLED" } } }),
+    db.receiptAllocation.groupBy({
+      by: ["invoiceId"],
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const allocMap = new Map(allocations.map((a) => [a.invoiceId, a._sum.amount ?? 0n]));
+
+  let invoicedNet   = 0n;
+  let invoicedGross = 0n;
+  let outstanding   = 0n;
+  for (const inv of taxInvoices) {
+    invoicedNet   += inv.taxableAmount;
+    invoicedGross += inv.total;
+    const paid = allocMap.get(inv.id) ?? 0n;
+    const rem  = computeOutstanding(inv.total, inv.advanceAdjusted, paid);
+    if (rem > 0n) outstanding += rem;
+  }
+
+  return {
+    taxInvoiceCount: taxInvoices.length,
+    invoicedNet,
+    invoicedGross,
+    outstanding,
+    creditNoteCount: creditNotes,
+  };
+}
+
 export async function getInvoice(
   ctx: RequestContext,
   id: string,
