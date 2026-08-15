@@ -17,6 +17,7 @@ import type { PickerRow } from "./picker-types";
 const querySchema = z.object({
   q:       z.string().trim().max(120).optional(),
   brandId: z.string().min(20).max(64).optional(),
+  family:  z.string().trim().max(50).optional(),
   limit:   z.number().int().positive().max(50).default(25),
 });
 
@@ -25,7 +26,7 @@ export async function searchColourwaysForPicker(input: unknown): Promise<PickerR
   requirePermission(ctx, "catalog.view");
   const parsed = querySchema.safeParse(input ?? {});
   if (!parsed.success) return [];
-  const { q, brandId, limit } = parsed.data;
+  const { q, brandId, family, limit } = parsed.data;
 
   const db = scoped(ctx);
   const where: Record<string, unknown> = { isActive: true };
@@ -39,6 +40,7 @@ export async function searchColourwaysForPicker(input: unknown): Promise<PickerR
     ];
   }
   if (brandId) where["collection"] = { brandId };
+  if (family)  where["family"] = family;
 
   const designs = await db.design.findMany({
     where,
@@ -46,7 +48,7 @@ export async function searchColourwaysForPicker(input: unknown): Promise<PickerR
     orderBy: { name: "asc" },
     select: {
       id: true, name: true, family: true, hsn: true, gstRate: true,
-      collection: { select: { brand: { select: { name: true } } } },
+      collection: { select: { name: true, brand: { select: { name: true } } } },
       colourways: {
         where: cw,
         take:  4,
@@ -72,18 +74,19 @@ export async function searchColourwaysForPicker(input: unknown): Promise<PickerR
     for (const c of d.colourways) {
       const rate = c.prices[0]?.amount ?? 0n;
       rows.push({
-        colourwayId: c.id,
-        designId:    d.id,
-        displayName: `${d.name} — ${c.colourName}`,
-        brandName:   d.collection.brand.name,
-        code:        c.code,
-        sellUnit:    c.sellUnit,
-        hsn:         d.hsn,
-        gstRate:     Number(d.gstRate),
-        family:      d.family,
-        ratePaise:   rate.toString(),
-        hex:         c.hex,
-        imageUrl:    c.imageKey,
+        colourwayId:    c.id,
+        designId:       d.id,
+        displayName:    `${d.name} — ${c.colourName}`,
+        brandName:      d.collection.brand.name,
+        collectionName: d.collection.name,
+        code:           c.code,
+        sellUnit:       c.sellUnit,
+        hsn:            d.hsn,
+        gstRate:        Number(d.gstRate),
+        family:         d.family,
+        ratePaise:      rate.toString(),
+        hex:            c.hex,
+        imageUrl:       c.imageKey,
       });
     }
   }

@@ -3,16 +3,17 @@
 // export async functions.
 
 export interface PickerRow {
-  colourwayId:  string;
-  designId:     string;
-  displayName:  string;
-  brandName:    string;
-  code:         string;
-  sellUnit:     string;
-  hsn:          string;
-  gstRate:      number;
-  family:       string;
-  ratePaise:    string;
-  hex:          string | null;
-  imageUrl:     string | null;
+  colourwayId:     string;
+  designId:        string;
+  displayName:     string;
+  brandName:       string;
+  collectionName?: string;
+  code:            string;
+  sellUnit:        string;
+  hsn:             string;
+  gstRate:         number;
+  family:          string;
+  ratePaise:       string;
+  hex:             string | null;
+  imageUrl:        string | null;
 }
