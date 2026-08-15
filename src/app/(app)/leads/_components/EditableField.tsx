@@ -150,9 +150,11 @@ export function EditableField({
       <div className="flex items-start gap-2 min-w-0 py-1 px-1 -mx-1">
         {icon && <span className="mt-0.5 text-text-dim shrink-0">{icon}</span>}
         <div className="flex-1 min-w-0">
-          <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-0.5">
-            {label}
-          </div>
+          {size !== "lg" && (
+            <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-0.5">
+              {label}
+            </div>
+          )}
           <div className={`${titleCls} truncate ${isEmpty ? "text-text-faint" : ""}`}>
             {isEmpty ? "—" : displayText}
           </div>
@@ -170,9 +172,11 @@ export function EditableField({
     >
       {icon && <span className="mt-0.5 text-text-dim shrink-0">{icon}</span>}
       <div className="flex-1 min-w-0">
-        <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-0.5">
-          {label}
-        </div>
+        {size !== "lg" && (
+          <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-0.5">
+            {label}
+          </div>
+        )}
         <div className={`${titleCls} truncate ${isEmpty ? "text-text-faint" : ""}`}>
           {isEmpty ? placeholder : displayText}
         </div>
