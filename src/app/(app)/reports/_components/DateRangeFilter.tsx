@@ -22,8 +22,8 @@ export function DateRangeFilter() {
 
   function push(f: string, t: string) {
     const next = new URLSearchParams(params.toString());
-    f ? next.set("from", f) : next.delete("from");
-    t ? next.set("to",   t) : next.delete("to");
+    if (f) next.set("from", f); else next.delete("from");
+    if (t) next.set("to",   t); else next.delete("to");
     const qs = next.toString();
     startTr(() => router.push(qs ? `/reports?${qs}` : "/reports"));
   }
