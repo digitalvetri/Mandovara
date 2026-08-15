@@ -45,7 +45,6 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
     section: "Delivery",
     items: [
       { label: "Sales Orders & Dispatch", href: "/orders",       icon: Send      },
-      { label: "Project Pipeline",        href: "/projects",     icon: Briefcase },
       { label: "Measurements",            href: "/measurements", icon: Ruler     },
       { label: "Make (Cut & Stitch)",     href: "/make",         icon: Scissors  },
       { label: "Installation",            href: "/install",      icon: Wrench    },
@@ -137,7 +136,7 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
             </div>
             {section.items.map((item) => (
               <NavRow
-                key={item.href}
+                key={item.label}
                 href={item.href}
                 label={item.label}
                 Icon={item.icon}
@@ -189,13 +188,12 @@ function NavRow({ href, label, Icon, active }: { href: string; label: string; Ic
           : "text-sidebar-dim hover:bg-sidebar-hover hover:text-sidebar-text",
       ].join(" ")}
     >
-      {active && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
-          style={{ background: "#2BA89A" }}
-        />
-      )}
+      {/* Always rendered — opacity swap avoids server/client child-count mismatch */}
+      <span
+        aria-hidden
+        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
+        style={{ background: "#2BA89A" }}
+      />
       <Icon size={15} strokeWidth={1.6} className="shrink-0" />
       <span className="truncate">{label}</span>
     </Link>
