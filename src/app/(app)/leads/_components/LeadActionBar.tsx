@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import type { Route } from "next";
 import {
-  CalendarPlus, StickyNote, MapPin, FileText,
+  CalendarPlus, MapPin, FileText,
   UserCheck, ArrowUpRight, Loader2,
 } from "lucide-react";
 import { changeLeadStage, convertLead } from "@/modules/leads/actions";
@@ -73,12 +73,6 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
         <a href="#follow-up" className={btn("neutral")}>
           <CalendarPlus size={14} strokeWidth={1.75} />
           Follow-up
-        </a>
-
-        {/* Activity — logs a note in the same follow-up section */}
-        <a href="#follow-up" className={btn("neutral")}>
-          <StickyNote size={14} strokeWidth={1.75} />
-          Activity
         </a>
 
         {/* Site Visit — changes stage to VISIT_SCHEDULED */}
