@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { Phone, MessageCircle, ArrowUpRight } from "lucide-react";
+import {
+  Phone, MessageCircle, ArrowUpRight,
+  PencilLine, RefreshCw, BellPlus, UserCheck, Trash2,
+} from "lucide-react";
 import type { LeadRow } from "@/modules/leads/queries";
 import { SOURCE_LABEL } from "@/modules/leads/schema";
+import { deleteLead } from "@/modules/leads/actions";
+import { MoreMenu, type MenuItem } from "@/components/data/MoreMenu";
 import { StatusPill } from "./StatusPill";
 
 // ── constants ────────────────────────────────────────────────────
@@ -42,6 +47,25 @@ function waHref(mobile: string): string {
   const d = mobile.replace(/\D/g, "");
   const num = d.startsWith("91") && d.length === 12 ? d : `91${d.slice(-10)}`;
   return `https://wa.me/${num}`;
+}
+
+function leadMenuItems(r: LeadRow): MenuItem[] {
+  const isTerminal = r.stage === "WON" || r.stage === "LOST";
+  return [
+    { key: "edit",      label: "Edit",            icon: PencilLine, href: `/leads/${r.id}/edit` },
+    { key: "status",    label: "Change Status",    icon: RefreshCw,  href: `/leads/${r.id}` },
+    { key: "followup",  label: "Add Follow-up",    icon: BellPlus,   href: `/leads/${r.id}` },
+    ...(!isTerminal ? [{ key: "convert", label: "Convert to Client", icon: UserCheck, href: `/leads/${r.id}` } as MenuItem] : []),
+    {
+      key:          "delete",
+      label:        "Delete Lead",
+      icon:         Trash2,
+      danger:       true,
+      separator:    true,
+      confirm:      "Permanently delete this lead? This cannot be undone.",
+      onClick:      () => void deleteLead(r.id),
+    },
+  ];
 }
 
 // ── component ────────────────────────────────────────────────────
@@ -98,8 +122,6 @@ export function LeadsTable({
           >
             {/* ── Identity + meta ──────────────────────────────── */}
             <div className="flex-1 min-w-0">
-
-              {/* Name · Status · Priority — most important, reads left to right */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[14px] font-semibold text-text leading-snug">
                   {r.name}
@@ -112,17 +134,14 @@ export function LeadsTable({
                 )}
               </div>
 
-              {/* Mobile · City · Source — enquiry context only */}
               <div className="flex items-center gap-2 mt-1 text-[12px] text-text-dim leading-tight flex-wrap">
                 <span className="font-data tabular tracking-tight">{fmtMobile(r.mobile)}</span>
-
                 {r.city && (
                   <>
                     <Sep />
                     <span>{r.city}</span>
                   </>
                 )}
-
                 <Sep />
                 <span className="inline-flex items-center gap-1.5">
                   {sourceDot && (
@@ -168,12 +187,12 @@ export function LeadsTable({
               </a>
               <Link
                 href={`/leads/${r.id}` as Route}
-                onClick={(e) => e.stopPropagation()}
-                className="ml-1.5 h-8 px-3 rounded-[7px] text-[12px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
+                className="ml-1 h-7 px-2.5 rounded-[7px] text-[12px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
               >
                 Details
                 <ArrowUpRight size={12} strokeWidth={2} />
               </Link>
+              <MoreMenu items={leadMenuItems(r)} />
             </div>
           </div>
         );

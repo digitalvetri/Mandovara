@@ -335,6 +335,19 @@ export async function convertLead(
   } catch (e) { return dbError(e); }
 }
 
+export async function deleteLead(id: string): Promise<ActionResult> {
+  const ctx = await devContext();
+  requirePermission(ctx, "lead.delete");
+  const db = scoped(ctx);
+  try {
+    await db.lead.delete({ where: { id } });
+    revalidatePath("/leads");
+    return { ok: true };
+  } catch (e) {
+    return dbError(e);
+  }
+}
+
 // ── helpers ──────────────────────────────────────────────────────────
 
 function zodError<T>(err: z.ZodError): ActionResult<T> {

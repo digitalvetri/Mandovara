@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { Phone, MessageCircle, ArrowUpRight, Briefcase } from "lucide-react";
+import {
+  Phone, MessageCircle, ArrowUpRight, Briefcase,
+  PencilLine, BellPlus, FolderPlus, Trash2,
+} from "lucide-react";
 import type { ClientRow } from "@/modules/clients/queries";
+import { deleteClient } from "@/modules/clients/actions";
+import { MoreMenu, type MenuItem } from "@/components/data/MoreMenu";
 
 const TYPE_LABEL: Record<string, string> = {
   HOMEOWNER: "Homeowner", ARCHITECT: "Architect",
@@ -22,7 +27,6 @@ const TYPE_STYLE: Record<string, string> = {
   DEALER:            "bg-warn/12 text-warn",
 };
 
-
 function fmtMobile(m: string): string {
   const d = m.replace(/^\+91/, "").replace(/\D/g, "");
   return d.length === 10 ? `${d.slice(0, 5)} ${d.slice(5)}` : m.replace("+91", "");
@@ -36,6 +40,27 @@ function waHref(mobile: string): string {
 
 function Sep() {
   return <span className="text-text-faint/60 select-none">·</span>;
+}
+
+function clientMenuItems(r: ClientRow): MenuItem[] {
+  const confirmMsg = r.projectCount > 0
+    ? `This client has ${r.projectCount} project${r.projectCount > 1 ? "s" : ""} and cannot be deleted.`
+    : "Permanently delete this client? This cannot be undone.";
+
+  return [
+    { key: "edit",      label: "Edit",          icon: PencilLine,  href: `/clients/${r.id}/edit` },
+    { key: "followup",  label: "Add Follow-up",  icon: BellPlus,    href: `/clients/${r.id}` },
+    { key: "project",   label: "New Project",    icon: FolderPlus,  href: `/projects/new?clientId=${r.id}` },
+    {
+      key:       "delete",
+      label:     "Delete Client",
+      icon:      Trash2,
+      danger:    true,
+      separator: true,
+      confirm:   confirmMsg,
+      onClick:   r.projectCount > 0 ? undefined : () => void deleteClient(r.id),
+    },
+  ];
 }
 
 export function ClientsTable({ rows }: { rows: ClientRow[] }) {
@@ -72,8 +97,6 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
           >
             {/* ── Identity ─────────────────────────────────────── */}
             <div className="flex-1 min-w-0">
-
-              {/* Name · Type · Project count */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[14px] font-semibold text-text leading-snug">{r.name}</span>
                 <span className={`text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${typeStyle}`}>
@@ -87,7 +110,6 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
                 )}
               </div>
 
-              {/* Mobile · Email · City */}
               <div className="flex items-center gap-2 mt-1 text-[12px] text-text-dim leading-tight flex-wrap">
                 <span className="font-data tabular tracking-tight">{fmtMobile(r.mobile)}</span>
                 {r.email && (
@@ -103,7 +125,6 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
                   </>
                 )}
               </div>
-
             </div>
 
             {/* ── Owner avatar ─────────────────────────────────── */}
@@ -138,12 +159,12 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
               </a>
               <Link
                 href={`/clients/${r.id}` as Route}
-                onClick={(e) => e.stopPropagation()}
-                className="ml-1.5 h-8 px-3 rounded-[7px] text-[12px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
+                className="ml-1 h-7 px-2.5 rounded-[7px] text-[12px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
               >
                 View
                 <ArrowUpRight size={12} strokeWidth={2} />
               </Link>
+              <MoreMenu items={clientMenuItems(r)} />
             </div>
           </div>
         );

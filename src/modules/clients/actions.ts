@@ -143,6 +143,26 @@ export async function setClientStatus(input: unknown): Promise<ActionResult<{ id
   return { ok: true, data: { id } };
 }
 
+export async function deleteClient(id: string): Promise<ActionResult> {
+  const ctx = await devContext();
+  requirePermission(ctx, "client.delete");
+  const db = scoped(ctx);
+  const projectCount = await db.project.count({ where: { clientId: id } });
+  if (projectCount > 0) {
+    return { ok: false, error: `Cannot delete — this client has ${projectCount} project${projectCount > 1 ? "s" : ""}.` };
+  }
+  try {
+    await db.client.delete({ where: { id } });
+    revalidatePath("/clients");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("Can't reach database server")) {
+      return { ok: false, error: "Database is unavailable." };
+    }
+    throw e;
+  }
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function zodError<T>(err: z.ZodError): ActionResult<T> {

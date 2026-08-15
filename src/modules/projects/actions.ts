@@ -90,6 +90,16 @@ export async function setProjectStatus(input: unknown): Promise<ActionResult<{ i
   return { ok: true, data: { id } };
 }
 
+export async function archiveProject(id: string): Promise<ActionResult> {
+  const ctx = await devContext();
+  requirePermission(ctx, "project.update");
+  const db = scoped(ctx);
+  await db.project.update({ where: { id }, data: { stage: "CANCELLED" } });
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${id}`);
+  return { ok: true };
+}
+
 export async function addMilestone(input: unknown): Promise<ActionResult<{ id: string }>> {
   const ctx = await devContext();
   requirePermission(ctx, "project.update");

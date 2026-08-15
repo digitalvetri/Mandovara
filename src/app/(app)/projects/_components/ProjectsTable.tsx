@@ -1,29 +1,41 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import {
-  MoreHorizontal, ArrowRight, PencilLine, RefreshCw,
+  ArrowRight, PencilLine, RefreshCw,
   BellPlus, FileText, Archive,
 } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import type { ProjectRow } from "@/modules/projects/queries";
+import { archiveProject } from "@/modules/projects/actions";
+import { MoreMenu, type MenuItem } from "@/components/data/MoreMenu";
 import { ProjectStatusPill } from "./StatusPill";
 
-const MENU_ITEMS = [
-  { label: "Edit",             icon: PencilLine, danger: false, href: (id: string) => `/projects/${id}/edit` },
-  { label: "Change Stage",     icon: RefreshCw,  danger: false, href: (_: string) => null },
-  { label: "Add Follow-up",    icon: BellPlus,   danger: false, href: (_: string) => null },
-  { label: "Create Quotation", icon: FileText,   danger: false, href: (id: string) => `/projects/${id}/quote/new` },
-  { label: "Archive",          icon: Archive,    danger: true,  href: (_: string) => null },
-] as const;
+function projectMenuItems(r: ProjectRow): MenuItem[] {
+  const isArchived = r.stage === "CANCELLED" || r.stage === "COMPLETED";
+  return [
+    { key: "edit",     label: "Edit",             icon: PencilLine, href: `/projects/${r.id}/edit` },
+    { key: "stage",    label: "Change Stage",      icon: RefreshCw,  href: `/projects/${r.id}` },
+    { key: "followup", label: "Add Follow-up",     icon: BellPlus,   href: `/projects/${r.id}` },
+    { key: "quote",    label: "Create Quotation",  icon: FileText,   href: `/projects/${r.id}/quote/new` },
+    ...(!isArchived ? [{
+      key:          "archive",
+      label:        "Archive Project",
+      icon:         Archive,
+      danger:       true,
+      separator:    true,
+      confirm:      "Archive this project? It will be marked as Cancelled.",
+      confirmLabel: "Archive",
+      onClick:      () => void archiveProject(r.id),
+    } as MenuItem] : []),
+  ];
+}
 
 export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
   const router = useRouter();
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   if (rows.length === 0) {
     return (
@@ -37,13 +49,6 @@ export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
         </p>
       </div>
     );
-  }
-
-  function toggleMenu(id: string) {
-    setOpenMenu((prev) => (prev === id ? null : id));
-  }
-  function closeMenu() {
-    setTimeout(() => setOpenMenu(null), 120);
   }
 
   return (
@@ -67,7 +72,7 @@ export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
             <span>{r.clientName}</span>
           </div>
 
-          {/* Value · Install date · Owner + action buttons */}
+          {/* Value · Install date · Actions */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-text-dim">
               <span className="tabular font-medium text-text">{formatINR(r.orderValue)}</span>
@@ -79,7 +84,6 @@ export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
               )}
             </div>
 
-            {/* Stopgap: prevent card click from firing */}
             <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
               <Link
                 href={`/projects/${r.id}` as Route}
@@ -87,43 +91,7 @@ export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
               >
                 Details <ArrowRight size={11} strokeWidth={1.75} />
               </Link>
-
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => toggleMenu(r.id)}
-                  onBlur={closeMenu}
-                  className="h-7 w-7 grid place-items-center rounded-[6px] text-text-dim border border-rule hover:text-text hover:bg-surface-2 transition-colors"
-                  aria-label="More actions"
-                >
-                  <MoreHorizontal size={13} strokeWidth={2} />
-                </button>
-                {openMenu === r.id && (
-                  <div className="absolute right-0 top-full mt-1 z-30 w-[188px] rounded-[10px] bg-surface border border-rule shadow-xl py-1">
-                    {MENU_ITEMS.map((item) => {
-                      const href = item.href(r.id);
-                      const cls = [
-                        "flex items-center gap-2.5 w-full px-3 h-8 text-[12.5px] text-left transition-colors hover:bg-surface-hover",
-                        item.danger ? "text-fault" : "text-text",
-                      ].join(" ");
-                      if (href) {
-                        return (
-                          <Link key={item.label} href={href as Route} className={cls}>
-                            <item.icon size={12} strokeWidth={1.75} className={item.danger ? "text-fault" : "text-text-dim"} />
-                            {item.label}
-                          </Link>
-                        );
-                      }
-                      return (
-                        <button key={item.label} type="button" className={cls}>
-                          <item.icon size={12} strokeWidth={1.75} className={item.danger ? "text-fault" : "text-text-dim"} />
-                          {item.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <MoreMenu items={projectMenuItems(r)} />
             </div>
           </div>
         </div>
