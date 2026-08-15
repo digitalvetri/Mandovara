@@ -48,6 +48,8 @@ export interface LeadDetail extends LeadRow {
   nextActionAt: Date | null;
   ownerName: string;
   budgetRangeSlug: string | null;
+  /** Human-readable site address joined from the JSON blob, or null if empty. */
+  siteAddress: string | null;
 }
 
 export interface ListLeadsResult {
@@ -185,6 +187,7 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
 
   const addr = lead.siteAddress as Record<string, unknown> | null;
   const budgetRangeSlug = typeof addr?.budgetRange === "string" ? addr.budgetRange : null;
+  const siteAddressStr = joinAddress(addr);
 
   return {
     id: lead.id, number: lead.number, name: lead.name, mobile: lead.mobile, email: lead.email,
@@ -195,9 +198,20 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
     lostReason: lead.lostReason, nextActionAt: lead.nextActionAt,
     ownerName: owner?.name ?? "—",
     budgetRangeSlug,
+    siteAddress: siteAddressStr,
     city: typeof addr?.city === "string" && addr.city ? addr.city : null,
     priority: typeof addr?.priority === "string" ? addr.priority : null,
   };
+}
+
+// Fold a site-address JSON blob into a single display line, dropping
+// empty parts. Returns null when nothing usable is present.
+function joinAddress(addr: Record<string, unknown> | null): string | null {
+  if (!addr) return null;
+  const parts = ["line1", "line", "street", "area", "city", "state", "pincode", "pin"]
+    .map((k) => addr[k])
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+  return parts.length > 0 ? parts.join(", ") : null;
 }
 
 export interface SalesUserOption {
