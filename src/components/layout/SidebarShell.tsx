@@ -52,8 +52,8 @@ export function SidebarShell({ userName, userRole }: Props) {
           // Mobile: full height from top, 260px wide, slides in/out
           "top-0 w-[272px]",
           open ? "translate-x-0" : "-translate-x-full",
-          // Desktop: always visible, starts below the 60px global topbar
-          "md:top-[60px] md:w-[240px] md:translate-x-0",
+          // Desktop: always visible, starts below the 68px global topbar
+          "md:top-[68px] md:w-[264px] md:translate-x-0",
         ].join(" ")}
       >
         {/* Mobile close button inside the drawer */}

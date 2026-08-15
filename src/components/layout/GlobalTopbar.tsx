@@ -51,22 +51,22 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 h-[60px] flex items-stretch bg-sidebar border-b border-rule">
+    <header className="fixed inset-x-0 top-0 z-40 h-[68px] flex items-stretch bg-sidebar border-b border-rule">
 
-      {/* ── Brand block — 240px, aligns with the sidebar ── */}
+      {/* ── Brand block — 264px, aligns with the wider sidebar ── */}
       <div
         className="hidden md:flex items-center gap-3 shrink-0 px-5 border-r border-rule"
-        style={{ width: "240px" }}
+        style={{ width: "264px" }}
       >
-        <MandovaraLeafIcon size={34} />
+        <MandovaraLeafIcon size={38} />
         <div>
           <div
-            className="text-sidebar-text font-semibold text-[15px] leading-[1.1] tracking-[0.06em]"
+            className="text-sidebar-text font-semibold text-[16.5px] leading-[1.1] tracking-[0.06em]"
             style={{ fontFamily: "'Fraunces', Georgia, serif" }}
           >
             Mandovara
           </div>
-          <div className="text-sidebar-dim text-[8.5px] tracking-[0.22em] mt-[3px] uppercase">
+          <div className="text-sidebar-dim text-[9px] tracking-[0.22em] mt-[3px] uppercase">
             Studio Console
           </div>
         </div>

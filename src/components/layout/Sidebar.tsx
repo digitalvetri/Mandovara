@@ -127,8 +127,8 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 pb-3">
         {NAV.map((section) => (
-          <div key={section.section} className="mb-3">
-            <div className="px-3 mb-1 mt-2 text-[9.5px] uppercase tracking-[0.22em] text-sidebar-dim">
+          <div key={section.section} className="mb-4">
+            <div className="px-3 mb-1.5 mt-2 text-[10.5px] uppercase tracking-[0.22em] text-sidebar-dim">
               {section.section}
             </div>
             {section.items.map((item) => (
@@ -145,16 +145,16 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
       </nav>
 
       {/* Profile + sign-out */}
-      <div className="border-t border-white/[0.08] px-4 py-3">
+      <div className="border-t border-white/[0.08] px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-accent/85 text-[#0B1020] flex items-center justify-center text-[11px] font-semibold tracking-wider shrink-0">
+          <div className="h-9 w-9 rounded-full bg-accent/85 text-[#0B1020] flex items-center justify-center text-[12px] font-semibold tracking-wider shrink-0">
             {initials(userName)}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[12.5px] font-medium truncate text-sidebar-text">
+            <div className="text-[13.5px] font-medium truncate text-sidebar-text">
               {userName}
             </div>
-            <div className="text-[10.5px] text-sidebar-dim truncate">
+            <div className="text-[11px] text-sidebar-dim truncate">
               {ROLE_LABEL[userRole] ?? userRole}
             </div>
           </div>
@@ -163,9 +163,9 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
             onClick={handleSignOut}
             disabled={signing}
             title="Sign out"
-            className="h-7 w-7 rounded-[6px] flex items-center justify-center text-sidebar-dim hover:text-sidebar-text hover:bg-sidebar-hover transition-colors shrink-0 disabled:opacity-40"
+            className="h-8 w-8 rounded-[7px] flex items-center justify-center text-sidebar-dim hover:text-sidebar-text hover:bg-sidebar-hover transition-colors shrink-0 disabled:opacity-40"
           >
-            <LogOut size={14} strokeWidth={1.7} />
+            <LogOut size={15} strokeWidth={1.7} />
           </button>
         </div>
       </div>
@@ -178,8 +178,8 @@ function NavRow({ href, label, Icon, active }: { href: string; label: string; Ic
     <Link
       href={href as Route}
       className={[
-        "relative flex items-center gap-3 h-[32px] px-3 rounded-[6px]",
-        "text-[12.5px] transition-colors",
+        "relative flex items-center gap-3 h-[38px] px-3 rounded-[7px]",
+        "text-[13.5px] transition-colors",
         active
           ? "bg-sidebar-hover text-sidebar-text"
           : "text-sidebar-dim hover:bg-sidebar-hover hover:text-sidebar-text",
@@ -188,10 +188,10 @@ function NavRow({ href, label, Icon, active }: { href: string; label: string; Ic
       {/* Always rendered — opacity swap avoids server/client child-count mismatch */}
       <span
         aria-hidden
-        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
+        className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
         style={{ background: "#2BA89A" }}
       />
-      <Icon size={15} strokeWidth={1.6} className="shrink-0" />
+      <Icon size={17} strokeWidth={1.6} className="shrink-0" />
       <span className="truncate">{label}</span>
     </Link>
   );

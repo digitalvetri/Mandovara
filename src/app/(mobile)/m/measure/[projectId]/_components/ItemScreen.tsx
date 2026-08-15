@@ -7,7 +7,7 @@
 // the offline outbox and resets the form to a fresh clientCuid
 // while keeping the same room.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, PenTool, MapPin, Loader2 } from "lucide-react";
 import { clientCuid, enqueueOutbox } from "@/lib/measure-outbox";
 import {
@@ -34,6 +34,23 @@ const CURTAIN_FAMILIES = new Set(["CURTAIN_FABRIC", "SHEER"]);
 const FLOORING_FAMILIES = new Set(["FLOORING"]);
 const BLIND_FAMILIES = new Set(["BLIND"]);
 
+// Family-aware default unit for the on-screen toggle. Storage is always
+// mm (unit-convert.ts handles the round trip); this only affects what
+// the measurer types. Feet for wall-scale products (wallpaper / flooring
+// / rugs), inches for openings measured with a tape, mm elsewhere.
+const FT_FAMILIES = new Set([
+  "WALLPAPER", "FLOORING", "CARPET_ROLL", "CARPET_TILE", "RUG",
+  "INTERIOR_FILM", "VERTICAL_GARDEN", "MURAL",
+]);
+const IN_FAMILIES = new Set([
+  "CURTAIN_FABRIC", "SHEER", "BLIND", "UPHOLSTERY_FABRIC",
+]);
+function defaultUnitForFamily(family: string): Unit {
+  if (FT_FAMILIES.has(family)) return "ft";
+  if (IN_FAMILIES.has(family)) return "in";
+  return "mm";
+}
+
 function emptyDraft(cuid: string, roomId: string): ItemDraft {
   return {
     clientCuid: cuid, roomId,
@@ -50,12 +67,23 @@ export function ItemScreen({
   projectId, measurementId, rooms, initialItemCount, onRoomAdded,
 }: ItemScreenProps) {
   const [itemCount, setItemCount] = useState(initialItemCount);
-  const [unit, setUnit]           = useState<Unit>("mm");
   const [draft, setDraft]         = useState<ItemDraft>(() => emptyDraft(clientCuid(), rooms[0]?.id ?? ""));
+  const [unit, setUnit]           = useState<Unit>(() => defaultUnitForFamily(draft.family));
   const [showRoom, setShowRoom]   = useState(!draft.roomId);
   const [showPhoto, setShowPhoto] = useState(false);
   const [showSketch, setShowSketch] = useState(false);
   const [saving, setSaving]       = useState(false);
+
+  // Auto-switch the on-screen unit when the family changes AND the
+  // measurer hasn't started typing dimensions yet. Once they've typed
+  // something we leave the unit alone — switching would either lose or
+  // silently convert their input.
+  const unitTouched = useRef(false);
+  useEffect(() => {
+    if (unitTouched.current) return;
+    if (draft.widthMm || draft.heightMm) return;
+    setUnit(defaultUnitForFamily(draft.family));
+  }, [draft.family, draft.widthMm, draft.heightMm]);
 
   const room = useMemo(() => rooms.find((r) => r.id === draft.roomId) ?? null, [rooms, draft.roomId]);
   const needsHeading = CURTAIN_FAMILIES.has(draft.family);
@@ -133,7 +161,7 @@ export function ItemScreen({
             <button
               key={u}
               type="button"
-              onClick={() => setUnit(u)}
+              onClick={() => { unitTouched.current = true; setUnit(u); }}
               className={`min-w-[60px] h-[32px] rounded-[7px] text-[12px] font-medium ${
                 unit === u ? "bg-gold text-ink" : "text-text-dim"
               }`}
