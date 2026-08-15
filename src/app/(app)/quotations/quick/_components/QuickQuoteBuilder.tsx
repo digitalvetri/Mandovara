@@ -12,8 +12,6 @@ import type { Route } from "next";
 import { Plus, Loader2 } from "lucide-react";
 import { formatINR, parseINR } from "@/kernel/money/format";
 import { createQuickQuote } from "@/modules/quotations/quick-actions";
-import type { PickerRow } from "@/modules/quotations/picker-types";
-import { CatalogPicker } from "./CatalogPicker";
 import { LineRow } from "./LineRow";
 import { type LineDraft, emptyLine, runningTotals } from "./line-utils";
 
@@ -31,7 +29,6 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
   const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
   const [validForDays, setValidForDays] = useState<string>("30");
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
-  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -55,21 +52,6 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
   }
   function addLine(): void { setLines((prev) => [...prev, emptyLine()]); }
   function removeLine(i: number): void { setLines((prev) => prev.filter((_, idx) => idx !== i)); }
-
-  function onPick(i: number, row: PickerRow): void {
-    const rateRupees = row.ratePaise === "0" ? "" : (Number(BigInt(row.ratePaise)) / 100).toFixed(2);
-    patch(i, {
-      colourwayId:  row.colourwayId,
-      displayName:  row.displayName,
-      sellUnit:     row.sellUnit,
-      gstRate:      row.gstRate,
-      ratePaise:    row.ratePaise,
-      rateEditable: rateRupees,
-      hex:          row.hex,
-      family:       row.family,
-      label:        (lines[i]?.label ?? "").length > 0 ? lines[i]!.label : row.displayName,
-    });
-  }
 
   function generate(): void {
     setError(null);
@@ -152,7 +134,6 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
               key={l.key}
               line={l}
               onChange={(next) => patch(i, next)}
-              onOpenPicker={() => setPickerIndex(i)}
               {...(lines.length > 1 ? { onRemove: () => removeLine(i) } : {})}
             />
           ))}
@@ -205,12 +186,6 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
         </div>
       </aside>
 
-      {pickerIndex !== null && (
-        <CatalogPicker
-          onPick={(row) => { onPick(pickerIndex, row); }}
-          onClose={() => setPickerIndex(null)}
-        />
-      )}
     </div>
   );
 }
