@@ -6,16 +6,26 @@ PRISMA=/opt/prisma-cli/node_modules/.bin/prisma
 echo "→ Applying pending migrations..."
 "$PRISMA" migrate deploy --schema=/app/prisma/schema.prisma
 
-ORG_COUNT=$(node -e "import('@prisma/client').then(async m=>{const p=new m.PrismaClient();try{process.stdout.write(String(await p.organization.count()))}catch(e){process.stdout.write('-1')}finally{await p.\$disconnect()}})" 2>/dev/null || echo "-1")
+cd /app
 
-if [ "$ORG_COUNT" = "0" ]; then
-  echo "→ DB is empty — running one-time seed..."
-  tsx /app/prisma/seed.ts
-elif [ "$ORG_COUNT" = "-1" ]; then
-  echo "→ Could not read Organization count — skipping seed (server will start and error if truly broken)"
-else
-  echo "→ DB already has $ORG_COUNT organization(s) — skipping seed"
-fi
+echo "→ Checking DB state..."
+CHECK=$(node /app/check-empty.mjs 2>&1) || CHECK="CHECK_FAILED"
+echo "→ check-empty output: [$CHECK]"
+
+case "$CHECK" in
+  "0")
+    echo "→ DB is empty — running one-time seed..."
+    tsx /app/prisma/seed.ts
+    ;;
+  ""|*[!0-9]*)
+    echo "→ Unable to verify DB state — skipping seed for safety."
+    echo "  If this is a fresh deploy, run seed manually via Coolify terminal:"
+    echo "    tsx /app/prisma/seed.ts"
+    ;;
+  *)
+    echo "→ DB already has $CHECK organization(s) — skipping seed"
+    ;;
+esac
 
 echo "→ Starting Next server..."
 exec node server.js

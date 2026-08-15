@@ -14,7 +14,7 @@ const VALID_ROLES: readonly string[] = [
 ];
 
 export async function devLogin(role: string): Promise<{ ok: boolean; error?: string }> {
-  if (process.env["NODE_ENV"] === "production") {
+  if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_DEV_AUTH"] !== "true") {
     return { ok: false, error: "Dev auth disabled in production" };
   }
   if (!VALID_ROLES.includes(role)) {
@@ -41,7 +41,7 @@ export async function devLoginByCredential(
   credential: string,
   password: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (process.env["NODE_ENV"] === "production") {
+  if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_DEV_AUTH"] !== "true") {
     return { ok: false, error: "Dev auth disabled in production" };
   }
 
