@@ -3,6 +3,7 @@ import path from "node:path";
 
 const config: NextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ["@react-pdf/renderer", "canvas"],
   // Standalone output — copies just the files needed to run the server
   // into .next/standalone, so the production Docker image can be tiny
   // (no dev deps, no source, no unused node_modules). Required for
