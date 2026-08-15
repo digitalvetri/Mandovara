@@ -5,60 +5,59 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { FileText, ArrowRight, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import type { QuotationInlineRow } from "@/modules/quotations/queries";
 
 interface QuotationsInlineTableProps {
   rows:  QuotationInlineRow[];
-  seeAllHref?: Route;
-  emptyHint?: string;
-  /** When set, an inline "+ New quotation" chip appears in the header
-   *  next to "See all" so users don't have to detour through the empty
-   *  state or the quotations list to start a new quote. */
+  /** Route for the "New quotation" affordance. When the list is empty
+   *  we show a large centered button; otherwise a small chip in the
+   *  header. Only one button on the page at a time. */
   newHref?: Route;
+  emptyHint?: string;
+  /**
+   * @deprecated "See all" was removed — the quotations module's own
+   * landing page is the canonical list.
+   */
+  seeAllHref?: Route;
 }
 
-export function QuotationsInlineTable({ rows, seeAllHref, emptyHint, newHref }: QuotationsInlineTableProps) {
+export function QuotationsInlineTable({ rows, newHref, emptyHint }: QuotationsInlineTableProps) {
+  const hasRows = rows.length > 0;
   return (
     <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-      <div className="flex items-center justify-between px-6 pt-4 pb-2">
-        <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+      <div className="flex items-center justify-between px-6 pt-5 pb-3">
+        <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-text">
           Quotations
         </div>
-        <div className="flex items-center gap-2">
+        {/* Header chip only when there ARE rows — empty state gets the
+             big centered button instead so users don't see two buttons
+             at once. */}
+        {newHref && hasRows && (
+          <Link
+            href={newHref}
+            className="inline-flex items-center gap-1.5 rounded-full border border-rule px-3.5 py-1.5 text-[11.5px] font-medium text-text-dim hover:border-gold hover:text-gold transition-colors"
+          >
+            <Plus size={11} strokeWidth={2.2} />
+            New quotation
+          </Link>
+        )}
+      </div>
+
+      {!hasRows ? (
+        <div className="px-6 pt-4 pb-8 text-center">
+          <FileText size={20} className="mx-auto mb-2.5 text-text-faint" />
+          <div className="mb-4 text-[13px] text-text-dim">
+            {emptyHint ?? "No quotations yet."}
+          </div>
           {newHref && (
             <Link
               href={newHref}
-              className="inline-flex items-center gap-1 rounded-full border border-rule px-3 py-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim hover:border-gold hover:text-gold"
+              className="inline-flex items-center gap-2 rounded-[10px] bg-gold px-5 py-2.5 text-[13px] font-semibold text-ink hover:bg-gold-strong transition-colors"
             >
-              <Plus size={10} />
+              <Plus size={13} strokeWidth={2.4} />
               New quotation
-            </Link>
-          )}
-          {seeAllHref && (
-            <Link
-              href={seeAllHref}
-              className="inline-flex items-center gap-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim hover:text-gold-strong"
-            >
-              See all <ArrowRight size={11} />
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="px-6 pb-6 pt-2 text-center">
-          <FileText size={18} className="mx-auto mb-2 text-text-faint" />
-          <div className="text-[12.5px] text-text-dim">
-            {emptyHint ?? "No quotations yet."}
-          </div>
-          {seeAllHref && (
-            <Link
-              href={"/quotations/new" as Route}
-              className="mt-3 inline-flex items-center gap-1 rounded-full border border-rule px-3 py-1 text-[10.5px] text-text-dim hover:border-gold hover:text-gold"
-            >
-              + New quotation
             </Link>
           )}
         </div>
