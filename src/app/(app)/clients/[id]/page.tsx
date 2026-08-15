@@ -100,7 +100,11 @@ export default async function ClientDetailPage({
             )}
           </div>
 
-          <QuotationsInlineTable rows={quotations} seeAllHref="/quotations" />
+          <QuotationsInlineTable
+            rows={quotations}
+            seeAllHref="/quotations"
+            newHref="/quotations/new"
+          />
 
           <ClientFollowUpForm clientId={client.id} />
 

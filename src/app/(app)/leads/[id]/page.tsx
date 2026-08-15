@@ -140,10 +140,13 @@ export default async function LeadDetailPage({
             rows={quotations}
             emptyHint={
               isConverted
-                ? "No quotations yet. Use Quick Quote above to create one."
+                ? "No quotations yet. Start one from the button above or with Quick Quote."
                 : "Convert this lead to a client first, then send a quotation."
             }
-            {...(isConverted ? { seeAllHref: "/quotations" as const } : {})}
+            {...(isConverted ? {
+              seeAllHref: "/quotations" as const,
+              newHref:    "/quotations/new" as const,
+            } : {})}
           />
 
           {/* Follow-up & Activity — anchor for the action bar */}
@@ -154,7 +157,7 @@ export default async function LeadDetailPage({
           {/* Timeline */}
           <div className="rounded-[14px] bg-surface border border-rule p-6">
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
-              Follow-ups &amp; activity ({followUps.length})
+              Follow-ups ({followUps.length})
             </div>
             {followUps.length === 0 ? (
               <div className="text-[12.5px] text-text-faint">

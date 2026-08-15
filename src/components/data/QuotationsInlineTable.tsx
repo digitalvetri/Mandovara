@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { FileText, ArrowRight } from "lucide-react";
+import { FileText, ArrowRight, Plus } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import type { QuotationInlineRow } from "@/modules/quotations/queries";
 
@@ -13,23 +13,38 @@ interface QuotationsInlineTableProps {
   rows:  QuotationInlineRow[];
   seeAllHref?: Route;
   emptyHint?: string;
+  /** When set, an inline "+ New quotation" chip appears in the header
+   *  next to "See all" so users don't have to detour through the empty
+   *  state or the quotations list to start a new quote. */
+  newHref?: Route;
 }
 
-export function QuotationsInlineTable({ rows, seeAllHref, emptyHint }: QuotationsInlineTableProps) {
+export function QuotationsInlineTable({ rows, seeAllHref, emptyHint, newHref }: QuotationsInlineTableProps) {
   return (
     <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
       <div className="flex items-center justify-between px-6 pt-4 pb-2">
         <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
           Quotations
         </div>
-        {seeAllHref && (
-          <Link
-            href={seeAllHref}
-            className="inline-flex items-center gap-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim hover:text-gold-strong"
-          >
-            See all <ArrowRight size={11} />
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {newHref && (
+            <Link
+              href={newHref}
+              className="inline-flex items-center gap-1 rounded-full border border-rule px-3 py-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim hover:border-gold hover:text-gold"
+            >
+              <Plus size={10} />
+              New quotation
+            </Link>
+          )}
+          {seeAllHref && (
+            <Link
+              href={seeAllHref}
+              className="inline-flex items-center gap-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim hover:text-gold-strong"
+            >
+              See all <ArrowRight size={11} />
+            </Link>
+          )}
+        </div>
       </div>
 
       {rows.length === 0 ? (
