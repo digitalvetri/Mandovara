@@ -22,14 +22,17 @@ import { startMeasurementAndRedirect } from "@/modules/measurement/start-and-red
 interface Props {
   action: NextAction;
   projectId: string;
-  /** Called with `true` when the action returned needsRooms=true so the
-   *  parent can open the room-setup sheet. */
+  /** Called when startMeasurementRound returns needsRooms=true. */
   onNeedsRooms?: () => void;
   /** Show a "Open on phone" secondary button (QR modal trigger). */
   onOpenOnPhone?: () => void;
+  /** Open the schedule-visit sheet for ENQUIRY-stage projects. */
+  onScheduleVisit?: () => void;
 }
 
-export function NextActionCard({ action, projectId, onNeedsRooms, onOpenOnPhone }: Props) {
+export function NextActionCard({
+  action, projectId, onNeedsRooms, onOpenOnPhone, onScheduleVisit,
+}: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,11 @@ export function NextActionCard({ action, projectId, onNeedsRooms, onOpenOnPhone 
   function fire(): void {
     setError(null);
     if (!action.enabled) return;
+
+    if (action.kind === "SCHEDULE_VISIT" && onScheduleVisit) {
+      onScheduleVisit();
+      return;
+    }
 
     if (action.kind === "START_MEASUREMENT") {
       start(async () => {

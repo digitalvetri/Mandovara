@@ -90,7 +90,7 @@ export default async function ProjectDetailPage({
       {/* ── Body — 2-column grid ────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
-          <StartMeasurementFlow projectId={p.id} action={action} />
+          <StartMeasurementFlow projectId={p.id} action={action} currentUserId={ctx.userId} />
           <MilestonesPanel milestones={milestones} orderValue={p.orderValue} />
           <MeasurementsSection projectId={p.id} rounds={rounds} />
           <CollapsedPanels projectId={p.id} tasks={tasks} siteLogs={siteLogs} />

@@ -66,14 +66,17 @@ export function resolveNextAction(
 
   switch (stage) {
     case "ENQUIRY":
+      // href is set to the project itself but the click is intercepted
+      // by NextActionCard via onScheduleVisit — it opens an inline sheet
+      // that pre-fills the projectId, so no navigation is required.
       return {
         kind:  "SCHEDULE_VISIT",
         label: "Schedule a site visit",
         cta:   "Schedule visit",
-        enabled: hasAny(ctx, ["project.update"]),
-        disabledReason: hasAny(ctx, ["project.update"]) ? null :
+        enabled: hasAny(ctx, ["project.update", "sitelog.create"]),
+        disabledReason: hasAny(ctx, ["project.update", "sitelog.create"]) ? null :
           "Site visits are scheduled by the sales team.",
-        href: `/projects/${id}`,
+        href: null,
       };
 
     case "SITE_VISIT":
@@ -101,7 +104,7 @@ export function resolveNextAction(
         enabled,
         disabledReason: enabled ? null :
           "Quotations are prepared by sales / designers.",
-        href: `/projects/${id}/quotations`,
+        href: `/quotations`,
       };
     }
 
@@ -113,7 +116,7 @@ export function resolveNextAction(
         enabled: hasAny(ctx, ["po.create", "requisition.create"]),
         disabledReason: hasAny(ctx, ["po.create", "requisition.create"]) ? null :
           "Purchase orders are raised by the store team.",
-        href: `/projects/${id}`,
+        href: `/purchase`,
       };
 
     case "PROCUREMENT": {
@@ -125,7 +128,7 @@ export function resolveNextAction(
         enabled,
         disabledReason: enabled ? null :
           "Dye-lot allocation is handled by the store team.",
-        href: `/projects/${id}`,
+        href: `/inventory`,
       };
     }
 
@@ -136,7 +139,7 @@ export function resolveNextAction(
         cta:   "Open make queue",
         enabled: hasAny(ctx, ["make.view"]),
         disabledReason: null,
-        href: `/projects/${id}`,
+        href: `/make`,
         subLine: project.makeInProgress
           ? `${project.makeInProgress.done} of ${project.makeInProgress.total} done`
           : undefined,
@@ -151,7 +154,7 @@ export function resolveNextAction(
         enabled,
         disabledReason: enabled ? null :
           "Installation scheduling is handled by the install team.",
-        href: `/projects/${id}`,
+        href: `/install`,
       };
     }
 
@@ -164,7 +167,7 @@ export function resolveNextAction(
         cta:   "Open snag register",
         enabled: hasAny(ctx, ["install.raiseSnag", "install.view"]),
         disabledReason: null,
-        href: `/projects/${id}`,
+        href: `/install`,
       };
 
     case "COMPLETED":
@@ -174,7 +177,7 @@ export function resolveNextAction(
         cta:   "Send review request",
         enabled: hasAny(ctx, ["client.viewOthers"]),
         disabledReason: null,
-        href: `/projects/${id}`,
+        href: `/clients/${id}`,
       };
 
     case "CANCELLED":
