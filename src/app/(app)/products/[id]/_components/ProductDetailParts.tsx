@@ -5,13 +5,14 @@ import { formatINR } from "@/kernel/money/format";
 // ── HERO ─────────────────────────────────────────────────────────────────────
 
 export function HeroImage({
-  src, hex, alt, isNew, dyeLotHint,
+  src, hex, alt, isNew, dyeLotHint, editor,
 }: {
   src: string | null;
   hex: string | null;
   alt: string;
   isNew: boolean;
   dyeLotHint: string | null;
+  editor?: React.ReactNode;
 }) {
   return (
     <div className="relative aspect-[4/5] rounded-[14px] border border-rule bg-ink overflow-hidden">
@@ -42,6 +43,7 @@ export function HeroImage({
           {dyeLotHint}
         </span>
       )}
+      {editor}
     </div>
   );
 }

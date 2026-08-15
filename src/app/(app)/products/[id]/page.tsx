@@ -15,13 +15,15 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
+import { can } from "@/kernel/rbac/guard";
 import { getProduct } from "@/modules/products/queries";
 import { StatusPill } from "../_components/StatusPill";
 import { CatalogueViewer } from "./_components/CatalogueViewer";
 import { HeroImage, VariantStrip, MiniSpec, PriceBlock, shortUom } from "./_components/ProductDetailParts";
+import { ImageEditor } from "./_components/ImageEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function ProductDetailPage({
 
   const uomShort = shortUom(product.uom);
   const hasDiscount  = product.retail != null && product.mrp != null && product.retail < product.mrp;
+  const canEditImage = can(ctx, "catalog.update");
 
   return (
     <>
@@ -62,6 +65,11 @@ export default async function ProductDetailPage({
             alt={product.name}
             isNew={product.isNew}
             dyeLotHint={product.dyeLotHint}
+            editor={
+              canEditImage
+                ? <ImageEditor colourwayId={product.id} hasImage={!!product.imageKey} />
+                : null
+            }
           />
           {product.siblingColourways.length > 0 && (
             <VariantStrip currentId={product.id} siblings={product.siblingColourways} />
@@ -165,11 +173,6 @@ export default async function ProductDetailPage({
             </div>
           )}
 
-          {/* Read-only banner */}
-          <div className="flex items-start gap-2 rounded-[10px] border border-info/30 bg-info/8 px-3 py-2.5 text-[11.5px] text-text-dim">
-            <Info size={13} className="shrink-0 mt-[2px] text-info" />
-            <span>Read-only for now. Edit via <span className="tabular text-text">scripts/add-catalog-xlsx.ts</span> or the upcoming Colourway editor.</span>
-          </div>
         </aside>
       </div>
     </>
