@@ -61,6 +61,12 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static     ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public           ./public
 
+# Next's tracer misses the generated Prisma client dir (.prisma/) on
+# some pnpm layouts — copy it explicitly. Without this, any require
+# of @prisma/client throws "Cannot find module '.prisma/client/default'".
+COPY --from=build --chown=nextjs:nodejs /app/node_modules/.prisma          ./node_modules/.prisma
+COPY --from=build --chown=nextjs:nodejs /app/node_modules/@prisma/client   ./node_modules/@prisma/client
+
 # The Prisma CLI needs its own binary to run `migrate deploy` at
 # container start. Install it into an isolated sibling dir so it
 # doesn't collide with the pnpm-structured node_modules that came
