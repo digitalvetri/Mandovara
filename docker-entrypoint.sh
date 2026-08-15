@@ -3,6 +3,14 @@ set -e
 
 PRISMA=/opt/prisma-cli/node_modules/.bin/prisma
 
+# Next's tracer misses .prisma/client on pnpm layouts, so any
+# require('@prisma/client') crashes with "Cannot find module
+# '.prisma/client/default'". Regenerate at container start —
+# ~2 seconds, idempotent, guaranteed to sit next to @prisma/client
+# wherever pnpm actually put it.
+echo "→ Regenerating Prisma client (fills in .prisma/client/*)..."
+cd /app && "$PRISMA" generate --schema=/app/prisma/schema.prisma
+
 echo "→ Applying pending migrations..."
 "$PRISMA" migrate deploy --schema=/app/prisma/schema.prisma
 

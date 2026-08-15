@@ -61,13 +61,6 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static     ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public           ./public
 
-# Next's tracer misses the generated Prisma client dir (.prisma/) on
-# pnpm layouts, even with outputFileTracingIncludes — so any
-# `require('@prisma/client')` throws "Cannot find module
-# '.prisma/client/default'". Fix by installing a clean @prisma/client
-# into /app/node_modules ourselves and generating the client against
-# our schema, overwriting whatever the standalone tracer left behind.
-
 # The Prisma CLI needs its own binary to run `migrate deploy` at
 # container start. Install it into an isolated sibling dir so it
 # doesn't collide with the pnpm-structured node_modules that came
@@ -79,14 +72,6 @@ RUN mkdir -p /opt/prisma-cli \
  && npm install --omit=dev --no-audit --no-fund prisma@6.19.0 tsx@4 \
  && ln -s /opt/prisma-cli/node_modules/.bin/tsx /usr/local/bin/tsx \
  && chown -R nextjs:nodejs /opt/prisma-cli
-
-# Install @prisma/client into the app's node_modules (no-save so we
-# don't disturb the standalone package.json) and run `prisma generate`
-# so /app/node_modules/.prisma/client/default.js exists at runtime.
-RUN cd /app \
- && npm install --no-save --omit=dev --no-audit --no-fund @prisma/client@6.19.0 \
- && /opt/prisma-cli/node_modules/.bin/prisma generate --schema=/app/prisma/schema.prisma \
- && chown -R nextjs:nodejs /app/node_modules/.prisma /app/node_modules/@prisma
 
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nextjs:nodejs scripts/check-empty.mjs /app/check-empty.mjs
