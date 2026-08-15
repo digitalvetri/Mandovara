@@ -48,16 +48,10 @@ test("reports page loads all five report sections", async ({ page }) => {
   ).toBeVisible();
 });
 
-// ── WhatsApp ──────────────────────────────────────────────────────────────────
-
-test("whatsapp page loads rules, templates and inbox", async ({ page }) => {
-  await page.goto("/whatsapp");
-  await expect(page).not.toHaveTitle(/404|500/);
-  await expectNoRuntimeError(page);
-  await expect(
-    page.getByText(/automation rules?|templates?|inbox|meta cloud/i).first(),
-  ).toBeVisible();
-});
+// ── WhatsApp Automation UI removed — see commit that dropped
+//    src/app/(app)/whatsapp/. Contact deep-links (wa.me) still exist on
+//    lead/client/order/quotation/invoice/project pages; those are covered
+//    by their own module specs, not here.
 
 // ── Attendance ────────────────────────────────────────────────────────────────
 
