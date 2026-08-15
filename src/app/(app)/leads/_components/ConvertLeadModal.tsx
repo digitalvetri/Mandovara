@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { X, UserCheck, Building2, MapPin, IndianRupee, CalendarDays, ClipboardList, Home } from "lucide-react";
+import { X, UserCheck, Building2, MapPin, IndianRupee, CalendarDays, ClipboardList, Home, Landmark } from "lucide-react";
 import { convertLead } from "@/modules/leads/actions";
 
 const PROJECT_TYPES = ["Residential", "Commercial", "Office", "Retail", "Hospitality", "Other"] as const;
@@ -32,6 +32,12 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
     billingState:      "Tamil Nadu",
     billingPincode:    "",
     billingCountry:    "India",
+    // business details
+    gstin:             "",
+    pan:               "",
+    stateCode:         "33",
+    paymentTermsDays:  "30",
+    creditLimit:       "",
     // project
     projectName:       leadName,
     projectType:       "Residential",
@@ -59,6 +65,11 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
         billingState:      form.billingState.trim() || undefined,
         billingPincode:    form.billingPincode.trim() || undefined,
         billingCountry:    form.billingCountry.trim() || undefined,
+        gstin:             form.gstin.trim() || undefined,
+        pan:               form.pan.trim() || undefined,
+        stateCode:         form.stateCode.trim() || undefined,
+        paymentTermsDays:  form.paymentTermsDays.trim() || undefined,
+        creditLimit:       form.creditLimit.trim() || undefined,
         projectName:       form.projectName.trim(),
         projectType:       form.projectType || undefined,
         siteCity:          form.siteCity.trim() || undefined,
@@ -135,6 +146,59 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
               <div>
                 <label className={lbl}>Country</label>
                 <input value={form.billingCountry} onChange={set("billingCountry")} className={inp} />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-rule" />
+
+          {/* Business Details */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-3">
+              <Landmark size={11} className="text-text-dim" strokeWidth={1.75} />
+              <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">Business Details</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={lbl}>GSTIN</label>
+                <input
+                  value={form.gstin} onChange={set("gstin")}
+                  className={inp} placeholder="27AABCU9603R1ZX"
+                  maxLength={15}
+                />
+              </div>
+              <div>
+                <label className={lbl}>PAN</label>
+                <input
+                  value={form.pan}
+                  onChange={(e) => setForm((f) => ({ ...f, pan: e.target.value.toUpperCase() }))}
+                  className={inp} placeholder="AABCU9603R"
+                  maxLength={10}
+                  style={{ textTransform: "uppercase" }}
+                />
+              </div>
+              <div>
+                <label className={lbl}>State Code</label>
+                <input
+                  value={form.stateCode} onChange={set("stateCode")}
+                  className={inp} placeholder="33"
+                  maxLength={2} inputMode="numeric"
+                />
+              </div>
+              <div>
+                <label className={lbl}>Payment Terms (Days)</label>
+                <input
+                  type="number" min={0} max={365}
+                  value={form.paymentTermsDays} onChange={set("paymentTermsDays")}
+                  className={inp} placeholder="30"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={lbl}><IndianRupee size={10} className="inline mr-1" />Credit Limit (₹)</label>
+                <input
+                  value={form.creditLimit} onChange={set("creditLimit")}
+                  className={inp} placeholder="0 (no credit)" inputMode="numeric"
+                />
               </div>
             </div>
           </div>

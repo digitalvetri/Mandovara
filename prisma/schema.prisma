@@ -747,10 +747,12 @@ model Client {
   mobile         String
   altMobile      String?
   email          String?
-  billingAddress Json
-  priceTier      String     @default("RETAIL")
-  creditLimit    BigInt     @default(0)
-  architectId    String?
+  billingAddress   Json
+  stateCode        String  @default("33")
+  priceTier        String  @default("RETAIL")
+  creditLimit      BigInt  @default(0)
+  paymentTermsDays Int     @default(30)
+  architectId      String?
   ownerId        String?
   notes          String?
   createdAt      DateTime   @default(now())

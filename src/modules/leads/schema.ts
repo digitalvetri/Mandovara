@@ -125,6 +125,12 @@ export const convertLeadSchema = z.object({
   billingState:      z.string().trim().max(100).optional(),
   billingPincode:    z.string().trim().max(10).optional(),
   billingCountry:    z.string().trim().max(100).optional(),
+  // client business details
+  gstin:             z.string().trim().max(15).optional(),
+  pan:               z.string().trim().max(10).optional(),
+  stateCode:         z.string().trim().max(2).optional(),
+  paymentTermsDays:  z.string().trim().optional(),   // string from input, parsed to int in action
+  creditLimit:       z.string().trim().max(30).optional(), // rupees string, converted to paise
   // project (goes to siteAddress JSON)
   projectName:       z.string().trim().min(1).max(200).optional(),
   projectType:       z.string().trim().max(50).optional(),

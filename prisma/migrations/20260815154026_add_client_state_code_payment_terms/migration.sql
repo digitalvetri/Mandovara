@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Client" ADD COLUMN     "paymentTermsDays" INTEGER NOT NULL DEFAULT 30,
+ADD COLUMN     "stateCode" TEXT NOT NULL DEFAULT '33';

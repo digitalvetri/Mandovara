@@ -219,6 +219,7 @@ export async function convertLead(
   const {
     id,
     billingLine1, billingCity, billingState, billingPincode, billingCountry,
+    gstin, pan, stateCode, paymentTermsDays: paymentTermsDaysStr, creditLimit: creditLimitStr,
     projectName: projNameInput, projectType, siteCity, requirement: reqInput, estimatedBudget, expectedStartDate,
   } = parsed.data;
 
@@ -278,18 +279,28 @@ export async function convertLead(
     ...(expectedStartDate && { expectedStartDate }),
   };
 
+  const creditLimitPaise = parseRupeesInput(creditLimitStr) ?? 0n;
+  const paymentTermsDaysInt = paymentTermsDaysStr
+    ? Math.max(0, parseInt(paymentTermsDaysStr, 10) || 30)
+    : 30;
+
   const result = await withTransaction(async (tx: TxClient) => {
     // 1. Allocate and create Client
     const code = await allocateNumber(tx, { orgId: ctx.orgId, series: "CLI", yymm, prefix: "MDV" });
     const client = await tx.client.create({
       data: {
-        organizationId: ctx.orgId,
+        organizationId:  ctx.orgId,
         code,
-        name:           lead.name,
-        mobile:         lead.mobile,
-        email:          lead.email ?? undefined,
-        billingAddress: clientBillingAddress,
-        ownerId:        ctx.userId,
+        name:            lead.name,
+        mobile:          lead.mobile,
+        email:           lead.email ?? undefined,
+        billingAddress:  clientBillingAddress,
+        gstin:           gstin  || undefined,
+        pan:             pan    || undefined,
+        stateCode:       stateCode || "33",
+        creditLimit:     creditLimitPaise,
+        paymentTermsDays: paymentTermsDaysInt,
+        ownerId:         ctx.userId,
       },
       select: { id: true },
     });
