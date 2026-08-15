@@ -6,7 +6,7 @@ import { useTransition, useState } from "react";
 import type { Route } from "next";
 import {
   CalendarPlus, StickyNote, MapPin, FileText,
-  Paperclip, UserCheck, ArrowUpRight, Loader2,
+  UserCheck, ArrowUpRight, Loader2,
 } from "lucide-react";
 import { changeLeadStage, convertLead } from "@/modules/leads/actions";
 import { ConvertLeadModal } from "./ConvertLeadModal";
@@ -110,12 +110,6 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
             Quick Quote
           </button>
         )}
-
-        {/* Documents — scrolls to the documents section */}
-        <a href="#documents" className={btn("neutral")}>
-          <Paperclip size={14} strokeWidth={1.75} />
-          Documents
-        </a>
 
         {/* Convert to Client (unconverted) or Open Client/Project (already converted) */}
         {isConverted ? (
