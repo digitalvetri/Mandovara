@@ -218,7 +218,7 @@ export async function convertLead(
 
   const parsed = convertLeadSchema.safeParse(input);
   if (!parsed.success) return zodError<{ clientId: string; projectId: string | null }>(parsed.error);
-  const { id } = parsed.data;
+  const { id, projectName: projNameInput, projectType, siteCity, requirement: reqInput, estimatedBudget, expectedStartDate } = parsed.data;
 
   const db = scoped(ctx);
   try {
@@ -255,9 +255,18 @@ export async function convertLead(
   }
 
   const addr = lead.siteAddress as Record<string, unknown> | null;
-  const projectName = (typeof addr?.projectName === "string" && addr.projectName)
-    ? addr.projectName
-    : lead.name;
+  const finalName = projNameInput?.trim()
+    || (typeof addr?.projectName === "string" && addr.projectName ? addr.projectName : lead.name);
+
+  // All soft intake fields go into siteAddress JSON — never overload orderValue or expectedInstallAt
+  const projSiteAddr: Record<string, unknown> = {
+    ...(addr ?? {}),
+    ...(projectType       && { projectType }),
+    ...(siteCity          && { city: siteCity }),
+    ...(reqInput          && { requirement: reqInput }),
+    ...(estimatedBudget   && { estimatedBudget }),
+    ...(expectedStartDate && { expectedStartDate }),
+  };
 
   const result = await withTransaction(async (tx: TxClient) => {
     // 1. Allocate and create Client
@@ -287,10 +296,10 @@ export async function convertLead(
         organizationId: ctx.orgId,
         branchId:       branch.id,
         number:         projNumber,
-        name:           projectName,
+        name:           finalName,
         clientId:       client.id,
         stage:          "ENQUIRY",
-        siteAddress:    addr ?? {},
+        siteAddress:    projSiteAddr,
         ownerId:        ctx.userId,
         ...(lead.architectId && { architectId: lead.architectId }),
       },

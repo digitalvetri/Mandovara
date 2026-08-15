@@ -98,6 +98,9 @@ export default async function LeadDetailPage({
         stage={lead.stage}
         convertedClientId={lead.convertedClientId}
         convertedProjectId={convertedProjectId}
+        leadName={lead.name}
+        mobile={lead.mobile}
+        email={lead.email ?? null}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">

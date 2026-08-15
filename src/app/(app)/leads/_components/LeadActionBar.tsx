@@ -9,19 +9,24 @@ import {
   Paperclip, UserCheck, ArrowUpRight, Loader2,
 } from "lucide-react";
 import { changeLeadStage, convertLead } from "@/modules/leads/actions";
+import { ConvertLeadModal } from "./ConvertLeadModal";
 
 interface Props {
   leadId: string;
   stage: string;
   convertedClientId: string | null;
   convertedProjectId: string | null;
+  leadName: string;
+  mobile: string;
+  email: string | null;
 }
 
-export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId }: Props) {
+export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showConvertModal, setShowConvertModal] = useState(false);
 
   const isConverted = convertedClientId != null;
   const isLost = stage === "LOST";
@@ -57,24 +62,6 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
         return;
       }
       router.push(`/quotations/quick?client=${res.data.clientId}` as Route);
-    });
-  }
-
-  function doConvert() {
-    if (busy) return;
-    setError(null);
-    setPendingAction("convert");
-    startTransition(async () => {
-      const res = await convertLead({ id: leadId });
-      if (!res.ok || !res.data) {
-        setError(res.error ?? "Could not convert lead");
-        setPendingAction(null);
-        return;
-      }
-      const dest = res.data.projectId
-        ? `/projects/${res.data.projectId}`
-        : `/clients/${res.data.clientId}`;
-      router.push(dest as Route);
     });
   }
 
@@ -130,7 +117,7 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
           Documents
         </a>
 
-        {/* Convert to Client (unconverted) or Open Project (already converted) */}
+        {/* Convert to Client (unconverted) or Open Client/Project (already converted) */}
         {isConverted ? (
           <Link
             href={(convertedProjectId
@@ -144,13 +131,11 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
         ) : !isLost ? (
           <button
             type="button"
-            onClick={doConvert}
+            onClick={() => setShowConvertModal(true)}
             disabled={busy}
             className={btn("good")}
           >
-            {pendingAction === "convert"
-              ? <Loader2 size={14} className="animate-spin" />
-              : <UserCheck size={14} strokeWidth={1.75} />}
+            <UserCheck size={14} strokeWidth={1.75} />
             Convert to Client
           </button>
         ) : null}
@@ -160,6 +145,15 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
       {error && (
         <p className="mt-2 text-[12px] text-bad">{error}</p>
       )}
+
+      <ConvertLeadModal
+        leadId={leadId}
+        leadName={leadName}
+        mobile={mobile}
+        email={email}
+        open={showConvertModal}
+        onClose={() => setShowConvertModal(false)}
+      />
     </div>
   );
 }

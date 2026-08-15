@@ -49,6 +49,8 @@ export interface ContactRow {
   whatsappOptIn: boolean;
 }
 
+export type ProjectSummaryItem = { id: string; number: string; name: string; stage: string; orderValue: bigint; siteAddress: Record<string, unknown> | null; createdAt: Date };
+
 export interface ClientDetail extends ClientRow {
   pan: string | null;
   altMobile: string | null;
@@ -56,6 +58,7 @@ export interface ClientDetail extends ClientRow {
   billingAddress: Record<string, unknown> | null;
   contacts: ContactRow[];
   ageing: AgeingBuckets;
+  projects: ProjectSummaryItem[];
 }
 
 export interface AgeingBuckets {
@@ -143,8 +146,12 @@ export async function getClient(ctx: RequestContext, id: string): Promise<Client
   });
   if (!row) return null;
 
-  const ageing = await computeAgeing(ctx, id);
+  const [ageing, projectRows] = await Promise.all([
+    computeAgeing(ctx, id),
+    db.project.findMany({ where: { clientId: id }, select: { id: true, number: true, name: true, stage: true, orderValue: true, siteAddress: true, createdAt: true }, orderBy: { createdAt: "desc" } }),
+  ]);
   const addr = row.billingAddress as { city?: string } | null;
+  const projects: ProjectSummaryItem[] = projectRows.map((p) => ({ ...p, siteAddress: p.siteAddress as Record<string, unknown> | null }));
 
   return {
     id: row.id, code: row.code, name: row.name, type: row.type,
@@ -156,10 +163,11 @@ export async function getClient(ctx: RequestContext, id: string): Promise<Client
     city: addr?.city ?? null,
     createdAt: row.createdAt,
     outstanding: ageing.total,
-    projectCount: 0,
-    latestProject: null,
+    projectCount: projects.length,
+    latestProject: projects[0] ? { name: projects[0].name, stage: projects[0].stage, orderValue: projects[0].orderValue, ownerName: "—" } : null,
     contacts: row.contacts,
     ageing,
+    projects,
   };
 }
 
@@ -183,18 +191,10 @@ function buildWhere(q: ListClientsQuery): WhereInput {
 }
 
 function orderFor(sort: ListClientsQuery["sort"]): { [k: string]: "asc" | "desc" } {
-  switch (sort) {
-    case "name":        return { name: "asc" };
-    case "outstanding":
-    case "recent":
-    default:            return { createdAt: "desc" };
-  }
+  return sort === "name" ? { name: "asc" } : { createdAt: "desc" };
 }
 
-interface ProjectSummary {
-  count: number;
-  latest: { name: string; stage: string; orderValue: bigint; ownerName: string } | null;
-}
+type ProjectSummary = { count: number; latest: { name: string; stage: string; orderValue: bigint; ownerName: string } | null };
 
 async function projectsByClient(ctx: RequestContext, clientIds: string[]): Promise<Map<string, ProjectSummary>> {
   if (clientIds.length === 0) return new Map();

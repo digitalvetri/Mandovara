@@ -130,6 +130,12 @@ export const statusChangeSchema = z
 
 export const convertLeadSchema = z.object({
   id: z.string().min(1),
+  projectName:       z.string().trim().min(1).max(200).optional(),
+  projectType:       z.string().trim().max(50).optional(),
+  siteCity:          z.string().trim().max(100).optional(),
+  requirement:       z.string().trim().max(2000).optional(),
+  estimatedBudget:   z.string().trim().max(30).optional(),
+  expectedStartDate: z.string().trim().max(10).optional(),
 });
 
 export type CreateLeadInput   = z.infer<typeof createLeadSchema>;

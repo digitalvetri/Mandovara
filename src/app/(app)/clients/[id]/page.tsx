@@ -11,6 +11,19 @@ import { getClient } from "@/modules/clients/queries";
 import { listQuotationsForClient } from "@/modules/quotations/queries";
 import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 
+const STAGE_LABEL: Record<string, string> = {
+  ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
+  ORDERED: "Ordered", PROCUREMENT: "Procurement", MAKE: "Make",
+  INSTALLATION: "Installation", SNAGGING: "Snagging",
+  COMPLETED: "Completed", CANCELLED: "Cancelled",
+};
+const STAGE_CLS: Record<string, string> = {
+  ENQUIRY: "text-text-dim", MEASUREMENT: "text-info", QUOTATION: "text-accent",
+  ORDERED: "text-gold", PROCUREMENT: "text-heat", MAKE: "text-heat",
+  INSTALLATION: "text-gold", SNAGGING: "text-fault",
+  COMPLETED: "text-good", CANCELLED: "text-text-dim",
+};
+
 export const dynamic = "force-dynamic";
 
 export default async function ClientDetailPage({
@@ -55,6 +68,47 @@ export default async function ClientDetailPage({
               </div>
             ) : (
               <div className="text-[12px] text-text-faint">No billing address on file.</div>
+            )}
+          </div>
+
+          {/* Projects */}
+          <div className="rounded-[14px] bg-surface border border-rule p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+                Projects ({client.projects.length})
+              </div>
+              <Link href={`/projects/new?client=${client.id}` as Route}
+                    className="text-[12px] text-accent hover:underline">
+                + New
+              </Link>
+            </div>
+            {client.projects.length === 0 ? (
+              <div className="text-[12px] text-text-faint py-3 text-center">No projects yet.</div>
+            ) : (
+              <div>
+                {client.projects.map((p) => {
+                  const sa = p.siteAddress as { city?: string; projectType?: string } | null;
+                  return (
+                    <Link key={p.id} href={`/projects/${p.id}` as Route}
+                          className="flex items-center gap-3 py-2.5 border-b border-rule/60 last:border-0 hover:bg-surface-hover -mx-2 px-2 rounded-[6px] transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[13px] font-medium text-text truncate">{p.name}</span>
+                          <span className={`text-[10px] font-semibold uppercase tracking-[0.07em] ${STAGE_CLS[p.stage] ?? "text-text-dim"}`}>
+                            {STAGE_LABEL[p.stage] ?? p.stage}
+                          </span>
+                        </div>
+                        <div className="text-[11.5px] text-text-dim mt-0.5">
+                          {p.number}{sa?.city ? ` · ${sa.city}` : ""}{sa?.projectType ? ` · ${sa.projectType}` : ""}
+                        </div>
+                      </div>
+                      {p.orderValue > 0n && (
+                        <span className="text-[12px] text-text-dim tabular shrink-0">{formatINR(p.orderValue)}</span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
             )}
           </div>
 
