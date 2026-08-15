@@ -199,16 +199,6 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
   };
 }
 
-// Fold a site-address JSON blob into a single display line, dropping
-// empty parts. Returns null when nothing usable is present.
-function joinAddress(addr: Record<string, unknown> | null): string | null {
-  if (!addr) return null;
-  const parts = ["line1", "line", "street", "area", "city", "state", "pincode", "pin"]
-    .map((k) => addr[k])
-    .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
-  return parts.length > 0 ? parts.join(", ") : null;
-}
-
 export interface SalesUserOption {
   id:   string;
   name: string;
