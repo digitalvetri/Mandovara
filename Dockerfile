@@ -64,16 +64,21 @@ COPY --from=build --chown=nextjs:nodejs /app/public           ./public
 # The Prisma CLI needs its own binary to run `migrate deploy` at
 # container start. Install it into an isolated sibling dir so it
 # doesn't collide with the pnpm-structured node_modules that came
-# out of the standalone build.
+# out of the standalone build. tsx joins it so the entrypoint can
+# run prisma/seed.ts (TypeScript) directly on an empty DB.
 RUN mkdir -p /opt/prisma-cli \
  && cd /opt/prisma-cli \
  && npm init -y >/dev/null \
- && npm install --omit=dev --no-audit --no-fund prisma@6.19.0 \
+ && npm install --omit=dev --no-audit --no-fund prisma@6.19.0 tsx@4 \
+ && ln -s /opt/prisma-cli/node_modules/.bin/tsx /usr/local/bin/tsx \
  && chown -R nextjs:nodejs /opt/prisma-cli
+
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
 
-# Entrypoint: apply pending migrations, then start Next.
-# Idempotent — deploy applies only pending migrations.
-CMD ["sh", "-c", "/opt/prisma-cli/node_modules/.bin/prisma migrate deploy --schema=/app/prisma/schema.prisma && node server.js"]
+# Entrypoint: apply pending migrations, seed if DB is empty, start Next.
+# All three steps idempotent — safe on every container start.
+CMD ["/app/docker-entrypoint.sh"]
