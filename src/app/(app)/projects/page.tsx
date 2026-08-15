@@ -1,12 +1,21 @@
+// Projects landing page — redesigned per the reference screenshot.
+//   ┌ Projects · N shown             + New Project
+//   ├ 4 KPI tiles (Active · Awaiting measure · Payments overdue · Receivables)
+//   ├ pill filters (All / Active / Completed / Cancelled)
+//   ├ search pill
+//   └ card grid — one card per project, progress bar + order value
+
 import Link from "next/link";
 import type { Route } from "next";
-import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
+import { Plus } from "lucide-react";
+import { Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
-import { listProjects } from "@/modules/projects/queries";
+import { getProjectKpis, listProjects } from "@/modules/projects/queries";
 import { PROJECT_STAGES as PROJECT_STATUSES, type ProjectStage as ProjectStatus } from "@/modules/projects/schema";
-import { ProjectFilters } from "./_components/ProjectFilters";
-import { ProjectsTable } from "./_components/ProjectsTable";
+import { ProjectKpiCards } from "./_components/ProjectKpiCards";
+import { ProjectsToolbar } from "./_components/ProjectsToolbar";
+import { ProjectCards } from "./_components/ProjectCards";
 
 export const dynamic = "force-dynamic";
 
@@ -22,23 +31,35 @@ export default async function ProjectsPage({
   const stage = normaliseStatus(params.stage ?? params.status);
   const page = parsePositiveInt(params.page) ?? 1;
 
-  const { rows, total, pageSize } = await listProjects(ctx, {
-    ...(q != null && { search: q }), stage, page,
-  });
+  const [{ rows, total, pageSize }, kpis] = await Promise.all([
+    listProjects(ctx, { ...(q != null && { search: q }), stage, page }),
+    getProjectKpis(ctx),
+  ]);
 
   return (
     <>
-      <Topbar
-        title="Projects"
-        eyebrow={`${total} project${total === 1 ? "" : "s"} · ${eyebrowFor(stage, q)}`}
-        actions={
-          <Link href={"/projects/new" as Route}>
-            <PrimaryButton>New Project</PrimaryButton>
-          </Link>
-        }
-      />
-      <ProjectFilters />
-      <ProjectsTable rows={rows} />
+      <Topbar title="" />
+
+      {/* Header */}
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <div>
+          <h1 className="font-display text-[28px] font-semibold leading-none text-text">Projects</h1>
+          <div className="mt-1 text-[11.5px] text-text-dim tabular-nums">
+            {total} shown
+          </div>
+        </div>
+        <Link
+          href={"/projects/new" as Route}
+          className="inline-flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-[12.5px] font-semibold text-ink transition-colors hover:bg-gold-strong"
+        >
+          <Plus size={13} strokeWidth={2.4} />
+          New Project
+        </Link>
+      </div>
+
+      <ProjectKpiCards kpis={kpis} />
+      <ProjectsToolbar />
+      <ProjectCards rows={rows} />
       <Pager page={page} pageSize={pageSize} total={total} />
     </>
   );
@@ -55,10 +76,4 @@ function parsePositiveInt(v: string | undefined): number | null {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 1) return null;
   return Math.floor(n);
-}
-function eyebrowFor(status: string, q: string | undefined): string {
-  const bits: string[] = [];
-  bits.push(status === "ACTIVE" ? "active" : status === "ALL" ? "all stages" : status.toLowerCase().replace(/_/g, " "));
-  if (q) bits.push(`matching "${q}"`);
-  return bits.join(" · ");
 }

@@ -59,6 +59,58 @@ const ACTIVE_STAGES = [
   "ORDERED", "PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING",
 ] as const;
 
+// ── Landing-page KPI tiles ──────────────────────────────────────
+export interface ProjectKpis {
+  activeCount:            number;
+  awaitingMeasurement:    number;    // ENQUIRY / SITE_VISIT / MEASUREMENT
+  paymentsOverdueCount:   number;    // projects with at least one overdue invoice
+  receivablesTotal:       bigint;    // sum of invoice outstanding across all projects
+}
+
+export async function getProjectKpis(ctx: RequestContext): Promise<ProjectKpis> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  const now = new Date();
+
+  const [
+    active,
+    preMeasure,
+    overdueInvoices,
+    invoices,
+    receipts,
+  ] = await Promise.all([
+    db.project.count({ where: { stage: { in: [...ACTIVE_STAGES] } } }),
+    db.project.count({ where: { stage: { in: ["ENQUIRY", "SITE_VISIT", "MEASUREMENT"] } } }),
+    db.invoice.findMany({
+      where: {
+        dueDate:  { lt: now },
+        status:   { notIn: ["PAID", "CANCELLED"] },
+      },
+      select: { projectId: true, total: true, advanceAdjusted: true },
+    }),
+    db.invoice.aggregate({
+      where: { status: { notIn: ["CANCELLED", "DRAFT"] } },
+      _sum:  { total: true, advanceAdjusted: true },
+    }),
+    db.receiptAllocation.aggregate({ _sum: { amount: true } }),
+  ]);
+
+  const projectsWithOverdue = new Set(
+    overdueInvoices.filter((i) => i.projectId).map((i) => i.projectId as string),
+  );
+  const invoicedTotal   = invoices._sum.total           ?? 0n;
+  const advanceTotal    = invoices._sum.advanceAdjusted ?? 0n;
+  const receiptsTotal   = receipts._sum.amount          ?? 0n;
+  const receivables     = invoicedTotal - advanceTotal - receiptsTotal;
+
+  return {
+    activeCount:          active,
+    awaitingMeasurement:  preMeasure,
+    paymentsOverdueCount: projectsWithOverdue.size,
+    receivablesTotal:     receivables > 0n ? receivables : 0n,
+  };
+}
+
 export async function listProjects(
   ctx: RequestContext,
   q: ListProjectsQuery,
