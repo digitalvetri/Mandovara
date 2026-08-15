@@ -32,7 +32,7 @@ export default async function InventoryPage({
   return (
     <>
       <Topbar
-        title="Stock & Dye Lots"
+        title="Stocks"
         eyebrow={`${rows.length} balance${rows.length === 1 ? "" : "s"}${search ? ` · matching "${search}"` : ""}`}
       />
       <BalanceFilters />

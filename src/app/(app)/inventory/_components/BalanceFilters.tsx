@@ -71,7 +71,7 @@ export function BalanceFilters() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Colourway code, name or dye lot"
+            placeholder="Colourway code or name"
             className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-text-muted"
           />
         </label>
