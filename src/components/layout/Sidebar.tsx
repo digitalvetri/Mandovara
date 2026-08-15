@@ -7,7 +7,7 @@ import { useTransition } from "react";
 import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, Send, Briefcase, Scissors, Wrench, Receipt, Wallet,
-  CalendarCheck, IndianRupee, MessageSquare, ShieldCheck, LogOut,
+  CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler,
   type LucideIcon,
 } from "lucide-react";
@@ -67,7 +67,6 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "System",
     items: [
-      { label: "WhatsApp Automation", href: "/whatsapp", icon: MessageSquare },
       { label: "Admin & Roles",       href: "/admin",    icon: ShieldCheck   },
     ],
   },
