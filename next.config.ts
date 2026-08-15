@@ -17,6 +17,11 @@ const config: NextConfig = {
     "/**/*": [
       "./node_modules/.prisma/client/**/*",
       "./node_modules/@prisma/client/**/*",
+      // bcryptjs is bundled into the server actions and never referenced
+      // as a package at runtime by app code — but the entrypoint's seed
+      // script requires it via node's resolver. Include it explicitly so
+      // it lands in /app/node_modules/bcryptjs/ inside the standalone tree.
+      "./node_modules/bcryptjs/**/*",
       "./prisma/**/*",
     ],
   },
