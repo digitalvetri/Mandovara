@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { Paperclip } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
@@ -205,21 +204,6 @@ export default async function LeadDetailPage({
             )}
           </div>
 
-          {/* Documents — anchor for the action bar */}
-          <div id="documents" className="rounded-[14px] bg-surface border border-rule p-6 scroll-mt-4">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
-              Documents
-            </div>
-            <div className="flex flex-col items-center py-6 gap-3 text-center">
-              <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center">
-                <Paperclip size={18} strokeWidth={1.5} className="text-text-dim" />
-              </div>
-              <div className="text-[13px] text-text-dim">No documents yet</div>
-              <p className="text-[11.5px] text-text-faint max-w-[260px]">
-                Attach drawings, client approvals, site photos, and contracts here.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* ── Aside ──────────────────────────────────────────── */}
