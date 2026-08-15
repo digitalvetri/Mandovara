@@ -1,36 +1,41 @@
 #!/bin/sh
-set -e
+# Deliberately no `set -e`: a seed failure must not tank the container
+# and trigger a restart loop. Migrations DO fail loud (checked explicitly).
 
 PRISMA=/opt/prisma-cli/node_modules/.bin/prisma
 
-# Next's tracer misses .prisma/client on pnpm layouts, so any
-# require('@prisma/client') crashes with "Cannot find module
-# '.prisma/client/default'". Regenerate at container start —
-# ~2 seconds, idempotent, guaranteed to sit next to @prisma/client
-# wherever pnpm actually put it.
-echo "→ Regenerating Prisma client (fills in .prisma/client/*)..."
+echo "→ Regenerating Prisma client..."
 cd /app && "$PRISMA" generate --schema=/app/prisma/schema.prisma
+if [ $? -ne 0 ]; then
+  echo "✗ prisma generate failed — aborting"; exit 1
+fi
 
 echo "→ Applying pending migrations..."
 "$PRISMA" migrate deploy --schema=/app/prisma/schema.prisma
-
-cd /app
+if [ $? -ne 0 ]; then
+  echo "✗ prisma migrate deploy failed — aborting"; exit 1
+fi
 
 echo "→ Checking DB state..."
-set +e
 CHECK=$(node /app/check-empty.mjs 2>&1)
 CHECK_EXIT=$?
-set -e
 echo "→ check-empty exit=$CHECK_EXIT output=[$CHECK]"
 
 if [ "$CHECK_EXIT" -eq 0 ] && [ "$CHECK" = "0" ]; then
-  echo "→ DB is empty — running one-time seed..."
+  echo "→ DB is empty — installing seed-only deps + running seed..."
+  cd /app && npm install --no-save --omit=optional --no-audit --no-fund bcryptjs 2>&1 | tail -3
   tsx /app/prisma/seed.ts
+  if [ $? -eq 0 ]; then
+    echo "✓ Seed complete"
+  else
+    echo "✗ Seed failed — server will start empty. Investigate then rerun:"
+    echo "    cd /app && tsx /app/prisma/seed.ts"
+  fi
 elif [ "$CHECK_EXIT" -eq 0 ]; then
   echo "→ DB already has $CHECK organization(s) — skipping seed"
 else
-  echo "→ Check failed — skipping seed. To seed manually:"
-  echo "    tsx /app/prisma/seed.ts"
+  echo "→ DB state check failed — skipping seed. To seed manually:"
+  echo "    cd /app && tsx /app/prisma/seed.ts"
 fi
 
 echo "→ Starting Next server..."
