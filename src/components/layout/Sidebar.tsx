@@ -8,7 +8,7 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, Send, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
-  Ruler,
+  Ruler, BarChart2,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -65,7 +65,8 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "System",
     items: [
-      { label: "Admin & Roles",       href: "/admin",    icon: ShieldCheck   },
+      { label: "Reports",       href: "/reports", icon: BarChart2   },
+      { label: "Admin & Roles", href: "/admin",   icon: ShieldCheck },
     ],
   },
 ];
