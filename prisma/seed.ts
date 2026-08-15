@@ -5,6 +5,7 @@ import { PrismaClient } from "@prisma/client";
 import { seedCatalog } from "./seed/catalog";
 import { seedCustomers } from "./seed/customers";
 import { seedMasters } from "./seed/masters";
+import { seedMilestoneTemplates } from "./seed/milestone-templates";
 import { printRowCounts } from "./seed/report";
 import { seedTransactions } from "./seed/transactions";
 
@@ -17,6 +18,9 @@ async function main(): Promise<void> {
 
   process.stdout.write("Seed: masters (org, branch, users, employees, vendors, statutory)...\n");
   const masters = await seedMasters(db);
+
+  process.stdout.write("Seed: milestone templates (project auto-gen)...\n");
+  await seedMilestoneTemplates(db, masters.orgId);
 
   process.stdout.write("Seed: catalog (brands → collections → designs → colourways)...\n");
   const catalog = await seedCatalog(db, masters.orgId);

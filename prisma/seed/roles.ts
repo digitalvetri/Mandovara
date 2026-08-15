@@ -18,6 +18,20 @@ const ROLE_META: Record<RoleKey, { name: string; description: string; isOwnerRol
   HR:              { name: "HR",                 description: "Employees, attendance, leave and payroll" },
 };
 
+// Explicit denies for the Owner (segregation-of-duties carveouts).
+// isOwnerRole=true grants every permission by default; scope=NONE rows
+// on this list are removed from that default set inside session.ts.
+// Spec (docs/BUILD-SPEC.md project-detail §5): the person who records a
+// dimension is not the person who approves it. The Owner approves and
+// views measurements; the measurement team creates and edits them.
+const OWNER_DENIES: readonly string[] = [
+  "measurement.create.any", "measurement.create.own",
+  "measurement.edit.any",   "measurement.edit.own",
+  "measurement.submit.any", "measurement.submit.own",
+  // Legacy keys — same intent, kept in lock-step during scoped-key migration.
+  "measurement.create", "measurement.update", "measurement.submit",
+];
+
 // Permission keys per role — based on CLAUDE.md §3.1 route access matrix.
 // OWNER gets no explicit rows; isOwnerRole=true triggers allPermissions() in session.ts.
 const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
@@ -31,7 +45,9 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "quotation.view", "quotation.create", "quotation.update", "quotation.revise", "quotation.send", "quotation.viewOthers",
     "order.view", "order.viewMargin",
     "project.view", "project.create", "project.update", "project.materialIssue",
-    "measurement.view", "measurement.create", "measurement.update", "measurement.submit", "measurement.approve", "measurement.revise",
+    // Measurement: FULL create · OWN edit · FULL submit · NONE approve · FULL view
+    "measurement.view", "measurement.create", "measurement.update", "measurement.submit", "measurement.revise",
+    "measurement.view.any", "measurement.create.any", "measurement.edit.own", "measurement.submit.any",
     "sitelog.view", "sitelog.create",
     "make.view", "make.printCutList",
     "install.view",
@@ -50,7 +66,8 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "quotation.view", "quotation.create", "quotation.update", "quotation.revise", "quotation.send", "quotation.viewOthers",
     "order.view",
     "project.view", "project.create",
-    "measurement.view",
+    // Measurement: OWN create · OWN edit · OWN submit · NONE approve · OWN view
+    "measurement.view", "measurement.view.own", "measurement.create.own", "measurement.edit.own", "measurement.submit.own",
     "sitelog.view",
     "report.view.dashboard", "report.view.sales",
   ],
@@ -59,7 +76,9 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "catalog.view",
     "client.view",
     "project.view",
+    // Measurement: FULL create · OWN edit · FULL submit · NONE approve · FULL view
     "measurement.view", "measurement.create", "measurement.update", "measurement.delete", "measurement.submit", "measurement.revise",
+    "measurement.view.any", "measurement.create.any", "measurement.edit.own", "measurement.submit.any",
     "sitelog.view", "sitelog.create",
     "make.view",
     "install.view",
@@ -99,7 +118,8 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "catalog.view",
     "project.view",
     "order.view",
-    "measurement.view",
+    // Measurement: VIEW only (installer sees dimensions but never types them)
+    "measurement.view", "measurement.view.any",
     "install.view", "install.create", "install.update", "install.complete", "install.raiseSnag",
     "sitelog.view", "sitelog.create",
     "report.view.dashboard",
@@ -156,6 +176,12 @@ export async function seedRoles(
           data: perms.map((key) => ({ roleId: role.id, key, scope: "FULL" as const })),
         });
       }
+    } else {
+      // Owner: seed deny carveouts so measurement.create/edit/submit
+      // return 403 even though isOwnerRole=true grants everything else.
+      await db.rolePermission.createMany({
+        data: OWNER_DENIES.map((key) => ({ roleId: role.id, key, scope: "NONE" as const })),
+      });
     }
   }
 

@@ -47,7 +47,22 @@ export const PERMISSIONS = {
   project:    ["view", "create", "update", "materialIssue", "milestoneBill", "closeSnag", "handover"],
   sitelog:    ["view", "create"],
   // Site measurements + persisted CalcResult (§7, Phase 2 gate).
-  measurement: ["view", "create", "update", "delete", "submit", "approve", "revise"],
+  //
+  // Scoped keys (docs/BUILD-SPEC.md project-detail §5) — the .any/.own
+  // suffix segregates duties: the person who records a dimension is not
+  // the same person who approves it. Legacy flat keys (`view`, `create`,
+  // `update`, `submit`, `approve`) are kept during the migration but new
+  // callers use the scoped variants. isOwnerRole grants "everything" as
+  // the default; scope=NONE deny rows carve out measurement creation for
+  // the Owner (see session.ts).
+  measurement: [
+    "view", "create", "update", "delete", "submit", "approve", "revise",
+    "view.any", "view.own",
+    "create.any", "create.own",
+    "edit.any", "edit.own",
+    "submit.any", "submit.own",
+    "approve.any",
+  ],
 
   // ── Finance ────────────────────────────────────────────────
   invoice:     ["view", "create", "cancel", "viewMargin", "irnRegenerate", "irnCancel"],

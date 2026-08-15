@@ -3,6 +3,10 @@
 // which extends this singleton with tenant + branch scoping + audit.
 
 import { PrismaClient } from "@prisma/client";
+// Side-effect import: registers every domain-event listener (milestone
+// auto-completion, etc.) on first module load. Every request path hits
+// this file, so listeners are guaranteed to be wired before any query.
+import "@/kernel/events/register";
 
 declare global {
 

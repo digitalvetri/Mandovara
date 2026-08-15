@@ -177,6 +177,59 @@ export interface ClientStatusChangedEvent extends EventBase {
   reason?: string;
 }
 
+// ── Site visits / measurement / milestones ──────────────────
+// The measurement.approved handler ticks the MEASUREMENT milestone AND
+// advances the project stage to QUOTATION — see kernel/milestones/listeners.
+export interface SiteVisitCompletedEvent extends EventBase {
+  type: "siteVisit.completed";
+  siteVisitId: string;
+  projectId: string;
+}
+export interface MeasurementSubmittedEvent extends EventBase {
+  type: "measurement.submitted";
+  measurementId: string;
+  projectId: string;
+}
+export interface MeasurementApprovedEvent extends EventBase {
+  type: "measurement.approved";
+  measurementId: string;
+  projectId: string;
+}
+// Advance.received carries both the received amount and the required
+// threshold — the ADVANCE milestone auto-completes only when total received
+// >= required. Partial payments don't tick.
+export interface AdvanceReceivedEvent extends EventBase {
+  type: "advance.received";
+  advanceId: string;
+  projectId: string;
+  amountReceived: Paise;
+  totalReceivedForProject: Paise;
+  advanceRequired: Paise;
+}
+// Grn.received announces material arriving for a specific project family;
+// the FABRIC_INWARD / ROLL_INWARD / MATERIAL_INWARD milestones subscribe.
+export interface GrnReceivedEvent extends EventBase {
+  type: "grn.received";
+  grnId: string;
+  projectId: string;
+  families: readonly string[];
+}
+export interface AllocationCompleteEvent extends EventBase {
+  type: "allocation.complete";
+  orderId: string;
+  projectId: string;
+}
+export interface MakeJobQcPassedEvent extends EventBase {
+  type: "makeJob.qcPassed";
+  makeJobId: string;
+  projectId: string;
+}
+export interface InstallVisitCompletedEvent extends EventBase {
+  type: "installVisit.completed";
+  installVisitId: string;
+  projectId: string;
+}
+
 // ── The union ───────────────────────────────────────────────
 export type DomainEvent =
   | QuotationCreatedEvent | QuotationSentEvent | QuotationAcceptedEvent | QuotationExpiredEvent
@@ -187,7 +240,10 @@ export type DomainEvent =
   | ApprovalRequestedEvent | ApprovalDecidedEvent
   | AttendancePunchedEvent | PayrollFinalizedEvent
   | LeadCreatedEvent | LeadStatusChangedEvent | LeadConvertedEvent
-  | ClientCreatedEvent | ClientStatusChangedEvent;
+  | ClientCreatedEvent | ClientStatusChangedEvent
+  | SiteVisitCompletedEvent | MeasurementSubmittedEvent | MeasurementApprovedEvent
+  | AdvanceReceivedEvent | GrnReceivedEvent | AllocationCompleteEvent
+  | MakeJobQcPassedEvent | InstallVisitCompletedEvent;
 
 export type DomainEventType = DomainEvent["type"];
 

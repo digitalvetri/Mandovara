@@ -55,7 +55,15 @@ export async function resolveContext(session: Session, opts?: { ip?: string }): 
 
   if (user.dynamicRole) {
     if (user.dynamicRole.isOwnerRole) {
-      permissions = allPermissions();
+      // Owner gets everything by default, but explicit scope=NONE rows
+      // are deny carveouts (e.g. `measurement.create.any` — Owner should
+      // never type site dimensions, that's a segregation-of-duties rule).
+      // Without this, an Owner-role user cannot be blocked from any action.
+      const s = new Set<PermissionKey>(allPermissions());
+      for (const p of user.dynamicRole.permissions) {
+        if (p.scope === "NONE" && isPermissionKey(p.key)) s.delete(p.key);
+      }
+      permissions = s;
     } else {
       const s = new Set<PermissionKey>();
       for (const p of user.dynamicRole.permissions) {

@@ -858,9 +858,43 @@ model Milestone {
   status         String   @default("PENDING")
   createdAt      DateTime @default(now())
 
+  // Milestone-template linkage (auto-generation from product families).
+  // A milestone with templateCode is derived from a MilestoneTemplate row
+  // for the project's set of families; a null templateCode means a
+  // manually-added milestone. billingWeightPct is the normalised weight
+  // after merging templates across families (sums to 100 across the set).
+  templateCode     String?
+  family           ProductFamily?
+  billingWeightPct Decimal?      @db.Decimal(5, 2)
+  autoCompleted    Boolean       @default(false)
+  sourceEvent      String?
+  plannedAt        DateTime?
+  completedAt      DateTime?
+
   project Project @relation(fields: [projectId], references: [id])
 
   @@index([projectId])
+  @@index([projectId, templateCode])
+}
+
+// Milestone templates seed the project milestone list from the project's
+// product families. Common templates (family = null) apply to every
+// project; family-specific templates merge in when that family is present.
+// Weights normalise to 100% across the merged set at generation time.
+model MilestoneTemplate {
+  id               String        @id @default(cuid())
+  organizationId   String
+  family           ProductFamily?
+  sequence         Int
+  code             String
+  name             String
+  billingWeightPct Decimal       @db.Decimal(5, 2)
+  autoCompleteOn   String?
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+
+  @@unique([organizationId, family, code])
+  @@index([organizationId, family, sequence])
 }
 
 model SiteLog {
