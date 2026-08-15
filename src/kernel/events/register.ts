@@ -7,6 +7,7 @@
 // module-scoped `registered` flag).
 
 import { registerMilestoneListeners } from "@/kernel/milestones/listeners";
+import { registerStockNotificationListeners } from "@/kernel/notifications/stock";
 
 let bootstrapped = false;
 
@@ -14,6 +15,7 @@ export function bootstrapEventListeners(): void {
   if (bootstrapped) return;
   bootstrapped = true;
   registerMilestoneListeners();
+  registerStockNotificationListeners();
 }
 
 // Auto-run on first import. Import order: prisma client → this module →

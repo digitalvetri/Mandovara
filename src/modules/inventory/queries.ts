@@ -1,187 +1,190 @@
-﻿// @ts-nocheck
-// Inventory repository.
+// Inventory repository — one query per surface the redesigned /inventory
+// page needs. Reads against the real schema (Colourway · StockBalance ·
+// StockMove · Design · PurchaseOrder). Storekeeper role sees everything;
+// permissions per Rule 8 gate against inventory.view.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
-export interface ListBalancesQuery {
-  warehouseId?: string | "ALL";
-  search?: string;
-  page?: number;
-  pageSize?: number;
-  onlyLow?: boolean; // reorder-level flag
+// ── Stock tab: one row per Colourway (SKU) ────────────────────────────
+export interface StockItemRow {
+  colourwayId:   string;
+  code:          string;
+  colourName:    string;
+  hex:           string | null;
+  imageKey:      string | null;
+  designName:    string;
+  brandName:     string;
+  family:        string;
+  sellUnit:      string;
+  onHand:        string;          // Σ StockBalance.quantity (decimal string)
+  reorderLevel:  string | null;   // Colourway.reorderLevel, decimal string
+  lastCostPaise: bigint;          // most recent StockMove.rate for GRN, else 0
+  gstRate:       string;          // Design.gstRate decimal string
+  isLow:         boolean;         // onHand <= reorderLevel (when set)
+  isOut:         boolean;         // onHand === 0
 }
 
-export interface BalanceRow {
-  productId: string;
-  productCode: string;
-  productName: string;
-  uom: string;
-  warehouseId: string;
-  warehouseName: string;
-  quantity: string; // decimal string
-  reserved: string;
-  available: string;
-  value: bigint;
-  reorderLevel: string | null;
-  isLow: boolean;
+export interface InventoryKpis {
+  itemCount:        number;   // active Colourway rows
+  lowStockCount:    number;   // items with reorderLevel set AND onHand <= reorderLevel
+  openPoCount:      number;   // PurchaseOrder status in DRAFT / SENT / PARTIAL
+  stockValuePaise:  bigint;   // Σ StockBalance.value across all lots
 }
 
-export interface ListBalancesResult {
-  rows: BalanceRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-  warehouses: { id: string; name: string }[];
+export interface ListStockItemsResult {
+  rows:      StockItemRow[];
+  total:     number;
+  page:      number;
+  pageSize:  number;
+  families:  string[];        // distinct families across active items — powers the pill filter
 }
 
-const DEFAULT_PAGE_SIZE = 25;
-const MAX_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE     = 200;
 
-export async function listBalances(
+export async function getInventoryKpis(ctx: RequestContext): Promise<InventoryKpis> {
+  requirePermission(ctx, "inventory.view");
+  const db = scoped(ctx);
+
+  const [items, balances, openPos] = await Promise.all([
+    db.colourway.findMany({
+      where:  { isActive: true },
+      select: { id: true, reorderLevel: true },
+    }),
+    db.stockBalance.findMany({
+      select: { colourwayId: true, quantity: true, value: true },
+    }),
+    db.purchaseOrder.count({
+      where: { status: { in: ["DRAFT", "SENT", "PARTIAL"] } },
+    }),
+  ]);
+
+  // Aggregate on-hand per colourway across dye lots so low-stock is
+  // computed on the total, not per lot.
+  const onHandByCw = new Map<string, number>();
+  let stockValue = 0n;
+  for (const b of balances) {
+    onHandByCw.set(b.colourwayId, (onHandByCw.get(b.colourwayId) ?? 0) + Number(b.quantity));
+    stockValue += b.value;
+  }
+
+  let low = 0;
+  for (const it of items) {
+    if (it.reorderLevel == null) continue;
+    const on = onHandByCw.get(it.id) ?? 0;
+    if (on <= Number(it.reorderLevel)) low += 1;
+  }
+
+  return {
+    itemCount:       items.length,
+    lowStockCount:   low,
+    openPoCount:     openPos,
+    stockValuePaise: stockValue,
+  };
+}
+
+export async function listStockItems(
   ctx: RequestContext,
-  q: ListBalancesQuery,
-): Promise<ListBalancesResult> {
+  q: { search?: string; family?: string | "ALL"; page?: number; pageSize?: number; onlyLow?: boolean },
+): Promise<ListStockItemsResult> {
   requirePermission(ctx, "inventory.view");
   const db = scoped(ctx);
 
   const pageSize = Math.min(q.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-  const page = Math.max(1, q.page ?? 1);
-  const skip = (page - 1) * pageSize;
+  const page     = Math.max(1, q.page ?? 1);
+  const skip     = (page - 1) * pageSize;
 
-  const where: Record<string, unknown> = {};
-  if (q.warehouseId && q.warehouseId !== "ALL") where["warehouseId"] = q.warehouseId;
-  if (q.search && q.search.trim().length > 0) {
+  const where: Record<string, unknown> = { isActive: true };
+  if (q.family && q.family !== "ALL") {
+    where["design"] = { family: q.family };
+  }
+  if (q.search && q.search.trim()) {
     const s = q.search.trim();
-    where["product"] = {
-      OR: [
-        { code: { contains: s, mode: "insensitive" } },
-        { name: { contains: s, mode: "insensitive" } },
-      ],
-    };
+    where["OR"] = [
+      { code:       { contains: s, mode: "insensitive" } },
+      { colourName: { contains: s, mode: "insensitive" } },
+      { design: { name: { contains: s, mode: "insensitive" } } },
+      { design: { code: { contains: s, mode: "insensitive" } } },
+    ];
   }
 
-  const [rows, total, warehouses] = await Promise.all([
-    db.stockBalance.findMany({
-      where, orderBy: { updatedAt: "desc" }, skip, take: pageSize,
+  const [items, total, allFamiliesRaw] = await Promise.all([
+    db.colourway.findMany({
+      where, skip, take: pageSize,
+      orderBy: [{ design: { name: "asc" } }, { colourName: "asc" }],
       select: {
-        productId: true, warehouseId: true,
-        quantity: true, reserved: true, value: true,
-        product:   { select: { code: true, name: true, uom: true, reorderLevel: true } },
-        warehouse: { select: { name: true } },
+        id: true, code: true, colourName: true, hex: true, imageKey: true, sellUnit: true,
+        reorderLevel: true,
+        design: {
+          select: {
+            name: true, family: true, gstRate: true,
+            collection: { select: { brand: { select: { name: true } } } },
+          },
+        },
       },
     }),
-    db.stockBalance.count({ where }),
-    db.warehouse.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
+    db.colourway.count({ where }),
+    db.design.findMany({
+      where:    { isActive: true },
+      select:   { family: true },
+      distinct: ["family"],
     }),
   ]);
 
-  const mapped: BalanceRow[] = rows.map((r) => {
-    const qty = r.quantity.toString();
-    const reserved = r.reserved.toString();
-    const available = subtractDec(qty, reserved);
-    const reorder = r.product.reorderLevel?.toString() ?? null;
-    const isLow = reorder != null && parseFloat(available) < parseFloat(reorder);
+  const colourwayIds = items.map((i) => i.id);
+  const [balances, lastCosts] = await Promise.all([
+    colourwayIds.length === 0 ? [] :
+      db.stockBalance.findMany({
+        where:  { colourwayId: { in: colourwayIds } },
+        select: { colourwayId: true, quantity: true },
+      }),
+    // Last GRN rate per colourway. Query one recent GRN_IN move per SKU
+    // in a single roundtrip (worst-case ordered scan, but colourwayIds
+    // is bounded by page size = 50 so it's cheap).
+    colourwayIds.length === 0 ? [] :
+      db.stockMove.findMany({
+        where: { colourwayId: { in: colourwayIds }, type: "GRN_IN" },
+        orderBy: { occurredAt: "desc" },
+        select: { colourwayId: true, rate: true, occurredAt: true },
+      }),
+  ]);
+
+  const onHandByCw = new Map<string, number>();
+  for (const b of balances) {
+    onHandByCw.set(b.colourwayId, (onHandByCw.get(b.colourwayId) ?? 0) + Number(b.quantity));
+  }
+  const lastCostByCw = new Map<string, bigint>();
+  for (const m of lastCosts) {
+    if (!lastCostByCw.has(m.colourwayId)) lastCostByCw.set(m.colourwayId, m.rate);
+  }
+
+  let rows: StockItemRow[] = items.map((c) => {
+    const onHand = onHandByCw.get(c.id) ?? 0;
+    const reorder = c.reorderLevel == null ? null : Number(c.reorderLevel);
     return {
-      productId: r.productId, productCode: r.product.code, productName: r.product.name,
-      uom: r.product.uom,
-      warehouseId: r.warehouseId, warehouseName: r.warehouse.name,
-      quantity: qty, reserved, available, value: r.value,
-      reorderLevel: reorder, isLow,
+      colourwayId:   c.id,
+      code:          c.code,
+      colourName:    c.colourName,
+      hex:           c.hex,
+      imageKey:      c.imageKey,
+      designName:    c.design.name,
+      brandName:     c.design.collection.brand.name,
+      family:        c.design.family,
+      sellUnit:      c.sellUnit,
+      onHand:        String(onHand),
+      reorderLevel:  reorder == null ? null : String(reorder),
+      lastCostPaise: lastCostByCw.get(c.id) ?? 0n,
+      gstRate:       c.design.gstRate.toString(),
+      isLow:         reorder != null && onHand <= reorder,
+      isOut:         onHand === 0,
     };
   });
 
-  return {
-    rows: q.onlyLow ? mapped.filter((r) => r.isLow) : mapped,
-    total: q.onlyLow ? mapped.filter((r) => r.isLow).length : total,
-    page, pageSize, warehouses,
-  };
-}
+  if (q.onlyLow) rows = rows.filter((r) => r.isLow);
 
-export interface LedgerRow {
-  id: string;
-  occurredAt: Date;
-  direction: string;
-  quantity: string;
-  rate: bigint;
-  refType: string;
-  refId: string;
-  warehouseName: string;
-  runningBalance: string;
-}
+  const families = Array.from(new Set(allFamiliesRaw.map((f) => f.family))).sort();
 
-export async function listLedgerForProduct(
-  ctx: RequestContext,
-  productId: string,
-  warehouseId?: string,
-): Promise<LedgerRow[]> {
-  requirePermission(ctx, "inventory.view");
-  const db = scoped(ctx);
-  const where: Record<string, unknown> = { productId };
-  if (warehouseId) where["warehouseId"] = warehouseId;
-  const rows = await db.stockLedgerEntry.findMany({
-    where,
-    orderBy: [{ occurredAt: "asc" }, { createdAt: "asc" }],
-    take: 500,
-    select: {
-      id: true, occurredAt: true, direction: true, quantity: true, rate: true,
-      refType: true, refId: true,
-      warehouse: { select: { name: true } },
-    },
-  });
-  // Running balance per warehouse.
-  const runningByWh = new Map<string, number>();
-  const out: LedgerRow[] = [];
-  for (const r of rows) {
-    const wh = r.warehouse.name;
-    const cur = runningByWh.get(wh) ?? 0;
-    const q = Number(r.quantity);
-    const next = r.direction === "IN" ? cur + q : cur - q;
-    runningByWh.set(wh, next);
-    out.push({
-      id: r.id, occurredAt: r.occurredAt, direction: r.direction,
-      quantity: r.quantity.toString(), rate: r.rate,
-      refType: r.refType, refId: r.refId, warehouseName: wh,
-      runningBalance: next.toString(),
-    });
-  }
-  return out.reverse(); // most recent first for display
-}
-
-export interface ProductPickerRow {
-  id: string; code: string; name: string; uom: string;
-}
-export async function listProductsForAdjustment(ctx: RequestContext): Promise<ProductPickerRow[]> {
-  requirePermission(ctx, "catalog.view");
-  const db = scoped(ctx);
-  const rows = await db.product.findMany({
-    where: { status: "ACTIVE" },
-    orderBy: { code: "asc" },
-    take: 500,
-    select: { id: true, code: true, name: true, uom: true },
-  });
-  return rows;
-}
-export async function listWarehouses(ctx: RequestContext): Promise<{ id: string; name: string }[]> {
-  requirePermission(ctx, "inventory.view");
-  const db = scoped(ctx);
-  return db.warehouse.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
-}
-
-// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-function subtractDec(a: string, b: string): string {
-  const scale = 10_000;
-  const ai = Math.round(parseFloat(a) * scale);
-  const bi = Math.round(parseFloat(b) * scale);
-  const diff = ai - bi;
-  const whole = Math.trunc(diff / scale);
-  const frac = Math.abs(diff % scale).toString().padStart(4, "0").replace(/0+$/, "");
-  return frac.length === 0 ? String(whole) : `${whole}.${frac}`;
+  return { rows, total: q.onlyLow ? rows.length : total, page, pageSize, families };
 }

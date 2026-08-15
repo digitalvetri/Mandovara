@@ -1,24 +1,36 @@
-// Zod schemas for the inventory module.
+// Zod schemas for the redesigned inventory module.
+//
+// The old @ts-nocheck adjustment schema referenced Product / Warehouse
+// models that don't exist in the current schema. Rewritten against
+// Colourway + StockBalance + StockMove.
 
 import { z } from "zod";
 
 export const ADJUSTMENT_REASONS = [
-  "DAMAGE", "THEFT", "COUNT_CORRECTION", "EXPIRY", "REPACK", "OTHER",
+  "STOCK_TAKE",    // physical count reconciliation
+  "DAMAGE",        // damaged in storage
+  "THEFT",         // shrinkage
+  "EXPIRY",        // aged / obsolete
+  "OTHER",
 ] as const;
 export type AdjustmentReason = (typeof ADJUSTMENT_REASONS)[number];
 
-// A single adjustment line. `quantity` is SIGNED — positive = stock IN,
-// negative = stock OUT. UI presents it as separate IN/OUT toggle for clarity.
-export const postAdjustmentSchema = z.object({
-  productId:    z.string().min(1, "Pick a product"),
-  warehouseId:  z.string().min(1, "Pick a warehouse"),
-  direction:    z.enum(["IN", "OUT"]),
-  quantity:     z.number().positive("Quantity must be > 0"),
-  reason:       z.enum(ADJUSTMENT_REASONS),
-  rate:         z.string().trim().min(1, "Rate is required"),
-  note:         z.string().trim().max(500).optional().or(z.literal("")),
-  adjustedAt:   z.string(),
-  overrideNegative: z.boolean().optional(),
-});
+const idField = z.string().min(20).max(64);
 
-export type PostAdjustmentInput = z.infer<typeof postAdjustmentSchema>;
+// Signed delta — positive INCREASES stock, negative DECREASES.
+// UI presents this as an IN/OUT toggle + positive number for clarity.
+export const adjustStockSchema = z.object({
+  colourwayId: idField,
+  dyeLot:      z.string().trim().max(80).optional().nullable(),
+  delta:       z.number().refine((n) => n !== 0, "Delta cannot be zero"),
+  reason:      z.enum(ADJUSTMENT_REASONS),
+  ratePaise:   z.union([z.number().int().nonnegative(), z.bigint()]).optional(),
+  note:        z.string().trim().max(500).optional(),
+});
+export type AdjustStockInput = z.infer<typeof adjustStockSchema>;
+
+export const setReorderLevelSchema = z.object({
+  colourwayId: idField,
+  level:       z.number().nonnegative().nullable(),
+});
+export type SetReorderLevelInput = z.infer<typeof setReorderLevelSchema>;

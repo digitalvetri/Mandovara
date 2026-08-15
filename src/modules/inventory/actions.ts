@@ -1,28 +1,28 @@
-﻿// @ts-nocheck
 "use server";
 
-// Inventory server actions.
+// Inventory server actions for the redesigned /inventory page.
 //
-// postAdjustment (inside a transaction):
-//   - Rule 3: stock ledger is append-only. We INSERT a StockLedgerEntry,
-//     never UPDATE. StockBalance is a materialised aggregate that we
-//     UPSERT inside the same transaction.
-//   - Never-negative guard: if this movement would push quantity below zero
-//     for that productÃ—warehouse, we refuse. Explicit `overrideNegative`
-//     flag + `inventory.overrideNegative` permission overrides â€” the
-//     violation still gets audited (via the scoped extension's audit hook).
-//   - Numbering: allocated per warehouse's branch for the docType "STOCK_ADJ".
+// Two entry points:
+//   - adjustStock — writes a StockMove row (append-only per StockMove
+//     model), upserts the StockBalance for that (colourwayId, dyeLot)
+//     row, publishes stock.belowReorder if the SKU crossed its
+//     reorderLevel on the way down.
+//   - setReorderLevel — one-field update on Colourway. Emits
+//     stock.belowReorder if the new level puts the SKU immediately
+//     underwater (e.g. threshold raised above current on-hand).
+//
+// The domain event is picked up in kernel/notifications/stock.ts and
+// creates in-app Notifications for STORE + OWNER users.
 
-import type { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
-import { requirePermission, can } from "@/kernel/rbac/guard";
-import { parseINR } from "@/kernel/money/format";
-import { allocateNumber, Prisma } from "@/kernel/numbering/series";
-import { financialYear } from "@/kernel/datetime";
+import { prisma } from "@/kernel/db/client";
+import { requirePermission } from "@/kernel/rbac/guard";
+import { bus } from "@/kernel/events/bus";
 import { devContext } from "@/lib/dev-context";
-import { postAdjustmentSchema } from "./schema";
+import { adjustStockSchema, setReorderLevelSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -31,138 +31,162 @@ export interface ActionResult<T = unknown> {
   fieldErrors?: Record<string, string>;
 }
 
-export async function postAdjustment(
-  input: unknown,
-): Promise<ActionResult<{ id: string; number: string; newBalance: string }>> {
+export async function adjustStock(input: unknown): Promise<ActionResult<{ id: string; newOnHand: string }>> {
   const ctx = await devContext();
   requirePermission(ctx, "inventory.adjust");
-
-  const parsed = postAdjustmentSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
+  const parsed = adjustStockSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
   const d = parsed.data;
 
-  const ratePaise = tryParse(d.rate);
-  if (ratePaise == null || ratePaise < 0n) {
-    return { ok: false, error: "Validation failed",
-             fieldErrors: { rate: "Rate must be a valid amount" } };
-  }
-
   const db = scoped(ctx);
-  const wh = await db.warehouse.findUniqueOrThrow({
-    where: { id: d.warehouseId },
-    select: { id: true, branchId: true, name: true },
+  const cw = await db.colourway.findUnique({
+    where:  { id: d.colourwayId },
+    select: { id: true, sellUnit: true, reorderLevel: true, isActive: true },
   });
-  const branch = await db.branch.findUniqueOrThrow({
-    where: { id: wh.branchId },
-    select: { invoicePrefix: true },
-  });
-  const existing = await db.stockBalance.findUnique({
-    where: { warehouseId_productId: { warehouseId: d.warehouseId, productId: d.productId } },
-    select: { quantity: true, value: true },
-  });
+  if (!cw) return { ok: false, error: "Product not found" };
+  if (!cw.isActive) return { ok: false, error: "Product is inactive" };
 
-  const currentQty   = new Prisma.Decimal(existing?.quantity ?? 0);
-  const currentValue = existing?.value ?? 0n;
-  const qty = new Prisma.Decimal(d.quantity);
-  const signedDelta  = d.direction === "IN" ? qty : qty.neg();
-  const newQty       = currentQty.plus(signedDelta);
+  const dyeLot = d.dyeLot?.trim() || null;
+  const deltaDec = new Prisma.Decimal(d.delta);
+  const ratePaise = typeof d.ratePaise === "bigint" ? d.ratePaise
+                  : d.ratePaise ? BigInt(d.ratePaise) : 0n;
 
-  // Never-negative guard (Â§11 acceptance): permission-gated override.
-  if (newQty.lt(0)) {
-    if (!d.overrideNegative) {
-      return {
-        ok: false,
-        error: `Would push stock to ${newQty.toString()}. Current on hand: ${currentQty.toString()}. Tick "Override negative" to force.`,
-      };
-    }
-    if (!can(ctx, "inventory.overrideNegative")) {
-      return { ok: false, error: "You don't have permission to post a negative stock movement." };
-    }
-  }
-
-  const adjustedAt = new Date(d.adjustedAt);
-  const created = await withTransaction(async (tx: TxClient) => {
-    const number = await allocateNumber(tx, {
-      orgId:         ctx.orgId,
-      branchId:      wh.branchId,
-      docType:       "STOCK_ADJ",
-      financialYear: financialYear(adjustedAt),
-      prefix:        `${branch.invoicePrefix}/ADJ`,
+  const { moveId, newOnHand, wasHealthy, isNowLow } = await withTransaction(async (tx: TxClient) => {
+    // Compound unique key requires string, not string|null, at the TS
+    // layer even though PG accepts NULL. Fall back to findFirst.
+    const existing = await tx.stockBalance.findFirst({
+      where:  { colourwayId: cw.id, dyeLot },
+      select: { id: true, quantity: true, value: true },
     });
-    const adjustment = await tx.stockAdjustment.create({
-      data: {
-        orgId:      ctx.orgId,
-        warehouseId: wh.id,
-        number,
-        productId:  d.productId,
-        quantity:   signedDelta,
-        reason:     d.reason,
-        note:       (d.note ?? "").trim() || null,
-        adjustedAt,
-        createdById: ctx.userId,
-      },
-      select: { id: true, number: true },
-    });
-    await tx.stockLedgerEntry.create({
-      data: {
-        orgId:       ctx.orgId,
-        warehouseId: wh.id,
-        productId:   d.productId,
-        direction:   d.direction,
-        quantity:    qty,
-        rate:        ratePaise,
-        refType:     "ADJUSTMENT",
-        refId:       adjustment.id,
-        occurredAt:  adjustedAt,
-      },
-    });
-    // Update / insert the balance row. Value: for IN, add qtyÃ—rate; for OUT,
-    // subtract at the *average* implied rate (currentValue / currentQty).
-    let newValue: bigint;
-    if (d.direction === "IN") {
-      newValue = currentValue + BigInt(Math.round(d.quantity * Number(ratePaise)));
+    const curQty   = existing ? new Prisma.Decimal(existing.quantity) : new Prisma.Decimal(0);
+    const curVal   = existing?.value ?? 0n;
+    const nextQty  = curQty.plus(deltaDec);
+    // Value: if adding, use the provided rate; if removing, take away
+    // at implied average so the value never drifts unbounded.
+    let nextVal: bigint;
+    if (deltaDec.gt(0)) {
+      nextVal = curVal + BigInt(Math.round(Number(deltaDec) * Number(ratePaise)));
     } else {
-      // Subtract at implied avg to keep valuation consistent; guard div/0.
-      const cQty = Number(currentQty.toString());
-      if (cQty === 0) {
-        // Negative stock created â€” value goes negative at incoming rate.
-        newValue = currentValue - BigInt(Math.round(d.quantity * Number(ratePaise)));
+      const cQ = Number(curQty);
+      if (cQ === 0) {
+        nextVal = curVal + BigInt(Math.round(Number(deltaDec) * Number(ratePaise)));
       } else {
-        const avg = Number(currentValue) / cQty;
-        newValue = currentValue - BigInt(Math.round(d.quantity * avg));
-        if (newValue < 0n) newValue = 0n;
+        const avg = Number(curVal) / cQ;
+        nextVal = curVal + BigInt(Math.round(Number(deltaDec) * avg));
+        if (nextVal < 0n) nextVal = 0n;
       }
     }
-    await tx.stockBalance.upsert({
-      where: { warehouseId_productId: { warehouseId: wh.id, productId: d.productId } },
-      create: {
-        orgId:       ctx.orgId,
-        warehouseId: wh.id,
-        productId:   d.productId,
-        quantity:    newQty,
-        value:       newValue,
+
+    const move = await tx.stockMove.create({
+      data: {
+        organizationId: ctx.orgId,
+        colourwayId:    cw.id,
+        dyeLot,
+        type:           "ADJUSTMENT",
+        quantity:       deltaDec.abs(),
+        rate:           ratePaise,
+        refType:        "ADJUSTMENT",
+        refId:          `adjust-${d.reason}`,
+        occurredAt:     new Date(),
+        createdById:    ctx.userId,
       },
-      update: { quantity: newQty, value: newValue },
+      select: { id: true },
     });
-    return { ...adjustment, newBalance: newQty.toString() };
+
+    if (existing) {
+      await tx.stockBalance.update({
+        where: { id: existing.id },
+        data:  { quantity: nextQty, value: nextVal },
+      });
+    } else {
+      await tx.stockBalance.create({
+        data: {
+          organizationId: ctx.orgId,
+          colourwayId:    cw.id,
+          dyeLot,
+          quantity:       nextQty,
+          value:          nextVal,
+        },
+      });
+    }
+
+    // Compute the SKU's total on-hand (across dye lots) to decide the
+    // low-stock crossing. Read AFTER the upsert.
+    const allLots = await tx.stockBalance.findMany({
+      where:  { colourwayId: cw.id },
+      select: { quantity: true },
+    });
+    const totalOnHand = allLots.reduce((s, b) => s + Number(b.quantity), 0);
+    const reorder = cw.reorderLevel == null ? null : Number(cw.reorderLevel);
+    const wasHealthy = reorder == null || (totalOnHand - Number(deltaDec)) > reorder;
+    const isNowLow   = reorder != null && totalOnHand <= reorder;
+
+    return { moveId: move.id, newOnHand: String(totalOnHand), wasHealthy, isNowLow };
   });
 
-  revalidatePath("/inventory");
-  return { ok: true, data: created };
-}
-
-// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
-  const fieldErrors: Record<string, string> = {};
-  for (const iss of err.issues) {
-    const p = iss.path
-      .filter((seg): seg is string | number => typeof seg === "string" || typeof seg === "number")
-      .join(".");
-    if (!fieldErrors[p]) fieldErrors[p] = iss.message;
+  // Fire the event AFTER commit — bus handlers create notifications.
+  if (wasHealthy && isNowLow) {
+    await bus.publish({
+      type:         "stock.belowReorder",
+      orgId:        ctx.orgId,
+      actorId:      ctx.userId,
+      occurredAt:   new Date(),
+      productId:    cw.id,
+      warehouseId:  "",              // legacy shape — kept for handler compatibility
+      currentQty:   newOnHand,
+      reorderLevel: String(cw.reorderLevel ?? 0),
+    });
   }
-  return { ok: false, error: "Validation failed", fieldErrors };
+
+  revalidatePath("/inventory");
+  return { ok: true, data: { id: moveId, newOnHand } };
 }
-function tryParse(v: string): bigint | null {
-  try { return parseINR(v); } catch { return null; }
+
+export async function setReorderLevel(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "inventory.adjust");
+  const parsed = setReorderLevelSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+  const d = parsed.data;
+
+  const db = scoped(ctx);
+  const cw = await db.colourway.findUnique({
+    where:  { id: d.colourwayId },
+    select: { id: true },
+  });
+  if (!cw) return { ok: false, error: "Product not found" };
+
+  await db.colourway.update({
+    where: { id: d.colourwayId },
+    data:  { reorderLevel: d.level == null ? null : new Prisma.Decimal(d.level) },
+  });
+
+  // If the new threshold puts current on-hand at/below it, fire the
+  // low-stock event so the notification lands.
+  if (d.level != null) {
+    const bals = await prisma.stockBalance.findMany({
+      where:  { colourwayId: d.colourwayId },
+      select: { quantity: true },
+    });
+    const onHand = bals.reduce((s, b) => s + Number(b.quantity), 0);
+    if (onHand <= d.level) {
+      await bus.publish({
+        type:         "stock.belowReorder",
+        orgId:        ctx.orgId,
+        actorId:      ctx.userId,
+        occurredAt:   new Date(),
+        productId:    d.colourwayId,
+        warehouseId:  "",
+        currentQty:   String(onHand),
+        reorderLevel: String(d.level),
+      });
+    }
+  }
+
+  revalidatePath("/inventory");
+  return { ok: true, data: { id: d.colourwayId } };
 }
