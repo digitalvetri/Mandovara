@@ -19,7 +19,10 @@ interface NavItem { label: string; href: string; icon: LucideIcon }
 const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "Overview",
-    items: [{ label: "Owner Dashboard", href: "/", icon: LayoutDashboard }],
+    items: [
+      { label: "Owner Dashboard", href: "/",         icon: LayoutDashboard },
+      { label: "Projects",        href: "/projects", icon: Briefcase       },
+    ],
   },
   {
     section: "Revenue",

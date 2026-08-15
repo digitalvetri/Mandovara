@@ -24,21 +24,17 @@ export function ProductCard({ row }: { row: ProductRow }) {
       href={`/products/${row.id}` as Route}
       className="group relative flex flex-col rounded-[14px] border border-rule bg-surface overflow-hidden transition-all duration-200 hover:bg-surface-hover hover:border-rule/80 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
     >
-      {/* Image well — 4:5 portrait */}
+      {/* Image well — fixed 4:5 portrait, image fills uniformly */}
       <div className="relative aspect-[4/5] bg-ink border-b border-rule/60 overflow-hidden">
         {row.imageKey ? (
           <img
             src={row.imageKey}
             alt={row.name}
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-contain"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
-          <div
-            className="absolute inset-0"
-            style={{ background: row.hex ?? "var(--color-surface-hover)" }}
-            aria-label={`${row.name} swatch`}
-          />
+          <SwatchFallback name={row.name} code={row.code} hex={row.hex} />
         )}
 
         {/* NEW pill — top-left */}
@@ -59,22 +55,25 @@ export function ProductCard({ row }: { row: ProductRow }) {
         )}
       </div>
 
-      {/* Card body */}
-      <div className="relative flex-1 flex flex-col px-4 py-3.5 gap-1">
+      {/* Card body — fixed row grid so every card aligns identically */}
+      <div className="relative flex flex-col px-4 pt-3.5 pb-3 gap-1">
         {/* 4px gold left edge — the design-system swatch chip */}
         <span
           aria-hidden
           className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-[2px]"
           style={{ backgroundColor: swatchColour }}
         />
-        <div className="pl-2 flex-1 flex flex-col">
-          <div className="font-display text-[15px] leading-[20px] font-[460] text-text tracking-[-0.01em] line-clamp-2 min-h-[40px]">
+        <div className="pl-2 flex flex-col">
+          {/* Name — always exactly 2 lines tall */}
+          <div className="font-display text-[15px] leading-[20px] font-[460] text-text tracking-[-0.01em] line-clamp-2 h-[40px]">
             {row.name}
           </div>
-          <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-text-dim truncate">
+          {/* Brand · family — always 1 line */}
+          <div className="mt-1 text-[10px] uppercase tracking-[0.14em] text-text-dim truncate h-[14px] leading-[14px]">
             {row.brand} <span className="text-text-faint">·</span> {row.familyLabel}
           </div>
-          <div className="mt-0.5 relative inline-block w-fit text-[10.5px] tabular text-text-faint">
+          {/* Code — always 1 line */}
+          <div className="mt-0.5 relative w-fit max-w-full text-[10.5px] tabular text-text-faint h-[14px] leading-[14px] truncate">
             {row.code}
             <span
               aria-hidden
@@ -82,13 +81,15 @@ export function ProductCard({ row }: { row: ProductRow }) {
             />
           </div>
 
-          {/* Price + stock row */}
-          <div className="mt-auto pt-2.5 flex items-baseline justify-between gap-2">
-            <div className="tabular">
+          {/* Price + stock — pinned row, consistent height */}
+          <div className="mt-3 pt-2.5 border-t border-rule/50 flex items-center justify-between gap-2 h-[28px]">
+            <div className="tabular flex items-baseline gap-1 min-w-0">
               {row.mrp != null ? (
                 <>
-                  <span className="text-[13.5px] font-medium text-text">{formatINR(row.mrp)}</span>
-                  <span className="ml-1 text-[10.5px] text-text-faint">/{uomShort}</span>
+                  <span className="text-[14px] font-medium text-text leading-none">
+                    {formatINR(row.mrp)}
+                  </span>
+                  <span className="text-[10.5px] text-text-faint leading-none">/{uomShort}</span>
                 </>
               ) : (
                 <span className="text-[11.5px] text-text-faint">Price on request</span>
@@ -100,6 +101,54 @@ export function ProductCard({ row }: { row: ProductRow }) {
       </div>
     </Link>
   );
+}
+
+// When there is no photograph, don't render a bare beige rectangle —
+// paint the swatch colour and cross-hatch it faintly so identical hex
+// values in the seed still read as textured chips rather than flat fills.
+// The design name and code appear once, in the card body directly below.
+function SwatchFallback({ name, hex }: { name: string; code: string; hex: string | null }) {
+  const bg = hex ?? "#8792AC";
+  const light = isLight(bg);
+  const hatch = light ? "rgba(11,16,32,0.07)" : "rgba(255,255,255,0.05)";
+  const monogram = initial(name);
+  const monogramColour = light ? "rgba(11,16,32,0.14)" : "rgba(255,255,255,0.12)";
+  return (
+    <div
+      className="absolute inset-0 flex items-center justify-center"
+      style={{
+        background: `
+          repeating-linear-gradient(135deg, ${hatch} 0 1px, transparent 1px 8px),
+          ${bg}
+        `,
+      }}
+      aria-label={`${name} swatch`}
+    >
+      <span
+        aria-hidden
+        className="font-display font-[500] leading-none select-none"
+        style={{ color: monogramColour, fontSize: "88px", letterSpacing: "-0.04em" }}
+      >
+        {monogram}
+      </span>
+    </div>
+  );
+}
+
+function initial(name: string): string {
+  const trimmed = name.trim().replace(/^[\d.\s]+/, "");
+  const first = trimmed.charAt(0).toUpperCase();
+  return first || name.trim().charAt(0).toUpperCase() || "•";
+}
+
+function isLight(hex: string): boolean {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return false;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luma > 0.6;
 }
 
 function StockPill({ inStock }: { inStock: boolean }) {
