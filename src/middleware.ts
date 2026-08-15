@@ -3,8 +3,9 @@ import type { NextRequest } from "next/server";
 
 // Paths that never need authentication
 const PUBLIC_PATHS = ["/login", "/api/health"];
-// Path prefixes that are always allowed (webhooks use their own HMAC auth)
-const PUBLIC_PREFIXES = ["/api/webhooks/", "/_next/", "/favicon.ico", "/icons/", "/images/"];
+// Path prefixes that are always allowed (webhooks use their own HMAC auth;
+// /api/admin/ endpoints use their own token header for auth).
+const PUBLIC_PREFIXES = ["/api/webhooks/", "/api/admin/", "/_next/", "/favicon.ico", "/icons/", "/images/"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
