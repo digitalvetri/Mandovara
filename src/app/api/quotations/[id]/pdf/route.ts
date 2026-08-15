@@ -18,7 +18,6 @@ export async function GET(
   const q = await getQuotation(ctx, id);
   if (!q) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const element = React.createElement(QuotePdf, { quotation: q }) as ReactElement<DocumentProps>;
   const buffer = await renderToBuffer(element);
   const bytes = new Uint8Array(buffer);
