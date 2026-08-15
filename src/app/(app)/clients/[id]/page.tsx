@@ -10,6 +10,7 @@ import { devContext } from "@/lib/dev-context";
 import { getClient } from "@/modules/clients/queries";
 import { listQuotationsForClient } from "@/modules/quotations/queries";
 import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
+import { BillingAddressCard } from "../_components/BillingAddressCard";
 
 const STAGE_LABEL: Record<string, string> = {
   ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
@@ -35,10 +36,6 @@ export default async function ClientDetailPage({
   if (!client) notFound();
   const quotations = await listQuotationsForClient(ctx, client.id);
 
-  const addr = client.billingAddress as {
-    line1?: string; line2?: string; city?: string; pincode?: string; stateCode?: string;
-  } | null;
-
   return (
     <>
       <Topbar
@@ -57,19 +54,10 @@ export default async function ClientDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-[14px] bg-surface border border-rule p-6">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
-              Billing Address
-            </div>
-            {addr ? (
-              <div className="text-[12.5px] text-text">
-                <div>{addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}</div>
-                <div className="text-text-dim">{addr.city ?? ""}{addr.pincode ? ` — ${addr.pincode}` : ""}{addr.stateCode ? ` · State ${addr.stateCode}` : ""}</div>
-              </div>
-            ) : (
-              <div className="text-[12px] text-text-faint">No billing address on file.</div>
-            )}
-          </div>
+          <BillingAddressCard
+            clientId={client.id}
+            initial={client.billingAddress as { line1?: string; city?: string; state?: string; pincode?: string; country?: string } | null}
+          />
 
           {/* Projects */}
           <div className="rounded-[14px] bg-surface border border-rule p-6">

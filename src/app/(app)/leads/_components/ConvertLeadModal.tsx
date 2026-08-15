@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { X, UserCheck, Building2, MapPin, IndianRupee, CalendarDays, ClipboardList } from "lucide-react";
+import { X, UserCheck, Building2, MapPin, IndianRupee, CalendarDays, ClipboardList, Home } from "lucide-react";
 import { convertLead } from "@/modules/leads/actions";
 
 const PROJECT_TYPES = ["Residential", "Commercial", "Office", "Retail", "Hospitality", "Other"] as const;
@@ -26,6 +26,13 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
+    // billing address
+    billingLine1:      "",
+    billingCity:       "Coimbatore",
+    billingState:      "Tamil Nadu",
+    billingPincode:    "",
+    billingCountry:    "India",
+    // project
     projectName:       leadName,
     projectType:       "Residential",
     siteCity:          "",
@@ -47,6 +54,11 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
     startTransition(async () => {
       const res = await convertLead({
         id:                leadId,
+        billingLine1:      form.billingLine1.trim() || undefined,
+        billingCity:       form.billingCity.trim() || undefined,
+        billingState:      form.billingState.trim() || undefined,
+        billingPincode:    form.billingPincode.trim() || undefined,
+        billingCountry:    form.billingCountry.trim() || undefined,
         projectName:       form.projectName.trim(),
         projectType:       form.projectType || undefined,
         siteCity:          form.siteCity.trim() || undefined,
@@ -85,43 +97,76 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
           </div>
         </div>
 
-        {/* Project form */}
-        <form onSubmit={submit} className="px-6 py-5 space-y-4 max-h-[58vh] overflow-y-auto">
-          <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim -mb-1">New project</div>
+        {/* Form — billing address + project */}
+        <form onSubmit={submit} className="px-6 py-5 space-y-5 max-h-[62vh] overflow-y-auto">
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className={lbl}>Project Name *</label>
-              <input value={form.projectName} onChange={set("projectName")} className={inp} placeholder={leadName} />
+          {/* Billing Address */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-3">
+              <Home size={11} className="text-text-dim" strokeWidth={1.75} />
+              <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">Billing Address</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className={lbl}>Address Line</label>
+                <input value={form.billingLine1} onChange={set("billingLine1")} className={inp} placeholder="Street, Building, Floor" />
+              </div>
+              <div>
+                <label className={lbl}>City</label>
+                <input value={form.billingCity} onChange={set("billingCity")} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>PIN Code</label>
+                <input value={form.billingPincode} onChange={set("billingPincode")} className={inp} placeholder="641002" inputMode="numeric" />
+              </div>
+              <div>
+                <label className={lbl}>State</label>
+                <input value={form.billingState} onChange={set("billingState")} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Country</label>
+                <input value={form.billingCountry} onChange={set("billingCountry")} className={inp} />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-rule" />
+
+          {/* Project */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-3">
+              <Building2 size={11} className="text-text-dim" strokeWidth={1.75} />
+              <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">New project</span>
             </div>
 
-            <div>
-              <label className={lbl}><Building2 size={10} className="inline mr-1" />Project Type</label>
-              <select value={form.projectType} onChange={set("projectType")} className={inp}>
-                {PROJECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className={lbl}><MapPin size={10} className="inline mr-1" />Site City</label>
-              <input value={form.siteCity} onChange={set("siteCity")} className={inp} placeholder="e.g. Coimbatore" />
-            </div>
-
-            <div>
-              <label className={lbl}><IndianRupee size={10} className="inline mr-1" />Estimated Budget (₹)</label>
-              <input value={form.estimatedBudget} onChange={set("estimatedBudget")} className={inp}
-                     placeholder="e.g. 250000" inputMode="numeric" />
-            </div>
-
-            <div>
-              <label className={lbl}><CalendarDays size={10} className="inline mr-1" />Expected Start Date</label>
-              <input type="date" value={form.expectedStartDate} onChange={set("expectedStartDate")} className={inp} />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className={lbl}><ClipboardList size={10} className="inline mr-1" />Requirement</label>
-              <textarea value={form.requirement} onChange={set("requirement")} className={ta} rows={3}
-                        placeholder="What is the client looking for?" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className={lbl}>Project Name *</label>
+                <input value={form.projectName} onChange={set("projectName")} className={inp} placeholder={leadName} />
+              </div>
+              <div>
+                <label className={lbl}>Project Type</label>
+                <select value={form.projectType} onChange={set("projectType")} className={inp}>
+                  {PROJECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}><MapPin size={10} className="inline mr-1" />Site City</label>
+                <input value={form.siteCity} onChange={set("siteCity")} className={inp} placeholder="e.g. Coimbatore" />
+              </div>
+              <div>
+                <label className={lbl}><IndianRupee size={10} className="inline mr-1" />Estimated Budget (₹)</label>
+                <input value={form.estimatedBudget} onChange={set("estimatedBudget")} className={inp} placeholder="e.g. 250000" inputMode="numeric" />
+              </div>
+              <div>
+                <label className={lbl}><CalendarDays size={10} className="inline mr-1" />Expected Start Date</label>
+                <input type="date" value={form.expectedStartDate} onChange={set("expectedStartDate")} className={inp} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={lbl}><ClipboardList size={10} className="inline mr-1" />Requirement</label>
+                <textarea value={form.requirement} onChange={set("requirement")} className={ta} rows={3}
+                          placeholder="What is the client looking for?" />
+              </div>
             </div>
           </div>
 

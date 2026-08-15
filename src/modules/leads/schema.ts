@@ -130,6 +130,13 @@ export const statusChangeSchema = z
 
 export const convertLeadSchema = z.object({
   id: z.string().min(1),
+  // billing address (goes to Client.billingAddress)
+  billingLine1:      z.string().trim().max(200).optional(),
+  billingCity:       z.string().trim().max(100).optional(),
+  billingState:      z.string().trim().max(100).optional(),
+  billingPincode:    z.string().trim().max(10).optional(),
+  billingCountry:    z.string().trim().max(100).optional(),
+  // project (goes to siteAddress JSON)
   projectName:       z.string().trim().min(1).max(200).optional(),
   projectType:       z.string().trim().max(50).optional(),
   siteCity:          z.string().trim().max(100).optional(),

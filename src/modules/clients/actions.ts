@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use server";
 
-import type { z } from "zod";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
@@ -99,6 +99,28 @@ export async function updateClient(input: unknown): Promise<ActionResult<{ id: s
   }
 
   revalidatePath("/clients");
+  revalidatePath(`/clients/${id}`);
+  return { ok: true, data: { id } };
+}
+
+export async function updateBillingAddress(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "client.update");
+
+  const parsed = z.object({
+    id:      z.string().min(1),
+    line1:   z.string().trim().max(200).optional(),
+    city:    z.string().trim().max(100).optional(),
+    state:   z.string().trim().max(100).optional(),
+    pincode: z.string().trim().max(10).optional(),
+    country: z.string().trim().max(100).optional(),
+  }).safeParse(input);
+  if (!parsed.success) return zodError<{ id: string }>(parsed.error);
+  const { id, ...addr } = parsed.data;
+
+  const db = scoped(ctx);
+  await db.client.update({ where: { id }, data: { billingAddress: addr } });
+
   revalidatePath(`/clients/${id}`);
   return { ok: true, data: { id } };
 }

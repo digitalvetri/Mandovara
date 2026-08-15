@@ -218,7 +218,11 @@ export async function convertLead(
 
   const parsed = convertLeadSchema.safeParse(input);
   if (!parsed.success) return zodError<{ clientId: string; projectId: string | null }>(parsed.error);
-  const { id, projectName: projNameInput, projectType, siteCity, requirement: reqInput, estimatedBudget, expectedStartDate } = parsed.data;
+  const {
+    id,
+    billingLine1, billingCity, billingState, billingPincode, billingCountry,
+    projectName: projNameInput, projectType, siteCity, requirement: reqInput, estimatedBudget, expectedStartDate,
+  } = parsed.data;
 
   const db = scoped(ctx);
   try {
@@ -258,7 +262,15 @@ export async function convertLead(
   const finalName = projNameInput?.trim()
     || (typeof addr?.projectName === "string" && addr.projectName ? addr.projectName : lead.name);
 
-  // All soft intake fields go into siteAddress JSON — never overload orderValue or expectedInstallAt
+  const clientBillingAddress = {
+    ...(billingLine1   && { line1:    billingLine1   }),
+    ...(billingCity    && { city:     billingCity    }),
+    ...(billingState   && { state:    billingState   }),
+    ...(billingPincode && { pincode:  billingPincode }),
+    ...(billingCountry && { country:  billingCountry }),
+  };
+
+  // All soft project intake fields go into siteAddress JSON — never overload orderValue or expectedInstallAt
   const projSiteAddr: Record<string, unknown> = {
     ...(addr ?? {}),
     ...(projectType       && { projectType }),
@@ -278,7 +290,7 @@ export async function convertLead(
         name:           lead.name,
         mobile:         lead.mobile,
         email:          lead.email ?? undefined,
-        billingAddress: {},
+        billingAddress: clientBillingAddress,
         ownerId:        ctx.userId,
       },
       select: { id: true },
