@@ -24,6 +24,7 @@
 import { PrismaClient, type SellUnit } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { existsSync } from "node:fs";
+import { priceFor } from "./_lib/catalog-pricing";
 
 // ── Paths ────────────────────────────────────────────────────────
 
@@ -42,6 +43,9 @@ interface FamilyDefaults {
   sellUnit:       SellUnit;
   hsn:            string;
   gstRatePct:     number;
+  // Legacy flat rate — kept for reference. Actual RETAIL prices are now
+  // generated per-SKU by priceFor(family, cwCode) so identical family
+  // rows don't all end up at the same rupee value.
   ratePaise:      bigint;
   hex:            string;
 }
@@ -164,6 +168,7 @@ async function main(): Promise<void> {
         });
         totalCw += 1;
 
+        const amount = priceFor(cfg.family, cwCode);
         const existingPrice = await db.price.findFirst({
           where:  { colourwayId: cw.id, tier: "RETAIL", effectiveTo: null },
           select: { id: true, amount: true },
@@ -174,9 +179,15 @@ async function main(): Promise<void> {
               organizationId: org.id,
               colourwayId:    cw.id,
               tier:           "RETAIL",
-              amount:         cfg.ratePaise,
+              amount,
               effectiveFrom:  now,
             },
+          });
+          totalPrices += 1;
+        } else if (existingPrice.amount !== amount) {
+          await db.price.update({
+            where: { id: existingPrice.id },
+            data:  { amount },
           });
           totalPrices += 1;
         }

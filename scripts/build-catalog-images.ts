@@ -150,21 +150,44 @@ async function findPdfs(dir: string): Promise<string[]> {
   return out.sort();
 }
 
-// Turn "ATHENA - CJS (5).pdf" → "athena", "SKY 1-CJS" → "sky-1".
+// Turn "ATHENA - CJS (5).pdf" → "athena", "SKY 1-CJS" → "sky-1",
+// "CARMEN2.0-CJS" → "carmen-2" (drop the trailing ".0" so numeric-
+// versioned designs collapse cleanly onto "CARMEN 2" in the DB).
 function normalise(raw: string): string {
   return raw
     .toLowerCase()
     .replace(/\.pdf$/i, "")
     .replace(/\(\d+\)/g, "")            // "(5)" revision number
     .replace(/\bcjs\b/g, "")            // supplier tag
+    .replace(/(\d+)\.0\b/g, "$1")       // "carmen2.0" → "carmen2"
     .replace(/[-_]+$/, "")
     .replace(/[^a-z0-9]+/g, " ")
+    .replace(/([a-z])(\d)/g, "$1 $2")   // "carmen2" → "carmen 2"
     .trim()
     .replace(/\s+/g, "-");
 }
 
 function slugify(raw: string): string {
   return normalise(raw) || "unnamed";
+}
+
+// Series markers, brand names and supplier tags that appear inside
+// PDF filenames but are never the design name themselves. Stripped
+// before scoring so "artbook-vol-2-fedora-gni-korea" can't grab
+// "AURORA VOL 2" purely on the [vol, 2] overlap.
+const MATCH_STOPWORDS = new Set([
+  "vol", "volume", "series", "collection", "the",
+  "fedora", "grandeco", "masureel", "bemax", "emiliana", "gni",
+  "korean", "korea", "italy", "italian", "belgium", "german",
+  "wallpapers", "wallpaper", "catalouge", "catalogue", "book",
+  "cjs", "pdf",
+]);
+
+function tokensOf(key: string): string[] {
+  return key
+    .split("-")
+    .filter((t) => t.length >= 2 || /^\d+$/.test(t))    // keep pure-digit tokens
+    .filter((t) => !MATCH_STOPWORDS.has(t));
 }
 
 // Consume the map entry on first match so a design with several
@@ -185,28 +208,30 @@ function matchOnce(
   const exact = map.get(key);
   if (exact) { map.delete(key); return exact; }
 
-  const keyTokens = new Set(key.split("-").filter((t) => t.length >= 2));
+  const keyTokens = new Set(tokensOf(key));
   if (keyTokens.size === 0) return null;
 
   // Fuzzy fallback rules:
   //   - Multi-token design: needs ≥2 of its unique tokens present in
   //     the PDF key. Blocks "silver" alone from stealing SILVER-OAK,
   //     "garden" alone from stealing SQUARE GARDEN.
-  //   - Single-token design: needs its one token (≥3 chars) present
-  //     in the PDF key. Lets "astra-fedora-wallpapers-gni-korea"
-  //     link to the ASTRA design.
+  //   - Single-token design: needs its one word token (≥3 chars,
+  //     never a bare number) present in the PDF key. Lets
+  //     "astra-fedora-wallpapers-gni-korea" link to the ASTRA design
+  //     but blocks bare "2" from stealing every numbered PDF.
   // Prefer higher score first, then higher ratio, so multi-token
   // matches beat coincidental single-token hits.
   let bestKey: string | null = null;
   let bestScore = 0;
   let bestRatio = 0;
   for (const [k, _] of map.entries()) {
-    const designTokens = [...new Set(k.split("-").filter((t) => t.length >= 2))];
+    const designTokens = [...new Set(tokensOf(k))];
     if (designTokens.length === 0) continue;
     const score = designTokens.filter((t) => keyTokens.has(t)).length;
     if (designTokens.length >= 2 && score < 2) continue;
     if (designTokens.length === 1) {
       const only = designTokens[0]!;
+      if (/^\d+$/.test(only)) continue;
       if (only.length < 3 || !keyTokens.has(only)) continue;
     }
     const ratio = score / designTokens.length;

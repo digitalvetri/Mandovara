@@ -54,25 +54,36 @@ async function main(): Promise<void> {
 // This post-seed pass scans every series and seeds the counter to the
 // max used, so the very next allocation returns the following number.
 async function bumpNumberSequences(db: PrismaClient, orgId: string): Promise<void> {
-  const cfg: { series: string; table: string; prefix: string }[] = [
-    { series: "PRJ", table: "Project",     prefix: "MDV" },
-    { series: "MEA", table: "Measurement", prefix: "MDV" },
-    { series: "QT",  table: "Quotation",   prefix: "MDV" },
-    { series: "SO",  table: "Order",       prefix: "MDV" },
-    { series: "INV", table: "Invoice",     prefix: "MDV" },
-    { series: "RCT", table: "Receipt",     prefix: "MDV" },
-    { series: "PO",  table: "PurchaseOrder", prefix: "MDV" },
-    { series: "GRN", table: "GRN",         prefix: "MDV" },
-    { series: "INS", table: "InstallVisit", prefix: "MDV" },
-    { series: "MJ",  table: "MakeJob",     prefix: "MDV" },
+  // Every series in src/modules/**/actions.ts that calls allocateNumber().
+  // MUST stay in sync with new modules — a missing entry silently causes
+  // "Unique constraint failed on (organizationId, number)" the first
+  // time a user creates a record of that type via the UI.
+  //
+  // `numberField` names the column in the target table that holds the
+  // MDV/<SERIES>-YYMM-NNNN string. Most tables use `number`; Client
+  // stores it in `code`.
+  const cfg: { series: string; table: string; numberField: string; prefix: string }[] = [
+    { series: "PRJ",  table: "Project",         numberField: "number", prefix: "MDV" },
+    { series: "MEA",  table: "Measurement",     numberField: "number", prefix: "MDV" },
+    { series: "QT",   table: "Quotation",       numberField: "number", prefix: "MDV" },
+    { series: "SO",   table: "Order",           numberField: "number", prefix: "MDV" },
+    { series: "INV",  table: "Invoice",         numberField: "number", prefix: "MDV" },
+    { series: "RCT",  table: "Receipt",         numberField: "number", prefix: "MDV" },
+    { series: "PO",   table: "PurchaseOrder",   numberField: "number", prefix: "MDV" },
+    { series: "GRN",  table: "GRN",             numberField: "number", prefix: "MDV" },
+    { series: "INS",  table: "InstallVisit",    numberField: "number", prefix: "MDV" },
+    { series: "MJ",   table: "MakeJob",         numberField: "number", prefix: "MDV" },
+    { series: "ENQ",  table: "Lead",            numberField: "number", prefix: "MDV" },
+    { series: "CLI",  table: "Client",          numberField: "code",   prefix: "MDV" },
+    { series: "SV",   table: "SiteVisit",       numberField: "number", prefix: "MDV" },
   ];
   for (const c of cfg) {
     const rows = await db.$queryRawUnsafe<{ yymm: string; max: number }[]>(`
-      SELECT SPLIT_PART(number, '-', 2) AS yymm,
-             MAX(CAST(SPLIT_PART(number, '-', 3) AS INT)) AS max
+      SELECT SPLIT_PART("${c.numberField}", '-', 2) AS yymm,
+             MAX(CAST(SPLIT_PART("${c.numberField}", '-', 3) AS INT)) AS max
       FROM "${c.table}"
       WHERE "organizationId" = $1
-        AND number ~ '^${c.prefix}/${c.series}-[0-9]+-[0-9]+$'
+        AND "${c.numberField}" ~ '^${c.prefix}/${c.series}-[0-9]+-[0-9]+$'
       GROUP BY 1
     `, orgId);
     for (const r of rows) {
