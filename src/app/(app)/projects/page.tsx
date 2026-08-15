@@ -29,7 +29,7 @@ export default async function ProjectsPage({
   return (
     <>
       <Topbar
-        title="Project Pipeline"
+        title="Projects"
         eyebrow={`${total} project${total === 1 ? "" : "s"} · ${eyebrowFor(stage, q)}`}
         actions={
           <Link href={"/projects/new" as Route}>
