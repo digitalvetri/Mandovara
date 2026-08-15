@@ -6,15 +6,8 @@ import { devContext } from "@/lib/dev-context";
 import { shortNumber } from "@/lib/short-number";
 import { getReportKpis } from "@/modules/reports/kpi";
 import { leadsBySource, invoiceAgeing, topClientsByRevenue, projectMarginTop } from "@/modules/reports/queries";
-import { listArchitectReport } from "@/modules/reports/architect";
-import { listFamilyMarginReport } from "@/modules/reports/family";
-import { listDeadStockReport } from "@/modules/reports/deadstock";
-import { listWastageReport } from "@/modules/reports/wastage";
 import { ExportButtons } from "./ExportButtons";
 import { DateRangeFilter } from "./_components/DateRangeFilter";
-import { FamilySection } from "./_components/FamilySection";
-import { ArchitectSection } from "./_components/ArchitectSection";
-import { DeadStockTable, WastageTable } from "./_components/OpsSection";
 
 export const dynamic = "force-dynamic";
 
@@ -32,17 +25,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const from = p.from ? new Date(p.from) : undefined;
   const to   = p.to   ? new Date(`${p.to}T23:59:59`) : undefined;
 
-  const [kpi, leads, ageing, topClients, margins, architects, familyMargin, deadStock, wastage] =
+  const [kpi, leads, ageing, topClients, margins] =
     await Promise.all([
       getReportKpis(ctx, { from, to }),
       leadsBySource(ctx),
       invoiceAgeing(ctx),
       topClientsByRevenue(ctx, 10),
       projectMarginTop(ctx, 10),
-      listArchitectReport(ctx),
-      listFamilyMarginReport(ctx),
-      listDeadStockReport(ctx),
-      listWastageReport(ctx),
     ]);
 
   const totalLeads      = leads.reduce((s, r) => s + r.total, 0);
@@ -160,24 +149,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </Card>
       </div>
 
-      {/* ── Product families ──────────────────────────────────────────────────── */}
-      <SectionLabel label="Product families" sub="Revenue vs COGS by material category — all invoiced orders" />
-      <Card title="Family-wise margin"><FamilySection rows={familyMargin} /></Card>
-
-      {/* ── Operations ────────────────────────────────────────────────────────── */}
-      <SectionLabel label="Operations" sub="Stock health and make efficiency" />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <Card title="Dead stock by dye lot" eyebrow="Dye-lot stock idle for 90+ days">
-          <DeadStockTable rows={deadStock} />
-        </Card>
-        <Card title="Wastage by tailor" eyebrow="Fabric issued vs wasted · make jobs">
-          <WastageTable rows={wastage} />
-        </Card>
-      </div>
-
-      {/* ── Architect referrals ───────────────────────────────────────────────── */}
-      <SectionLabel label="Architect referrals" sub="Revenue and commission tracking per referral partner" />
-      <Card title="Architect commission"><ArchitectSection rows={architects} /></Card>
     </>
   );
 }
@@ -211,14 +182,6 @@ function Card({ title, eyebrow, children }: { title: string; eyebrow?: string; c
   );
 }
 
-function SectionLabel({ label, sub }: { label: string; sub?: string }) {
-  return (
-    <div className="mt-6 mb-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-dim">{label}</div>
-      {sub && <div className="text-[11px] text-text-faint mt-0.5">{sub}</div>}
-    </div>
-  );
-}
 
 function Empty({ text }: { text: string }) {
   return <div className="py-6 text-center text-[12px] text-text-faint">{text}</div>;
