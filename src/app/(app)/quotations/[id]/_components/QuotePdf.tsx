@@ -1,171 +1,169 @@
-// Server-side PDF component rendered by @react-pdf/renderer.
-// Uses built-in PDF fonts (Helvetica / Courier) — no external font downloads.
-// Rupee amounts use "Rs." prefix (Helvetica does not include U+20B9).
+// Server-side quotation PDF — @react-pdf/renderer.
+// Fonts in public/fonts/ include U+20B9 (₹) — LiberationBold for bold weight.
 
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import path from "path";
+import { Document, Page, View, Text, Image, Font, StyleSheet } from "@react-pdf/renderer";
 import type { QuotationDetail, QuotationLine } from "@/modules/quotations/queries";
 
+// ── fonts ──────────────────────────────────────────────────────────────────
+const FONTS = path.join(process.cwd(), "public", "fonts");
+Font.register({
+  family: "Geist",
+  fonts: [
+    { src: path.join(FONTS, "GeistRegular.ttf"),  fontWeight: "normal" },
+    { src: path.join(FONTS, "LiberationBold.ttf"), fontWeight: "bold"   },
+  ],
+});
+
 // ── colours ────────────────────────────────────────────────────────────────
-const TEAL   = "#1B8A7E";
-const WHITE  = "#FFFFFF";
-const INK    = "#111827";
-const MUTED  = "#64748B";
-const BORD   = "#E2E8F0";
-const STRIP  = "#F8FAFC";
-const THEAD  = "#1B8A7E"; // same as TEAL
+const BRAND = "#1B8A7E";
+const WHITE = "#FFFFFF";
+const INK   = "#111827";
+const MUTED = "#6B7280";
+const RULE  = "#E5E7EB";
+const STRIP = "#F9FAFB";
 
 // ── styles ─────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  page: {
-    fontFamily: "Helvetica",
-    fontSize: 9,
-    color: INK,
-    backgroundColor: WHITE,
-    paddingTop: 24,
-    paddingBottom: 40,
-    paddingHorizontal: 32,
-  },
+  page: { fontFamily: "Geist", fontSize: 9, color: INK, backgroundColor: WHITE,
+          paddingTop: 28, paddingBottom: 44, paddingHorizontal: 32 },
 
-  // Header
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
-  logoBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-  logoM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
-  brandCol: { marginLeft: 8, justifyContent: "center" },
-  brandName: { fontSize: 16, fontFamily: "Helvetica-Bold", color: INK, letterSpacing: 0.3 },
-  brandSub: { fontSize: 6.5, color: MUTED, letterSpacing: 2, marginTop: 3 },
-  quotLabel: { textAlign: "right" },
-  quotTitle: { fontSize: 14, fontFamily: "Helvetica-Bold", color: TEAL, letterSpacing: 1.5 },
-  quotNum: { fontSize: 8.5, color: MUTED, fontFamily: "Courier", marginTop: 3 },
-  quotRev: { fontSize: 7.5, color: MUTED, marginTop: 2 },
+  // Header: logo | QUOTATION
+  header:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start",
+               marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1.5, borderBottomColor: BRAND },
+  logoImg:   { width: 130, height: 44, objectFit: "contain" },
+  logoText:  { fontSize: 15, fontWeight: "bold", color: INK },
+  logoSub:   { fontSize: 6.5, color: MUTED, letterSpacing: 1.5, marginTop: 2 },
+  quotRight: { alignItems: "flex-end" },
+  quotTitle: { fontSize: 20, fontWeight: "bold", color: BRAND, letterSpacing: 2 },
+  quotNum:   { fontSize: 9, color: MUTED, marginTop: 4 },
+  quotRev:   { fontSize: 7.5, color: MUTED, marginTop: 2 },
 
-  // Meta strip
-  metaStrip: { flexDirection: "row", backgroundColor: STRIP, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, borderWidth: 1, borderColor: BORD, borderRadius: 3 },
-  metaCol: { flex: 1 },
-  metaLabel: { fontSize: 6.5, color: MUTED, letterSpacing: 1, marginBottom: 3 },
-  metaValue: { fontSize: 8.5, fontFamily: "Helvetica-Bold" },
+  // Info strip
+  infoStrip: { flexDirection: "row", backgroundColor: STRIP, borderWidth: 0.75, borderColor: RULE,
+               borderRadius: 3, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 12 },
+  infoCol:   { flex: 1 },
+  infoLbl:   { fontSize: 6.5, color: MUTED, letterSpacing: 0.8, marginBottom: 2.5 },
+  infoVal:   { fontSize: 8.5, fontWeight: "bold" },
 
-  // Bill To / From
-  addrRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
-  addrBox: { flex: 1, borderWidth: 1, borderColor: BORD, borderRadius: 3, padding: 10, backgroundColor: STRIP },
-  addrTitle: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: TEAL, letterSpacing: 1.2, marginBottom: 6 },
-  addrName: { fontSize: 9.5, fontFamily: "Helvetica-Bold", color: INK, marginBottom: 2 },
-  addrLine: { fontSize: 7.5, color: MUTED, marginTop: 1 },
-  addrMono: { fontSize: 7.5, color: MUTED, fontFamily: "Courier", marginTop: 2 },
+  // Addresses
+  addrRow:  { flexDirection: "row", gap: 10, marginBottom: 14 },
+  addrBox:  { flex: 1, borderWidth: 0.75, borderColor: RULE, borderRadius: 3,
+              padding: 10, backgroundColor: STRIP },
+  addrSec:  { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1.2, marginBottom: 5 },
+  addrName: { fontSize: 9.5, fontWeight: "bold", color: INK, marginBottom: 2.5 },
+  addrLine: { fontSize: 7.5, color: MUTED, marginTop: 1.5 },
 
   // Table
   tableWrap: { marginBottom: 12 },
-  thead: { flexDirection: "row", backgroundColor: THEAD, paddingVertical: 5, paddingHorizontal: 0 },
-  th: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: WHITE, letterSpacing: 0.8 },
-  tr: { flexDirection: "row", paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: BORD },
-  tdCenter: { fontSize: 8, color: MUTED, textAlign: "center" },
-  tdLeft: { fontSize: 8 },
-  tdRight: { fontSize: 8, fontFamily: "Courier", textAlign: "right" },
-  tdMuted: { fontSize: 7, color: MUTED, marginTop: 1 },
-  tdOptional: { fontSize: 7, color: TEAL, marginTop: 1 },
+  thead:     { flexDirection: "row", backgroundColor: BRAND, paddingVertical: 5 },
+  th:        { fontSize: 6.5, fontWeight: "bold", color: WHITE, letterSpacing: 0.6 },
+  tr:        { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: RULE, paddingVertical: 5 },
+  tdLeft:    { fontSize: 8 },
+  tdRight:   { fontSize: 8, textAlign: "right" },
+  tdMuted:   { fontSize: 6.5, color: MUTED, marginTop: 1.5 },
+  tdOpt:     { fontSize: 6.5, color: BRAND, marginTop: 1.5 },
 
-  // Col widths (of 531pt usable width = 595 - 64 margins)
-  cNo:   { width: 20, paddingHorizontal: 4 },
+  // Column widths (531pt usable = 595 − 64)
+  cNo:   { width: 18, paddingHorizontal: 3 },
   cDesc: { flex: 1, paddingHorizontal: 5 },
-  cQty:  { width: 55, paddingHorizontal: 4 },
-  cRate: { width: 88, paddingHorizontal: 4 },
-  cGst:  { width: 40, paddingHorizontal: 4 },
-  cAmt:  { width: 90, paddingHorizontal: 4 },
+  cQty:  { width: 38, paddingHorizontal: 3 },
+  cUnit: { width: 28, paddingHorizontal: 3 },
+  cRate: { width: 76, paddingHorizontal: 3 },
+  cGst:  { width: 35, paddingHorizontal: 3 },
+  cAmt:  { width: 76, paddingHorizontal: 3 },
 
   // Totals
-  totalsWrap: { alignItems: "flex-end", marginBottom: 10 },
-  totalsInner: { width: 215 },
-  totRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3, borderBottomWidth: 0.5, borderBottomColor: BORD },
-  totLabel: { fontSize: 8, color: MUTED },
-  totValue: { fontSize: 8, fontFamily: "Courier" },
-  grandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: TEAL, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 3, marginTop: 8 },
-  grandLabel: { fontSize: 8, fontFamily: "Helvetica-Bold", color: WHITE, letterSpacing: 1 },
-  grandValue: { fontSize: 13, fontFamily: "Courier-Bold", color: WHITE },
+  totalsWrap:  { alignItems: "flex-end", marginBottom: 10 },
+  totalsInner: { width: 230 },
+  totRow:      { flexDirection: "row", justifyContent: "space-between",
+                 paddingVertical: 3.5, borderBottomWidth: 0.5, borderBottomColor: RULE },
+  totLbl:      { fontSize: 8, color: MUTED },
+  totVal:      { fontSize: 8 },
+  grandRow:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+                 backgroundColor: BRAND, paddingVertical: 8, paddingHorizontal: 12,
+                 borderRadius: 3, marginTop: 6 },
+  grandLbl:    { fontSize: 8, fontWeight: "bold", color: WHITE, letterSpacing: 0.8 },
+  grandVal:    { fontSize: 14, fontWeight: "bold", color: WHITE },
 
   // Terms
-  termsWrap: { borderTopWidth: 1, borderTopColor: BORD, paddingTop: 10, marginTop: 4 },
-  termsTitle: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: TEAL, letterSpacing: 1.2, marginBottom: 5 },
-  termsBody: { fontSize: 7.5, color: MUTED, lineHeight: 1.6 },
+  termsWrap: { borderTopWidth: 0.75, borderTopColor: RULE, paddingTop: 8, marginTop: 4 },
+  termsSec:  { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1, marginBottom: 4 },
+  termsBody: { fontSize: 7.5, color: MUTED, lineHeight: 1.5 },
 
   // Footer
-  footer: { position: "absolute", bottom: 20, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: BORD, paddingTop: 6 },
-  footerText: { fontSize: 7, color: MUTED },
+  footer:     { position: "absolute", bottom: 20, left: 32, right: 32,
+                borderTopWidth: 0.5, borderTopColor: RULE, paddingTop: 5 },
+  footerRow:  { flexDirection: "row", justifyContent: "space-between" },
+  footerText: { fontSize: 6.5, color: MUTED },
 });
 
 // ── helpers ────────────────────────────────────────────────────────────────
-const UNIT_SHORT: Record<string, string> = {
+const U: Record<string, string> = {
   METRE: "m", ROLL: "roll", SQFT: "sqft", SQM: "sqm",
   PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft",
 };
 
-function fmtDate(d: Date): string {
+function fd(d: Date): string {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 }
 
-function fmtMoney(paise: bigint): string {
-  const neg = paise < 0n;
-  const abs = neg ? -paise : paise;
-  const rupees = abs / 100n;
-  const s = rupees.toString();
-  const l3 = s.slice(-3);
-  const grouped = s.length <= 3 ? s : s.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + l3;
-  return neg ? `(Rs.${grouped})` : `Rs.${grouped}`;
-}
-
-function lineAmtPaise(l: QuotationLine): bigint {
-  return l.amount; // already in paise from DB
+function fm(p: bigint): string {
+  const neg = p < 0n;
+  const a   = neg ? -p : p;
+  const r   = a / 100n;
+  const raw = r.toString();
+  const grp = raw.length <= 3
+    ? raw
+    : raw.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + raw.slice(-3);
+  return neg ? `(₹${grp})` : `₹${grp}`;
 }
 
 // ── sub-components ────────────────────────────────────────────────────────
-function TableHeader() {
+function TH() {
   return (
     <View style={s.thead}>
-      <View style={s.cNo}><Text style={[s.th, { textAlign: "center" }]}>#</Text></View>
-      <View style={s.cDesc}><Text style={s.th}>Description</Text></View>
-      <View style={s.cQty}><Text style={[s.th, { textAlign: "right" }]}>Qty</Text></View>
-      <View style={s.cRate}><Text style={[s.th, { textAlign: "right" }]}>Rate</Text></View>
-      <View style={s.cGst}><Text style={[s.th, { textAlign: "right" }]}>GST%</Text></View>
-      <View style={s.cAmt}><Text style={[s.th, { textAlign: "right" }]}>Amount</Text></View>
+      <View style={s.cNo}  ><Text style={[s.th, { textAlign: "center" }]}>#</Text></View>
+      <View style={s.cDesc}><Text style={s.th}>DESCRIPTION / ROOM</Text></View>
+      <View style={s.cQty} ><Text style={[s.th, { textAlign: "right"  }]}>QTY</Text></View>
+      <View style={s.cUnit}><Text style={s.th}>UNIT</Text></View>
+      <View style={s.cRate}><Text style={[s.th, { textAlign: "right"  }]}>RATE</Text></View>
+      <View style={s.cGst} ><Text style={[s.th, { textAlign: "right"  }]}>GST%</Text></View>
+      <View style={s.cAmt} ><Text style={[s.th, { textAlign: "right"  }]}>AMOUNT</Text></View>
     </View>
   );
 }
 
-function TableRow({ line, idx }: { line: QuotationLine; idx: number }) {
+function TR({ line: l, idx }: { line: QuotationLine; idx: number }) {
   const bg = idx % 2 === 1 ? STRIP : WHITE;
-  const unitStr = UNIT_SHORT[line.unit] ?? line.unit.toLowerCase();
-  const qty = parseFloat(line.quantity);
   return (
     <View style={[s.tr, { backgroundColor: bg }]} wrap={false}>
-      <View style={s.cNo}><Text style={s.tdCenter}>{idx + 1}</Text></View>
+      <View style={s.cNo}>
+        <Text style={[s.tdLeft, { textAlign: "center", color: MUTED }]}>{idx + 1}</Text>
+      </View>
       <View style={s.cDesc}>
-        <Text style={s.tdLeft}>{line.description || "—"}</Text>
-        {line.roomLabel ? <Text style={s.tdMuted}>{line.roomLabel}</Text> : null}
-        {line.isOptional ? <Text style={s.tdOptional}>Optional</Text> : null}
+        <Text style={s.tdLeft}>{l.description || "—"}</Text>
+        {l.roomLabel   ? <Text style={s.tdMuted}>{l.roomLabel}</Text>   : null}
+        {l.isOptional  ? <Text style={s.tdOpt}>Optional</Text>          : null}
       </View>
-      <View style={s.cQty}>
-        <Text style={[s.tdRight, { fontFamily: "Courier" }]}>{qty} {unitStr}</Text>
-      </View>
-      <View style={s.cRate}>
-        <Text style={s.tdRight}>{fmtMoney(line.rate)}</Text>
-      </View>
-      <View style={s.cGst}>
-        <Text style={[s.tdRight, { color: MUTED }]}>{line.gstRate}%</Text>
-      </View>
-      <View style={s.cAmt}>
-        <Text style={[s.tdRight, { fontFamily: "Courier-Bold" }]}>{fmtMoney(lineAmtPaise(line))}</Text>
-      </View>
+      <View style={s.cQty} ><Text style={[s.tdRight]}>{parseFloat(l.quantity)}</Text></View>
+      <View style={s.cUnit}><Text style={[s.tdLeft, { color: MUTED }]}>{U[l.unit] ?? l.unit.toLowerCase()}</Text></View>
+      <View style={s.cRate}><Text style={s.tdRight}>{fm(l.rate)}</Text></View>
+      <View style={s.cGst} ><Text style={[s.tdRight, { color: MUTED }]}>{l.gstRate}%</Text></View>
+      <View style={s.cAmt} ><Text style={[s.tdRight, { fontWeight: "bold" }]}>{fm(l.amount)}</Text></View>
     </View>
   );
 }
 
 // ── main component ────────────────────────────────────────────────────────
-interface Props { quotation: QuotationDetail }
+interface Props { quotation: QuotationDetail; logoSrc?: string }
 
-export function QuotePdf({ quotation: q }: Props) {
-  const isIntraState = q.cgst > 0n;
+export function QuotePdf({ quotation: q, logoSrc }: Props) {
+  const isIntra = q.cgst > 0n;
 
-  const taxRows: Array<{ label: string; v: bigint }> = [
+  const taxRows: { label: string; v: bigint }[] = [
     { label: "Taxable Amount", v: q.taxableAmount },
-    ...(isIntraState
+    ...(isIntra
       ? [{ label: "CGST", v: q.cgst }, { label: "SGST", v: q.sgst }]
       : [{ label: "IGST", v: q.igst }]),
     ...(q.roundOff !== 0n ? [{ label: "Round-off", v: q.roundOff }] : []),
@@ -175,90 +173,100 @@ export function QuotePdf({ quotation: q }: Props) {
     <Document title={`Quotation ${q.number}`} author="Mandovara" creator="Mandovara Interior OS">
       <Page size="A4" style={s.page}>
 
-        {/* ── HEADER ── */}
+        {/* ── HEADER ─────────────────────────────────────────────────── */}
         <View style={s.header}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={s.logoBox}><Text style={s.logoM}>M</Text></View>
-            <View style={s.brandCol}>
-              <Text style={s.brandName}>Mandovara</Text>
-              <Text style={s.brandSub}>INTERIORS  ·  COIMBATORE</Text>
-            </View>
+          <View>
+            {logoSrc
+              ? <Image src={logoSrc} style={s.logoImg} />
+              : (
+                <View>
+                  <Text style={s.logoText}>Mandovara</Text>
+                  <Text style={s.logoSub}>INTERIORS  ·  COIMBATORE</Text>
+                </View>
+              )
+            }
           </View>
-          <View style={s.quotLabel}>
+          <View style={s.quotRight}>
             <Text style={s.quotTitle}>QUOTATION</Text>
             <Text style={s.quotNum}>{q.number}</Text>
             {q.revision > 0 && <Text style={s.quotRev}>Revision {q.revision}</Text>}
           </View>
         </View>
 
-        {/* ── META STRIP ── */}
-        <View style={s.metaStrip}>
+        {/* ── INFO STRIP ─────────────────────────────────────────────── */}
+        <View style={s.infoStrip}>
           {[
-            { label: "QUOTE NO.", value: q.number, mono: true },
-            { label: "DATE", value: fmtDate(q.date) },
-            { label: "VALID UNTIL", value: fmtDate(q.validUntil) },
-            { label: "BRANCH", value: q.branchName },
-          ].map(({ label, value, mono }) => (
-            <View key={label} style={s.metaCol}>
-              <Text style={s.metaLabel}>{label}</Text>
-              <Text style={[s.metaValue, mono ? { fontFamily: "Courier-Bold" } : {}]}>{value}</Text>
+            { label: "QUOTE NO.", value: q.number },
+            { label: "DATE",      value: fd(q.date) },
+            { label: "VALID UNTIL", value: fd(q.validUntil) },
+            { label: "BRANCH",    value: q.branchName },
+          ].map(({ label, value }) => (
+            <View key={label} style={s.infoCol}>
+              <Text style={s.infoLbl}>{label}</Text>
+              <Text style={s.infoVal}>{value}</Text>
             </View>
           ))}
         </View>
 
-        {/* ── BILL TO / FROM ── */}
+        {/* ── BILL TO / FROM ─────────────────────────────────────────── */}
         <View style={s.addrRow}>
           <View style={s.addrBox}>
-            <Text style={s.addrTitle}>BILL TO</Text>
+            <Text style={s.addrSec}>BILL TO</Text>
             <Text style={s.addrName}>{q.clientName}</Text>
             <Text style={s.addrLine}>{q.clientMobile}</Text>
-            {q.clientEmail ? <Text style={s.addrLine}>{q.clientEmail}</Text> : null}
-            {q.clientGstin ? <Text style={s.addrMono}>GSTIN: {q.clientGstin}</Text> : null}
+            {q.clientEmail  ? <Text style={s.addrLine}>{q.clientEmail}</Text> : null}
+            {q.clientGstin  ? <Text style={s.addrLine}>GSTIN: {q.clientGstin}</Text> : null}
           </View>
           <View style={s.addrBox}>
-            <Text style={s.addrTitle}>FROM</Text>
+            <Text style={s.addrSec}>FROM</Text>
             <Text style={s.addrName}>{q.branchName}</Text>
-            <Text style={s.addrLine}>32 Thirumoorthy Layout, Thadagam Rd</Text>
+            <Text style={s.addrLine}>32 Thirumoorthy Layout, Thadagam Road</Text>
             <Text style={s.addrLine}>RS Puram, Coimbatore 641002</Text>
-            <Text style={s.addrLine}>State code {q.supplierStateCode} · {isIntraState ? "Intra-state" : "Inter-state"}</Text>
+            <Text style={s.addrLine}>+91 8940430051  ·  mandovara22@gmail.com</Text>
+            <Text style={s.addrLine}>State code {q.supplierStateCode}  ·  {isIntra ? "Intra-state" : "Inter-state"}</Text>
           </View>
         </View>
 
-        {/* ── LINE ITEMS ── */}
+        {/* ── ITEMS TABLE ────────────────────────────────────────────── */}
         <View style={s.tableWrap}>
-          <TableHeader />
-          {q.lines.map((l, i) => <TableRow key={l.id} line={l} idx={i} />)}
+          <TH />
+          {q.lines.map((l, i) => <TR key={l.id} line={l} idx={i} />)}
         </View>
 
-        {/* ── TOTALS ── */}
+        {/* ── TAX SUMMARY ────────────────────────────────────────────── */}
         <View style={s.totalsWrap} wrap={false}>
           <View style={s.totalsInner}>
             {taxRows.map(({ label, v }) => (
               <View key={label} style={s.totRow}>
-                <Text style={s.totLabel}>{label}</Text>
-                <Text style={s.totValue}>{fmtMoney(v)}</Text>
+                <Text style={s.totLbl}>{label}</Text>
+                <Text style={s.totVal}>{fm(v)}</Text>
               </View>
             ))}
             <View style={s.grandRow}>
-              <Text style={s.grandLabel}>GRAND TOTAL</Text>
-              <Text style={s.grandValue}>{fmtMoney(q.total)}</Text>
+              <Text style={s.grandLbl}>GRAND TOTAL</Text>
+              <Text style={s.grandVal}>{fm(q.total)}</Text>
             </View>
           </View>
         </View>
 
-        {/* ── TERMS ── */}
+        {/* ── TERMS ──────────────────────────────────────────────────── */}
         {q.termsText ? (
           <View style={s.termsWrap} wrap={false}>
-            <Text style={s.termsTitle}>TERMS &amp; CONDITIONS</Text>
+            <Text style={s.termsSec}>TERMS &amp; CONDITIONS</Text>
             <Text style={s.termsBody}>{q.termsText}</Text>
           </View>
         ) : null}
 
-        {/* ── FOOTER (fixed on every page) ── */}
+        {/* ── FOOTER (every page) ────────────────────────────────────── */}
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>mandovara.com  ·  +91 8940430051</Text>
-          <Text style={s.footerText}>32 Thirumoorthy Layout, RS Puram, Coimbatore 641002</Text>
-          <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          <View style={s.footerRow}>
+            <Text style={s.footerText}>mandovara.com  ·  +91 8940430051</Text>
+            <Text style={s.footerText}>32 Thirumoorthy Layout, RS Puram, Coimbatore 641002</Text>
+            <Text
+              style={s.footerText}
+              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+            />
+          </View>
         </View>
 
       </Page>

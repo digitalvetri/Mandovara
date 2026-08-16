@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { NextResponse } from "next/server";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
@@ -9,6 +11,12 @@ import { QuotePdf } from "@/app/(app)/quotations/[id]/_components/QuotePdf";
 
 export const dynamic = "force-dynamic";
 
+function readLogoSrc(): string | undefined {
+  const p = path.join(process.cwd(), "public", "mandovara-logo.jpg");
+  if (!fs.existsSync(p)) return undefined;
+  return `data:image/jpeg;base64,${fs.readFileSync(p).toString("base64")}`;
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -18,7 +26,8 @@ export async function GET(
   const q = await getQuotation(ctx, id);
   if (!q) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const element = React.createElement(QuotePdf, { quotation: q }) as ReactElement<DocumentProps>;
+  const logoSrc = readLogoSrc();
+  const element = React.createElement(QuotePdf, { quotation: q, logoSrc }) as ReactElement<DocumentProps>;
   const buffer = await renderToBuffer(element);
   const bytes = new Uint8Array(buffer);
 
