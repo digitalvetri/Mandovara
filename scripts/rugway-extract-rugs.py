@@ -14,6 +14,15 @@ OUT.mkdir(parents=True, exist_ok=True)
 TOP_RUG    = (640, 295, 933, 690)
 BOTTOM_RUG = (640, 935, 933, 1330)
 
+# Page 9 (TD-311 Turkish Delight) is the ONLY page in the catalogue with
+# a single-product layout — it shows a large lifestyle photo of the rug
+# on a living-room floor plus one flat rug view (a runner at bottom-left,
+# not the usual right-column position). The default TOP/BOTTOM boxes
+# grab garbage on this page. Override to a single slot with the runner.
+PAGE_OVERRIDES = {
+    9: [("a", (52, 915, 340, 1310))],
+}
+
 FIRST_DETAIL_PAGE = 4   # inclusive
 LAST_DETAIL_PAGE  = 25  # inclusive
 
@@ -24,7 +33,8 @@ for page in range(FIRST_DETAIL_PAGE, LAST_DETAIL_PAGE + 1):
         print(f"skip missing {src.name}")
         continue
     img = Image.open(src)
-    for slot, box in [("a", TOP_RUG), ("b", BOTTOM_RUG)]:
+    slots = PAGE_OVERRIDES.get(page, [("a", TOP_RUG), ("b", BOTTOM_RUG)])
+    for slot, box in slots:
         crop = img.crop(box)
         dst = OUT / f"rug-p{page:02d}{slot}.jpg"
         crop.save(dst, "JPEG", quality=90)

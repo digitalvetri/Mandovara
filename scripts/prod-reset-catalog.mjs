@@ -20,7 +20,7 @@
 // on rugway rows (Design.collection.brand is per-org, no branch fanout).
 
 import { PrismaClient } from "@prisma/client";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -85,8 +85,14 @@ function fedoraSwatchPath(designCode, n) {
   return null;
 }
 
-function rugwaySrc(page, slot) {
-  return path.join(RUGWAY_CROPS, `rug-p${String(page).padStart(2, "0")}${slot}.jpg`);
+// Enumerate rug crops on disk instead of assuming (page, a/b) tuples.
+// This lets us drop a slot (e.g. page 9 has only one product, no slot b)
+// without leaving a gap in the RUG-XXX code sequence.
+async function listRugwayCrops() {
+  const entries = await readdir(RUGWAY_CROPS);
+  return entries
+    .filter((f) => /^rug-p\d{2}[a-z]\.jpg$/i.test(f))
+    .sort();
 }
 
 async function main() {
@@ -176,57 +182,57 @@ async function importRugway(db, orgId) {
   });
 
   const now = new Date();
-  let count = 0, skipped = 0;
-  for (let page = 4; page <= 25; page++) {
-    for (const slot of ["a", "b"]) {
-      count += 1;
-      const code = `RUG-${String(count).padStart(3, "0")}`;
-      const src  = rugwaySrc(page, slot);
-      if (!existsSync(src)) { console.warn(`  skip ${code}: no crop at ${src}`); skipped += 1; continue; }
+  const files = await listRugwayCrops();
+  let count = 0;
+  for (const cropFile of files) {
+    count += 1;
+    const code = `RUG-${String(count).padStart(3, "0")}`;
+    const src  = path.join(RUGWAY_CROPS, cropFile);
+    // Preserve provenance via the filename (rug-p09a.jpg) in specs, so
+    // we can trace any single rug back to the PDF page + slot it came
+    // from without depending on the sequential code alone.
+    const design = await db.design.create({
+      data: {
+        organizationId: orgId,
+        collectionId:   collection.id,
+        code,
+        name:           `Rugway ${code}`,
+        family:         "RUG",
+        hsn:            "5703",
+        gstRate:        12,
+        specs:          { sourcedFrom: "Rugway Rugs- PDF", cropFile },
+      },
+      select: { id: true },
+    });
+    const cw = await db.colourway.create({
+      data: {
+        organizationId: orgId,
+        designId:       design.id,
+        code,
+        colourName:     "Standard",
+        sellUnit:       "PIECE",
+      },
+      select: { id: true },
+    });
+    await db.price.create({
+      data: {
+        organizationId: orgId,
+        colourwayId:    cw.id,
+        tier:           "MRP",
+        amount:         0n,
+        effectiveFrom:  now,
+      },
+    });
 
-      const design = await db.design.create({
-        data: {
-          organizationId: orgId,
-          collectionId:   collection.id,
-          code,
-          name:           `Rugway ${code}`,
-          family:         "RUG",
-          hsn:            "5703",
-          gstRate:        12,
-          specs:          { sourcedFrom: "Rugway Rugs- PDF", page, slot },
-        },
-        select: { id: true },
-      });
-      const cw = await db.colourway.create({
-        data: {
-          organizationId: orgId,
-          designId:       design.id,
-          code,
-          colourName:     "Standard",
-          sellUnit:       "PIECE",
-        },
-        select: { id: true },
-      });
-      await db.price.create({
-        data: {
-          organizationId: orgId,
-          colourwayId:    cw.id,
-          tier:           "MRP",
-          amount:         0n,
-          effectiveFrom:  now,
-        },
-      });
-
-      const buf = await readFile(src);
-      const dst = path.join(UPLOAD_DIR, `${cw.id}.jpg`);
-      await writeFile(dst, buf);
-      await db.colourway.update({
-        where: { id: cw.id },
-        data:  { imageKey: `${PUBLIC_ROUTE}/${cw.id}.jpg?v=${Date.now()}` },
-      });
-    }
+    const buf = await readFile(src);
+    const dst = path.join(UPLOAD_DIR, `${cw.id}.jpg`);
+    await writeFile(dst, buf);
+    await db.colourway.update({
+      where: { id: cw.id },
+      data:  { imageKey: `${PUBLIC_ROUTE}/${cw.id}.jpg?v=${Date.now()}` },
+    });
   }
-  return count - skipped;
+  return count;
 }
 
 async function importFedora(db, orgId) {
