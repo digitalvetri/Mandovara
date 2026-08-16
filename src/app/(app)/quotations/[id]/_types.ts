@@ -30,13 +30,15 @@ export interface SerializedQuotation {
   branchId: string;
   branchName: string;
   supplierStateCode: string;
-  clientId: string;
+  // Party — FIXES-01 §5.1. Exactly one of leadId / clientId is set.
+  leadId:   string | null;
+  clientId: string | null;
   clientName: string;
   clientMobile: string;
   clientEmail: string | null;
   clientGstin: string | null;
-  projectId: string;
-  projectName: string;
+  projectId:   string | null;
+  projectName: string | null;
   date: string;
   validUntil: string;
   taxableAmountStr: string;

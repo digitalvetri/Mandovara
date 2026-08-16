@@ -75,13 +75,17 @@ export interface QuotationDetail {
   branchId: string;
   branchName: string;
   supplierStateCode: string;
-  clientId: string;
+  // Party — FIXES-01 §5.1. Exactly one of leadId / clientId is set.
+  // The client* fields carry the party's display info regardless of
+  // which side is set (lead's name/mobile OR client's).
+  leadId:   string | null;
+  clientId: string | null;
   clientName: string;
   clientMobile: string;
   clientEmail: string | null;
   clientGstin: string | null;
-  projectId: string;
-  projectName: string;
+  projectId:   string | null;
+  projectName: string | null;
   date: Date;
   validUntil: Date;
   taxableAmount: bigint;
@@ -219,7 +223,7 @@ export async function getQuotation(
     where: { id },
     select: {
       id: true, number: true, revision: true, status: true, branchId: true,
-      projectId: true, clientId: true,
+      leadId: true, projectId: true, clientId: true,
       date: true, validUntil: true, termsText: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
       project: {
@@ -241,19 +245,36 @@ export async function getQuotation(
     },
   });
   if (!row) return null;
-  // Lead-scoped quotations (FIXES-01 §5.1) have no project — the detail
-  // renderer (PDF, screen) can't hydrate a client card without one yet.
-  // Returning null is a safe stopgap until the detail page grows a
-  // dedicated lead-scoped branch next session.
-  if (!row.project || !row.projectId || !row.clientId) return null;
-  const project = row.project;
-  const projectId = row.projectId;
-  const clientId = row.clientId;
 
   const branch = await db.branch.findUniqueOrThrow({
     where:  { id: row.branchId },
     select: { name: true, stateCode: true },
   });
+
+  // Party info — from the linked project's client (client-scoped) or
+  // from the lead directly (lead-scoped, FIXES-01 §5.1).
+  let clientName   = "—";
+  let clientMobile = "";
+  let clientEmail: string | null = null;
+  let clientGstin: string | null = null;
+  let projectName: string | null = null;
+  if (row.project) {
+    clientName   = row.project.client.name;
+    clientMobile = row.project.client.mobile;
+    clientEmail  = row.project.client.email;
+    clientGstin  = row.project.client.gstin;
+    projectName  = row.project.name;
+  } else if (row.leadId) {
+    const lead = await db.lead.findUnique({
+      where:  { id: row.leadId },
+      select: { name: true, mobile: true, email: true },
+    });
+    if (lead) {
+      clientName   = lead.name;
+      clientMobile = lead.mobile;
+      clientEmail  = lead.email;
+    }
+  }
 
   return {
     id: row.id,
@@ -263,13 +284,14 @@ export async function getQuotation(
     branchId: row.branchId,
     branchName: branch.name,
     supplierStateCode: branch.stateCode,
-    clientId,
-    clientName: project.client.name,
-    clientMobile: project.client.mobile,
-    clientEmail: project.client.email,
-    clientGstin: project.client.gstin,
-    projectName: project.name,
-    projectId,
+    leadId:      row.leadId,
+    clientId:    row.clientId,
+    clientName,
+    clientMobile,
+    clientEmail,
+    clientGstin,
+    projectName,
+    projectId:   row.projectId,
     date: row.date,
     validUntil: row.validUntil,
     termsText: row.termsText,

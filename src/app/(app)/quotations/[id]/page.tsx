@@ -17,6 +17,7 @@ function serializeQuotation(q: QuotationDetail): SerializedQuotation {
     branchId: q.branchId,
     branchName: q.branchName,
     supplierStateCode: q.supplierStateCode,
+    leadId: q.leadId,
     clientId: q.clientId,
     clientName: q.clientName,
     clientMobile: q.clientMobile,
