@@ -2,39 +2,30 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition, useState, useEffect } from "react";
-import { Search, LayoutList, LayoutGrid, ChevronDown } from "lucide-react";
+import { Search, ChevronDown } from "lucide-react";
 
-const STATUS_TABS: { key: string; label: string }[] = [
-  { key: "ALL", label: "All" },
-  { key: "DRAFT", label: "Draft" },
+const STATUS_OPTIONS: { key: string; label: string }[] = [
+  { key: "ALL",              label: "All Status" },
+  { key: "DRAFT",            label: "Draft" },
   { key: "PENDING_APPROVAL", label: "Pending Approval" },
-  { key: "APPROVED", label: "Approved" },
-  { key: "SENT", label: "Sent" },
-  { key: "REVISED", label: "Revised" },
-  { key: "ACCEPTED", label: "Accepted" },
-  { key: "REJECTED", label: "Rejected" },
-  { key: "EXPIRED", label: "Expired" },
+  { key: "APPROVED",         label: "Approved" },
+  { key: "SENT",             label: "Sent" },
+  { key: "REVISED",          label: "Revised" },
+  { key: "ACCEPTED",         label: "Accepted" },
+  { key: "REJECTED",         label: "Rejected" },
+  { key: "EXPIRED",          label: "Expired" },
 ];
 
-const SORT_OPTIONS = [
-  { value: "recent", label: "Newest first" },
-  { value: "oldest", label: "Oldest first" },
-  { value: "total",  label: "Highest value" },
-];
-
-interface QuotationFiltersProps {
-  statusCounts: Record<string, number>;
-}
-
-export function QuotationFilters({ statusCounts }: QuotationFiltersProps) {
+export function QuotationFilters() {
   const router = useRouter();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const currentStatus = params.get("status") ?? "ALL";
-  const currentSort   = params.get("sort") ?? "recent";
-  const currentView   = params.get("view") ?? "list";
-  const currentSearch = params.get("q") ?? "";
+  const currentStatus   = params.get("status")   ?? "ALL";
+  const currentSearch   = params.get("q")         ?? "";
+  const currentDateFrom = params.get("dateFrom")  ?? "";
+  const currentDateTo   = params.get("dateTo")    ?? "";
+
   const [search, setSearch] = useState(currentSearch);
   useEffect(() => setSearch(currentSearch), [currentSearch]);
 
@@ -45,12 +36,11 @@ export function QuotationFilters({ statusCounts }: QuotationFiltersProps) {
     });
   }
 
-  function setParam(key: string, value: string, clear?: string[]) {
+  function setParam(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
     if (value === "" || value === "ALL") next.delete(key);
     else next.set(key, value);
     next.delete("page");
-    for (const k of clear ?? []) next.delete(k);
     push(next);
   }
 
@@ -59,96 +49,86 @@ export function QuotationFilters({ statusCounts }: QuotationFiltersProps) {
     setParam("q", search.trim());
   }
 
-  const totalCount = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  function reset() {
+    startTransition(() => router.push("/quotations"));
+  }
+
+  const hasFilters =
+    currentSearch !== "" ||
+    currentStatus !== "ALL" ||
+    currentDateFrom !== "" ||
+    currentDateTo !== "";
+
+  const selectCls =
+    "h-[36px] pl-3 pr-7 rounded-[8px] bg-surface border border-rule " +
+    "text-[12.5px] text-text-dim appearance-none outline-none " +
+    "hover:border-accent/60 focus:border-accent transition-colors cursor-pointer";
+
+  const inputCls =
+    "h-[36px] px-3 rounded-[8px] bg-surface border border-rule " +
+    "text-[12.5px] text-text-dim outline-none " +
+    "hover:border-accent/60 focus:border-accent transition-colors " +
+    "[color-scheme:dark]";
 
   return (
-    <div className="mb-4 space-y-2.5">
-      {/* ── Top row: search + sort + view toggle ──────────────────── */}
-      <div className="flex items-center gap-2.5">
-        <form onSubmit={onSearchSubmit} className="flex-1 max-w-[400px]">
-          <label className="flex items-center gap-2 h-[34px] px-3 bg-surface border border-rule rounded-[8px] focus-within:border-accent transition-colors">
-            <Search size={13} strokeWidth={1.75} className="text-text-faint shrink-0" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Number, client name…"
-              className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-text-faint"
-            />
-          </label>
-        </form>
+    <div className="mb-5 flex flex-wrap items-center gap-2">
+      {/* Search */}
+      <form onSubmit={onSearchSubmit} className="flex-1 min-w-[200px] max-w-[320px]">
+        <label className="flex items-center gap-2 h-[36px] px-3 bg-surface border border-rule rounded-[8px] focus-within:border-accent transition-colors">
+          <Search size={13} strokeWidth={1.75} className="text-text-dim shrink-0" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Number, client name…"
+            className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-text-dim/50"
+          />
+        </label>
+      </form>
 
-        {/* Sort */}
-        <div className="relative flex items-center">
-          <select
-            value={currentSort}
-            onChange={(e) => setParam("sort", e.target.value)}
-            className="h-[34px] pl-3 pr-7 rounded-[8px] bg-surface border border-rule text-[12.5px] text-text-dim appearance-none outline-none hover:border-accent transition-colors cursor-pointer"
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <ChevronDown size={12} className="absolute right-2 text-text-dim pointer-events-none" />
-        </div>
-
-        {/* View toggle */}
-        <div className="flex items-center gap-0.5 border border-rule rounded-[8px] bg-surface p-0.5 ml-auto">
-          <button
-            type="button"
-            title="List view"
-            onClick={() => setParam("view", "list")}
-            className={[
-              "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors",
-              currentView !== "cards" ? "bg-surface-2 text-text" : "text-text-dim hover:text-text",
-            ].join(" ")}
-          >
-            <LayoutList size={14} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            title="Card view"
-            onClick={() => setParam("view", "cards")}
-            className={[
-              "flex items-center justify-center w-7 h-7 rounded-[6px] transition-colors",
-              currentView === "cards" ? "bg-surface-2 text-text" : "text-text-dim hover:text-text",
-            ].join(" ")}
-          >
-            <LayoutGrid size={14} strokeWidth={1.75} />
-          </button>
-        </div>
+      {/* Status */}
+      <div className="relative flex items-center">
+        <select
+          value={currentStatus}
+          onChange={(e) => setParam("status", e.target.value)}
+          className={selectCls}
+        >
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.key} value={o.key}>{o.label}</option>
+          ))}
+        </select>
+        <ChevronDown size={12} className="absolute right-2.5 text-text-dim pointer-events-none" />
       </div>
 
-      {/* ── Status tabs with counts ────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none">
-        {STATUS_TABS.map((tab) => {
-          const active = currentStatus === tab.key;
-          const count  = tab.key === "ALL" ? totalCount : (statusCounts[tab.key] ?? 0);
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setParam("status", tab.key)}
-              className={[
-                "flex items-center gap-1.5 h-[30px] px-3 rounded-[6px] text-[12px] whitespace-nowrap transition-colors shrink-0",
-                active
-                  ? "bg-accent text-white font-medium"
-                  : "text-text-dim hover:text-text hover:bg-surface-2",
-              ].join(" ")}
-            >
-              {tab.label}
-              <span
-                className={[
-                  "inline-block min-w-[18px] px-1 text-center text-[10.5px] rounded-[4px] tabular",
-                  active ? "bg-white/20 text-white" : "bg-surface-2 text-text-dim",
-                ].join(" ")}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Date from */}
+      <input
+        type="date"
+        value={currentDateFrom}
+        onChange={(e) => setParam("dateFrom", e.target.value)}
+        className={inputCls}
+        title="From date"
+      />
+
+      {/* Date to */}
+      <input
+        type="date"
+        value={currentDateTo}
+        onChange={(e) => setParam("dateTo", e.target.value)}
+        className={inputCls}
+        title="To date"
+      />
+
+      {/* Reset */}
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={reset}
+          className="h-[36px] px-3 rounded-[8px] text-[12.5px] text-text-dim
+                     hover:text-text hover:bg-surface-2 transition-colors"
+        >
+          Reset
+        </button>
+      )}
     </div>
   );
 }

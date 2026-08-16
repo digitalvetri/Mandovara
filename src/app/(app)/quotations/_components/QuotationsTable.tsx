@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { MoreHorizontal, Eye, Pencil, Download, MessageCircle, Copy, Check, Flame, AlertTriangle } from "lucide-react";
+import {
+  MoreHorizontal, Eye, Pencil, Download, MessageCircle, Copy, Check,
+} from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import type { QuotationRow } from "@/modules/quotations/queries";
@@ -15,41 +17,9 @@ function digitsOnly(mobile: string): string {
   return d.startsWith("91") && d.length === 12 ? d : `91${d}`;
 }
 
-// ── Expiry cell ───────────────────────────────────────────────────────────────
+// ── More actions dropdown ─────────────────────────────────────────────────────
 
-function ExpiryDate({ row }: { row: QuotationRow }) {
-  const date = formatDate(row.validUntil);
-  if (row.expiryBucket === "ok") {
-    return <span className="tabular text-text-dim">{date}</span>;
-  }
-  if (row.expiryBucket === "expired") {
-    return (
-      <span className="inline-flex items-center gap-1">
-        <span className="tabular text-fault line-through">{date}</span>
-        <span className="text-[10px] font-medium bg-fault/10 text-fault px-1.5 py-0.5 rounded-[3px]">Expired</span>
-      </span>
-    );
-  }
-  if (row.expiryBucket === "critical") {
-    return (
-      <span className="inline-flex items-center gap-1 text-fault">
-        <Flame size={11} strokeWidth={2} />
-        <span className="tabular font-medium">{date}</span>
-      </span>
-    );
-  }
-  // soon
-  return (
-    <span className="inline-flex items-center gap-1 text-heat">
-      <AlertTriangle size={11} strokeWidth={2} />
-      <span className="tabular">{date}</span>
-    </span>
-  );
-}
-
-// ── Row actions menu ──────────────────────────────────────────────────────────
-
-function RowActions({ row }: { row: QuotationRow }) {
+function MoreMenu({ row }: { row: QuotationRow }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -63,11 +33,12 @@ function RowActions({ row }: { row: QuotationRow }) {
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  const canEdit = ["DRAFT", "REVISED"].includes(row.status);
-  const link    = `/quotations/${row.id}`;
-  const shortNum  = row.number.split("/").slice(-1)[0] ?? row.number;
-  const waBody    = encodeURIComponent(`Namaste,\n\nPlease find quotation ${shortNum} at:\n${typeof window !== "undefined" ? window.location.origin : ""}${link}`);
-  const waHref    = `https://wa.me/${digitsOnly(row.clientMobile)}?text=${waBody}`;
+  const link     = `/quotations/${row.id}`;
+  const shortNum = row.number.split("/").slice(-1)[0] ?? row.number;
+  const waBody   = encodeURIComponent(
+    `Namaste,\n\nPlease find quotation ${shortNum} at:\n${typeof window !== "undefined" ? window.location.origin : ""}${link}`,
+  );
+  const waHref = `https://wa.me/${digitsOnly(row.clientMobile)}?text=${waBody}`;
 
   async function copyLink() {
     try {
@@ -79,14 +50,18 @@ function RowActions({ row }: { row: QuotationRow }) {
     } catch { /* clipboard denied */ }
   }
 
-  const itemCls = "flex items-center gap-2.5 w-full px-3 py-2 text-[12.5px] text-text-dim hover:text-text hover:bg-surface-2 transition-colors text-left";
+  const itemCls =
+    "flex items-center gap-2.5 w-full px-3 py-2 text-[12.5px] " +
+    "text-text-dim hover:text-text hover:bg-surface-2 transition-colors text-left";
 
   return (
-    <div className="relative flex justify-end" ref={ref}>
+    <div className="relative" ref={ref}>
       <button
         type="button"
+        title="More actions"
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        className="flex items-center justify-center w-7 h-7 rounded-[6px] text-text-dim hover:text-text hover:bg-surface-2 transition-colors"
+        className="flex items-center justify-center w-7 h-7 rounded-[6px]
+                   text-text-dim hover:text-text hover:bg-surface-2 transition-colors"
       >
         <MoreHorizontal size={14} strokeWidth={1.75} />
       </button>
@@ -94,26 +69,9 @@ function RowActions({ row }: { row: QuotationRow }) {
       {open && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-full mt-1 z-50 min-w-[168px] rounded-[10px] bg-surface border border-rule shadow-xl shadow-ink/40 py-1"
+          className="absolute right-0 top-full mt-1 z-50 min-w-[168px] rounded-[10px]
+                     bg-surface border border-rule shadow-xl shadow-ink/40 py-1"
         >
-          <Link
-            href={`/quotations/${row.id}` as Route}
-            className={itemCls}
-            onClick={() => setOpen(false)}
-          >
-            <Eye size={13} strokeWidth={1.75} /> View
-          </Link>
-
-          {canEdit && (
-            <Link
-              href={`/quotations/${row.id}/edit` as Route}
-              className={itemCls}
-              onClick={() => setOpen(false)}
-            >
-              <Pencil size={13} strokeWidth={1.75} /> Edit
-            </Link>
-          )}
-
           <a
             href={`/api/quotations/${row.id}/pdf`}
             download
@@ -122,7 +80,6 @@ function RowActions({ row }: { row: QuotationRow }) {
           >
             <Download size={13} strokeWidth={1.75} /> Download PDF
           </a>
-
           <a
             href={waHref}
             target="_blank"
@@ -130,13 +87,13 @@ function RowActions({ row }: { row: QuotationRow }) {
             className={itemCls}
             onClick={() => setOpen(false)}
           >
-            <MessageCircle size={13} strokeWidth={1.75} /> WhatsApp
+            <MessageCircle size={13} strokeWidth={1.75} /> Send on WhatsApp
           </a>
-
           <button type="button" onClick={copyLink} className={itemCls}>
             {copied
               ? <><Check size={13} className="text-solid" /> Copied!</>
-              : <><Copy size={13} strokeWidth={1.75} /> Copy link</>}
+              : <><Copy size={13} strokeWidth={1.75} /> Copy link</>
+            }
           </button>
         </div>
       )}
@@ -144,7 +101,54 @@ function RowActions({ row }: { row: QuotationRow }) {
   );
 }
 
-// ── Table ─────────────────────────────────────────────────────────────────────
+// ── Valid-upto cell — plain date, muted when expired ─────────────────────────
+
+function ValidUpto({ row }: { row: QuotationRow }) {
+  const label = formatDate(row.validUntil);
+  if (row.expiryBucket === "expired") {
+    return <span className="tabular text-[12.5px] text-fault/70 line-through">{label}</span>;
+  }
+  return <span className="tabular text-[12.5px] text-text-dim">{label}</span>;
+}
+
+// ── Actions cell — three inline icon buttons ──────────────────────────────────
+
+function RowActions({ row }: { row: QuotationRow }) {
+  const canEdit = ["DRAFT", "REVISED"].includes(row.status);
+  const btnCls =
+    "flex items-center justify-center w-7 h-7 rounded-[6px] " +
+    "text-text-dim hover:text-text hover:bg-surface-2 transition-colors";
+
+  return (
+    <div className="flex items-center justify-end gap-0.5">
+      <Link
+        href={`/quotations/${row.id}` as Route}
+        title="View"
+        className={btnCls}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Eye size={14} strokeWidth={1.75} />
+      </Link>
+      {canEdit ? (
+        <Link
+          href={`/quotations/${row.id}/edit` as Route}
+          title="Edit"
+          className={btnCls}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Pencil size={13} strokeWidth={1.75} />
+        </Link>
+      ) : (
+        <span className={`${btnCls} opacity-25 cursor-default`}>
+          <Pencil size={13} strokeWidth={1.75} />
+        </span>
+      )}
+      <MoreMenu row={row} />
+    </div>
+  );
+}
+
+// ── Table columns ─────────────────────────────────────────────────────────────
 
 const COLUMNS: readonly Column<QuotationRow>[] = [
   {
@@ -160,33 +164,15 @@ const COLUMNS: readonly Column<QuotationRow>[] = [
     render: (r) => (
       <div>
         <div className="text-[13px] text-text font-medium leading-snug">{r.clientName}</div>
-        <div className="text-[11.5px] text-text-dim mt-0.5 truncate max-w-[180px]">{r.projectName}</div>
+        <div className="text-[11.5px] text-text-dim mt-0.5 font-data tabular">{r.clientMobile}</div>
       </div>
     ),
   },
   {
-    key: "items",
-    header: "Items",
-    align: "right",
-    render: (r) => <span className="tabular text-[13px] text-text-dim">{r.lineCount}</span>,
-  },
-  {
-    key: "date",
-    header: "Created",
-    cellClassName: "text-text-dim tabular text-[12.5px]",
-    render: (r) => formatDate(r.date),
-  },
-  {
-    key: "valid",
-    header: "Valid Until",
-    render: (r) => <ExpiryDate row={r} />,
-  },
-  {
-    key: "total",
-    header: "Amount",
-    align: "right",
+    key: "project",
+    header: "Project / Design",
     render: (r) => (
-      <span className="tabular font-semibold text-[13.5px] text-text">{formatINR(r.total)}</span>
+      <span className="text-[12.5px] text-text-dim truncate max-w-[200px] block">{r.projectName}</span>
     ),
   },
   {
@@ -195,10 +181,23 @@ const COLUMNS: readonly Column<QuotationRow>[] = [
     render: (r) => <StatusPill status={r.status} />,
   },
   {
-    key: "owner",
-    header: "Owner",
-    cellClassName: "text-text-dim text-[12.5px]",
-    render: (r) => r.ownerName,
+    key: "total",
+    header: "Total Value",
+    align: "right",
+    render: (r) => (
+      <span className="tabular font-semibold text-[13.5px] text-text">{formatINR(r.total)}</span>
+    ),
+  },
+  {
+    key: "validUntil",
+    header: "Valid Upto",
+    render: (r) => <ValidUpto row={r} />,
+  },
+  {
+    key: "date",
+    header: "Created On",
+    cellClassName: "text-text-dim tabular text-[12.5px]",
+    render: (r) => formatDate(r.date),
   },
   {
     key: "actions",
@@ -206,6 +205,8 @@ const COLUMNS: readonly Column<QuotationRow>[] = [
     render: (r) => <RowActions row={r} />,
   },
 ];
+
+// ── Export ────────────────────────────────────────────────────────────────────
 
 export function QuotationsTable({ rows }: { rows: QuotationRow[] }) {
   return (
@@ -218,15 +219,7 @@ export function QuotationsTable({ rows }: { rows: QuotationRow[] }) {
       emptyState={
         <EmptyState
           title="No quotations found."
-          body={
-            <>
-              Try adjusting your filters, or{" "}
-              <Link href={"/quotations/new" as Route} className="text-accent hover:underline">
-                create a new quotation
-              </Link>
-              .
-            </>
-          }
+          body="Try adjusting your filters or create a new quotation."
         />
       }
     />

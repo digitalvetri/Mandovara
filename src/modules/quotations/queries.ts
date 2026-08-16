@@ -6,6 +6,8 @@ import type { QuotationStatus } from "./schema";
 export interface ListQuotationsQuery {
   search?: string;
   status?: QuotationStatus | "ALL";
+  dateFrom?: Date;
+  dateTo?: Date;
   page?: number;
   pageSize?: number;
   sort?: "recent" | "oldest" | "total";
@@ -336,7 +338,7 @@ export async function listQuotationsForClient(
 
 type WhereInput = Record<string, unknown>;
 
-function buildWhere(q: ListQuotationsQuery): WhereInput {
+export function buildWhere(q: ListQuotationsQuery): WhereInput {
   const where: WhereInput = {};
   if (q.search && q.search.trim().length > 0) {
     const s = q.search.trim();
@@ -346,6 +348,12 @@ function buildWhere(q: ListQuotationsQuery): WhereInput {
     ];
   }
   if (q.status && q.status !== "ALL") where["status"] = q.status;
+  if (q.dateFrom || q.dateTo) {
+    const dateFilter: WhereInput = {};
+    if (q.dateFrom) dateFilter["gte"] = q.dateFrom;
+    if (q.dateTo) dateFilter["lte"] = q.dateTo;
+    where["date"] = dateFilter;
+  }
   return where;
 }
 
