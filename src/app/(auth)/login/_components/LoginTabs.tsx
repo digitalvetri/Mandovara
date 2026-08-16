@@ -32,8 +32,7 @@ export function LoginCard() {
   // this component simply renders nothing when SHOW_CREDS is false.
   const SHOW_CREDS_HELPER = process.env.NODE_ENV !== "production";
 
-  function navigate() {
-    const dest = params.get("from") ?? "/";
+  function navigate(dest: string) {
     router.push(dest);
     router.refresh();
   }
@@ -45,7 +44,13 @@ export function LoginCard() {
     start(async () => {
       const res = await devLoginByCredential(credential.trim(), password);
       if (!res.ok) { setError(res.error ?? "Login failed"); return; }
-      navigate();
+      // If this account still holds a temporary password, force the rotation
+      // before letting the user reach their intended destination.
+      if (res.mustChangePassword) {
+        navigate("/change-password?forced=1");
+        return;
+      }
+      navigate(params.get("from") ?? "/");
     });
   }
 

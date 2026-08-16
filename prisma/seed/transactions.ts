@@ -467,6 +467,10 @@ export async function seedTransactions(
     await db.project.update({ where: { id: projectId }, data: { orderValue } });
   }
 
+  // NOTE: NumberSequence is not bumped here — prisma/seed.ts bumpNumberSequences()
+  // runs after all seeding, queries every doc table's max number, and covers
+  // all 13 series comprehensively. No local bump needed.
+
   process.stdout.write(
     `  projects: ${projectRows.length}, rooms: ${roomRows.length}, measurements: ${measurementRows.length}, items: ${itemRows.length}, calcResults: ${calcRows.length}, quotations: ${quotationRows.length}, orders: ${orderRows.length}\n`,
   );

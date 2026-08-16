@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const uid = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!uid) redirect("/login");
 
-  // Current user for sidebar display
+  // Current user for sidebar display + mustChangePassword gate
   const ctx = await devContext();
   let userName = "User";
   let userRole = ctx.roles[0] ?? "STAFF";
@@ -19,9 +19,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   try {
     const user = await prisma.user.findUnique({
       where: { id: ctx.userId },
-      select: { name: true, role: true },
+      select: { name: true, role: true, mustChangePassword: true },
     });
     if (user) {
+      // Force password rotation before the user can access any app route.
+      if (user.mustChangePassword) redirect("/change-password?forced=1");
       userName = user.name;
       userRole = user.role;
     }

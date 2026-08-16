@@ -189,17 +189,21 @@ export async function seedMasters(db: PrismaClient, seed?: number): Promise<Seed
   });
 
   // ── Users (9, one per AppRole) ─────────────────────────────────────────────
+  // Seeded with DEFAULT_DEV_PASSWORD + mustChangePassword=true so the very
+  // first login rotates them to a user-chosen password. Same-password-for-all
+  // is fine here precisely because they can't keep it.
   const pwHash = bcrypt.hashSync(DEFAULT_DEV_PASSWORD, 10);
   const userRows: Prisma.UserCreateManyInput[] = USER_SPECS.map((u) => ({
-    organizationId: org.id,
-    mobile:         u.mobile,
-    email:          u.email,
-    name:           u.name,
-    passwordHash:   pwHash,
-    role:           u.role as Prisma.UserCreateManyInput["role"],
-    branchIds:      [branch.id],
-    locale:         "en",
-    status:         "ACTIVE",
+    organizationId:     org.id,
+    mobile:             u.mobile,
+    email:              u.email,
+    name:               u.name,
+    passwordHash:       pwHash,
+    mustChangePassword: true,
+    role:               u.role as Prisma.UserCreateManyInput["role"],
+    branchIds:          [branch.id],
+    locale:             "en",
+    status:             "ACTIVE",
   }));
 
   const createdUsers = await db.user.createManyAndReturn({ data: userRows });

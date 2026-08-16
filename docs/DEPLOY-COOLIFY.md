@@ -68,6 +68,9 @@ Open the app service → **Environment Variables** tab → add these:
 | `COOKIE_SECURE`    | `false` if the app is served over plain HTTP (e.g. sslip.io test URL) | **Leave unset (or `true`) once TLS is enabled.** Browsers refuse Secure cookies over HTTP; setting `false` while on HTTP is the only way login can succeed. |
 | `NEXT_PUBLIC_APP_URL` | your app's public URL (get after step 7)                       | Fill after first deploy                                   |
 | `NODE_ENV`         | `production`                                                      | Already set inside the Dockerfile too                     |
+| `SENTRY_DSN`       | *(optional)* paste the DSN from sentry.io → Settings → Client Keys | Server + edge error capture. Leave unset if you don't want Sentry. |
+| `NEXT_PUBLIC_SENTRY_DSN` | *(optional)* same value as `SENTRY_DSN`                     | Browser error capture. Only add if you also add `SENTRY_DSN`. |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | *(optional)* only if you want source-map upload at build time | All three must be set together — otherwise the wrapper no-ops and next build proceeds untouched. |
 
 Leave WhatsApp / GSP secrets empty for now — they only matter when Phase 6 / 8 code paths run.
 
@@ -180,3 +183,36 @@ Coolify keeps every previous image build. To roll back:
 3. Click **Redeploy** on that row
 
 Data (DB rows, uploaded files) is unaffected — only the app code reverts.
+
+---
+
+## Postgres backups
+
+**Automated schedule (recommended):**
+
+1. Coolify dashboard → **Databases** → open the `mandovara-postgres` service
+2. **Backups** tab → **+ Add scheduled backup**
+3. Configure:
+   - **Schedule:** `0 21 * * *` (03:00 IST = 21:30 UTC — adjust if your VPS is not UTC)
+   - **Retention:** 14 days
+   - **Storage:** local Coolify volume (fine for MVP; add S3 later when the DB grows past a few GB)
+4. Click **Save** → hit **Run backup now** to verify the first one completes green.
+
+Coolify stores each backup under `/data/coolify/backups/` on the VPS. Restore is one click from the same UI (Backups tab → pick a backup → **Restore**).
+
+**On-demand manual backup** (from Coolify's web terminal on the Postgres service):
+
+```sh
+pg_dump -U postgres mandovara \
+  | gzip > /tmp/mandovara-$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+```
+
+Then copy it off the VPS: `docker cp <pg-container>:/tmp/mandovara-XXXX.sql.gz ./` from an SSH session on the host.
+
+**Restore a manual dump:**
+
+```sh
+gunzip -c mandovara-YYYYMMDDTHHMMSSZ.sql.gz \
+  | docker exec -i <pg-container> psql -U postgres mandovara
+```
+

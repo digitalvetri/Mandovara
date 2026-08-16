@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
-// Paths that never need authentication
-const PUBLIC_PATHS = ["/login", "/api/health"];
+// Paths that never need authentication (change-password itself is gated
+// server-side against a valid session — putting it here just means the
+// middleware doesn't force a redirect; the page still checks the cookie).
+const PUBLIC_PATHS = ["/login", "/change-password", "/api/health"];
 // Path prefixes always allowed (webhooks use their own HMAC; /api/admin/
 // endpoints use a token header; the rest are static assets).
 const PUBLIC_PREFIXES = [

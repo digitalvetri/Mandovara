@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const config: NextConfig = {
   reactStrictMode: true,
@@ -29,18 +30,32 @@ const config: NextConfig = {
   // typedRoutes disabled — friction outweighs value while modules are still
   // landing in placeholder form. Re-enable in Session 20+ when routes stabilise.
   typedRoutes: false,
-  // Skip in-container TypeScript check — Coolify's build container OOMs
-  // on it (small VPS + 658 packages + tsc + Turbopack). Local `pnpm build`
-  // + `pnpm exec tsc` still catch every type error, so this only removes
-  // the deploy-time check, not our source-of-truth check. Next 16
-  // dropped the `eslint` config key entirely; ESLint no longer runs on
-  // `next build` by default.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // TypeScript check runs in-container during `next build` — the 4 GB heap
+  // set on the build stage in Dockerfile (`NODE_OPTIONS=--max-old-space-size=4096`)
+  // is enough to avoid the OOM that previously forced us to skip it.
   turbopack: {
     root: path.resolve("."),
   },
 };
 
-export default config;
+// Sentry build-time wrapper. Source-map upload only runs when
+// SENTRY_AUTH_TOKEN + SENTRY_ORG + SENTRY_PROJECT are all set (Coolify
+// build env). Without them, withSentryConfig no-ops and next build proceeds
+// unchanged. Runtime Sentry init lives in src/instrumentation{,-client}.ts.
+const sentryEnabled = !!(
+  process.env["SENTRY_AUTH_TOKEN"]
+  && process.env["SENTRY_ORG"]
+  && process.env["SENTRY_PROJECT"]
+);
+
+export default sentryEnabled
+  ? withSentryConfig(config, {
+      org:       process.env["SENTRY_ORG"]!,
+      project:   process.env["SENTRY_PROJECT"]!,
+      authToken: process.env["SENTRY_AUTH_TOKEN"]!,
+      silent:            true,
+      widenClientFileUpload: true,
+      disableLogger:     true,
+      tunnelRoute:       "/monitoring",
+    })
+  : config;

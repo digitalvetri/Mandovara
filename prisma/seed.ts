@@ -89,6 +89,8 @@ async function bumpNumberSequences(db: PrismaClient, orgId: string): Promise<voi
     { series: "ENQ",  table: "Lead",            numberField: "number", prefix: "MDV" },
     { series: "CLI",  table: "Client",          numberField: "code",   prefix: "MDV" },
     { series: "SV",   table: "SiteVisit",       numberField: "number", prefix: "MDV" },
+    { series: "REQ",  table: "PurchaseRequest", numberField: "number", prefix: "MDV" },
+    { series: "TASK", table: "Task",            numberField: "number", prefix: "MDV" },
   ];
   for (const c of cfg) {
     const rows = await db.$queryRawUnsafe<{ yymm: string; max: number }[]>(`

@@ -4,6 +4,8 @@
 //
 // - devLoginByCredential: email/mobile + password, bcrypt-verified against
 //   User.passwordHash. Users with no hash cannot log in.
+// - changePassword: authenticated user rotates their own password. Clears
+//   the mustChangePassword flag on success.
 // - devLogout: clears the session cookie.
 // - devLogin(role): DELETED. Was a "pick any user with role X and become them"
 //   shortcut — a giant impersonation hole. Callers now must supply a password.
@@ -11,12 +13,19 @@
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/kernel/db/client";
-import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from "./session";
+import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from "./session";
 
-export interface LoginResult { ok: boolean; error?: string }
+export interface LoginResult {
+  ok: boolean;
+  error?: string;
+  /** Set by devLoginByCredential when the user must rotate their password. */
+  mustChangePassword?: boolean;
+}
 
 // Deliberately generic error to prevent user enumeration.
 const GENERIC_ERR = "Invalid email/mobile or password";
+
+const MIN_PASSWORD_LEN = 10;
 
 export async function devLoginByCredential(
   credential: string,
@@ -30,13 +39,13 @@ export async function devLoginByCredential(
   try {
     let user = await prisma.user.findFirst({
       where: { email: q.toLowerCase() },
-      select: { id: true, passwordHash: true, status: true },
+      select: { id: true, passwordHash: true, status: true, mustChangePassword: true },
       orderBy: { createdAt: "asc" },
     });
     if (!user) {
       user = await prisma.user.findFirst({
         where: { mobile: q },
-        select: { id: true, passwordHash: true, status: true },
+        select: { id: true, passwordHash: true, status: true, mustChangePassword: true },
         orderBy: { createdAt: "asc" },
       });
     }
@@ -45,7 +54,6 @@ export async function devLoginByCredential(
       return { ok: false, error: "This account is suspended. Contact your administrator." };
     }
     if (!user.passwordHash) {
-      // A user exists but has no password set — refuse (was silently accepted before).
       return { ok: false, error: "This account has no password set. Contact your administrator." };
     }
     const valid = await bcrypt.compare(password, user.passwordHash);
@@ -67,7 +75,14 @@ export async function devLoginByCredential(
       maxAge: SESSION_MAX_AGE,
       sameSite: "lax",
     });
-    return { ok: true };
+
+    // Fire-and-forget lastLoginAt update — non-blocking, don't fail login
+    // if this write hiccups.
+    prisma.user
+      .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+      .catch((err) => console.error("[auth] lastLoginAt update failed:", err));
+
+    return { ok: true, mustChangePassword: user.mustChangePassword };
   } catch (e) {
     console.error("[auth] loginByCredential failed:", e);
     return { ok: false, error: "Login failed — please try again in a moment" };
@@ -77,4 +92,54 @@ export async function devLoginByCredential(
 export async function devLogout(): Promise<void> {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
+}
+
+/**
+ * Authenticated password change. Reads the user from the session cookie
+ * (no need to trust a form-supplied user id), verifies the current password,
+ * enforces a minimum length + "must be different" policy, and clears the
+ * mustChangePassword flag.
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<LoginResult> {
+  if (!currentPassword || !newPassword) {
+    return { ok: false, error: "Both current and new password are required" };
+  }
+  if (newPassword.length < MIN_PASSWORD_LEN) {
+    return { ok: false, error: `New password must be at least ${MIN_PASSWORD_LEN} characters` };
+  }
+  if (newPassword === currentPassword) {
+    return { ok: false, error: "New password must differ from the current one" };
+  }
+
+  try {
+    const jar = await cookies();
+    const uid = await verifySession(jar.get(SESSION_COOKIE)?.value);
+    if (!uid) return { ok: false, error: "Session expired — please sign in again" };
+
+    const user = await prisma.user.findUnique({
+      where: { id: uid },
+      select: { id: true, passwordHash: true, status: true },
+    });
+    if (!user || user.status !== "ACTIVE") {
+      return { ok: false, error: "Account not found or suspended" };
+    }
+    if (!user.passwordHash) {
+      return { ok: false, error: "This account has no password set" };
+    }
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) return { ok: false, error: "Current password is incorrect" };
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newHash, mustChangePassword: false },
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("[auth] changePassword failed:", e);
+    return { ok: false, error: "Could not change password — please try again" };
+  }
 }
