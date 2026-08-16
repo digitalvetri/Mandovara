@@ -15,7 +15,7 @@
 import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { ArrowRight, Loader2, Lock, QrCode } from "lucide-react";
+import { ArrowRight, Loader2, Lock } from "lucide-react";
 import type { NextAction } from "@/modules/projects/next-action";
 import { startMeasurementAndRedirect } from "@/modules/measurement/start-and-redirect";
 
@@ -24,14 +24,12 @@ interface Props {
   projectId: string;
   /** Called when startMeasurementRound returns needsRooms=true. */
   onNeedsRooms?: () => void;
-  /** Show a "Open on phone" secondary button (QR modal trigger). */
-  onOpenOnPhone?: () => void;
   /** Open the schedule-visit sheet for ENQUIRY-stage projects. */
   onScheduleVisit?: () => void;
 }
 
 export function NextActionCard({
-  action, projectId, onNeedsRooms, onOpenOnPhone, onScheduleVisit,
+  action, projectId, onNeedsRooms, onScheduleVisit,
 }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -90,16 +88,6 @@ export function NextActionCard({
             {!pending && action.cta && <ArrowRight size={14} strokeWidth={2.2} />}
           </button>
 
-          {action.kind === "START_MEASUREMENT" && onOpenOnPhone && (
-            <button
-              type="button"
-              onClick={onOpenOnPhone}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-rule bg-transparent px-4 py-2.5 text-[12.5px] text-text-dim transition-colors hover:text-text"
-            >
-              <QrCode size={13} />
-              Open on phone
-            </button>
-          )}
         </div>
       ) : (
         <div className="flex items-start gap-2 rounded-[10px] border border-rule bg-surface-2 px-4 py-3 text-[12.5px] leading-relaxed text-text-dim">

@@ -3,7 +3,6 @@
 // Owns the interactive state for the Next Action hero:
 //   - the "Start measurement" button (via NextActionCard)
 //   - the "Schedule visit" sheet (ENQUIRY-stage action)
-//   - the "Open on phone" QR modal
 //   - the room-setup sheet that appears when the project has no rooms
 //
 // Kept as one client component so the server page.tsx can stay a plain
@@ -18,7 +17,6 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { Route } from "next";
 import { NextActionCard } from "./NextActionCard";
-import { OpenOnPhoneModal } from "./OpenOnPhoneModal";
 import { RoomSetupSheet } from "./RoomSetupSheet";
 import { ScheduleVisitSheet } from "./ScheduleVisitSheet";
 import type { NextAction } from "@/modules/projects/next-action";
@@ -33,7 +31,6 @@ export function StartMeasurementFlow({ projectId, action, currentUserId }: Props
   const router     = useRouter();
   const pathname   = usePathname();
   const params     = useSearchParams();
-  const [showQr, setShowQr] = useState(false);
   const [needsRoomsOpen, setNeedsRoomsOpen] = useState(false);
   const [scheduleVisitOpen, setScheduleVisitOpen] = useState(false);
 
@@ -59,7 +56,6 @@ export function StartMeasurementFlow({ projectId, action, currentUserId }: Props
         projectId={projectId}
         action={action}
         onNeedsRooms={() => setNeedsRoomsOpen(true)}
-        onOpenOnPhone={() => setShowQr(true)}
         onScheduleVisit={() => setScheduleVisitOpen(true)}
       />
 
@@ -82,12 +78,6 @@ export function StartMeasurementFlow({ projectId, action, currentUserId }: Props
         defaultAssigneeId={currentUserId}
         open={scheduleVisitOpen}
         onClose={() => setScheduleVisitOpen(false)}
-      />
-
-      <OpenOnPhoneModal
-        projectId={projectId}
-        open={showQr}
-        onClose={() => setShowQr(false)}
       />
     </>
   );
