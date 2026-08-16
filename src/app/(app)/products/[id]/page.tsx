@@ -26,6 +26,8 @@ import { HeroImage, VariantStrip, MiniSpec, PriceBlock, SizePriceTable, shortUom
 import { ImageEditor } from "./_components/ImageEditor";
 import { ProjectContextBanner } from "../_components/ProjectContextBanner";
 import { AttachToItemButton } from "./_components/AttachToItemButton";
+import { AddToQuoteModal } from "./_components/AddToQuoteModal";
+import { listOpenQuotationsForAppend } from "@/modules/quotations/queries";
 import { scoped } from "@/kernel/db/scoped";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +50,11 @@ export default async function ProductDetailPage({
   const canEdit      = can(ctx, "catalog.update");
   const canEditImage = canEdit;
   const hasSizePrices = product.prices.some((p) => p.tier.startsWith("SIZE:"));
+
+  // Open draft quotations for the Add-to-Quote modal (FIXES-01 §7.3).
+  // Only fetched when the user COULD append (needs quotation.update perm).
+  const canAppend = can(ctx, "quotation.update");
+  const openQuotations = canAppend ? await listOpenQuotationsForAppend(ctx) : [];
 
   // Browsing-from-project context — suppresses the "Add to Quote" CTA
   // (the user is picking a product to attach to a project measurement,
@@ -221,6 +228,14 @@ export default async function ProductDetailPage({
                 Back to {forProject.name}
                 <ArrowRight size={16} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
+            ) : canAppend ? (
+              // FIXES-01 §7.3 — modal offers append-to-existing OR new quote.
+              <AddToQuoteModal
+                colourwayId={product.id}
+                colourwayCode={product.code}
+                openQuotations={openQuotations}
+                serializedTotals={openQuotations.map((q) => q.total.toString())}
+              />
             ) : (
               <Link
                 href={"/quotations/quick" as Route}

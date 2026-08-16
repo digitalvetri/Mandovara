@@ -406,3 +406,45 @@ function orderFor(sort: ListQuotationsQuery["sort"]): { [k: string]: "asc" | "de
     default:       return { date: "desc" };
   }
 }
+
+// FIXES-01 §7.3 — quick list of open (DRAFT) quotations for the
+// PDP's Add-to-Quote modal. Filters to only APPENDABLE states.
+export interface OpenQuotationOption {
+  id:         string;
+  number:     string;
+  clientName: string; // "Lead: X" for lead-scoped, "Client: X" otherwise
+  total:      bigint;
+  date:       Date;
+  isLead:     boolean;
+}
+export async function listOpenQuotationsForAppend(
+  ctx: RequestContext,
+): Promise<OpenQuotationOption[]> {
+  requirePermission(ctx, "quotation.view");
+  const db = scoped(ctx);
+  const rows = await db.quotation.findMany({
+    where:   { status: { in: ["DRAFT", "REVISED"] } },
+    orderBy: { date: "desc" },
+    take:    25,
+    select: {
+      id: true, number: true, total: true, date: true,
+      leadId: true, clientId: true,
+      project: { select: { client: { select: { name: true } } } },
+    },
+  });
+  const leadIds = Array.from(new Set(rows.map((r) => r.leadId).filter((x): x is string => !!x)));
+  const leads = leadIds.length > 0
+    ? await db.lead.findMany({ where: { id: { in: leadIds } }, select: { id: true, name: true } })
+    : [];
+  const leadName = new Map(leads.map((l) => [l.id, l.name] as const));
+  return rows.map((r) => ({
+    id:         r.id,
+    number:     r.number,
+    clientName: r.leadId
+      ? `Lead: ${leadName.get(r.leadId) ?? "—"}`
+      : `Client: ${r.project?.client.name ?? "—"}`,
+    total:      r.total,
+    date:       r.date,
+    isLead:     !!r.leadId,
+  }));
+}
