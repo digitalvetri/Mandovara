@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createSiteVisit } from "@/modules/site-visits/actions";
+import type { ProjectSelectOption } from "@/modules/projects/queries";
 
 const PURPOSES = [
   { value: "INITIAL_SURVEY", label: "Initial Survey" },
@@ -13,7 +14,9 @@ const PURPOSES = [
   { value: "HANDOVER",       label: "Handover" },
 ];
 
-export function NewVisitButton() {
+interface Props { projects: ProjectSelectOption[] }
+
+export function NewVisitButton({ projects }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -73,12 +76,17 @@ export function NewVisitButton() {
                 <input type="datetime-local" name="scheduledAt" required className={inputCls} />
               </Field>
 
-              <Field label="Project ID (optional)">
-                <input type="text" name="projectId" placeholder="cuid…" className={inputCls} />
+              <Field label="Project (optional)">
+                <select name="projectId" className={inputCls}>
+                  <option value="">— none —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.number} · {p.name}</option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Assign to (User ID)">
-                <input type="text" name="assignedToId" required placeholder="cuid…" className={inputCls} />
+                <input type="text" name="assignedToId" required placeholder="User ID…" className={inputCls} />
               </Field>
 
               <Field label="Initial observations">

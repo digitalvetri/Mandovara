@@ -176,6 +176,20 @@ export async function listProjects(
   };
 }
 
+export interface ProjectSelectOption { id: string; name: string; number: string }
+
+export async function listProjectsForSelect(
+  ctx: RequestContext,
+): Promise<ProjectSelectOption[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  return db.project.findMany({
+    select: { id: true, name: true, number: true },
+    orderBy: { createdAt: "desc" },
+    take: 300,
+  });
+}
+
 export async function getProject(ctx: RequestContext, id: string): Promise<ProjectDetail | null> {
   requirePermission(ctx, "project.view");
   const db = scoped(ctx);

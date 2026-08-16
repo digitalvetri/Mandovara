@@ -50,6 +50,17 @@ export async function createSiteVisit(
     return { ok: false, error: "Either a project or a lead must be linked" };
   }
 
+  // Verify the project exists and belongs to this org before entering the transaction.
+  // Without this, an invalid projectId causes a DB-level FK constraint error.
+  if (d.projectId) {
+    const db = scoped(ctx);
+    const exists = await db.project.findFirst({
+      where: { id: d.projectId, organizationId: ctx.orgId },
+      select: { id: true },
+    });
+    if (!exists) return { ok: false, error: "Selected project not found" };
+  }
+
   const created = await withTransaction(async (tx: TxClient) => {
     const number = await allocateNumber(tx, {
       orgId:  ctx.orgId,

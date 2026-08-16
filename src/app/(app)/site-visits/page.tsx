@@ -1,6 +1,7 @@
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { listSiteVisits } from "@/modules/site-visits/queries";
+import { listProjectsForSelect } from "@/modules/projects/queries";
 import { formatDate } from "@/kernel/datetime";
 import { NewVisitButton } from "./_components/NewVisitButton";
 
@@ -16,14 +17,17 @@ const STATUS_CHIP: Record<string, string> = {
 
 export default async function SiteVisitsPage() {
   const ctx = await devContext();
-  const visits = await listSiteVisits(ctx, { limit: 100 });
+  const [visits, projects] = await Promise.all([
+    listSiteVisits(ctx, { limit: 100 }),
+    listProjectsForSelect(ctx),
+  ]);
 
   return (
     <>
       <Topbar
         title="Site Visits"
         eyebrow="Scheduled field visits — surveys, measurements, supervision and handovers"
-        actions={<NewVisitButton />}
+        actions={<NewVisitButton projects={projects} />}
       />
 
       <div className="rounded-[14px] bg-surface border border-rule overflow-x-auto">
