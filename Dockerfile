@@ -30,6 +30,12 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@10 --activate
 
+# Give Node a 4 GB heap for `next build` (tsc + Turbopack together OOM
+# on the default 1.5 GB heap on modest VPS builds — Coolify build was
+# failing with exit code 255 during "Running TypeScript"). Applied only
+# to this stage; runtime doesn't need the extra allocation.
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
