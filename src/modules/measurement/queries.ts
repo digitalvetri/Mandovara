@@ -123,6 +123,7 @@ export async function getRoundDetail(
               engineVersion: true, materialQty: true, materialUnit: true,
               widthsRequired: true, cutLengthMm: true, rollsRequired: true,
               boxesRequired: true, areaSqft: true, warnings: true, computedAt: true,
+              colourwayId: true,
             },
           },
         },
@@ -138,7 +139,22 @@ export async function getRoundDetail(
     : [];
   const nameOf = new Map(users.map((u) => [u.id, u.name] as const));
 
-  const itemsByRoom = groupItemsByRoom(round.items);
+  // CalcResult has a colourwayId FK but no Prisma relation to Colourway,
+  // so hydrate the picked colourways in a batch and stitch on rendering.
+  const pickedIds = Array.from(new Set(
+    round.items
+      .map((it) => it.calc?.colourwayId ?? null)
+      .filter((v): v is string => typeof v === "string"),
+  ));
+  const colourways = pickedIds.length > 0
+    ? await db.colourway.findMany({
+        where:  { id: { in: pickedIds } },
+        select: { id: true, code: true, colourName: true },
+      })
+    : [];
+  const cwById = new Map(colourways.map((c) => [c.id, c] as const));
+
+  const itemsByRoom = groupItemsByRoom(round.items, cwById);
 
   return {
     id:             round.id,
@@ -165,6 +181,7 @@ export async function getRoundDetail(
 /** Bucket items under their Room, preserving Room.sortOrder. */
 function groupItemsByRoom(
   items: Array<Parameters<typeof toItemDetail>[0]>,
+  cwById: ReadonlyMap<string, { id: string; code: string; colourName: string }>,
 ): RoomItemsBucket[] {
   const byRoom = new Map<string, RoomItemsBucket>();
   for (const it of items) {
@@ -176,7 +193,7 @@ function groupItemsByRoom(
       sortOrder:  it.room.sortOrder,
       items:      [],
     };
-    bucket.items.push(toItemDetail(it));
+    bucket.items.push(toItemDetail(it, cwById));
     byRoom.set(key, bucket);
   }
   return [...byRoom.values()].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -197,10 +214,15 @@ type ItemRow = {
     rollsRequired: number | null; boxesRequired: number | null;
     areaSqft: { toString: () => string } | null;
     warnings: string[]; computedAt: Date;
+    colourwayId: string | null;
   } | null;
 };
 
-function toItemDetail(it: ItemRow): ItemDetail {
+function toItemDetail(
+  it: ItemRow,
+  cwById: ReadonlyMap<string, { id: string; code: string; colourName: string }>,
+): ItemDetail {
+  const cw = it.calc?.colourwayId ? cwById.get(it.calc.colourwayId) ?? null : null;
   return {
     id:                 it.id,
     roomId:             it.roomId,
@@ -234,6 +256,9 @@ function toItemDetail(it: ItemRow): ItemDetail {
       areaSqft:       it.calc.areaSqft?.toString() ?? null,
       warnings:       it.calc.warnings,
       computedAt:     it.calc.computedAt,
+      colourwayId:    it.calc.colourwayId,
+      colourwayCode:  cw?.code       ?? null,
+      colourName:     cw?.colourName ?? null,
     } : null,
   };
 }

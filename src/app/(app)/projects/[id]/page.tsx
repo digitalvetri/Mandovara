@@ -11,16 +11,21 @@
 // user's permissions don't cover margin/outstanding, so the row IDs and
 // paisa values never leave the DB for those roles.
 
+import Link from "next/link";
+import type { Route } from "next";
 import { notFound } from "next/navigation";
+import { Package } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { shortNumber } from "@/lib/short-number";
 import { devContext } from "@/lib/dev-context";
 import {
-  getProject, getProjectMilestones, getProjectTasks, getProjectSiteLogs,
-  getProjectMeasurements, getProjectMoney, getProjectTeam,
+  getProject, getProjectMilestones, getProjectTasks,
+  getProjectMeasurements, getProjectMoney,
+  getProjectPayments, getProjectChosenItems,
 } from "@/modules/projects/queries";
+import { listSiteVisits } from "@/modules/site-visits/queries";
 import { resolveNextAction } from "@/modules/projects/next-action";
 import { StageStepper } from "../_components/StageStepper";
 import { MilestonesPanel } from "../_components/MilestonesPanel";
@@ -28,6 +33,9 @@ import { MeasurementsSection } from "../_components/MeasurementsSection";
 import { RightRail } from "../_components/RightRail";
 import { CollapsedPanels } from "../_components/CollapsedPanels";
 import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
+import { UpcomingVisitsCard } from "../_components/UpcomingVisitsCard";
+import { PaymentsPanel } from "../_components/PaymentsPanel";
+import { ChosenItemsPanel } from "../_components/ChosenItemsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -39,13 +47,14 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const [milestones, tasks, siteLogs, rounds, money, team] = await Promise.all([
+  const [milestones, tasks, rounds, money, visits, payments, chosen] = await Promise.all([
     getProjectMilestones(ctx, id),
     getProjectTasks(ctx, id),
-    getProjectSiteLogs(ctx, id),
     getProjectMeasurements(ctx, id),
     getProjectMoney(ctx, id),
-    getProjectTeam(ctx, id),
+    listSiteVisits(ctx, { projectId: id, limit: 10 }),
+    getProjectPayments(ctx, id),
+    getProjectChosenItems(ctx, id),
   ]);
 
   const action = resolveNextAction(ctx, { id: p.id, stage: p.stage });
@@ -62,6 +71,15 @@ export default async function ProjectDetailPage({
       <Topbar
         title=""
         eyebrow=""
+        actions={
+          <Link
+            href={`/products?forProject=${encodeURIComponent(p.id)}` as Route}
+            className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[8px] border border-rule bg-surface text-[12px] text-text-dim hover:text-text hover:border-gold/40 transition-colors"
+          >
+            <Package size={13} strokeWidth={2} />
+            Browse catalog
+          </Link>
+        }
       />
 
       {/* ── Header ────────────────────────────────────────────────── */}
@@ -77,7 +95,11 @@ export default async function ProjectDetailPage({
         </h1>
 
         <div className="mt-4">
-          <StageStepper stage={p.stage} />
+          <StageStepper
+            stage={p.stage}
+            projectId={p.id}
+            canEdit={ctx.permissions.has("project.update")}
+          />
         </div>
 
         <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[12.5px] tabular-nums text-text-dim">
@@ -91,12 +113,20 @@ export default async function ProjectDetailPage({
       <div className="grid grid-cols-1 gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           <StartMeasurementFlow projectId={p.id} action={action} currentUserId={ctx.userId} />
+          <UpcomingVisitsCard visits={visits} />
           <MilestonesPanel milestones={milestones} orderValue={p.orderValue} />
+          <ChosenItemsPanel projectId={p.id} items={chosen} />
           <MeasurementsSection projectId={p.id} rounds={rounds} />
-          <CollapsedPanels projectId={p.id} tasks={tasks} siteLogs={siteLogs} />
+          {payments && (
+            <PaymentsPanel
+              payments={payments}
+              canCreate={ctx.permissions.has("invoice.create")}
+            />
+          )}
+          <CollapsedPanels projectId={p.id} tasks={tasks} />
         </div>
 
-        <RightRail project={p} money={money} team={team} />
+        <RightRail project={p} money={money} />
       </div>
     </>
   );

@@ -79,7 +79,7 @@ export async function createPO(
         date:       now,
         ...(d.expectedAt && { expectedAt: new Date(d.expectedAt) }),
         ...(d.projectId  && { projectId: d.projectId }),
-        status:     "DRAFT",
+        status:     "SENT",
         totalValue,
       },
       select: { id: true, number: true },

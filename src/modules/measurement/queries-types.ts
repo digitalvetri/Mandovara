@@ -37,6 +37,10 @@ export interface ItemCalcSnapshot {
   areaSqft:       string | null;
   warnings:       string[];
   computedAt:     Date;
+  // Colourway picked for this item (written by pickProductForMeasurementItem).
+  colourwayId:    string | null;
+  colourwayCode:  string | null;
+  colourName:     string | null;
 }
 
 export interface ItemDetail {

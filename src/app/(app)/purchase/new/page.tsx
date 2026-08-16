@@ -14,10 +14,7 @@ export default async function NewPOPage() {
   ]);
   return (
     <>
-      <Topbar
-        title="New purchase order"
-        eyebrow="Draft is saved first; approve to issue to vendor."
-      />
+      <Topbar title="New purchase order" />
       <POBuilder vendors={vendors} colourways={colourways} />
     </>
   );

@@ -7,10 +7,16 @@ import type { Route } from "next";
 import { formatINR } from "@/kernel/money/format";
 import type { ProjectRow } from "@/modules/projects/queries";
 import { EmptyState } from "@/components/data/DataTable";
+import { phaseForStage, PROJECT_PHASES } from "@/modules/projects/next-action";
+import { InteractiveStagePill } from "./InteractiveStagePill";
 
-interface Props { rows: ProjectRow[] }
+interface Props {
+  rows:         ProjectRow[];
+  /** True when the user can move a project's stage from the card pill. */
+  canEditStage?: boolean;
+}
 
-export function ProjectCards({ rows }: Props) {
+export function ProjectCards({ rows, canEditStage = false }: Props) {
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -22,15 +28,17 @@ export function ProjectCards({ rows }: Props) {
 
   return (
     <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {rows.map((r) => <Card key={r.id} r={r} />)}
+      {rows.map((r) => <Card key={r.id} r={r} canEditStage={canEditStage} />)}
     </ul>
   );
 }
 
 // ── Card ──────────────────────────────────────────────────
-function Card({ r }: { r: ProjectRow }) {
-  const pct = progressForStage(r.stage);
+function Card({ r, canEditStage }: { r: ProjectRow; canEditStage: boolean }) {
   const isCancelled = r.stage === "CANCELLED";
+  const milestonePct = r.milestonesTotal > 0
+    ? Math.round((r.milestonesDone / r.milestonesTotal) * 100)
+    : progressForStage(r.stage);
 
   return (
     <li>
@@ -42,7 +50,7 @@ function Card({ r }: { r: ProjectRow }) {
           <span className="tabular-nums text-[11px] text-text-dim">
             {shortNumber(r.number)}
           </span>
-          <StagePill stage={r.stage} />
+          <InteractiveStagePill projectId={r.id} stage={r.stage} canEdit={canEditStage} />
         </div>
 
         <div className={`mb-1 line-clamp-2 text-[14.5px] font-semibold ${isCancelled ? "text-text-dim" : "text-text"}`}>
@@ -56,56 +64,37 @@ function Card({ r }: { r: ProjectRow }) {
         <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-surface-2">
           <div
             className={`h-full rounded-full ${isCancelled ? "bg-text-dim/40" : "bg-solid"}`}
-            style={{ width: `${pct}%` }}
+            style={{ width: `${milestonePct}%` }}
           />
         </div>
 
         <div className="flex items-baseline justify-between gap-2 text-[11px]">
-          <span className="text-text-dim tabular-nums">{pct}% complete</span>
+          <span className="text-text-dim tabular-nums">
+            {r.milestonesTotal > 0
+              ? `${r.milestonesDone}/${r.milestonesTotal} milestones`
+              : `${milestonePct}% complete`}
+          </span>
           <span className={`tabular-nums text-[13px] font-medium ${isCancelled ? "text-text-dim" : "text-text"}`}>
             {formatINR(r.orderValue)}
           </span>
         </div>
+
+        {r.nextMilestoneName && !isCancelled && (
+          <div className="mt-2 truncate text-[11px] text-text-dim">
+            Next: <span className="text-text">{r.nextMilestoneName}</span>
+          </div>
+        )}
       </Link>
     </li>
   );
 }
 
-// ── Status pill (compact) ─────────────────────────────────
-function StagePill({ stage }: { stage: string }) {
-  const cfg = STAGE_TONE[stage] ?? { color: "text-text-dim", bg: "bg-surface-2", label: stage };
-  return (
-    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${cfg.bg} ${cfg.color}`}>
-      {cfg.label}
-    </span>
-  );
-}
-
-const STAGE_TONE: Record<string, { color: string; bg: string; label: string }> = {
-  ENQUIRY:      { color: "text-text-dim",     bg: "bg-surface-2",     label: "Enquiry" },
-  SITE_VISIT:   { color: "text-info",         bg: "bg-info/12",       label: "Site Visit" },
-  MEASUREMENT:  { color: "text-info",         bg: "bg-info/12",       label: "Measure" },
-  QUOTATION:    { color: "text-heat",         bg: "bg-heat/12",       label: "Quote" },
-  ORDERED:      { color: "text-solid",        bg: "bg-solid/12",      label: "Ordered" },
-  PROCUREMENT:  { color: "text-solid",        bg: "bg-solid/12",      label: "Procure" },
-  MAKE:         { color: "text-solid",        bg: "bg-solid/12",      label: "Make" },
-  INSTALLATION: { color: "text-solid",        bg: "bg-solid/12",      label: "Install" },
-  SNAGGING:     { color: "text-fault",        bg: "bg-fault/12",      label: "Snag" },
-  COMPLETED:    { color: "text-solid",        bg: "bg-solid/12",      label: "Done" },
-  CANCELLED:    { color: "text-fault",        bg: "bg-fault/12",      label: "Cancelled" },
-};
-
-// Rough progress mapping — one point per stage completed. Not billing
-// weight; that lives on the project detail page's Milestones panel.
-const STAGE_ORDER: readonly string[] = [
-  "ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION",
-  "ORDERED", "PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED",
-];
 function progressForStage(stage: string): number {
-  if (stage === "CANCELLED") return 0;
-  const i = STAGE_ORDER.indexOf(stage);
+  const phase = phaseForStage(stage);
+  if (phase === "CANCELLED") return 0;
+  const i = PROJECT_PHASES.indexOf(phase);
   if (i < 0) return 0;
-  return Math.round(((i + 1) / STAGE_ORDER.length) * 100);
+  return Math.round(((i + 1) / PROJECT_PHASES.length) * 100);
 }
 
 function shortNumber(n: string): string {

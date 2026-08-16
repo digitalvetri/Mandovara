@@ -117,8 +117,7 @@ export function POBuilder({ vendors, colourways }: Props) {
           <thead>
             <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
               <Th>Colourway</Th>
-              <Th align="right" width={80}>Qty</Th>
-              <Th width={100}>Unit</Th>
+              <Th align="right" width={110}>Qty</Th>
               <Th align="right" width={140}>Rate (₹)</Th>
               <Th align="right" width={130}>Amount</Th>
               <Th width={30}></Th>
@@ -126,7 +125,6 @@ export function POBuilder({ vendors, colourways }: Props) {
           </thead>
           <tbody>
             {lines.map((l, i) => {
-              const c = colourwayMap.get(l.colourwayId);
               const rate = safePaise(l.rate);
               const qty = Number(l.quantity) || 0;
               const amount = (rate * BigInt(Math.round(qty * 10_000))) / 10_000n;
@@ -142,24 +140,14 @@ export function POBuilder({ vendors, colourways }: Props) {
                         </option>
                       ))}
                     </select>
-                    {c && (
-                      <div className="text-[10.5px] text-text-faint mt-0.5">
-                        {c.design.family.toLowerCase().replace(/_/g, " ")}
-                      </div>
-                    )}
                   </Td>
                   <Td align="right">
-                    <input inputMode="decimal" value={l.quantity}
-                           onChange={(e) => updateLine(i, { quantity: e.target.value })}
-                           className={`${cellCls} tabular text-right`} />
-                  </Td>
-                  <Td>
-                    <select value={l.unit} onChange={(e) => updateLine(i, { unit: e.target.value as SellUnit })}
-                            className={cellCls}>
-                      {(["METRE","ROLL","SQFT","SQM","PIECE","BOX","RUNNING_FT"] as SellUnit[]).map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
+                    <div className="inline-flex items-baseline gap-1">
+                      <input inputMode="decimal" value={l.quantity}
+                             onChange={(e) => updateLine(i, { quantity: e.target.value })}
+                             className={`${cellCls} tabular text-right w-[64px]`} />
+                      <span className="text-[10.5px] text-text-faint">{l.unit.toLowerCase()}</span>
+                    </div>
                   </Td>
                   <Td align="right">
                     <input inputMode="decimal" value={l.rate}
@@ -187,26 +175,24 @@ export function POBuilder({ vendors, colourways }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-[14px] bg-surface border border-rule p-5">
-          {serverError && <div className="text-[12px] text-bad mb-3">{serverError}</div>}
-          <div className="flex items-center justify-end gap-3">
-            <button type="button" onClick={() => router.back()}
-                    className="h-[36px] px-4 rounded-[8px] text-[12.5px] text-text-dim hover:text-text hover:bg-surface-hover transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={pending}
-                    className="h-[36px] px-5 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:bg-accent-hover disabled:opacity-60 transition-colors">
-              {pending ? "Saving…" : "Create purchase order"}
-            </button>
-          </div>
-        </div>
-        <div className="rounded-[14px] bg-surface border border-rule p-5">
-          <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Total (preview)</div>
-          <div className="font-display text-[22px] font-semibold text-text tabular-nums">
+      {serverError && <div className="text-[12px] text-bad">{serverError}</div>}
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">Total</span>
+          <span className="font-display text-[22px] font-semibold text-text tabular-nums">
             {formatINR(totalValue)}
-          </div>
-          <p className="mt-2 text-[10.5px] text-text-faint">Server confirms on save.</p>
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => router.back()}
+                  className="h-[36px] px-4 rounded-[8px] text-[12.5px] text-text-dim hover:text-text hover:bg-surface-hover transition-colors">
+            Cancel
+          </button>
+          <button type="submit" disabled={pending}
+                  className="h-[36px] px-5 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:bg-accent-hover disabled:opacity-60 transition-colors">
+            {pending ? "Saving…" : "Create purchase order"}
+          </button>
         </div>
       </div>
     </form>

@@ -220,3 +220,52 @@ export const STAGE_SHORT_LABEL: Record<string, string> = {
   COMPLETED:    "Done",
   CANCELLED:    "Cancelled",
 };
+
+// Customer-facing 4-phase view of the 10-stage internal workflow. Owners
+// think in "site visit → measurement → installation → completed"; the
+// internal ENQUIRY/QUOTATION/ORDERED/PROCUREMENT/MAKE/SNAGGING states are
+// substeps within those phases and don't need their own visual tokens.
+export type ProjectPhase = "SITE_VISIT" | "MEASUREMENT" | "INSTALLATION" | "COMPLETED";
+
+export const PROJECT_PHASES: readonly ProjectPhase[] = [
+  "SITE_VISIT", "MEASUREMENT", "INSTALLATION", "COMPLETED",
+];
+
+export const PHASE_LABEL: Record<ProjectPhase, string> = {
+  SITE_VISIT:   "Site Visit",
+  MEASUREMENT:  "Measurement",
+  INSTALLATION: "Installation",
+  COMPLETED:    "Completed",
+};
+
+// The first internal stage jumped to when the user clicks a phase in the
+// stepper — lets a manual override still map cleanly onto ProjectStage.
+export const PHASE_TARGET_STAGE: Record<ProjectPhase, string> = {
+  SITE_VISIT:   "SITE_VISIT",
+  MEASUREMENT:  "MEASUREMENT",
+  INSTALLATION: "INSTALLATION",
+  COMPLETED:    "COMPLETED",
+};
+
+export function phaseForStage(stage: string): ProjectPhase | "CANCELLED" {
+  switch (stage) {
+    case "ENQUIRY":
+    case "SITE_VISIT":
+      return "SITE_VISIT";
+    case "MEASUREMENT":
+    case "QUOTATION":
+      return "MEASUREMENT";
+    case "ORDERED":
+    case "PROCUREMENT":
+    case "MAKE":
+    case "INSTALLATION":
+    case "SNAGGING":
+      return "INSTALLATION";
+    case "COMPLETED":
+      return "COMPLETED";
+    case "CANCELLED":
+      return "CANCELLED";
+    default:
+      return "SITE_VISIT";
+  }
+}

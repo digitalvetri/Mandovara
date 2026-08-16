@@ -16,6 +16,8 @@ import { FilterRail } from "./_components/FilterRail";
 import { ResultsBar } from "./_components/ResultsBar";
 import { ProductGrid } from "./_components/ProductGrid";
 import { EmptyResults } from "./_components/EmptyResults";
+import { ProjectContextBanner } from "./_components/ProjectContextBanner";
+import { scoped } from "@/kernel/db/scoped";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,8 @@ interface SearchParams {
   priceMax?:   string;
   page?:       string;
   sort?:       string;
+  forProject?: string;
+  itemId?:     string;
 }
 
 export default async function ProductsPage({
@@ -61,17 +65,49 @@ export default async function ProductsPage({
 
   const totalAll = result.categories.reduce((s, c) => s + c.productCount, 0);
 
+  // "Browsing for a project" context — pulled from ?forProject query.
+  // Suppresses the "New Product" CTA and shows a Back-to-project banner.
+  // When ?itemId is also present, the banner sharpens to "Selecting for
+  // → {item label}" and every card click will land on the PDP's Attach
+  // button instead of a generic Back-to-project.
+  const forProjectId = params.forProject?.trim() || null;
+  const itemId       = params.itemId?.trim() || null;
+  const forProject = forProjectId
+    ? await scoped(ctx).project.findUnique({
+        where:  { id: forProjectId },
+        select: { id: true, name: true },
+      })
+    : null;
+  const targetItem = itemId && forProject
+    ? await scoped(ctx).measurementItem.findUnique({
+        where:  { id: itemId },
+        select: { id: true, label: true, measurement: { select: { projectId: true } } },
+      })
+    : null;
+  const validItem = targetItem && targetItem.measurement.projectId === forProject?.id
+    ? targetItem : null;
+
   return (
     <>
       <Topbar
         title="Product Catalog"
         eyebrow={`${totalAll} SKUs · ${result.categories.length} categor${result.categories.length === 1 ? "y" : "ies"}${result.brands.length > 1 ? ` · ${result.brands.length} brands` : ""}`}
         actions={
-          <Link href={"/products/new" as Route}>
-            <PrimaryButton>New Product</PrimaryButton>
-          </Link>
+          forProject ? null : (
+            <Link href={"/products/new" as Route}>
+              <PrimaryButton>New Product</PrimaryButton>
+            </Link>
+          )
         }
       />
+
+      {forProject && (
+        <ProjectContextBanner
+          projectId={forProject.id}
+          projectName={forProject.name}
+          itemLabel={validItem?.label ?? null}
+        />
+      )}
 
       <div className="flex flex-col lg:flex-row gap-6 pb-10">
         <FilterRail
@@ -94,7 +130,7 @@ export default async function ProductsPage({
             <EmptyResults hasFilters={hasActiveFilters(params)} />
           ) : (
             <>
-              <ProductGrid rows={result.rows} />
+              <ProductGrid rows={result.rows} forProject={forProject?.id} itemId={validItem?.id} />
               <Pager page={result.page} pageSize={result.pageSize} total={result.total} />
             </>
           )}

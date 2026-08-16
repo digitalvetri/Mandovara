@@ -9,9 +9,12 @@
 // Here we know the project — one less form field to fill.
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
 import { createSiteVisit } from "@/modules/site-visits/actions";
+import { formatDate } from "@/kernel/datetime";
 
 const PURPOSES = [
   { value: "INITIAL_SURVEY", label: "Initial survey" },
@@ -29,6 +32,13 @@ interface Props {
   onClose: () => void;
 }
 
+interface SuccessState {
+  id: string;
+  number: string;
+  scheduledAt: Date;
+  stageAdvanced: boolean;
+}
+
 export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose }: Props) {
   const router = useRouter();
   const [purpose, setPurpose]         = useState("INITIAL_SURVEY");
@@ -36,6 +46,7 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
   const [assigneeId, setAssigneeId]   = useState(defaultAssigneeId);
   const [notes, setNotes]             = useState("");
   const [error, setError]             = useState<string | null>(null);
+  const [success, setSuccess]         = useState<SuccessState | null>(null);
   const [pending, start]              = useTransition();
 
   if (!open) return null;
@@ -50,10 +61,76 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
         assignedToId: assigneeId,
         observations: notes.trim() || undefined,
       });
-      if (!res.ok) { setError(res.error ?? "Could not schedule visit"); return; }
-      onClose();
+      if (!res.ok || !res.data) { setError(res.error ?? "Could not schedule visit"); return; }
+      setSuccess({
+        id:            res.data.id,
+        number:        res.data.number,
+        scheduledAt:   new Date(res.data.scheduledAt),
+        stageAdvanced: res.data.stageAdvanced,
+      });
       router.refresh();
     });
+  }
+
+  function closeAndReset(): void {
+    setSuccess(null);
+    setError(null);
+    setNotes("");
+    onClose();
+  }
+
+  if (success) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site visit scheduled"
+      >
+        <div className="w-full max-w-[460px] rounded-[14px] border border-rule bg-surface p-6">
+          <div className="mb-3 flex items-start gap-3">
+            <div className="mt-0.5 rounded-full bg-solid/12 p-2 text-solid">
+              <CheckCircle2 size={20} />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-display text-[19px] font-semibold text-text">
+                Visit scheduled
+              </h2>
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-text-dim">
+                <span className="tabular-nums text-text">{success.number}</span>
+                {" · "}
+                {formatDate(success.scheduledAt)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-4 rounded-[10px] border border-rule bg-surface-2 px-4 py-3 text-[12px] leading-relaxed text-text-dim">
+            {success.stageAdvanced ? (
+              <>The visit is now on the assignee&apos;s schedule and the project has moved to <span className="text-text">Site Visit</span>. You can track it here or in the Site Visits list.</>
+            ) : (
+              <>The visit is now on the assignee&apos;s schedule. You can track it on this project or in the Site Visits list.</>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <Link
+              href={`/site-visits/${success.id}` as Route}
+              className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule px-3.5 py-2 text-[12.5px] text-text-dim hover:text-text"
+            >
+              Open visit
+              <ArrowRight size={12} />
+            </Link>
+            <button
+              type="button"
+              onClick={closeAndReset}
+              className="rounded-[8px] bg-gold px-5 py-2 text-[12.5px] font-semibold text-ink hover:bg-gold-strong"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -68,7 +145,7 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
           <h2 className="font-display text-[19px] font-semibold text-text">Schedule site visit</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeAndReset}
             className="rounded-[6px] p-1 text-text-dim hover:bg-surface-2 hover:text-text"
             aria-label="Close"
           >
@@ -76,7 +153,7 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
           </button>
         </div>
         <p className="mb-4 text-[12px] leading-relaxed text-text-dim">
-          A team member goes to the site with a specific purpose. Measurement, sample-showing and snag-fix all begin here.
+          A team member goes to the site with a specific purpose. Measurement, sample-showing and snag-fix all begin here. Scheduling this visit moves the project to <span className="text-text">Site Visit</span>.
         </p>
 
         <div className="space-y-3">
@@ -131,7 +208,7 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
         <div className="mt-6 flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeAndReset}
             disabled={pending}
             className="rounded-[8px] px-4 py-2 text-[12.5px] text-text-dim hover:text-text disabled:opacity-60"
           >

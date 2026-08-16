@@ -9,6 +9,7 @@ const STUB_DASHBOARD: DashboardData = {
   openLeads: 0, openLeadsDelta: 0, openLeadsAwaitingQuote: 0,
   overdueInvoices: 0n, overdueInvoicesCount: 0, overdueBadge: 0,
   revenueByMonth: [], projectStages: [], siteVisits: [], activity: [],
+  teamAssignments: [],
 };
 import Link from "next/link";
 import type { Route } from "next";
@@ -24,6 +25,7 @@ import { StoreView } from "./_dashboard/StoreView";
 import { MakeSupervisorView } from "./_dashboard/MakeSupervisorView";
 import { InstallerView } from "./_dashboard/InstallerView";
 import { AccountsView } from "./_dashboard/AccountsView";
+import { TeamAssignments } from "./_dashboard/TeamAssignments";
 
 export const dynamic = "force-dynamic";
 
@@ -143,9 +145,13 @@ export default async function DashboardPage() {
         <ProjectStages stages={d.projectStages} />
       </section>
 
-      <section className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 pb-10">
+      <section className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         <SiteVisits visits={d.siteVisits} />
         <RecentActivity items={d.activity} />
+      </section>
+
+      <section className="mt-4 pb-10">
+        <TeamAssignments rows={d.teamAssignments} />
       </section>
     </>
   );

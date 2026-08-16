@@ -7,10 +7,7 @@ import type { POLineRow } from "@/modules/purchase/queries";
 
 interface LineState {
   quantity: string;
-  dyeLot: string;
   binLocation: string;
-  rollCount: string;
-  rollLengthsM: string; // comma-separated: "10.05,10.05,7.2"
 }
 
 interface Props {
@@ -30,19 +27,11 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
   const pendingLines = lines.filter((l) => parseFloat(l.pendingQty) > 0);
   if (pendingLines.length === 0) return null;
 
-  const hasRolls = pendingLines.some((l) => l.unit === "ROLL");
-
   function lineState(id: string): LineState {
-    return stateByLine[id] ?? { quantity: "", dyeLot: "", binLocation: "", rollCount: "", rollLengthsM: "" };
+    return stateByLine[id] ?? { quantity: "", binLocation: "" };
   }
   function updateLine(id: string, patch: Partial<LineState>) {
     setStateByLine((s) => ({ ...s, [id]: { ...lineState(id), ...patch } }));
-  }
-
-  function parseRollLengths(s: string): number[] | undefined {
-    if (!s.trim()) return undefined;
-    const parts = s.split(",").map((p) => Number(p.trim())).filter((n) => n > 0);
-    return parts.length > 0 ? parts : undefined;
   }
 
   function commit(e: React.FormEvent) {
@@ -53,15 +42,10 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
         const st = lineState(l.id);
         const qty = Number(st.quantity ?? 0);
         if (qty <= 0) return null;
-        const rollCount = st.rollCount ? Number(st.rollCount) : undefined;
-        const rollLengthsM = parseRollLengths(st.rollLengthsM);
         return {
           colourwayId:  l.colourwayId,
           quantity:     qty,
-          dyeLot:       st.dyeLot || undefined,
           binLocation:  st.binLocation || undefined,
-          ...(rollCount     != null && { rollCount }),
-          ...(rollLengthsM           && { rollLengthsM }),
         };
       })
       .filter((l): l is NonNullable<typeof l> => l !== null);
@@ -119,10 +103,7 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
               <Th>Colourway</Th>
               <Th align="right">Pending</Th>
               <Th align="right" width={110}>Receive now</Th>
-              <Th width={130}>Dye lot</Th>
               <Th width={110}>Bin</Th>
-              {hasRolls && <Th width={70}>Rolls</Th>}
-              {hasRolls && <Th width={180}>Roll lengths (m)</Th>}
             </tr>
           </thead>
           <tbody>
@@ -146,40 +127,11 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
                 </Td>
                 <Td>
                   <input
-                    value={lineState(l.id).dyeLot}
-                    onChange={(e) => updateLine(l.id, { dyeLot: e.target.value })}
-                    placeholder="LOT-2608A"
-                    className={`${cellCls} tabular uppercase`} />
-                </Td>
-                <Td>
-                  <input
                     value={lineState(l.id).binLocation}
                     onChange={(e) => updateLine(l.id, { binLocation: e.target.value })}
                     placeholder="A-3"
                     className={`${cellCls} tabular`} />
                 </Td>
-                {hasRolls && (
-                  <Td>
-                    {l.unit === "ROLL" && (
-                      <input inputMode="numeric"
-                        value={lineState(l.id).rollCount}
-                        onChange={(e) => updateLine(l.id, { rollCount: e.target.value.replace(/\D/g, "") })}
-                        placeholder="3"
-                        className={`${cellCls} tabular text-right`} />
-                    )}
-                  </Td>
-                )}
-                {hasRolls && (
-                  <Td>
-                    {l.unit === "ROLL" && (
-                      <input
-                        value={lineState(l.id).rollLengthsM}
-                        onChange={(e) => updateLine(l.id, { rollLengthsM: e.target.value })}
-                        placeholder="10.05,10.05,7.2"
-                        className={`${cellCls} tabular`} />
-                    )}
-                  </Td>
-                )}
               </tr>
             ))}
           </tbody>

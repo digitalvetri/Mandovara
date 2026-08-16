@@ -149,6 +149,39 @@ export function PriceBlock({
   );
 }
 
+// Renders the per-size price table (3x5 / 4x6 / …) when a rug or
+// similar SKU has multiple size-tier rows. Tiers arrive as
+// "SIZE:3x5" — we strip the prefix and show the clean label.
+export function SizePriceTable({
+  prices, uomShort,
+}: {
+  prices: { tier: string; amount: bigint }[];
+  uomShort: string;
+}) {
+  const rows = prices
+    .filter((p) => p.tier.startsWith("SIZE:"))
+    .map((p) => ({ label: p.tier.slice("SIZE:".length), amount: p.amount }));
+  if (rows.length === 0) return null;
+  return (
+    <div className="rounded-[10px] border border-rule bg-surface/60 overflow-hidden">
+      <div className="px-4 py-2 border-b border-rule text-[10.5px] uppercase tracking-[0.16em] text-text-dim flex items-baseline justify-between">
+        <span>Prices per size</span>
+        <span className="text-text-faint text-[10px]">₹ / {uomShort}</span>
+      </div>
+      <table className="w-full text-[12.5px]">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-b border-rule/60 last:border-b-0">
+              <td className="px-4 py-2 text-text tabular uppercase">{r.label}</td>
+              <td className="px-4 py-2 text-right text-text tabular font-medium">{formatINR(r.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function shortUom(uom: string): string {
   switch (uom) {
     case "METRE":       return "m";

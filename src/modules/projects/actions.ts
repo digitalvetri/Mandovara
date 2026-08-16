@@ -11,6 +11,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { parseINR } from "@/kernel/money/format";
 import { allocateNumber, yymmFromDate, Prisma } from "@/kernel/numbering/series";
+import { generateMilestonesForProject } from "@/kernel/milestones/generate";
 import { devContext } from "@/lib/dev-context";
 import {
   createProjectSchema, setProjectStatusSchema,
@@ -67,6 +68,18 @@ export async function createProject(input: unknown): Promise<ActionResult<{ id: 
       },
       select: { id: true, number: true },
     });
+
+    // Seed the common milestone spine (Site Visit → Measurement → Quote
+    // → Advance → Procure → Install → Handover) so the panel is never
+    // empty. Family-specific rows (Fabric inward, Cut & stitch, etc.)
+    // are added later when measurements reveal the project's families —
+    // see kernel/milestones/generate.ts.
+    await generateMilestonesForProject(tx, {
+      orgId:     ctx.orgId,
+      projectId: project.id,
+      families:  [],
+    });
+
     return project;
   });
 

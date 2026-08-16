@@ -38,7 +38,7 @@ const updateVisitStatusSchema = z.object({
 
 export async function createSiteVisit(
   input: unknown,
-): Promise<ActionResult<{ id: string; number: string }>> {
+): Promise<ActionResult<{ id: string; number: string; scheduledAt: Date; stageAdvanced: boolean }>> {
   const ctx = await devContext();
   requirePermission(ctx, "sitelog.create");
 
@@ -57,7 +57,7 @@ export async function createSiteVisit(
       yymm:   yymmFromDate(new Date(d.scheduledAt)),
       prefix: "MDV",
     });
-    return tx.siteVisit.create({
+    const visit = await tx.siteVisit.create({
       data: {
         organizationId: ctx.orgId,
         number,
@@ -70,11 +70,28 @@ export async function createSiteVisit(
         photoKeys:    [],
         observations: d.observations ?? null,
       },
-      select: { id: true, number: true },
+      select: { id: true, number: true, scheduledAt: true },
     });
+
+    // Auto-advance the project's stage when a visit is scheduled from
+    // ENQUIRY. The pipeline moves by *doing the work*, not by clicking a
+    // dropdown — so scheduling a site visit progresses the project. Any
+    // later visit (project already at MEASUREMENT, INSTALLATION, etc.)
+    // leaves the stage alone.
+    let stageAdvanced = false;
+    if (d.projectId) {
+      const res = await tx.project.updateMany({
+        where: { id: d.projectId, stage: "ENQUIRY" },
+        data:  { stage: "SITE_VISIT" },
+      });
+      stageAdvanced = res.count > 0;
+    }
+
+    return { ...visit, stageAdvanced };
   });
 
   revalidatePath("/site-visits");
+  revalidatePath("/projects");
   if (d.projectId) revalidatePath(`/projects/${d.projectId}`);
   return { ok: true, data: created };
 }

@@ -30,7 +30,8 @@ interface Props {
   orderValue: bigint;
 }
 
-export function MilestonesPanel({ milestones, orderValue }: Props) {
+export function MilestonesPanel({ milestones: raw, orderValue }: Props) {
+  const milestones = dedupeByCode(raw);
   if (milestones.length === 0) {
     return (
       <Section title="Milestones">
@@ -99,6 +100,23 @@ export function MilestonesPanel({ milestones, orderValue }: Props) {
 function weight(m: ProjectMilestone): number {
   const w = m.billingWeightPct ?? m.billingPct;
   return Number(w) || 0;
+}
+
+// Auto-generation runs one milestone per (project × active family), which
+// makes "Site visit", "Measurement", "Handover" etc. appear once per
+// family a project spans. That's noise: those gates fire once for the
+// project as a whole. Collapse by code, preferring the completed row so
+// the list stays honest when part of the fleet is done.
+function dedupeByCode(list: ProjectMilestone[]): ProjectMilestone[] {
+  const byCode = new Map<string, ProjectMilestone>();
+  for (const m of list) {
+    const key = m.templateCode ?? `${m.family ?? ""}::${m.name}::${m.order}`;
+    const existing = byCode.get(key);
+    if (!existing) { byCode.set(key, m); continue; }
+    const rank = (x: ProjectMilestone) => x.status === "COMPLETED" ? 3 : x.status === "IN_PROGRESS" ? 2 : x.status === "BLOCKED" ? 1 : 0;
+    if (rank(m) > rank(existing)) byCode.set(key, m);
+  }
+  return Array.from(byCode.values()).sort((a, b) => a.order - b.order);
 }
 
 function FamilyGroup({ family, milestones }: { family: string | null; milestones: ProjectMilestone[] }) {

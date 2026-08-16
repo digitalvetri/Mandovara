@@ -84,11 +84,11 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
-              <Input label="Room"        value={line.roomName}  onChange={(v) => onChange({ roomName: v })} />
-              <Input label="Label"       value={line.label}     onChange={(v) => onChange({ label: v })} className="lg:col-span-2" />
-              <Input label="Width (mm)"  value={line.widthMm}   onChange={(v) => onChange({ widthMm: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
-              <Input label="Height (mm)" value={line.heightMm}  onChange={(v) => onChange({ heightMm: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
-              <Input label="Qty"         value={line.quantity}  onChange={(v) => onChange({ quantity: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
+              <Input label="Room"                        value={line.roomName} onChange={(v) => onChange({ roomName: v })} />
+              <Input label="Label"                       value={line.label}    onChange={(v) => onChange({ label: v })} className="lg:col-span-2" />
+              <Input label={dimensionLabel(line.family, "width")}  value={line.widthMm}  onChange={(v) => onChange({ widthMm: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
+              <Input label={dimensionLabel(line.family, "height")} value={line.heightMm} onChange={(v) => onChange({ heightMm: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
+              <Input label="Qty"                         value={line.quantity} onChange={(v) => onChange({ quantity: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
             </div>
 
             <div className="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -109,6 +109,33 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
       </div>
     </div>
   );
+}
+
+// The physical surface being measured differs by product family — a
+// wallpaper roll covers a wall, a curtain runs across a window, a blind
+// fits an opening. Generic "Width/Height" reads like a spec of the SKU
+// itself; contextual labels make it obvious you're entering the surface
+// the product will cover. Rooms/floors say "length" instead of "height".
+function dimensionLabel(family: string | undefined, dim: "width" | "height"): string {
+  const vertical =
+    (family === "FLOORING" || family === "CARPET_ROLL" || family === "CARPET_TILE")
+      ? "length" : "height";
+  const surface = ((): string | null => {
+    switch (family) {
+      case "WALLPAPER":
+      case "VERTICAL_GARDEN":  return "Wall";
+      case "CURTAIN_FABRIC":
+      case "SHEER":            return "Window";
+      case "BLIND":            return "Opening";
+      case "FLOORING":
+      case "CARPET_ROLL":
+      case "CARPET_TILE":      return "Room";
+      case "INTERIOR_FILM":    return "Surface";
+      default:                 return null;
+    }
+  })();
+  const base = dim === "width" ? "width" : vertical;
+  return surface ? `${surface} ${base} (mm)` : `${base[0]!.toUpperCase()}${base.slice(1)} (mm)`;
 }
 
 function Input({ label, value, onChange, inputMode, className }: {

@@ -27,10 +27,8 @@ export function POTable({ rows }: { rows: PORow[] }) {
           <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
             <Th>Number</Th>
             <Th>Vendor</Th>
-            <Th align="right">Lines</Th>
-            <Th>Date</Th>
-            <Th>Expected by</Th>
             <Th align="right">Total</Th>
+            <Th>Expected by</Th>
             <Th>Status</Th>
           </tr>
         </thead>
@@ -43,10 +41,8 @@ export function POTable({ rows }: { rows: PORow[] }) {
                 </Link>
               </Td>
               <Td>{r.vendorName}</Td>
-              <Td align="right"><span className="tabular text-text-dim">{r.lineCount}</span></Td>
-              <Td className="text-text-dim tabular">{formatDate(r.date)}</Td>
-              <Td className="text-text-dim tabular">{r.expectedAt ? formatDate(r.expectedAt) : "—"}</Td>
               <Td align="right"><span className="tabular text-text">{formatINR(r.totalValue)}</span></Td>
+              <Td className="text-text-dim tabular">{r.expectedAt ? formatDate(r.expectedAt) : "—"}</Td>
               <Td><POStatusPill status={r.status} /></Td>
             </tr>
           ))}

@@ -59,7 +59,7 @@ export default async function ProjectsPage({
 
       <ProjectKpiCards kpis={kpis} />
       <ProjectsToolbar />
-      <ProjectCards rows={rows} />
+      <ProjectCards rows={rows} canEditStage={ctx.permissions.has("project.update")} />
       <Pager page={page} pageSize={pageSize} total={total} />
     </>
   );

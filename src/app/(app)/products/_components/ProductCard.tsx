@@ -15,13 +15,19 @@ import type { Route } from "next";
 import { formatINR } from "@/kernel/money/format";
 import type { ProductRow } from "@/modules/products/queries";
 
-export function ProductCard({ row }: { row: ProductRow }) {
+export function ProductCard({
+  row, forProject, itemId,
+}: { row: ProductRow; forProject?: string; itemId?: string }) {
   const swatchColour = row.hex ?? "var(--color-gold)";
   const uomShort = row.uom === "METRE" ? "m" : row.uom === "SQFT" ? "sqft" : row.uom === "ROLL" ? "roll" : row.uom === "BOX" ? "box" : row.uom === "PIECE" ? "pc" : row.uom.toLowerCase();
+  const qs = new URLSearchParams();
+  if (forProject) qs.set("forProject", forProject);
+  if (itemId)     qs.set("itemId",     itemId);
+  const href = qs.toString().length > 0 ? `/products/${row.id}?${qs.toString()}` : `/products/${row.id}`;
 
   return (
     <Link
-      href={`/products/${row.id}` as Route}
+      href={href as Route}
       className="group relative flex flex-col rounded-[14px] border border-rule bg-surface overflow-hidden transition-all duration-200 hover:bg-surface-hover hover:border-rule/80 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
     >
       {/* Image well — fixed 4:5 portrait, image fills uniformly */}

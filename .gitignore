@@ -54,3 +54,17 @@ test-results/
 # verification screenshots (root only)
 /*.png
 tests/e2e/.auth/
+pre-wipe.dump
+
+# Catalog extraction artefacts — regenerable from source PDFs via the
+# accompanying scripts. Pages are ~200 MB (rendered @ 200dpi); swatches
+# and crops are already copied into public/catalog/uploads/ at import
+# time, so the intermediates aren't needed in-repo.
+scripts/fedora-pages/
+scripts/fedora-swatches/
+scripts/rugway-pages/
+scripts/rugway-crops/
+scripts/rugway-crops-hi/
+scripts/rugway-crops-test/
+scripts/rugway-quality/
+scripts/rugway-quality-test/

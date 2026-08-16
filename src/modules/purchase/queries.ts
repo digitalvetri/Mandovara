@@ -43,7 +43,7 @@ export async function listPOs(
   const statusFilter: Record<string, unknown> = {};
   if (q.status && q.status !== "ALL") {
     statusFilter["status"] = q.status === "OPEN"
-      ? { in: ["SENT", "PARTIAL"] }
+      ? { in: ["DRAFT", "SENT", "PARTIAL"] }
       : q.status;
   }
 

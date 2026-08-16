@@ -20,6 +20,8 @@ import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
+import { bus } from "@/kernel/events/bus";
+import "@/kernel/events/register";
 import {
   startRoundSchema, submitRoundSchema, approveRoundSchema, reviseRoundSchema,
   createRoomSchema,
@@ -181,6 +183,20 @@ export async function approveMeasurementRound(
     where: { id: measurementId },
     data:  { status: "APPROVED", approvedById: ctx.userId, approvedAt: new Date() },
   });
+
+  // Fires kernel/milestones/listeners:onMeasurementApproved which ticks
+  // the MEASUREMENT milestone AND advances the project stage MEASUREMENT
+  // → QUOTATION (guarded — won't regress a project past QUOTATION).
+  await bus.publish({
+    type:       "measurement.approved",
+    orgId:      ctx.orgId,
+    actorId:    ctx.userId,
+    occurredAt: new Date(),
+    measurementId,
+    projectId:  round.projectId,
+  });
+
+  revalidatePath(`/projects/${round.projectId}`);
   revalidatePath(`/projects/${round.projectId}/measurements`);
   revalidatePath(`/projects/${round.projectId}/measurements/${measurementId}`);
   return { ok: true, data: { id: measurementId } };

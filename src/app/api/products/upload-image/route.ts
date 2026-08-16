@@ -34,7 +34,11 @@ const ALLOWED: Record<string, string> = {
   "image/png":  "png",
   "image/webp": "webp",
 };
-const UPLOAD_DIR = "/app/public/catalog/uploads";
+// Derive from process.cwd() so the same code works locally (Windows /
+// macOS repo root) and in Coolify (Dockerfile sets WORKDIR /app, so
+// cwd = "/app"). PUBLIC_ROUTE is the URL Next serves this from under
+// public/.
+const UPLOAD_DIR = path.join(process.cwd(), "public", "catalog", "uploads");
 const PUBLIC_ROUTE = "/catalog/uploads";
 
 export async function POST(req: Request): Promise<NextResponse<{ ok: boolean; imageKey?: string; error?: string }>> {

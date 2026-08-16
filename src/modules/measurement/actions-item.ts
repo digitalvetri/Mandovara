@@ -15,7 +15,7 @@ import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import {
-  addItemSchema, updateItemSchema, deleteItemSchema, syncItemSchema,
+  addItemSchema, updateItemSchema, deleteItemSchema, syncItemSchema, pickProductSchema,
 } from "./schema";
 import {
   type ActionResult, zodError, canEditRound,
@@ -138,6 +138,67 @@ export async function deleteMeasurementItem(
   await db.measurementItem.delete({ where: { id } });
   revalidatePath(`/projects/${existing.measurement.projectId}/measurements/${existing.measurementId}`);
   return { ok: true, data: { id } };
+}
+
+// Attach a Colourway to a MeasurementItem. Updates CalcResult.colourwayId
+// (creates a minimal CalcResult row if the item doesn't have one yet).
+// No round-status gate — designers pick / swap colours at any stage.
+// Returns measurementId + projectId so the caller can navigate back.
+export async function pickProductForMeasurementItem(
+  input: unknown,
+): Promise<ActionResult<{ measurementId: string; projectId: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "measurement.update");
+  const parsed = pickProductSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { measurementItemId, colourwayId } = parsed.data;
+
+  const db = scoped(ctx);
+  const item = await db.measurementItem.findUnique({
+    where:  { id: measurementItemId },
+    select: {
+      id: true, measurementId: true, family: true,
+      widthMm: true, heightMm: true, quantity: true,
+      measurement: { select: { projectId: true } },
+      calc: { select: { id: true } },
+    },
+  });
+  if (!item) return { ok: false, error: "Measurement item not found" };
+
+  // Cross-check the colourway is real and reachable in this org.
+  const cw = await db.colourway.findUnique({
+    where:  { id: colourwayId },
+    select: { id: true, sellUnit: true, design: { select: { family: true } } },
+  });
+  if (!cw) return { ok: false, error: "Colourway not found" };
+
+  if (item.calc) {
+    await db.calcResult.update({
+      where: { id: item.calc.id },
+      data:  { colourwayId },
+    });
+  } else {
+    // Minimal placeholder CalcResult — the full engine run happens when
+    // dimensions change (updateMeasurementItem). We only need the link.
+    await db.calcResult.create({
+      data: {
+        organizationId:    ctx.orgId,
+        measurementItemId,
+        colourwayId,
+        engineVersion:     `${item.family.toLowerCase()}@stub`,
+        inputs:            {},
+        materialQty:       "0",
+        materialUnit:      cw.sellUnit,
+      },
+    });
+  }
+
+  revalidatePath(`/projects/${item.measurement.projectId}`);
+  revalidatePath(`/projects/${item.measurement.projectId}/measurements/${item.measurementId}`);
+  return {
+    ok:   true,
+    data: { measurementId: item.measurementId, projectId: item.measurement.projectId },
+  };
 }
 
 // Sync path for the field PWA's offline outbox drain. Idempotent on

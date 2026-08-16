@@ -86,6 +86,22 @@ async function onQuotationAccepted(e: QuotationAcceptedEvent): Promise<void> {
   });
   if (!q) return;
   await completeMilestonesByEvent(q.projectId, "quotation.accepted");
+
+  // Advance project stage to ORDERED so the 4-phase UI moves from
+  // "Measurement" (QUOTATION lives inside that phase) to "Installation".
+  // Guarded — never regress a project past ORDERED.
+  const project = await prisma.project.findUnique({
+    where:  { id: q.projectId },
+    select: { stage: true },
+  });
+  if (!project) return;
+  const stagesBefore: readonly string[] = ["ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION"];
+  if (stagesBefore.includes(project.stage)) {
+    await prisma.project.update({
+      where: { id: q.projectId },
+      data:  { stage: "ORDERED" },
+    });
+  }
 }
 
 async function onAdvanceReceived(e: AdvanceReceivedEvent): Promise<void> {

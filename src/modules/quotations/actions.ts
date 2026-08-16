@@ -11,6 +11,8 @@ import { parseINR } from "@/kernel/money/format";
 import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kernel/tax/gst";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
+import { bus } from "@/kernel/events/bus";
+import "@/kernel/events/register";
 import { MADE_TO_MEASURE_FAMILIES } from "./lib";
 import { createQuotationSchema, setStatusSchema, quotationLineInput, type QuotationLineInput } from "./schema";
 
@@ -232,7 +234,7 @@ export async function setQuotationStatus(
   const db = scoped(ctx);
   const q = await db.quotation.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, clientId: true },
   });
   if (!q) return { ok: false, error: "Quotation not found" };
 
@@ -308,6 +310,20 @@ export async function setQuotationStatus(
                                         ? { rejectionReason: "Returned to draft by approver" }                   : {}),
     },
   });
+
+  // Fire domain events after successful state transition. Listeners in
+  // kernel/milestones handle milestone auto-completion and stage advance
+  // (see onQuotationAccepted).
+  if (status === "ACCEPTED") {
+    await bus.publish({
+      type:        "quotation.accepted",
+      orgId:       ctx.orgId,
+      actorId:     ctx.userId,
+      occurredAt:  new Date(),
+      quotationId: id,
+      clientId:    q.clientId,
+    });
+  }
 
   revalidatePath("/quotations");
   revalidatePath(`/quotations/${id}`);

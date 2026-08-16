@@ -1,20 +1,20 @@
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
-import { listCategories } from "@/modules/products/queries";
+import { listBrandsForPicker } from "@/modules/products/queries";
 import { ProductForm } from "../_components/ProductForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewProductPage() {
   const ctx = await devContext();
-  const categories = await listCategories(ctx);
+  const brands = await listBrandsForPicker(ctx);
   return (
     <>
       <Topbar
         title="New product"
-        eyebrow="One SKU. Category is created inline if new."
+        eyebrow="Category picks a family. Brand is created inline if new."
       />
-      <ProductForm mode="create" categories={categories} />
+      <ProductForm mode="create" brands={brands} />
     </>
   );
 }

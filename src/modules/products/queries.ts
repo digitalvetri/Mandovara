@@ -242,6 +242,125 @@ export async function listCategories(ctx: RequestContext): Promise<CategoryOptio
   return familyCounts(ctx);
 }
 
+// Lightweight brand picker for the New Product form. Returns every
+// active brand, not only those with existing designs, so the datalist
+// stays useful in a freshly-wiped catalog before any products exist.
+export async function listBrandsForPicker(
+  ctx: RequestContext,
+): Promise<Array<{ id: string; name: string }>> {
+  requirePermission(ctx, "catalog.view");
+  const db = scoped(ctx);
+  return db.brand.findMany({
+    where:   { isActive: true },
+    orderBy: { name: "asc" },
+    select:  { id: true, name: true },
+  });
+}
+
+// Editable snapshot for the /products/[id]/edit form. Structured to
+// match the updateProductSchema shape so defaultValues plug in
+// directly.
+export interface ProductEditSnapshot {
+  id:       string;
+  code:     string;
+  name:     string;
+  brand:    string;
+  family:   string;
+  familyLabel: string;
+  hsn:      string;
+  gstRate:  number;
+  sellUnit: string;
+  pileHeightMm: string;    // "" if not set
+  gsm:          string;    // ""
+  pileYarn:     string;
+  points:       string;
+  extraSpecs:   Array<{ key: string; value: string }>;
+  sizePrices:   Array<{ tier: string; price: string }>; // rupees as string
+  cost:         string;    // ""
+  imageKey:     string | null;
+}
+
+const RESERVED_SPEC_KEYS = new Set([
+  "sourcedFrom", "sourcedOn", "sheet", "page", "slot", "series", "pileYarn", "points",
+]);
+
+export async function getProductForEdit(
+  ctx: RequestContext,
+  id:  string,
+): Promise<ProductEditSnapshot | null> {
+  requirePermission(ctx, "catalog.view");
+  const canSeeCost = can(ctx, "catalog.viewCost");
+  const db = scoped(ctx);
+
+  const cw = await db.colourway.findUnique({
+    where:  { id },
+    select: {
+      id: true, code: true, sellUnit: true, imageKey: true,
+      design: {
+        select: {
+          name: true, family: true, hsn: true, gstRate: true,
+          gsm: true, thicknessMm: true, specs: true,
+          collection: { select: { brand: { select: { name: true } } } },
+        },
+      },
+      prices: {
+        orderBy: { effectiveFrom: "desc" },
+        select:  { tier: true, amount: true, effectiveFrom: true, effectiveTo: true },
+      },
+    },
+  });
+  if (!cw) return null;
+
+  const now = new Date();
+  const activePrices = cw.prices.filter(
+    (p) => p.effectiveFrom <= now && (p.effectiveTo == null || p.effectiveTo >= now),
+  );
+
+  // Bucket the active prices by prefix. Size-tier rows come out as
+  // { tier: "3x5", price: "7100" }; single-tier COST separately.
+  const sizePrices = activePrices
+    .filter((p) => p.tier.startsWith("SIZE:"))
+    .map((p) => ({
+      tier:  p.tier.slice("SIZE:".length),
+      price: (Number(p.amount) / 100).toString(),
+    }));
+  const cost = canSeeCost
+    ? activePrices.find((p) => p.tier === "COST")
+    : undefined;
+
+  const specs = (cw.design.specs && typeof cw.design.specs === "object" && !Array.isArray(cw.design.specs))
+    ? cw.design.specs as Record<string, unknown>
+    : {};
+  const pileYarn = typeof specs["pileYarn"] === "string" ? specs["pileYarn"] as string : "";
+  const points   = typeof specs["points"]   === "string" ? specs["points"]   as string
+                 : specs["points"] != null ? String(specs["points"]) : "";
+  const extraSpecs = Object.entries(specs)
+    .filter(([k]) => !RESERVED_SPEC_KEYS.has(k))
+    .map(([k, v]) => ({ key: k, value: v == null ? "" : String(v) }));
+
+  const familyLabel = FAMILY_LABEL[cw.design.family] ?? cw.design.family;
+
+  return {
+    id:       cw.id,
+    code:     cw.code,
+    name:     cw.design.name,
+    brand:    cw.design.collection.brand.name,
+    family:   cw.design.family,
+    familyLabel,
+    hsn:      cw.design.hsn,
+    gstRate:  Number(cw.design.gstRate),
+    sellUnit: cw.sellUnit,
+    pileHeightMm: cw.design.thicknessMm != null ? String(cw.design.thicknessMm) : "",
+    gsm:          cw.design.gsm != null ? String(cw.design.gsm) : "",
+    pileYarn,
+    points,
+    extraSpecs,
+    sizePrices,
+    cost:     cost ? (Number(cost.amount) / 100).toString() : "",
+    imageKey: cw.imageKey,
+  };
+}
+
 async function familyCounts(ctx: RequestContext): Promise<CategoryOption[]> {
   const db = scoped(ctx);
   const rows = await db.design.groupBy({

@@ -4,18 +4,17 @@
 // permission and this component doesn't render it at all (spec §3, §6).
 
 import Link from "next/link";
-import { Phone, MessageCircle, MapPin, Crown, User as UserIcon } from "lucide-react";
+import { Phone, MessageCircle, MapPin } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
-import type { ProjectDetail, ProjectMoney, ProjectTeamRow } from "@/modules/projects/queries";
+import type { ProjectDetail, ProjectMoney } from "@/modules/projects/queries";
 
 interface Props {
   project: ProjectDetail;
   money: ProjectMoney | null;
-  team: ProjectTeamRow[];
   clientArchitectName?: string | null;
 }
 
-export function RightRail({ project, money, team, clientArchitectName }: Props) {
+export function RightRail({ project, money, clientArchitectName }: Props) {
   return (
     <aside className="space-y-4 lg:sticky lg:top-4 lg:h-fit">
       <ClientCard
@@ -30,7 +29,6 @@ export function RightRail({ project, money, team, clientArchitectName }: Props) 
         contactMobile={project.siteContactMobile}
       />
       {money && <MoneyCard money={money} />}
-      <TeamCard team={team} />
     </aside>
   );
 }
@@ -169,37 +167,6 @@ function MoneyRow({ k, v, big }: { k: string; v: React.ReactNode; big?: boolean 
       ].join(" ")}>{v}</dd>
     </div>
   );
-}
-
-function TeamCard({ team }: { team: ProjectTeamRow[] }) {
-  if (team.length === 0) {
-    return (
-      <Card title="Team">
-        <p className="text-[11.5px] text-text-dim italic">No members assigned yet.</p>
-      </Card>
-    );
-  }
-  return (
-    <Card title="Team">
-      <ul className="space-y-2">
-        {team.map((m) => (
-          <li key={m.userId} className="flex items-center gap-2.5 text-[12.5px]">
-            {m.isOwner
-              ? <Crown  size={13} className="text-gold shrink-0" />
-              : <UserIcon size={13} className="text-text-dim shrink-0" />}
-            <span className="text-text">{m.name}</span>
-            <span className="ml-auto text-[10.5px] uppercase tracking-[0.1em] text-text-dim">
-              {shortRole(m.role)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
-function shortRole(r: string): string {
-  return r.replace("_", " ").toLowerCase();
 }
 
 function digits(s: string): string {

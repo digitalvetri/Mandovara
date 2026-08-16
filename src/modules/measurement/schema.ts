@@ -132,6 +132,15 @@ export type UpdateItemInput   = z.infer<typeof updateItemSchema>;
 export const deleteItemSchema = z.object({ id: idField });
 export type DeleteItemInput   = z.infer<typeof deleteItemSchema>;
 
+// Picking a product for a measurement item — writes CalcResult.colourwayId.
+// Deliberately NOT gated by round-status: designers routinely swap
+// colourways after a round is APPROVED, before the quote goes out.
+export const pickProductSchema = z.object({
+  measurementItemId: idField,
+  colourwayId:       idField,
+});
+export type PickProductInput = z.infer<typeof pickProductSchema>;
+
 // Convenience for the field PWA: create-or-upsert by clientCuid.
 // (Reuses addItemSchema — clientCuid is already declared there.)
 export const syncItemSchema = addItemSchema.and(

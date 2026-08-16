@@ -8,6 +8,8 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
+import { bus } from "@/kernel/events/bus";
+import "@/kernel/events/register";
 import {
   createInstallVisitSchema,
   assignCrewSchema,
@@ -132,7 +134,7 @@ export async function advanceInstallStatus(
   const { visitId } = parsed.data;
 
   const db = scoped(ctx);
-  const visit = await db.installVisit.findUnique({ where: { id: visitId }, select: { id: true, status: true } });
+  const visit = await db.installVisit.findUnique({ where: { id: visitId }, select: { id: true, status: true, projectId: true } });
   if (!visit) return { ok: false, error: "Install visit not found" };
 
   const next = INSTALL_STATUS_NEXT[visit.status];
@@ -153,6 +155,18 @@ export async function advanceInstallStatus(
   await db.installVisitEvent.create({
     data: { organizationId: ctx.orgId, visitId, actorId: ctx.userId, type: "STATUS_CHANGE", fromStatus: visit.status, toStatus: next, payload: {} },
   });
+
+  // Tick the INSTALLATION milestone when this transition lands on COMPLETED.
+  if (next === "COMPLETED") {
+    await bus.publish({
+      type:           "installVisit.completed",
+      orgId:          ctx.orgId,
+      actorId:        ctx.userId,
+      occurredAt:     now,
+      installVisitId: visitId,
+      projectId:      visit.projectId,
+    });
+  }
 
   revalidatePath("/install");
   revalidatePath(`/install/${visitId}`);

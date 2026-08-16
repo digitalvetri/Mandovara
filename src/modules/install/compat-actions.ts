@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
+import { bus } from "@/kernel/events/bus";
+import "@/kernel/events/register";
 import { completeInstallSchema, rescheduleInstallVisitSchema } from "./schema";
 import type { ActionResult } from "./actions";
 
@@ -22,7 +24,7 @@ export async function completeInstallVisit(
   const db = scoped(ctx);
   const visit = await db.installVisit.findUnique({
     where: { id: d.visitId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, projectId: true },
   });
   if (!visit) return { ok: false, error: "Install visit not found" };
   if (!["ASSIGNED", "IN_PROGRESS", "SCHEDULED"].includes(visit.status)) {
@@ -43,6 +45,18 @@ export async function completeInstallVisit(
       organizationId: ctx.orgId, visitId: d.visitId, actorId: ctx.userId,
       type: "STATUS_CHANGE", fromStatus: visit.status, toStatus: "COMPLETED", payload: {},
     },
+  });
+
+  // Fires onInstallVisitCompleted → ticks the INSTALLATION milestone.
+  // Stage advance to COMPLETED lives on the customer-confirmation path
+  // (install/actions.confirmInstall) — a raw signature isn't enough.
+  await bus.publish({
+    type:           "installVisit.completed",
+    orgId:          ctx.orgId,
+    actorId:        ctx.userId,
+    occurredAt:     now,
+    installVisitId: d.visitId,
+    projectId:      visit.projectId,
   });
 
   revalidatePath("/install");
