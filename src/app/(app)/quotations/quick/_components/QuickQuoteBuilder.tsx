@@ -85,8 +85,7 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 pb-10">
       <div className="space-y-4">
         <div className="rounded-[14px] bg-surface border border-rule p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
+          <label className="block">
               <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">Project</div>
               <select
                 value={projectId}
@@ -100,19 +99,6 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
                 <option value="__new__">+ Create a new project for {clientName}</option>
               </select>
             </label>
-            <label className="block">
-              <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">Branch</div>
-              <select
-                value={branchId}
-                onChange={(e) => setBranchId(e.target.value)}
-                className="w-full h-[40px] rounded-[8px] border border-rule bg-transparent px-2 text-[12.5px] text-text"
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </label>
-          </div>
           {usingNewProject && (
             <label className="block mt-3">
               <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">New project name</div>

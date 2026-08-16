@@ -105,6 +105,32 @@ export function stateLabel(code: string): string {
 
 // ── Tax & Details section (extracted to stay under the 300-line limit) ─────
 
+// ── Amount in words (Indian system) ──────────────────────────────────────
+
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+  "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+  "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+function _w(x: number): string {
+  if (x === 0) return "";
+  if (x < 20) return ONES[x]!;
+  if (x < 100) return (TENS[Math.floor(x / 10)]! + (x % 10 ? " " + ONES[x % 10]! : "")).trim();
+  return (ONES[Math.floor(x / 100)]! + " Hundred" + (x % 100 ? " " + _w(x % 100) : "")).trim();
+}
+
+export function rupeesToWords(rupees: number): string {
+  if (!isFinite(rupees) || rupees <= 0) return "Zero Rupees Only";
+  const n = Math.floor(rupees);
+  const parts: string[] = [];
+  let rem = n;
+  if (rem >= 10000000) { parts.push(_w(Math.floor(rem / 10000000)) + " Crore"); rem %= 10000000; }
+  if (rem >= 100000)   { parts.push(_w(Math.floor(rem / 100000)) + " Lakh");    rem %= 100000; }
+  if (rem >= 1000)     { parts.push(_w(Math.floor(rem / 1000)) + " Thousand");  rem %= 1000; }
+  if (rem > 0)         { parts.push(_w(rem)); }
+  return parts.join(" ") + " Only";
+}
+
 export function TaxDetails({
   posCode,
   setPosCode,

@@ -113,13 +113,7 @@ export function QuotationBuilder({ projectId, branches }: Props) {
   return (
     <div className="space-y-4 pb-10">
       {/* Header */}
-      <div className="rounded-[14px] bg-surface border border-rule p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <label className="block">
-          <div className={lbl}>Branch</div>
-          <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={fld}>
-            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </label>
+      <div className="rounded-[14px] bg-surface border border-rule p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="block">
           <div className={lbl}>Place of supply (state code)</div>
           <input value={placeOfSupplyCode}
