@@ -4,7 +4,7 @@
 //   - `colourwayId` (text)  — target SKU
 //   - `file`        (blob)  — jpg|png|webp, ≤5MB
 //
-// Auth via middleware's dev_uid cookie; RBAC checked here (catalog.update).
+// Auth via middleware's signed session cookie; RBAC checked here (catalog.update).
 //
 // Storage: writes to `/app/public/catalog/uploads/{colourwayId}.{ext}`,
 // which sits on the Coolify `catalog-assets` volume mounted at

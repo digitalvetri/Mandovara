@@ -1,17 +1,21 @@
-// DEV-ONLY RequestContext helper. Until Phase 7 lands real auth (mobile-
-// number-first login, Argon2id, httpOnly cookies), the app uses a cookie
-// "dev_uid" set by the dev login page to identity the current user.
+// Per-request RequestContext resolver — reads the signed session cookie,
+// verifies its HMAC, and hydrates the user's org/roles/permissions.
 //
-// Uses React's cache() for per-request deduplication — multiple server
-// components/actions calling devContext() in one request share one DB read.
-// Unlike a module-level variable, this is per-request, so different browser
-// sessions get different contexts.
+// Uses React's cache() for per-request deduplication.
+//
+// In production: no cookie = throw. The middleware (src/proxy.ts) prevents
+// unauthenticated requests from ever reaching a page/action that calls this,
+// so a throw here indicates a bug (or an api route missing from the public
+// prefixes). In dev, if you hit a page without logging in you'll see the
+// error at the layout boundary — go to /login and sign in.
 
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { prisma } from "@/kernel/db/client";
 import type { RequestContext } from "@/kernel/auth/context";
 import { PERMISSIONS, isPermissionKey, type PermissionKey } from "@/kernel/rbac/permissions";
+import { SESSION_COOKIE, verifySession } from "./session";
 
 function allRegisteredPermissions(): ReadonlySet<PermissionKey> {
   const set = new Set<PermissionKey>();
@@ -21,21 +25,12 @@ function allRegisteredPermissions(): ReadonlySet<PermissionKey> {
   return set;
 }
 
-const STUB_CONTEXT: RequestContext = {
-  userId: "dev-stub-user",
-  orgId: "dev-stub-org",
-  branchIds: [],
-  branchScope: "ALL",
-  roles: ["OWNER"],
-  permissions: allRegisteredPermissions(),
-};
-
 async function buildContext(userId: string): Promise<RequestContext | null> {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true, organizationId: true, branchIds: true, role: true,
+        id: true, organizationId: true, branchIds: true, role: true, status: true,
         dynamicRole: {
           select: {
             isOwnerRole: true,
@@ -45,6 +40,7 @@ async function buildContext(userId: string): Promise<RequestContext | null> {
       },
     });
     if (!user) return null;
+    if (user.status !== "ACTIVE") return null;
 
     let permissions: ReadonlySet<PermissionKey>;
     if (user.dynamicRole) {
@@ -75,41 +71,27 @@ async function buildContext(userId: string): Promise<RequestContext | null> {
 }
 
 export const devContext = cache(async (): Promise<RequestContext> => {
-  if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_DEV_AUTH"] !== "true") {
-    throw new Error("devContext() called in production — refuse.");
-  }
-
-  // 1. Try the dev_uid cookie (set by the login page)
+  let uid: string | null = null;
   try {
     const jar = await cookies();
-    const uid = jar.get("dev_uid")?.value;
-    if (uid) {
-      const ctx = await buildContext(uid);
-      if (ctx) return ctx;
-    }
+    const raw = jar.get(SESSION_COOKIE)?.value;
+    uid = await verifySession(raw);
   } catch {
-    // Running outside request scope (seed scripts, tests) — fall through
+    // Running outside a request scope (seed scripts, tests) — leave uid null.
   }
 
-  // 2. Fall back to the first OWNER in the DB
-  try {
-    const owner = await prisma.user.findFirstOrThrow({
-      where: { role: "OWNER" },
-      select: {
-        id: true, organizationId: true, branchIds: true, role: true,
-        dynamicRole: {
-          select: {
-            isOwnerRole: true,
-            permissions: { select: { key: true, scope: true } },
-          },
-        },
-      },
-    });
-    const ctx = await buildContext(owner.id);
+  if (uid) {
+    const ctx = await buildContext(uid);
     if (ctx) return ctx;
-  } catch {
-    console.warn("[devContext] DB unreachable — using stub context. Start Docker to load real data.");
+    // Cookie signature valid but user is missing / suspended (e.g. deleted
+    // after the session was issued). Send them to /login — the next login
+    // overwrites the cookie. Redirect here instead of throwing so we don't
+    // hand back a 500.
+    redirect("/login");
   }
 
-  return STUB_CONTEXT;
+  // No cookie at all — the middleware should have caught this. If we reach
+  // here it's a bug (or a route missed from the public prefixes). Redirect
+  // anyway so the user has a working next step.
+  redirect("/login");
 });

@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { SidebarShell } from "@/components/layout/SidebarShell";
 import { devContext } from "@/lib/dev-context";
 import { prisma } from "@/kernel/db/client";
+import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // Gate: must be logged in
+  // Gate: must be logged in with a valid signed session
   const jar = await cookies();
-  if (!jar.has("dev_uid")) redirect("/login");
+  const uid = await verifySession(jar.get(SESSION_COOKIE)?.value);
+  if (!uid) redirect("/login");
 
   // Current user for sidebar display
   const ctx = await devContext();

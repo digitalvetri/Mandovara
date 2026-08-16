@@ -3,12 +3,15 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ThreeCanvas } from "./_components/ThreeCanvas";
 import { LoginCard } from "./_components/LoginTabs";
+import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   const jar = await cookies();
-  if (jar.has("dev_uid")) redirect("/");
+  const cookie = jar.get(SESSION_COOKIE)?.value;
+  const uid = await verifySession(cookie);
+  if (uid) redirect("/");
 
   return (
     <div className="min-h-screen flex">

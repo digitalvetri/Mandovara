@@ -2,26 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { devLogin, devLoginByCredential } from "@/lib/dev-auth";
-import {
-  Crown, Users, Palette, Briefcase, Ruler, Package,
-  Scissors, Wrench, IndianRupee, UserCog,
-  ChevronDown, Loader2, Eye, EyeOff, ArrowRight, Info,
-} from "lucide-react";
+import { devLoginByCredential } from "@/lib/dev-auth";
+import { Loader2, Eye, EyeOff, ArrowRight, Info } from "lucide-react";
 import { MandovaraLogo } from "./MandovaraLogo";
 import { CredentialsPanel, DEFAULT_PASSWORD } from "./CredentialsPanel";
-
-const EMPLOYEE_ROLES = [
-  { value: "DESIGNER",        label: "Interior Designer",    Icon: Palette     },
-  { value: "SALES",           label: "Sales Executive",      Icon: Briefcase   },
-  { value: "MEASURE_EXEC",    label: "Measurement Exec",     Icon: Ruler       },
-  { value: "STORE",           label: "Store Keeper",         Icon: Package     },
-  { value: "MAKE_SUPERVISOR", label: "Make Supervisor",      Icon: Scissors    },
-  { value: "INSTALLER",       label: "Site Installer",       Icon: Wrench      },
-  { value: "ACCOUNTS",        label: "Accounts",             Icon: IndianRupee },
-  { value: "HR",              label: "HR Manager",           Icon: UserCog     },
-] as const;
-
 
 function focusStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.borderColor = "#2BA89A";
@@ -42,8 +26,11 @@ export function LoginCard() {
   const [credential, setCredential] = useState("");
   const [password, setPassword]     = useState("");
   const [showPwd, setShowPwd]       = useState(false);
-  const [showRoles, setShowRoles]   = useState(false);
   const [showCreds, setShowCreds]   = useState(false);
+
+  // Show the seeded-credentials helper only in dev builds. In production
+  // this component simply renders nothing when SHOW_CREDS is false.
+  const SHOW_CREDS_HELPER = process.env.NODE_ENV !== "production";
 
   function navigate() {
     const dest = params.get("from") ?? "/";
@@ -67,15 +54,6 @@ export function LoginCard() {
     setPassword(DEFAULT_PASSWORD);
     setShowCreds(false);
     setError(null);
-  }
-
-  async function handleRoleLogin(role: string) {
-    setError(null);
-    start(async () => {
-      const res = await devLogin(role);
-      if (!res.ok) { setError(res.error ?? "Login failed"); return; }
-      navigate();
-    });
   }
 
   const canSubmit = credential.trim().length > 0 && password.length > 0;
@@ -112,19 +90,21 @@ export function LoginCard() {
             >
               Email or Mobile
             </label>
-            <button
-              type="button"
-              onClick={() => setShowCreds((v) => !v)}
-              className="flex items-center gap-1 text-[10.5px] font-medium transition-colors"
-              style={{ color: "#2BA89A" }}
-            >
-              <Info size={11} strokeWidth={2} />
-              View credentials
-            </button>
+            {SHOW_CREDS_HELPER && (
+              <button
+                type="button"
+                onClick={() => setShowCreds((v) => !v)}
+                className="flex items-center gap-1 text-[10.5px] font-medium transition-colors"
+                style={{ color: "#2BA89A" }}
+              >
+                <Info size={11} strokeWidth={2} />
+                View credentials
+              </button>
+            )}
           </div>
 
-          {/* Credentials helper panel */}
-          {showCreds && (
+          {/* Credentials helper panel — dev only */}
+          {SHOW_CREDS_HELPER && showCreds && (
             <CredentialsPanel onSelect={fillCredential} />
           )}
 
@@ -206,70 +186,6 @@ export function LoginCard() {
         </button>
       </form>
 
-      {/* ── Divider ── */}
-      <div className="flex items-center gap-3 my-6">
-        <div className="flex-1 h-px" style={{ background: "#D8EEEA" }} />
-        <span className="text-[11px] tracking-[0.06em]" style={{ color: "#7A9A98" }}>
-          or quick access
-        </span>
-        <div className="flex-1 h-px" style={{ background: "#D8EEEA" }} />
-      </div>
-
-      {/* ── Owner quick tile ── */}
-      <button
-        type="button"
-        onClick={() => handleRoleLogin("OWNER")}
-        disabled={pending}
-        className="w-full mb-2.5 flex items-center gap-3 px-4 h-[46px] rounded-[12px] transition-all duration-150"
-        style={{ background: "#F2FFFE", border: "1.5px solid #C8E8E4" }}
-      >
-        <Crown size={16} strokeWidth={1.8} style={{ color: "#2BA89A" }} className="shrink-0" />
-        <span className="text-[13px] font-medium flex-1 text-left" style={{ color: "#0F2A28" }}>
-          Enter as Owner
-        </span>
-        <span className="text-[10.5px]" style={{ color: "#7A9A98" }}>No password needed</span>
-      </button>
-
-      {/* ── Employee roles toggle ── */}
-      <button
-        type="button"
-        onClick={() => setShowRoles((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 h-[46px] rounded-[12px] transition-all duration-150"
-        style={{ background: "#F5F9F8", border: "1.5px solid #D8E8E6" }}
-      >
-        <Users size={16} strokeWidth={1.8} style={{ color: "#5A8A86" }} className="shrink-0" />
-        <span className="text-[13px] font-medium flex-1 text-left" style={{ color: "#4A6462" }}>
-          Employee roles
-        </span>
-        <ChevronDown
-          size={15}
-          strokeWidth={2}
-          style={{
-            color: "#7A9A98",
-            transform: showRoles ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 200ms",
-          }}
-        />
-      </button>
-
-      {showRoles && (
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          {EMPLOYEE_ROLES.map(({ value, label, Icon }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => handleRoleLogin(value)}
-              disabled={pending}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-[10px] text-left transition-all duration-150 hover:border-[#2BA89A]"
-              style={{ background: "#F5F9F8", border: "1.5px solid #D8E8E6", color: "#2A4A48" }}
-            >
-              <Icon size={14} strokeWidth={1.7} className="shrink-0" style={{ color: "#2BA89A" }} />
-              <span className="text-[11.5px] font-medium leading-tight">{label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Footer */}
       <div
         className="mt-8 pt-5 text-center text-[10.5px]"
@@ -280,4 +196,3 @@ export function LoginCard() {
     </div>
   );
 }
-

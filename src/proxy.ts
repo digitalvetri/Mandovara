@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 // Paths that never need authentication
 const PUBLIC_PATHS = ["/login", "/api/health"];
-// Path prefixes that are always allowed (webhooks use their own HMAC auth;
-// /api/admin/ endpoints use their own token header for auth).
-const PUBLIC_PREFIXES = ["/api/webhooks/", "/api/admin/", "/_next/", "/favicon.ico", "/icons/", "/images/", "/catalog/uploads/"];
+// Path prefixes always allowed (webhooks use their own HMAC; /api/admin/
+// endpoints use a token header; the rest are static assets).
+const PUBLIC_PREFIXES = [
+  "/api/webhooks/",
+  "/api/admin/",
+  "/_next/",
+  "/favicon.ico",
+  "/icons/",
+  "/images/",
+  "/catalog/uploads/",
+];
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (
@@ -17,13 +26,16 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const uid = req.cookies.get("dev_uid")?.value;
-  if (!uid) {
+  const cookie = req.cookies.get(SESSION_COOKIE)?.value;
+  const userId = await verifySession(cookie);
+  if (!userId) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
-    // Preserve the intended destination so we can redirect back after login
     url.searchParams.set("from", pathname);
-    return NextResponse.redirect(url);
+    const res = NextResponse.redirect(url);
+    // If a cookie was present but invalid (bad sig, rotated secret), clear it.
+    if (cookie) res.cookies.delete(SESSION_COOKIE);
+    return res;
   }
 
   return NextResponse.next();

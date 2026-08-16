@@ -64,11 +64,14 @@ Open the app service → **Environment Variables** tab → add these:
 | `DATABASE_URL`     | (from step 2)                                                     | Pooled or direct — Coolify Postgres has no PgBouncer      |
 | `DIRECT_URL`       | (same as DATABASE_URL)                                            | Prisma migrate uses this — fine to reuse                  |
 | `REDIS_URL`        | (from step 3)                                                     | BullMQ needs it                                           |
-| `SESSION_SECRET`   | run `openssl rand -hex 32` locally and paste                      | 64-char random hex                                        |
+| `SESSION_SECRET`   | run `openssl rand -hex 32` locally and paste                      | **64-char random hex — required. Rotating invalidates all sessions.** |
+| `COOKIE_SECURE`    | `false` if the app is served over plain HTTP (e.g. sslip.io test URL) | **Leave unset (or `true`) once TLS is enabled.** Browsers refuse Secure cookies over HTTP; setting `false` while on HTTP is the only way login can succeed. |
 | `NEXT_PUBLIC_APP_URL` | your app's public URL (get after step 7)                       | Fill after first deploy                                   |
 | `NODE_ENV`         | `production`                                                      | Already set inside the Dockerfile too                     |
 
 Leave WhatsApp / GSP secrets empty for now — they only matter when Phase 6 / 8 code paths run.
+
+> ⚠️ **Remove any `ALLOW_DEV_AUTH` env var if you set it earlier.** That escape hatch has been deleted from the code; leaving the variable in place does nothing but is misleading. The only way in is now a real email/mobile + password login against a bcrypt hash.
 
 ---
 

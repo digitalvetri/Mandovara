@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-// Login page is force-static — no DB call, always renders in CI.
-// Clear the dev_uid cookie first so the page doesn't redirect to the app.
+// Login page is force-dynamic — no DB call except session verify.
+// Clear cookies first so the page doesn't redirect the pre-authenticated
+// context back to the app.
 test("login page renders brand mark and sign-in prompt", async ({ page, context }) => {
   await context.clearCookies();
   await page.goto("/login");
