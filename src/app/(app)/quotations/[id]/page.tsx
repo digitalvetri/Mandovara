@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { getQuotation, type QuotationDetail } from "@/modules/quotations/queries";
@@ -72,10 +71,6 @@ export default async function QuotationDetailPage({
 
   return (
     <>
-      <Topbar
-        title={serialized.number}
-        eyebrow={serialized.projectName}
-      />
       <QuotationHeader quotation={serialized} canApprove={canApprove} />
       <QuotationWorkspace quotation={serialized} canApprove={canApprove} />
     </>

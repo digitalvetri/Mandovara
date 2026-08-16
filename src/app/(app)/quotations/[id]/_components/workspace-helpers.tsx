@@ -80,3 +80,84 @@ export function TRow({ k, v }: { k: string; v: number }) {
     </div>
   );
 }
+
+// ── Indian state codes for Tax & Details display ───────────────────────────
+
+export const INDIAN_STATES: Record<string, string> = {
+  "01": "Jammu & Kashmir",  "02": "Himachal Pradesh", "03": "Punjab",
+  "04": "Chandigarh",       "05": "Uttarakhand",       "06": "Haryana",
+  "07": "Delhi",            "08": "Rajasthan",          "09": "Uttar Pradesh",
+  "10": "Bihar",            "11": "Sikkim",             "12": "Arunachal Pradesh",
+  "13": "Nagaland",         "14": "Manipur",            "15": "Mizoram",
+  "16": "Tripura",          "17": "Meghalaya",          "18": "Assam",
+  "19": "West Bengal",      "20": "Jharkhand",          "21": "Odisha",
+  "22": "Chhattisgarh",     "23": "Madhya Pradesh",     "24": "Gujarat",
+  "26": "Daman & Diu",      "27": "Maharashtra",        "28": "Andhra Pradesh",
+  "29": "Karnataka",        "30": "Goa",                "31": "Lakshadweep",
+  "32": "Kerala",           "33": "Tamil Nadu",         "34": "Puducherry",
+  "35": "A&N Islands",      "36": "Telangana",          "37": "Andhra Pradesh",
+};
+
+export function stateLabel(code: string): string {
+  const name = INDIAN_STATES[code];
+  return name ? `${name} (${code})` : code || "—";
+}
+
+// ── Tax & Details section (extracted to stay under the 300-line limit) ─────
+
+export function TaxDetails({
+  posCode,
+  setPosCode,
+  isIntraState,
+  isDraft,
+}: {
+  posCode: string;
+  setPosCode: (v: string) => void;
+  isIntraState: boolean;
+  isDraft: boolean;
+}) {
+  return (
+    <div className="border-t border-rule px-7 py-5">
+      <div className="text-[11.5px] uppercase tracking-[0.1em] text-text-dim mb-4">
+        Tax &amp; Details
+      </div>
+      <div className="flex flex-wrap items-start gap-x-10 gap-y-4">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.1em] text-text-dim mb-1.5">
+            Place of Supply
+          </div>
+          {isDraft ? (
+            <div className="flex items-center gap-2.5">
+              <input
+                type="text"
+                maxLength={2}
+                value={posCode}
+                onChange={(e) => setPosCode(e.target.value.toUpperCase())}
+                className="h-8 w-12 px-2 rounded-[6px] border border-rule bg-transparent text-[13px] tabular text-text text-center outline-none focus:border-accent transition-colors"
+              />
+              <span className="text-[13px] text-text-dim">{stateLabel(posCode)}</span>
+            </div>
+          ) : (
+            <div className="text-[13px] text-text tabular">{stateLabel(posCode)}</div>
+          )}
+        </div>
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.1em] text-text-dim mb-1.5">
+            Tax Type
+          </div>
+          <div className="text-[13px] text-text">
+            {isIntraState ? "Intra-state" : "Inter-state"}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.1em] text-text-dim mb-1.5">
+            GST Type
+          </div>
+          <div className="text-[13px] text-text">
+            {isIntraState ? "CGST + SGST" : "IGST"}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

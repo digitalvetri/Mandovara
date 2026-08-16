@@ -8,7 +8,7 @@ import type { EditLine } from "./QuotePreviewA4";
 import type { SerializedQuotation } from "../_types";
 import {
   SELL_UNITS, UNIT_SHORT, newKey, INPUT, INPUT_SM,
-  fmtRupee, lineAmt, computeTotals, initLines, TRow,
+  fmtRupee, lineAmt, computeTotals, initLines, TRow, TaxDetails,
 } from "./workspace-helpers";
 
 export function QuotationWorkspace({
@@ -78,9 +78,9 @@ export function QuotationWorkspace({
       {/* ── Section header ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 px-7 py-4 border-b border-rule">
         <div>
-          <div className="text-[14px] font-semibold text-text">Line Items</div>
+          <div className="text-[14px] font-semibold text-text">Items in this quotation</div>
           <div className="text-[12.5px] text-text-dim mt-0.5">
-            {lines.length} line{lines.length !== 1 ? "s" : ""}
+            {lines.length} item{lines.length !== 1 ? "s" : ""}
           </div>
         </div>
         {isDraft && (
@@ -111,7 +111,7 @@ export function QuotationWorkspace({
           <thead>
             <tr className="text-[11px] uppercase tracking-[0.1em] text-text-dim border-b-2 border-rule">
               <th className="text-left pb-3 pr-3 w-[44px]">#</th>
-              <th className="text-left pb-3 pr-4">Description / Room</th>
+              <th className="text-left pb-3 pr-4">Item / Description</th>
               <th className="text-right pb-3 pr-3 w-[80px]">Qty</th>
               <th className="text-left pb-3 pr-3 w-[90px]">Unit</th>
               <th className="text-right pb-3 pr-3 w-[112px]">Rate (₹)</th>
@@ -240,27 +240,18 @@ export function QuotationWorkspace({
         )}
       </div>
 
-      {/* ── Totals ────────────────────────────────────────────────────── */}
+      {/* ── Tax & Details ─────────────────────────────────────────────── */}
+      <TaxDetails
+        posCode={posCode}
+        setPosCode={setPosCode}
+        isIntraState={isIntraState}
+        isDraft={isDraft}
+      />
+
+      {/* ── Final Total ───────────────────────────────────────────────── */}
       <div className="border-t border-rule bg-surface px-7 py-6">
-        <div className="flex items-start justify-between gap-8 flex-wrap">
-          {isDraft && (
-            <div className="flex flex-col gap-2.5 pt-1">
-              <label className="text-[11.5px] uppercase tracking-[0.1em] text-text-dim">
-                Place of supply (state code)
-              </label>
-              <input
-                type="text"
-                maxLength={2}
-                value={posCode}
-                onChange={(e) => setPosCode(e.target.value.toUpperCase())}
-                className="h-10 w-16 px-3 rounded-[7px] border border-rule bg-transparent text-[14px] tabular text-text text-center outline-none focus:border-accent transition-colors"
-              />
-              <span className="text-[12.5px] text-text-dim">
-                {isIntraState ? "Intra-state — CGST + SGST" : "Inter-state — IGST"}
-              </span>
-            </div>
-          )}
-          <div className="ml-auto space-y-3.5 min-w-[280px]">
+        <div className="flex justify-end">
+          <div className="space-y-3.5 min-w-[280px]">
             <TRow k="Taxable amount" v={totals.taxable} />
             {isIntraState ? (
               <>
@@ -274,8 +265,8 @@ export function QuotationWorkspace({
               <TRow k="Round-off" v={totals.roundOff} />
             )}
             <div className="pt-4 border-t-2 border-rule flex justify-between items-baseline gap-8">
-              <span className="font-semibold text-[15px] text-text">Total (incl. GST)</span>
-              <span className="font-display text-[30px] font-semibold text-text tabular">
+              <span className="font-semibold text-[14px] text-text">Final Total (including GST)</span>
+              <span className="font-display text-[32px] font-semibold text-text tabular">
                 {fmtRupee(totals.total)}
               </span>
             </div>
