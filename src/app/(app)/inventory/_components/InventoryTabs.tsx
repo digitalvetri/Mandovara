@@ -1,12 +1,8 @@
-// Four-tab pill row across the top of the inventory module.
-// Only "Stock" is fully wired today; the other three link at existing
-// modules so nothing dead-ends in a placeholder.
-
 import Link from "next/link";
 import type { Route } from "next";
-import { Boxes, ShoppingCart, ArrowRightLeft, ClipboardList } from "lucide-react";
+import { Boxes, ShoppingCart } from "lucide-react";
 
-type Key = "stock" | "purchasing" | "operations" | "requests";
+type Key = "stock" | "purchasing";
 
 interface Tab {
   key: Key;
@@ -16,10 +12,8 @@ interface Tab {
 }
 
 const TABS: readonly Tab[] = [
-  { key: "stock",       label: "Stock",       href: "/inventory" as Route,          Icon: Boxes           },
-  { key: "purchasing",  label: "Purchasing",  href: "/purchase"  as Route,          Icon: ShoppingCart    },
-  { key: "operations",  label: "Operations",  href: "/inventory?tab=operations" as Route, Icon: ArrowRightLeft },
-  { key: "requests",    label: "Requests",    href: "/inventory?tab=requests"   as Route, Icon: ClipboardList  },
+  { key: "stock",      label: "Stock",      href: "/inventory" as Route, Icon: Boxes        },
+  { key: "purchasing", label: "Purchasing", href: "/purchase"  as Route, Icon: ShoppingCart },
 ];
 
 export function InventoryTabs({ active }: { active: Key }) {
