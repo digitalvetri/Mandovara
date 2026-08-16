@@ -6,9 +6,11 @@
 //
 // Filter chips (status, sort) still live in URL params, driven by
 // InvoiceFilters — kept as a thin secondary row so the header stays
-// clean. The "+ New Invoice" button routes to /orders because in
-// Mandovara's model an invoice is always minted from an Order (via
-// CreateInvoiceButton on the orders page).
+// clean. The "+ New Invoice" button routes to /invoicing/new — a
+// dedicated picker that lists open orders with a one-click "Create
+// Invoice" per row (invoices are always minted from an Order in
+// Mandovara's model, but the previous UX of dumping the user on the
+// full /orders page was confusing).
 
 import Link from "next/link";
 import type { Route } from "next";
@@ -64,7 +66,7 @@ export default async function InvoicingPage({
           </div>
         </div>
         <Link
-          href={"/orders" as Route}
+          href={"/invoicing/new" as Route}
           className="inline-flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-[12.5px] font-semibold text-ink transition-colors hover:bg-gold-strong"
         >
           <Plus size={13} strokeWidth={2.4} />
