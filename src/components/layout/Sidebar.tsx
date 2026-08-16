@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
-  Boxes, Send, Briefcase, Wrench, Receipt, Wallet,
+  Boxes, MapPin, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler, BarChart2,
   type LucideIcon,
@@ -43,9 +43,9 @@ const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "Delivery",
     items: [
-      { label: "Sales Orders & Dispatch", href: "/orders",       icon: Send      },
-      { label: "Measurements",            href: "/measurements", icon: Ruler     },
-      { label: "Installation",            href: "/install",      icon: Wrench    },
+      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin    },
+      { label: "Measurements",          href: "/measurements", icon: Ruler     },
+      { label: "Installation",          href: "/install",      icon: Wrench    },
     ],
   },
   {
