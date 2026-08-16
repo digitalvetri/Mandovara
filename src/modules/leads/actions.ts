@@ -333,6 +333,15 @@ export async function convertLead(
       data: { stage: "WON", convertedClientId: client.id },
     });
 
+    // 4. FIXES-01 §5.1 — re-link every lead-scoped quotation for this
+    //    lead onto the newly-created Client + Project. Preserves history
+    //    (nothing deleted) while satisfying the party XOR constraint
+    //    (leadId nulled, clientId set).
+    await tx.quotation.updateMany({
+      where: { leadId: lead.id },
+      data:  { leadId: null, clientId: client.id, projectId: project.id },
+    });
+
     return { clientId: client.id, projectId: project.id };
   });
 

@@ -13,6 +13,7 @@ import { LeadFollowUpForm } from "../_components/LeadFollowUpForm";
 import { EditableField } from "../_components/EditableField";
 import { LeadDetailsCard } from "../_components/LeadDetailsCard";
 import { LeadActionBar } from "../_components/LeadActionBar";
+import { ConversionApprovalCard, type LeadScopedQuote } from "../_components/ConversionApprovalCard";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,26 @@ export default async function LeadDetailPage({
   const quotations = lead.convertedClientId
     ? await listQuotationsForClient(ctx, lead.convertedClientId)
     : [];
+
+  // FIXES-01 §5.1 — fetch lead-scoped quotations (leadId matches this lead)
+  // to drive the two-approval Convert-to-Client card.
+  const leadScopedQuoteRows = lead.convertedClientId
+    ? []
+    : await db.quotation.findMany({
+        where:   { leadId: id },
+        orderBy: { date: "desc" },
+        select:  {
+          id: true, number: true, status: true, total: true,
+          ownerConvertApprovedAt: true,
+        },
+      });
+  const leadScopedQuotes: LeadScopedQuote[] = leadScopedQuoteRows.map((q) => ({
+    id:     q.id,
+    number: q.number,
+    status: q.status,
+    total:  q.total.toString(),
+    ownerConvertApprovedAt: q.ownerConvertApprovedAt?.toISOString() ?? null,
+  }));
 
   const createdDate = lead.createdAt.toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
@@ -107,6 +128,17 @@ export default async function LeadDetailPage({
             <div className="rounded-[14px] bg-good/8 border border-good/30 p-4 text-[12.5px] text-text">
               This lead has been converted to a client. Edits here won&apos;t sync — update the client record instead.
             </div>
+          )}
+
+          {/* Two-approval Convert-to-Client card — FIXES-01 §5.1 */}
+          {!isConverted && leadScopedQuotes.length > 0 && (
+            <ConversionApprovalCard
+              leadId={lead.id}
+              leadName={lead.name}
+              mobile={lead.mobile}
+              email={lead.email ?? null}
+              quotes={leadScopedQuotes}
+            />
           )}
 
           {/* Editable info card */}

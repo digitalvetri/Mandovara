@@ -553,3 +553,46 @@ function zodError<T>(err: z.ZodError): ActionResult<T> {
   }
   return { ok: false, error: "Validation failed", fieldErrors };
 }
+
+// FIXES-01 §5.1 — owner sign-off to convert a lead-scoped quotation
+// into a real Client + Project. Gate 2 of the two-approval flow (gate 1
+// is `Quotation.status = ACCEPTED`, i.e. client acceptance recorded).
+// Toggleable — passing `revoke: true` clears the approval if the owner
+// changes their mind before conversion runs.
+export async function approveQuotationForConversion(
+  input: unknown,
+): Promise<ActionResult<{ id: string; approved: boolean }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "lead.convert");
+
+  const parsed = z.object({
+    id:     z.string().min(1),
+    revoke: z.boolean().optional(),
+  }).safeParse(input);
+  if (!parsed.success) return zodError<{ id: string; approved: boolean }>(parsed.error);
+  const { id, revoke } = parsed.data;
+
+  const db = scoped(ctx);
+  const q = await db.quotation.findUnique({
+    where:  { id },
+    select: { id: true, status: true, leadId: true, ownerConvertApprovedAt: true },
+  });
+  if (!q) return { ok: false, error: "Quotation not found" };
+  if (!q.leadId) {
+    return { ok: false, error: "Only lead-scoped quotations need conversion approval." };
+  }
+  if (!revoke && q.status !== "ACCEPTED") {
+    return { ok: false, error: `Quote must be ACCEPTED before owner approval (currently ${q.status}).` };
+  }
+
+  await db.quotation.update({
+    where: { id },
+    data:  revoke
+      ? { ownerConvertApprovedAt: null, ownerConvertApprovedById: null }
+      : { ownerConvertApprovedAt: new Date(), ownerConvertApprovedById: ctx.userId },
+  });
+
+  revalidatePath(`/quotations/${id}`);
+  if (q.leadId) revalidatePath(`/leads/${q.leadId}`);
+  return { ok: true, data: { id, approved: !revoke } };
+}

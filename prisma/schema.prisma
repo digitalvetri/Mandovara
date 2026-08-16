@@ -1084,6 +1084,12 @@ model Quotation {
   rejectionReason String?
   sentAt         DateTime?
   pdfKey         String?
+  // Owner sign-off to CONVERT a lead-scoped quotation into a Client +
+  // Project (FIXES-01 §5.1). Independent of `approvedById` (which is
+  // internal quote approval before send). Both must be present + the
+  // quote must be ACCEPTED before the lead can flip to WON.
+  ownerConvertApprovedById String?
+  ownerConvertApprovedAt   DateTime?
 
   project Project?        @relation(fields: [projectId], references: [id])
   lines   QuotationLine[]
