@@ -15,6 +15,7 @@ import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { getClient, listClients } from "@/modules/clients/queries";
+import { listLeads } from "@/modules/leads/queries";
 import { listBranches } from "@/modules/branches/queries";
 import { scoped } from "@/kernel/db/scoped";
 import { QuickQuoteBuilder } from "./_components/QuickQuoteBuilder";
@@ -56,26 +57,27 @@ export default async function QuickQuotePage({
     );
   }
 
-  // ── Client-picker step ───────────────────────────────────────
+  // ── Party-picker step (leads + clients) — FIXES-01 §7.4 ─────
   if (!clientId) {
     const q = params.q?.trim() ?? "";
-    const { rows, total } = await listClients(ctx, {
-      ...(q && { search: q }),
-      page: 1,
-      pageSize: 25,
-      sort: "recent",
-    });
+    const [{ rows, total: clientTotal }, { rows: leadRows, total: leadTotal }] = await Promise.all([
+      listClients(ctx, { ...(q && { search: q }), page: 1, pageSize: 25, sort: "recent" }),
+      // Exclude WON/LOST from the picker — they're not actionable for a
+      // new quote (WON already has a client, LOST is dead).
+      listLeads(ctx, { ...(q && { search: q }), page: 1, pageSize: 25 }),
+    ]);
+    const openLeads = leadRows.filter((l) => l.stage !== "WON" && l.stage !== "LOST");
     return (
       <>
         <Topbar
           title="Quick Quote"
           eyebrow={
             q
-              ? `${total} match${total === 1 ? "" : "es"} · pick a client to continue`
-              : "Pick a client to start"
+              ? `${openLeads.length + clientTotal} match${openLeads.length + clientTotal === 1 ? "" : "es"} · pick a lead or client to continue`
+              : `Pick a lead or client to start · ${leadTotal + clientTotal} total`
           }
         />
-        <ClientPicker rows={rows} q={q} />
+        <ClientPicker rows={rows} leads={openLeads} q={q} />
       </>
     );
   }
