@@ -121,11 +121,14 @@ export function ReceiptRecorder({ clients, branches, initialClientId }: Props) {
             ))}
           </select>
         </Field>
-        <Field label="Branch" required error={fieldErrors["branchId"]}>
-          <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={fieldCls}>
-            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </Field>
+        {/* FIXES-01 §6 — single-branch shops don't see a selector. */}
+        {branches.length > 1 && (
+          <Field label="Branch" required error={fieldErrors["branchId"]}>
+            <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={fieldCls}>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Date" required>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${fieldCls} tabular`} />
         </Field>

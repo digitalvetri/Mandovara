@@ -77,11 +77,17 @@ export function ProjectForm({ clients, branches }: Props) {
           {clients.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
         </select>
       </EntityForm.Field>
-      <EntityForm.Field label="Branch" error={errors.branchId?.message} required>
-        <select {...register("branchId")} className={EntityForm.fieldCls}>
-          {branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-        </select>
-      </EntityForm.Field>
+      {/* FIXES-01 §6 — hide the selector when the org has one branch;
+          keep as a hidden input so branchId still ships in the payload. */}
+      {branches.length > 1 ? (
+        <EntityForm.Field label="Branch" error={errors.branchId?.message} required>
+          <select {...register("branchId")} className={EntityForm.fieldCls}>
+            {branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+          </select>
+        </EntityForm.Field>
+      ) : (
+        <input type="hidden" {...register("branchId")} />
+      )}
       <EntityForm.Field label="Order value" error={errors.orderValue?.message} required hint="e.g. 500000 or 5L">
         <input {...register("orderValue")} inputMode="decimal" className={`${EntityForm.fieldCls} tabular`} />
       </EntityForm.Field>
