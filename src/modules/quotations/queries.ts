@@ -11,16 +11,30 @@ export interface ListQuotationsQuery {
   sort?: "recent" | "oldest" | "total";
 }
 
+export type ExpiryBucket = "ok" | "soon" | "critical" | "expired";
+
 export interface QuotationRow {
   id: string;
   number: string;
   clientId: string;
   clientName: string;
+  clientMobile: string;
+  projectId: string;
+  projectName: string;
   date: Date;
   validUntil: Date;
   status: string;
   total: bigint;
   lineCount: number;
+  ownerName: string;
+  expiryBucket: ExpiryBucket;
+}
+
+export interface QuotationKPIs {
+  total: number;
+  byStatus: Record<string, number>;
+  expiringSoon: number;
+  totalValueStr: string;
 }
 
 export interface ListQuotationsResult {
@@ -81,6 +95,39 @@ export interface QuotationDetail {
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 
+export async function quotationKPIs(ctx: RequestContext): Promise<QuotationKPIs> {
+  requirePermission(ctx, "quotation.view");
+  const db = scoped(ctx);
+
+  const now = new Date();
+  const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const [groups, expiringSoonCount, valueAgg] = await Promise.all([
+    db.quotation.groupBy({ by: ["status"], _count: { _all: true } }),
+    db.quotation.count({
+      where: {
+        status: { in: ["SENT", "APPROVED", "REVISED"] },
+        validUntil: { gte: now, lte: sevenDaysOut },
+      },
+    }),
+    db.quotation.aggregate({ _sum: { total: true } }),
+  ]);
+
+  const byStatus: Record<string, number> = {};
+  let total = 0;
+  for (const g of groups) {
+    byStatus[g.status] = g._count._all;
+    total += g._count._all;
+  }
+
+  return {
+    total,
+    byStatus,
+    expiringSoon: expiringSoonCount,
+    totalValueStr: (valueAgg._sum.total ?? 0n).toString(),
+  };
+}
+
 export async function listQuotations(
   ctx: RequestContext,
   q: ListQuotationsQuery,
@@ -100,13 +147,37 @@ export async function listQuotations(
       where, orderBy, skip, take: pageSize,
       select: {
         id: true, number: true, date: true, validUntil: true, status: true, total: true,
-        clientId: true,
-        project: { select: { client: { select: { name: true } } } },
+        clientId: true, ownerId: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+            client: { select: { name: true, mobile: true } },
+          },
+        },
         _count: { select: { lines: true } },
       },
     }),
     db.quotation.count({ where }),
   ]);
+
+  const ownerIds = [...new Set(rows.map((r) => r.ownerId))];
+  const users = ownerIds.length > 0
+    ? await db.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })
+    : [];
+  const userMap = new Map(users.map((u) => [u.id, u.name]));
+
+  const now = new Date();
+  const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  function bucketFor(status: string, validUntil: Date): ExpiryBucket {
+    if (!["SENT", "APPROVED", "REVISED"].includes(status)) return "ok";
+    if (validUntil < now) return "expired";
+    if (validUntil <= threeDays) return "critical";
+    if (validUntil <= sevenDays) return "soon";
+    return "ok";
+  }
 
   return {
     rows: rows.map((r) => ({
@@ -114,11 +185,16 @@ export async function listQuotations(
       number: r.number,
       clientId: r.clientId,
       clientName: r.project.client.name,
+      clientMobile: r.project.client.mobile,
+      projectId: r.project.id,
+      projectName: r.project.name,
       date: r.date,
       validUntil: r.validUntil,
       status: r.status,
       total: r.total,
       lineCount: r._count.lines,
+      ownerName: userMap.get(r.ownerId) ?? "—",
+      expiryBucket: bucketFor(r.status, r.validUntil),
     })),
     total, page, pageSize,
   };

@@ -3,10 +3,12 @@ import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
-import { listQuotations } from "@/modules/quotations/queries";
+import { listQuotations, quotationKPIs } from "@/modules/quotations/queries";
 import { QUOTATION_STATUSES, type QuotationStatus } from "@/modules/quotations/schema";
 import { QuotationFilters } from "./_components/QuotationFilters";
 import { QuotationsTable } from "./_components/QuotationsTable";
+import { QuotationKPICards } from "./_components/QuotationKPICards";
+import { QuotationCardView } from "./_components/QuotationCardView";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,7 @@ interface SearchParams {
   status?: string;
   page?: string;
   sort?: string;
+  view?: string;
 }
 
 export default async function QuotationsPage({
@@ -27,25 +30,31 @@ export default async function QuotationsPage({
   const status = normaliseStatus(params.status);
   const page = parsePositiveInt(params.page) ?? 1;
   const sort = (params.sort as "recent" | "oldest" | "total" | undefined) ?? "recent";
+  const view = params.view === "cards" ? "cards" : "list";
 
-  const { rows, total, pageSize } = await listQuotations(ctx, {
-    ...(q != null && { search: q }),
-    status, page, sort,
-  });
+  const [{ rows, total, pageSize }, kpis] = await Promise.all([
+    listQuotations(ctx, { ...(q != null && { search: q }), status, page, sort }),
+    quotationKPIs(ctx),
+  ]);
 
   return (
     <>
       <Topbar
         title="Quotations"
-        eyebrow={`${total} quote${total === 1 ? "" : "s"} · ${status === "ALL" ? "all statuses" : status.toLowerCase()}${q ? ` · matching "${q}"` : ""}`}
+        eyebrow={`${kpis.total} total · Create, manage and track customer quotations`}
         actions={
           <Link href={"/quotations/new" as Route}>
             <PrimaryButton>New Quotation</PrimaryButton>
           </Link>
         }
       />
-      <QuotationFilters />
-      <QuotationsTable rows={rows} />
+      <QuotationKPICards kpis={kpis} />
+      <QuotationFilters statusCounts={kpis.byStatus} />
+      {view === "cards" ? (
+        <QuotationCardView rows={rows} />
+      ) : (
+        <QuotationsTable rows={rows} />
+      )}
       <Pager page={page} pageSize={pageSize} total={total} />
     </>
   );
