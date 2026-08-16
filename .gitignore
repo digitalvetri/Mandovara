@@ -57,13 +57,13 @@ tests/e2e/.auth/
 pre-wipe.dump
 
 # Catalog extraction artefacts — regenerable from source PDFs via the
-# accompanying scripts. Pages are ~200 MB (rendered @ 200dpi); swatches
-# and crops are already copied into public/catalog/uploads/ at import
-# time, so the intermediates aren't needed in-repo.
+# accompanying scripts. Pages are ~200 MB (rendered @ 200dpi).
+# scripts/fedora-swatches/ and scripts/rugway-crops/ are TRACKED
+# (~5 MB combined) because prod-reset-catalog.mjs needs them baked
+# into the Docker image at build time — the container can't scp them
+# in from outside.
 scripts/fedora-pages/
-scripts/fedora-swatches/
 scripts/rugway-pages/
-scripts/rugway-crops/
 scripts/rugway-crops-hi/
 scripts/rugway-crops-test/
 scripts/rugway-quality/

@@ -74,8 +74,18 @@ RUN mkdir -p /opt/prisma-cli \
  && chown -R nextjs:nodejs /opt/prisma-cli
 
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY --chown=nextjs:nodejs scripts/check-empty.mjs      /app/check-empty.mjs
-COPY --chown=nextjs:nodejs scripts/wipe-demo-data.mjs   /app/scripts/wipe-demo-data.mjs
+COPY --chown=nextjs:nodejs scripts/check-empty.mjs         /app/check-empty.mjs
+COPY --chown=nextjs:nodejs scripts/wipe-demo-data.mjs      /app/scripts/wipe-demo-data.mjs
+
+# One-shot catalog reset — wipes brand/collection/design/colourway and
+# reloads Rugway + Fedora with real swatch images copied onto the
+# mounted /app/public/catalog volume. Baked in with its source-image
+# folders so it can run entirely inside the container.
+# Gate: CONFIRM_WIPE=I_UNDERSTAND must be set — see script header.
+COPY --chown=nextjs:nodejs scripts/prod-reset-catalog.mjs  /app/scripts/prod-reset-catalog.mjs
+COPY --chown=nextjs:nodejs scripts/fedora-swatches         /app/scripts/fedora-swatches
+COPY --chown=nextjs:nodejs scripts/rugway-crops            /app/scripts/rugway-crops
+
 RUN chmod +x /app/docker-entrypoint.sh
 
 USER nextjs
