@@ -47,11 +47,20 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
 
   function doQuickQuote() {
     if (busy) return;
-    // If already converted, go straight to quick-quote with the client ID
+    // If already converted, go straight to quick-quote with the client ID.
     if (convertedClientId) {
       router.push(`/quotations/quick?client=${convertedClientId}` as Route);
       return;
     }
+    // Not-yet-converted lead: quoting REQUIRES a Client (schema constraint
+    // on Quotation.clientId). Make the side-effect explicit — user must
+    // confirm the lead becomes a client. FIXES-01 §5.1 doctrine: never
+    // create a Client silently as a side-effect of "quote".
+    const ok = window.confirm(
+      `This will convert "${leadName}" into a Client and Project before opening the quote builder.\n\n` +
+      `Once converted, the lead moves to WON status. Continue?`,
+    );
+    if (!ok) return;
     setError(null);
     setPendingAction("quote");
     startTransition(async () => {
@@ -90,18 +99,23 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
           </button>
         )}
 
-        {/* Quick Quote — navigates to quotation builder; converts lead first if needed */}
+        {/* Quick Quote — for converted leads, goes straight to the quote
+            builder. For not-yet-converted leads, the label warns that
+            clicking will convert first (with a confirm dialog gate). */}
         {!isLost && (
           <button
             type="button"
             onClick={doQuickQuote}
             disabled={busy}
             className={btn("accent")}
+            title={isConverted
+              ? "Open the Quick Quote builder for this client"
+              : "Converts the lead to a Client + Project, then opens the quote builder"}
           >
             {pendingAction === "quote"
               ? <Loader2 size={14} className="animate-spin" />
               : <FileText size={14} strokeWidth={1.75} />}
-            Quick Quote
+            {isConverted ? "Quick Quote" : "Convert & Quote"}
           </button>
         )}
 
