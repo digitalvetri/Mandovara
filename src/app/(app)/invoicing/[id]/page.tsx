@@ -25,11 +25,19 @@ export default async function InvoiceDetailPage({
   const isOverdue = inv.status !== "PAID" && inv.status !== "CANCELLED" && overdueDays > 0;
   const canCancel = inv.status === "ISSUED" || inv.status === "DRAFT";
 
-  // WhatsApp pre-filled message
+  // WhatsApp pre-filled message. FIXES-01 §4.3 preference is a REAL
+  // PDF attachment via Meta's media endpoint — that needs WABA setup.
+  // Until then: wa.me click-to-chat with the invoice summary, and the
+  // user drags the downloaded PDF into WhatsApp Web. The "Download PDF"
+  // button next to it makes that flow one-two-three.
   const waText = encodeURIComponent(
-    `Hi, please find your invoice ${inv.number} for ₹${(Number(inv.total) / 100).toLocaleString("en-IN")} dated ${formatDate(inv.date)}. Outstanding: ₹${(Number(inv.outstanding) / 100).toLocaleString("en-IN")} due ${formatDate(inv.dueDate)}. — Mandovara`,
+    `Namaste ${inv.clientName.split(/\s+/)[0] ?? inv.clientName},\n\n` +
+    `Please find your invoice ${inv.number} for ₹${(Number(inv.total) / 100).toLocaleString("en-IN")} dated ${formatDate(inv.date)}.\n` +
+    (inv.outstanding > 0n ? `Outstanding: ₹${(Number(inv.outstanding) / 100).toLocaleString("en-IN")} due ${formatDate(inv.dueDate)}.\n` : "") +
+    `\n— Mandovara, Coimbatore`,
   );
-  const waHref = `https://wa.me/91${inv.clientMobile.replace(/\D/g, "")}?text=${waText}`;
+  const waDigits = inv.clientMobile.replace(/\D/g, "");
+  const waHref = `https://wa.me/${waDigits.startsWith("91") ? waDigits : "91" + waDigits}?text=${waText}`;
 
   return (
     <>
@@ -38,15 +46,21 @@ export default async function InvoiceDetailPage({
         eyebrow={`${inv.clientName} · ${formatDate(inv.date)} → due ${formatDate(inv.dueDate)}${inv.orderNumber ? ` · from ${inv.orderNumber}` : ""}`}
         actions={
           <div className="flex items-center gap-2" data-no-print>
+            <a
+              href={`/api/invoicing/${inv.id}/pdf`}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-rule bg-surface-2 text-text-dim text-[12px] hover:bg-surface hover:text-text transition-colors"
+            >
+              Download PDF
+            </a>
             <PrintButton />
             {inv.clientMobile && (
               <a
                 href={waHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-rule bg-surface-2 text-text-dim text-[12px] hover:bg-surface hover:text-text transition-colors"
+                className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-[#25D366] text-white text-[12px] font-medium hover:bg-[#1ebe57] transition-colors"
               >
-                Send WhatsApp
+                Send on WhatsApp
               </a>
             )}
             {inv.outstanding > 0n && (
