@@ -16,14 +16,18 @@ import { LineRow } from "./LineRow";
 import { type LineDraft, emptyLine, runningTotals } from "./line-utils";
 
 interface Props {
-  clientId:   string;
+  // Exactly one of leadId / clientId is set — mirror of the server-side
+  // XOR (FIXES-01 §5.1). Lead-scoped mode hides the project selector.
+  leadId?:    string;
+  clientId?:  string;
   clientName: string;
   branches:   { id: string; name: string }[];
   projects:   { id: string; name: string; number: string }[];
 }
 
-export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: Props) {
+export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, projects }: Props) {
   const router = useRouter();
+  const isLeadScoped = !!leadId;
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? "__new__");
   const [newProjectName, setNewProjectName] = useState<string>("");
   const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
@@ -35,7 +39,8 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
   const usingNewProject = projectId === "__new__";
   const canSubmit =
     branchId &&
-    (usingNewProject ? newProjectName.trim().length > 0 : projectId.length > 0) &&
+    // Lead-scoped skips the project gate; client-scoped needs a project pick.
+    (isLeadScoped || (usingNewProject ? newProjectName.trim().length > 0 : projectId.length > 0)) &&
     lines.length > 0 &&
     lines.every((l) =>
       l.colourwayId &&
@@ -57,10 +62,12 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
     setError(null);
     start(async () => {
       const payload = {
-        clientId,
+        ...(isLeadScoped ? { leadId } : { clientId }),
         branchId,
         validForDays: parseInt(validForDays, 10) || 30,
-        ...(usingNewProject ? { newProjectName: newProjectName.trim() } : { projectId }),
+        ...(!isLeadScoped && (usingNewProject
+          ? { newProjectName: newProjectName.trim() }
+          : { projectId })),
         lines: lines.map((l) => ({
           roomName:    l.roomName.trim(),
           label:       l.label.trim(),
@@ -84,35 +91,43 @@ export function QuickQuoteBuilder({ clientId, clientName, branches, projects }: 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 pb-10">
       <div className="space-y-4">
-        <div className="rounded-[14px] bg-surface border border-rule p-4">
-          <label className="block">
-              <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">Project</div>
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full h-[40px] rounded-[8px] border border-rule bg-transparent px-2 text-[12.5px] text-text"
-              >
-                {projects.length === 0 && <option value="__new__">No projects yet — create one</option>}
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.number} · {p.name}</option>
-                ))}
-                <option value="__new__">+ Create a new project for {clientName}</option>
-              </select>
-            </label>
-          {usingNewProject && (
-            <label className="block mt-3">
-              <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">New project name</div>
-              <input
-                type="text"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Villa at Saibaba Colony · Apartment fitout · etc."
-                className="w-full h-[40px] rounded-[8px] border border-rule bg-transparent px-3 text-[13px] text-text placeholder:text-text-faint"
-                maxLength={120}
-              />
-            </label>
-          )}
-        </div>
+        {isLeadScoped ? (
+          <div className="rounded-[14px] bg-gold-tint border border-gold/40 p-4 text-[12px] text-text">
+            <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mr-2">Lead quote</span>
+            Drafting a preliminary quotation for <span className="font-medium">{clientName}</span> —
+            no client or project is created. Convert the lead separately when it's accepted.
+          </div>
+        ) : (
+          <div className="rounded-[14px] bg-surface border border-rule p-4">
+            <label className="block">
+                <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">Project</div>
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="w-full h-[40px] rounded-[8px] border border-rule bg-transparent px-2 text-[12.5px] text-text"
+                >
+                  {projects.length === 0 && <option value="__new__">No projects yet — create one</option>}
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.number} · {p.name}</option>
+                  ))}
+                  <option value="__new__">+ Create a new project for {clientName}</option>
+                </select>
+              </label>
+            {usingNewProject && (
+              <label className="block mt-3">
+                <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">New project name</div>
+                <input
+                  type="text"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="Villa at Saibaba Colony · Apartment fitout · etc."
+                  className="w-full h-[40px] rounded-[8px] border border-rule bg-transparent px-3 text-[13px] text-text placeholder:text-text-faint"
+                  maxLength={120}
+                />
+              </label>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           {lines.map((l, i) => (

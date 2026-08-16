@@ -26,7 +26,7 @@ import { quickQuoteSchema } from "./quick-schemas";
 
 export async function createQuickQuote(
   input: unknown,
-): Promise<ActionResult<{ quotationId: string; projectId: string; measurementId: string }>> {
+): Promise<ActionResult<{ quotationId: string; projectId: string | null; measurementId: string | null }>> {
   const ctx = await devContext();
   requirePermission(ctx, "quotation.create");
 
@@ -42,11 +42,23 @@ export async function createQuickQuote(
   });
   if (!branch) return { ok: false, error: "Branch not found" };
 
-  const client = await db.client.findUnique({
-    where:  { id: d.clientId },
-    select: { id: true, billingAddress: true },
-  });
-  if (!client) return { ok: false, error: "Client not found" };
+  // FIXES-01 §5.1 — lead-scoped quick quote never touches Client / Project.
+  // The party stays a lead until an explicit "Convert to Client" step.
+  const isLeadScoped = !!d.leadId;
+  let client: { id: string; billingAddress: unknown } | null = null;
+  if (isLeadScoped) {
+    const lead = await db.lead.findUnique({
+      where:  { id: d.leadId! },
+      select: { id: true },
+    });
+    if (!lead) return { ok: false, error: "Lead not found" };
+  } else {
+    client = await db.client.findUnique({
+      where:  { id: d.clientId! },
+      select: { id: true, billingAddress: true },
+    });
+    if (!client) return { ok: false, error: "Client not found" };
+  }
 
   // ── Resolve colourways for GST rate + family ───────────────────
   const cwIds = d.lines.map((l) => l.colourwayId);
@@ -102,113 +114,123 @@ export async function createQuickQuote(
   validUntil.setDate(now.getDate() + d.validForDays);
 
   const result = await withTransaction(async (tx: TxClient) => {
-    // ── Project ────────────────────────────────────────────────
-    let projectId = d.projectId ?? "";
-    if (!projectId) {
-      const projNumber = await allocateNumber(tx, {
-        orgId: ctx.orgId, series: "PRJ", yymm: yymmFromDate(now), prefix: branch.invoicePrefix,
-      });
-      const proj = await tx.project.create({
-        data: {
-          organizationId:   ctx.orgId,
-          branchId:         branch.id,
-          number:           projNumber,
-          name:             d.newProjectName!.trim(),
-          clientId:         d.clientId,
-          stage:            "ENQUIRY",
-          siteAddress:      client.billingAddress ?? {},
-          ownerId:          ctx.userId,
-        },
-        select: { id: true },
-      });
-      projectId = proj.id;
+    // ── Project (client-scoped only; lead-scoped skips) ────────
+    let projectId: string | null = null;
+    if (!isLeadScoped) {
+      projectId = d.projectId ?? null;
+      if (!projectId) {
+        const projNumber = await allocateNumber(tx, {
+          orgId: ctx.orgId, series: "PRJ", yymm: yymmFromDate(now), prefix: branch.invoicePrefix,
+        });
+        const siteAddress = (client?.billingAddress ?? {}) as object;
+        const proj = await tx.project.create({
+          data: {
+            organizationId:   ctx.orgId,
+            branchId:         branch.id,
+            number:           projNumber,
+            name:             d.newProjectName!.trim(),
+            clientId:         d.clientId!,
+            stage:            "ENQUIRY",
+            siteAddress,
+            ownerId:          ctx.userId,
+          },
+          select: { id: true },
+        });
+        projectId = proj.id;
+      }
     }
 
-    // ── Preliminary measurement round ──────────────────────────
-    const meaNumber = await allocateNumber(tx, {
-      orgId: ctx.orgId, series: "MEA", yymm: yymmFromDate(now), prefix: branch.invoicePrefix,
-    });
-    const round = await tx.measurement.create({
-      data: {
-        organizationId: ctx.orgId,
-        projectId,
-        number:         meaNumber,
-        visitedAt:      now,
-        measuredById:   ctx.userId,
-        status:         "DRAFT",
-        notes:          "Preliminary — client-supplied dimensions from quick quote. Replace with an on-site round before make.",
-      },
-      select: { id: true },
-    });
-
-    // ── Rooms (idempotent by name within this project) ─────────
-    const wantedNames = new Set(d.lines.map((l) => l.roomName.trim()));
-    const existingRooms = await tx.room.findMany({
-      where:  { projectId, name: { in: [...wantedNames] } },
-      select: { id: true, name: true },
-    });
-    const roomIdByName = new Map(existingRooms.map((r) => [r.name, r.id]));
-    for (const name of wantedNames) {
-      if (roomIdByName.has(name)) continue;
-      const created = await tx.room.create({
-        data: { organizationId: ctx.orgId, projectId, name },
-        select: { id: true, name: true },
-      });
-      roomIdByName.set(name, created.id);
-    }
-
-    // ── MeasurementItem + CalcResult per line ──────────────────
+    // ── Measurement + Rooms + Items (client-scoped only) ───────
+    // Lead-scoped quotations are pre-conversion estimates — no project
+    // to hang measurements off, and the calc engine's warnings/rolls
+    // land on the client-side line preview only. When the lead converts,
+    // a proper on-site measurement round supersedes.
+    let measurementId: string | null = null;
     const itemIdByLineIdx = new Map<number, string>();
-    for (let i = 0; i < d.lines.length; i++) {
-      const line = d.lines[i]!;
-      const cw   = cwMap.get(line.colourwayId)!;
-      const family = cw.design.family;
-      const roomId = roomIdByName.get(line.roomName.trim())!;
-
-      const item = await tx.measurementItem.create({
+    if (!isLeadScoped && projectId) {
+      const meaNumber = await allocateNumber(tx, {
+        orgId: ctx.orgId, series: "MEA", yymm: yymmFromDate(now), prefix: branch.invoicePrefix,
+      });
+      const round = await tx.measurement.create({
         data: {
           organizationId: ctx.orgId,
-          measurementId:  round.id,
-          roomId,
-          label:          line.label,
-          surface:        surfaceFromFamily(family),
-          family,
-          widthMm:        new Decimal(line.widthMm),
-          heightMm:       new Decimal(line.heightMm),
-          quantity:       Math.max(1, Math.round(line.quantity)),
-          photoKeys:      [],
-          notes:          "Preliminary — from quick quote.",
+          projectId,
+          number:         meaNumber,
+          visitedAt:      now,
+          measuredById:   ctx.userId,
+          status:         "DRAFT",
+          notes:          "Preliminary — client-supplied dimensions from quick quote. Replace with an on-site round before make.",
         },
         select: { id: true },
       });
-      itemIdByLineIdx.set(i, item.id);
+      measurementId = round.id;
 
-      const calc = computeCalcResult({
-        family,
-        widthMm:  line.widthMm,
-        heightMm: line.heightMm,
-        quantity: Math.max(1, Math.round(line.quantity)),
-        ...(family === "WALLPAPER" && { deductions: [] }),
+      const wantedNames = new Set(d.lines.map((l) => l.roomName.trim()));
+      const existingRooms = await tx.room.findMany({
+        where:  { projectId, name: { in: [...wantedNames] } },
+        select: { id: true, name: true },
       });
-      await tx.calcResult.create({
-        data: {
-          organizationId:    ctx.orgId,
-          measurementItemId: item.id,
-          engineVersion:     calc.engineVersion,
-          inputs:            calc.inputs as object,
-          materialQty:       new Decimal(calc.materialQty),
-          materialUnit:      calc.materialUnit,
-          widthsRequired:    calc.widthsRequired ?? null,
-          cutLengthMm:       calc.cutLengthMm !== undefined ? new Decimal(calc.cutLengthMm) : null,
-          rollsRequired:     calc.rollsRequired ?? null,
-          boxesRequired:     calc.boxesRequired ?? null,
-          areaSqft:          calc.areaSqft !== undefined ? new Decimal(calc.areaSqft) : null,
-          wastagePct:        calc.wastagePct !== undefined ? new Decimal(calc.wastagePct) : null,
-          fabricRun:         calc.fabricRun ?? null,
-          liningQty:         calc.liningQty !== undefined ? new Decimal(calc.liningQty) : null,
-          warnings:          calc.warnings,
-        },
-      });
+      const roomIdByName = new Map(existingRooms.map((r) => [r.name, r.id]));
+      for (const name of wantedNames) {
+        if (roomIdByName.has(name)) continue;
+        const created = await tx.room.create({
+          data: { organizationId: ctx.orgId, projectId, name },
+          select: { id: true, name: true },
+        });
+        roomIdByName.set(name, created.id);
+      }
+
+      for (let i = 0; i < d.lines.length; i++) {
+        const line = d.lines[i]!;
+        const cw   = cwMap.get(line.colourwayId)!;
+        const family = cw.design.family;
+        const roomId = roomIdByName.get(line.roomName.trim())!;
+
+        const item = await tx.measurementItem.create({
+          data: {
+            organizationId: ctx.orgId,
+            measurementId:  round.id,
+            roomId,
+            label:          line.label,
+            surface:        surfaceFromFamily(family),
+            family,
+            widthMm:        new Decimal(line.widthMm),
+            heightMm:       new Decimal(line.heightMm),
+            quantity:       Math.max(1, Math.round(line.quantity)),
+            photoKeys:      [],
+            notes:          "Preliminary — from quick quote.",
+          },
+          select: { id: true },
+        });
+        itemIdByLineIdx.set(i, item.id);
+
+        const calc = computeCalcResult({
+          family,
+          widthMm:  line.widthMm,
+          heightMm: line.heightMm,
+          quantity: Math.max(1, Math.round(line.quantity)),
+          ...(family === "WALLPAPER" && { deductions: [] }),
+        });
+        await tx.calcResult.create({
+          data: {
+            organizationId:    ctx.orgId,
+            measurementItemId: item.id,
+            engineVersion:     calc.engineVersion,
+            inputs:            calc.inputs as object,
+            materialQty:       new Decimal(calc.materialQty),
+            materialUnit:      calc.materialUnit,
+            widthsRequired:    calc.widthsRequired ?? null,
+            cutLengthMm:       calc.cutLengthMm !== undefined ? new Decimal(calc.cutLengthMm) : null,
+            rollsRequired:     calc.rollsRequired ?? null,
+            boxesRequired:     calc.boxesRequired ?? null,
+            areaSqft:          calc.areaSqft !== undefined ? new Decimal(calc.areaSqft) : null,
+            wastagePct:        calc.wastagePct !== undefined ? new Decimal(calc.wastagePct) : null,
+            fabricRun:         calc.fabricRun ?? null,
+            liningQty:         calc.liningQty !== undefined ? new Decimal(calc.liningQty) : null,
+            warnings:          calc.warnings,
+          },
+        });
+      }
     }
 
     // ── Quotation ──────────────────────────────────────────────
@@ -221,8 +243,9 @@ export async function createQuickQuote(
         branchId:       branch.id,
         number:         qtNumber,
         revision:       0,
+        leadId:         isLeadScoped ? d.leadId! : null,
+        clientId:       isLeadScoped ? null : d.clientId!,
         projectId,
-        clientId:       d.clientId,
         date:           now,
         validUntil,
         status:         "DRAFT",
@@ -240,7 +263,9 @@ export async function createQuickQuote(
 
     await tx.quotationLine.createMany({
       data: computed.map((l) => {
-        const itemId = itemIdByLineIdx.get(l.lineNo - 1)!;
+        // measurementItemId is null for lead-scoped lines (no measurement
+        // round exists yet — a real round supersedes at conversion).
+        const itemId = itemIdByLineIdx.get(l.lineNo - 1) ?? null;
         const line = l.input;
         return {
           organizationId:    ctx.orgId,
@@ -264,11 +289,12 @@ export async function createQuickQuote(
       }),
     });
 
-    return { quotationId: q.id, projectId, measurementId: round.id };
+    return { quotationId: q.id, projectId, measurementId };
   });
 
-  revalidatePath(`/clients/${d.clientId}`);
-  revalidatePath(`/projects/${result.projectId}`);
+  if (isLeadScoped) revalidatePath(`/leads/${d.leadId!}`);
+  else              revalidatePath(`/clients/${d.clientId!}`);
+  if (result.projectId) revalidatePath(`/projects/${result.projectId}`);
   revalidatePath(`/quotations`);
   return { ok: true, data: result };
 }

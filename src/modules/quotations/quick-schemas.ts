@@ -21,8 +21,12 @@ export const quickLineSchema = z.object({
 });
 export type QuickLineInput = z.infer<typeof quickLineSchema>;
 
+// FIXES-01 §5.1 — a quick quote is drafted against EITHER a lead
+// (pre-conversion, no project) or a client (post-conversion, project
+// created on the fly if needed). XOR the two paths.
 export const quickQuoteSchema = z.object({
-  clientId:       idField,
+  leadId:         idField.optional(),
+  clientId:       idField.optional(),
   projectId:      idField.optional(),
   newProjectName: z.string().trim().min(1).max(120).optional(),
   branchId:       idField,
@@ -30,8 +34,11 @@ export const quickQuoteSchema = z.object({
   discountPct:    z.number().min(0).max(100).default(0),
   termsText:      z.string().trim().max(2000).optional(),
   lines:          z.array(quickLineSchema).min(1).max(50),
-}).refine((d) => d.projectId || d.newProjectName, {
-  message: "Either projectId or newProjectName is required.",
-  path:    ["projectId"],
-});
+}).refine(
+  (d) => (d.leadId ? 1 : 0) + (d.clientId ? 1 : 0) === 1,
+  { message: "Provide either leadId OR clientId, not both.", path: ["leadId"] },
+).refine(
+  (d) => d.leadId ? true : (d.projectId || d.newProjectName),
+  { message: "For a client quote, either projectId or newProjectName is required.", path: ["projectId"] },
+);
 export type QuickQuoteInput = z.infer<typeof quickQuoteSchema>;

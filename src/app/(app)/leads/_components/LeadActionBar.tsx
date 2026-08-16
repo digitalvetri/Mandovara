@@ -8,7 +8,7 @@ import {
   CalendarPlus, MapPin, FileText,
   UserCheck, ArrowUpRight, Loader2,
 } from "lucide-react";
-import { changeLeadStage, convertLead } from "@/modules/leads/actions";
+import { changeLeadStage } from "@/modules/leads/actions";
 import { ConvertLeadModal } from "./ConvertLeadModal";
 
 interface Props {
@@ -47,31 +47,16 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
 
   function doQuickQuote() {
     if (busy) return;
-    // If already converted, go straight to quick-quote with the client ID.
+    // Already-converted → go straight to the client-scoped builder.
     if (convertedClientId) {
       router.push(`/quotations/quick?client=${convertedClientId}` as Route);
       return;
     }
-    // Not-yet-converted lead: quoting REQUIRES a Client (schema constraint
-    // on Quotation.clientId). Make the side-effect explicit — user must
-    // confirm the lead becomes a client. FIXES-01 §5.1 doctrine: never
-    // create a Client silently as a side-effect of "quote".
-    const ok = window.confirm(
-      `This will convert "${leadName}" into a Client and Project before opening the quote builder.\n\n` +
-      `Once converted, the lead moves to WON status. Continue?`,
-    );
-    if (!ok) return;
-    setError(null);
-    setPendingAction("quote");
-    startTransition(async () => {
-      const res = await convertLead({ id: leadId });
-      if (!res.ok || !res.data) {
-        setError(res.error ?? "Could not prepare quote");
-        setPendingAction(null);
-        return;
-      }
-      router.push(`/quotations/quick?client=${res.data.clientId}` as Route);
-    });
+    // Not-yet-converted lead → open the builder in LEAD-SCOPED mode.
+    // FIXES-01 §5.1: no more silent conversion on quote. The lead stays
+    // a lead until the client accepts + owner approves via the explicit
+    // Convert-to-Client action. The quotation carries leadId only.
+    router.push(`/quotations/quick?leadId=${leadId}` as Route);
   }
 
   return (
@@ -99,9 +84,9 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
           </button>
         )}
 
-        {/* Quick Quote — for converted leads, goes straight to the quote
-            builder. For not-yet-converted leads, the label warns that
-            clicking will convert first (with a confirm dialog gate). */}
+        {/* Quick Quote — opens the builder in either client-scoped
+            (isConverted) or lead-scoped mode. Lead-scoped quotes leave
+            the lead as a lead; conversion is now a separate step. */}
         {!isLost && (
           <button
             type="button"
@@ -110,12 +95,12 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
             className={btn("accent")}
             title={isConverted
               ? "Open the Quick Quote builder for this client"
-              : "Converts the lead to a Client + Project, then opens the quote builder"}
+              : "Draft a preliminary quote against this lead — no client/project created yet"}
           >
             {pendingAction === "quote"
               ? <Loader2 size={14} className="animate-spin" />
               : <FileText size={14} strokeWidth={1.75} />}
-            {isConverted ? "Quick Quote" : "Convert & Quote"}
+            Quick Quote
           </button>
         )}
 
