@@ -1,5 +1,6 @@
 // Server-side quotation PDF — @react-pdf/renderer.
-// Fonts in public/fonts/ include U+20B9 (₹) — LiberationBold for bold weight.
+// Fonts: GeistRegular (normal, has ₹ U+20B9) + NotoSans-Bold (bold, has ₹).
+// LiberationSans-Bold from pdfjs-dist lacks ₹ in its cmap — do not use.
 
 import path from "path";
 import { Document, Page, View, Text, Image, Font, StyleSheet } from "@react-pdf/renderer";
@@ -11,7 +12,7 @@ Font.register({
   family: "Geist",
   fonts: [
     { src: path.join(FONTS, "GeistRegular.ttf"),  fontWeight: "normal" },
-    { src: path.join(FONTS, "LiberationBold.ttf"), fontWeight: "bold"   },
+    { src: path.join(FONTS, "NotoSans-Bold.ttf"),  fontWeight: "bold"   },
   ],
 });
 
@@ -120,9 +121,9 @@ function fm(p: bigint): string {
 }
 
 // ── sub-components ────────────────────────────────────────────────────────
-function TH() {
+function TH({ fixed: fx }: { fixed?: boolean }) {
   return (
-    <View style={s.thead}>
+    <View style={s.thead} fixed={fx}>
       <View style={s.cNo}  ><Text style={[s.th, { textAlign: "center" }]}>#</Text></View>
       <View style={s.cDesc}><Text style={s.th}>DESCRIPTION / ROOM</Text></View>
       <View style={s.cQty} ><Text style={[s.th, { textAlign: "right"  }]}>QTY</Text></View>
@@ -229,7 +230,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
 
         {/* ── ITEMS TABLE ────────────────────────────────────────────── */}
         <View style={s.tableWrap}>
-          <TH />
+          <TH fixed />
           {q.lines.map((l, i) => <TR key={l.id} line={l} idx={i} />)}
         </View>
 
