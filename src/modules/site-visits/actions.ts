@@ -7,6 +7,8 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { devContext } from "@/lib/dev-context";
+import { bus } from "@/kernel/events/bus";
+import "@/kernel/events/register";
 
 export interface ActionResult<T = unknown> {
   ok: boolean; data?: T; error?: string; fieldErrors?: Record<string, string>;
@@ -61,50 +63,59 @@ export async function createSiteVisit(
     if (!exists) return { ok: false, error: "Selected project not found" };
   }
 
-  const created = await withTransaction(async (tx: TxClient) => {
-    const number = await allocateNumber(tx, {
-      orgId:  ctx.orgId,
-      series: "SV",
-      yymm:   yymmFromDate(new Date(d.scheduledAt)),
-      prefix: "MDV",
-    });
-    const visit = await tx.siteVisit.create({
-      data: {
-        organizationId: ctx.orgId,
-        number,
-        projectId:    d.projectId ?? null,
-        leadId:       d.leadId ?? null,
-        purpose:      d.purpose,
-        scheduledAt:  new Date(d.scheduledAt),
-        assignedToId: d.assignedToId,
-        status:       "SCHEDULED",
-        photoKeys:    [],
-        observations: d.observations ?? null,
-      },
-      select: { id: true, number: true, scheduledAt: true },
-    });
-
-    // Auto-advance the project's stage when a visit is scheduled from
-    // ENQUIRY. The pipeline moves by *doing the work*, not by clicking a
-    // dropdown — so scheduling a site visit progresses the project. Any
-    // later visit (project already at MEASUREMENT, INSTALLATION, etc.)
-    // leaves the stage alone.
-    let stageAdvanced = false;
-    if (d.projectId) {
-      const res = await tx.project.updateMany({
-        where: { id: d.projectId, stage: "ENQUIRY" },
-        data:  { stage: "SITE_VISIT" },
+  try {
+    const created = await withTransaction(async (tx: TxClient) => {
+      const number = await allocateNumber(tx, {
+        orgId:  ctx.orgId,
+        series: "SV",
+        yymm:   yymmFromDate(new Date(d.scheduledAt)),
+        prefix: "MDV",
       });
-      stageAdvanced = res.count > 0;
-    }
+      const visit = await tx.siteVisit.create({
+        data: {
+          organizationId: ctx.orgId,
+          number,
+          projectId:    d.projectId ?? null,
+          leadId:       d.leadId ?? null,
+          purpose:      d.purpose,
+          scheduledAt:  new Date(d.scheduledAt),
+          assignedToId: d.assignedToId,
+          status:       "SCHEDULED",
+          photoKeys:    [],
+          observations: d.observations ?? null,
+        },
+        select: { id: true, number: true, scheduledAt: true },
+      });
 
-    return { ...visit, stageAdvanced };
-  });
+      // Auto-advance the project's stage when a visit is scheduled from
+      // ENQUIRY. The pipeline moves by *doing the work*, not by clicking a
+      // dropdown — so scheduling a site visit progresses the project. Any
+      // later visit (project already at MEASUREMENT, INSTALLATION, etc.)
+      // leaves the stage alone.
+      let stageAdvanced = false;
+      if (d.projectId) {
+        const res = await tx.project.updateMany({
+          where: { id: d.projectId, stage: "ENQUIRY" },
+          data:  { stage: "SITE_VISIT" },
+        });
+        stageAdvanced = res.count > 0;
+      }
 
-  revalidatePath("/site-visits");
-  revalidatePath("/projects");
-  if (d.projectId) revalidatePath(`/projects/${d.projectId}`);
-  return { ok: true, data: created };
+      return { ...visit, stageAdvanced };
+    });
+
+    revalidatePath("/site-visits");
+    revalidatePath("/projects");
+    if (d.projectId) revalidatePath(`/projects/${d.projectId}`);
+    return { ok: true, data: created };
+  } catch (e: unknown) {
+    // FIXES-01 §8 doctrine — never let a create action throw silently.
+    console.error("createSiteVisit failed:", e);
+    return {
+      ok:    false,
+      error: e instanceof Error ? `Could not create site visit: ${e.message}` : "Could not create site visit",
+    };
+  }
 }
 
 export async function updateSiteVisitStatus(
@@ -118,20 +129,44 @@ export async function updateSiteVisitStatus(
   const { id, status, observations, customerNotes } = parsed.data;
 
   const db = scoped(ctx);
-  await db.siteVisit.update({
-    where: { id },
-    data: {
-      status,
-      ...(status === "IN_PROGRESS" ? { startedAt: new Date() }   : {}),
-      ...(status === "COMPLETED"   ? { completedAt: new Date() }  : {}),
-      ...(observations    !== undefined ? { observations }    : {}),
-      ...(customerNotes   !== undefined ? { customerNotes }   : {}),
-    },
-  });
+  try {
+    const visit = await db.siteVisit.update({
+      where: { id },
+      data: {
+        status,
+        ...(status === "IN_PROGRESS" ? { startedAt: new Date() }   : {}),
+        ...(status === "COMPLETED"   ? { completedAt: new Date() }  : {}),
+        ...(observations    !== undefined ? { observations }    : {}),
+        ...(customerNotes   !== undefined ? { customerNotes }   : {}),
+      },
+      select: { id: true, projectId: true },
+    });
 
-  revalidatePath("/site-visits");
-  revalidatePath(`/site-visits/${id}`);
-  return { ok: true, data: { id } };
+    // FIXES-01 §9 — fire siteVisit.completed when transitioning to
+    // COMPLETED. The kernel/milestones listener uses this to auto-tick
+    // the SITE_VISIT milestone on the project.
+    if (status === "COMPLETED" && visit.projectId) {
+      await bus.publish({
+        type:        "siteVisit.completed",
+        orgId:       ctx.orgId,
+        actorId:     ctx.userId,
+        occurredAt:  new Date(),
+        siteVisitId: id,
+        projectId:   visit.projectId,
+      });
+      revalidatePath(`/projects/${visit.projectId}`);
+    }
+
+    revalidatePath("/site-visits");
+    revalidatePath(`/site-visits/${id}`);
+    return { ok: true, data: { id } };
+  } catch (e: unknown) {
+    console.error("updateSiteVisitStatus failed:", e);
+    return {
+      ok:    false,
+      error: e instanceof Error ? `Could not update site visit: ${e.message}` : "Could not update site visit",
+    };
+  }
 }
 
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {

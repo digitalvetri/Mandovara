@@ -45,10 +45,18 @@ export async function createVendor(input: unknown): Promise<ActionResult<{ id: s
     revalidatePath("/purchase/vendors");
     return { ok: true, data: created };
   } catch (e: unknown) {
+    // FIXES-01 §8 — never let a create action throw. A thrown server
+    // action returns a rejected promise that the client-side handler
+    // sees as an unhandled rejection; the button hangs and the user
+    // gets no feedback. Always surface an error message instead.
     if (isUniqueConstraint(e)) {
-      return { ok: false, error: "Vendor code conflict — please retry" };
+      return { ok: false, error: "Vendor code conflict — please retry (someone created a vendor in the same instant)." };
     }
-    throw e;
+    console.error("createVendor failed:", e);
+    return {
+      ok:    false,
+      error: e instanceof Error ? `Could not create vendor: ${e.message}` : "Could not create vendor",
+    };
   }
 }
 
@@ -60,22 +68,30 @@ export async function updateVendor(input: unknown): Promise<ActionResult<{ id: s
   const { id, ...rest } = parsed.data;
 
   const db = scoped(ctx);
-  await db.vendor.update({
-    where: { id },
-    data: {
-      ...(rest.name != null             && { name: rest.name }),
-      ...(rest.mobile != null           && { mobile: normaliseMobile(rest.mobile) }),
-      ...(rest.email != null            && { email: emptyToNull(rest.email) }),
-      ...(rest.gstin != null            && { gstin: emptyToNull(rest.gstin)?.toUpperCase() ?? null }),
-      ...(rest.paymentTermsDays != null && { paymentTermsDays: rest.paymentTermsDays }),
-      ...(rest.leadTimeDays != null     && { leadTimeDays: rest.leadTimeDays }),
-      ...(rest.brandIds != null         && { brandIds: rest.brandIds }),
-      ...(rest.rating !== undefined     && { rating: rest.rating }),
-    },
-  });
-  revalidatePath("/purchase/vendors");
-  revalidatePath(`/purchase/vendors/${id}`);
-  return { ok: true, data: { id } };
+  try {
+    await db.vendor.update({
+      where: { id },
+      data: {
+        ...(rest.name != null             && { name: rest.name }),
+        ...(rest.mobile != null           && { mobile: normaliseMobile(rest.mobile) }),
+        ...(rest.email != null            && { email: emptyToNull(rest.email) }),
+        ...(rest.gstin != null            && { gstin: emptyToNull(rest.gstin)?.toUpperCase() ?? null }),
+        ...(rest.paymentTermsDays != null && { paymentTermsDays: rest.paymentTermsDays }),
+        ...(rest.leadTimeDays != null     && { leadTimeDays: rest.leadTimeDays }),
+        ...(rest.brandIds != null         && { brandIds: rest.brandIds }),
+        ...(rest.rating !== undefined     && { rating: rest.rating }),
+      },
+    });
+    revalidatePath("/purchase/vendors");
+    revalidatePath(`/purchase/vendors/${id}`);
+    return { ok: true, data: { id } };
+  } catch (e: unknown) {
+    console.error("updateVendor failed:", e);
+    return {
+      ok:    false,
+      error: e instanceof Error ? `Could not update vendor: ${e.message}` : "Could not update vendor",
+    };
+  }
 }
 
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
