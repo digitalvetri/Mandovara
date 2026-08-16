@@ -15,7 +15,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "next";
-import { Search, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, SlidersHorizontal, X } from "lucide-react";
 import type { BrandOption, CategoryOption, PriceBand } from "@/modules/products/queries";
 
 interface Props {
@@ -38,6 +38,25 @@ export function FilterRail({ categories, brands, priceBand }: Props) {
 
   const [search, setSearch] = useState(q);
   useEffect(() => setSearch(q), [q]);
+
+  // FIXES-01 §7.1 — collapsible filter block. Search bar stays always
+  // visible above; the facets below fold away by default. Auto-open if
+  // any filter is currently active so the user can see what's on.
+  const activeCount =
+    (categoryId !== "ALL"                  ? 1 : 0) +
+    (brandId    !== "ALL"                  ? 1 : 0) +
+    (priceMin.trim() !== ""                ? 1 : 0) +
+    (priceMax.trim() !== ""                ? 1 : 0) +
+    (inStock                                ? 1 : 0);
+  const [expanded, setExpanded] = useState(activeCount > 0);
+  useEffect(() => { if (activeCount > 0) setExpanded(true); }, [activeCount]);
+
+  function clearAll(): void {
+    const p = new URLSearchParams();
+    // Preserve the search term (it lives in the always-visible bar).
+    if (q) p.set("q", q);
+    push(p);
+  }
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function push(next: URLSearchParams) {
@@ -89,7 +108,40 @@ export function FilterRail({ categories, brands, priceBand }: Props) {
         )}
       </div>
 
-      <div className="mt-4 rounded-[14px] bg-surface border border-rule overflow-hidden">
+      {/* FIXES-01 §7.1 — toggle to open/close the facet block. Split
+          into two side-by-side buttons so Clear doesn't nest inside
+          the toggle (invalid HTML) and doesn't accidentally toggle. */}
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex-1 flex items-center justify-between gap-2 h-[34px] px-3 rounded-[8px] bg-surface border border-rule text-[11.5px] text-text-dim hover:text-text hover:border-rule/80 transition-colors"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <SlidersHorizontal size={12} />
+            Filters
+            {activeCount > 0 && (
+              <span className="ml-1 rounded-full bg-gold-tint px-1.5 py-[1px] text-[10px] font-semibold tabular text-gold">
+                {activeCount}
+              </span>
+            )}
+          </span>
+          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+        {activeCount > 0 && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="h-[34px] px-3 rounded-[8px] border border-rule bg-surface text-[10.5px] uppercase tracking-[0.1em] text-text-dim hover:text-fault hover:border-fault/40 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {expanded && (
+      <div className="mt-2 rounded-[14px] bg-surface border border-rule overflow-hidden">
         <Section title="Category" count={categories.length}>
           <FilterButton
             active={categoryId === "ALL"}
@@ -153,6 +205,7 @@ export function FilterRail({ categories, brands, priceBand }: Props) {
           </label>
         </Section>
       </div>
+      )}
     </aside>
   );
 }
