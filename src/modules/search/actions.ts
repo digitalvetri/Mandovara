@@ -123,7 +123,11 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
     })),
     ...quotes.map((q): SearchHit => ({
       kind: "quotation", id: q.id, title: q.number,
-      subtitle: `${q.project.client.name} · ${q.status.toLowerCase()}`,
+      // Lead-scoped quotations have no project; label them "Lead quote"
+      // until the search index grows a lead-name lookup next session.
+      subtitle: q.project
+        ? `${q.project.client.name} · ${q.status.toLowerCase()}`
+        : `Lead quote · ${q.status.toLowerCase()}`,
       href: `/quotations/${q.id}`,
     })),
     ...orders.map((o): SearchHit => ({

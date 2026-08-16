@@ -301,7 +301,10 @@ export async function listAcceptedQuotations(
   requirePermission(ctx, "order.create");
   const db = scoped(ctx);
   const rows = await db.quotation.findMany({
-    where: { status: "ACCEPTED" },
+    // Only client-scoped ACCEPTED quotes can become orders. Lead-scoped
+    // ones need a Convert-to-Client step first (§5.1) — hide them from
+    // the "raise an order" picker.
+    where: { status: "ACCEPTED", projectId: { not: null } },
     orderBy: { date: "desc" },
     take: 200,
     select: {
@@ -309,13 +312,15 @@ export async function listAcceptedQuotations(
       project: { select: { client: { select: { name: true } } } },
     },
   });
-  return rows.map((r) => ({
-    id: r.id,
-    number: r.number,
-    clientName: r.project.client.name,
-    total: r.total,
-    date: r.date,
-  }));
+  return rows
+    .filter((r): r is typeof r & { project: NonNullable<typeof r.project> } => r.project !== null)
+    .map((r) => ({
+      id: r.id,
+      number: r.number,
+      clientName: r.project.client.name,
+      total: r.total,
+      date: r.date,
+    }));
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

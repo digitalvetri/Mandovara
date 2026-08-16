@@ -32,15 +32,11 @@ const config: NextConfig = {
   // Skip in-container TypeScript check — Coolify's build container OOMs
   // on it (small VPS + 658 packages + tsc + Turbopack). Local `pnpm build`
   // + `pnpm exec tsc` still catch every type error, so this only removes
-  // the deploy-time check, not our source-of-truth check.
+  // the deploy-time check, not our source-of-truth check. Next 16
+  // dropped the `eslint` config key entirely; ESLint no longer runs on
+  // `next build` by default.
   typescript: {
     ignoreBuildErrors: true,
-  },
-  // Same reasoning for lint — expensive at build time, redundant with
-  // local pnpm exec eslint. Not a quality gate we lose, just moved out
-  // of the deploy path.
-  eslint: {
-    ignoreDuringBuilds: true,
   },
   turbopack: {
     root: path.resolve("."),

@@ -264,9 +264,12 @@ async function loadRecentActivity(db: Db): Promise<ActivityItem[]> {
 
   for (const q of quotes) {
     const ts = q.sentAt ?? q.date;
+    // Lead-scoped quotations have no project — label the party generically
+    // until the dashboard grows a lead-party lookup.
+    const recipient = q.project?.client.name ?? "a lead";
     events.push({
       id: `q-${q.id}`, kind: "quote",
-      title: `Quote ${q.number.split("/").pop() ?? q.number} sent to ${q.project.client.name}`,
+      title: `Quote ${q.number.split("/").pop() ?? q.number} sent to ${recipient}`,
       when: relTime(now - ts.getTime()),
       at: ts.getTime(),
     });

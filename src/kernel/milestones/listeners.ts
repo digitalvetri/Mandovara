@@ -85,6 +85,10 @@ async function onQuotationAccepted(e: QuotationAcceptedEvent): Promise<void> {
     select: { projectId: true },
   });
   if (!q) return;
+  // Lead-scoped quotations (FIXES-01 §5.1) have no projectId — nothing to
+  // tick or advance yet. The conversion step handles the milestone chain
+  // once a project exists.
+  if (!q.projectId) return;
   await completeMilestonesByEvent(q.projectId, "quotation.accepted");
 
   // Advance project stage to ORDERED so the 4-phase UI moves from

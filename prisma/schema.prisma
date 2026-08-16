@@ -1057,8 +1057,14 @@ model Quotation {
   number         String
   revision       Int             @default(0)
   parentId       String?
-  projectId      String
-  clientId       String
+  // FIXES-01 §5.1 — a quotation belongs to EITHER a lead (before
+  // conversion) or a client (post-conversion), never both. XOR
+  // enforced at the DB level via a CHECK constraint added in the
+  // accompanying migration. projectId is only set once a client
+  // exists, so it is nullable too.
+  leadId         String?
+  clientId       String?
+  projectId      String?
   date           DateTime
   validUntil     DateTime
   status         QuotationStatus @default(DRAFT)
@@ -1079,11 +1085,13 @@ model Quotation {
   sentAt         DateTime?
   pdfKey         String?
 
-  project Project         @relation(fields: [projectId], references: [id])
+  project Project?        @relation(fields: [projectId], references: [id])
   lines   QuotationLine[]
 
   @@unique([organizationId, number, revision])
   @@index([organizationId, projectId, status])
+  @@index([organizationId, leadId])
+  @@index([organizationId, clientId])
 }
 
 model QuotationLine {

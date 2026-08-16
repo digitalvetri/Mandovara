@@ -50,11 +50,28 @@ export async function createQuotation(
     where: { id: d.branchId },
     select: { id: true, invoicePrefix: true, stateCode: true },
   });
-  const project = await db.project.findUniqueOrThrow({
-    where: { id: d.projectId },
-    select: { id: true, clientId: true },
-  });
-  const clientId = d.clientId ?? project.clientId;
+
+  // Party resolution: EITHER a lead OR a (client, maybe project). The
+  // schema refine already asserted XOR — narrow into concrete IDs here.
+  let quoteLeadId:    string | null = null;
+  let quoteClientId:  string | null = null;
+  let quoteProjectId: string | null = null;
+  if (d.leadId) {
+    const lead = await db.lead.findUnique({ where: { id: d.leadId }, select: { id: true } });
+    if (!lead) return { ok: false, error: "Lead not found" };
+    quoteLeadId = lead.id;
+  } else if (d.projectId) {
+    const project = await db.project.findUniqueOrThrow({
+      where:  { id: d.projectId },
+      select: { id: true, clientId: true },
+    });
+    quoteProjectId = project.id;
+    quoteClientId  = d.clientId ?? project.clientId;
+  } else if (d.clientId) {
+    const client = await db.client.findUnique({ where: { id: d.clientId }, select: { id: true } });
+    if (!client) return { ok: false, error: "Client not found" };
+    quoteClientId = client.id;
+  }
 
   // Fetch colourway → design for measurement gate and GST rate resolution
   const colourwayIds = d.lines
@@ -72,31 +89,37 @@ export async function createQuotation(
     : [];
   const cwMap = new Map(colourways.map((c) => [c.id, c]));
 
-  // § 0.10 / § 15.1 — server-side measurement gate, never UI-only
-  for (let i = 0; i < d.lines.length; i++) {
-    const line = d.lines[i]!;
-    if (line.measurementItemId) continue;
+  // § 0.10 / § 15.1 — server-side measurement gate. Enforced only for
+  // client-scoped quotes (real projects with measurement rounds). Lead-
+  // scoped quotes are preliminary estimates — no project, no measurements
+  // — so the gate is relaxed. A proper on-site measurement + revised
+  // quote lands after conversion.
+  if (!quoteLeadId) {
+    for (let i = 0; i < d.lines.length; i++) {
+      const line = d.lines[i]!;
+      if (line.measurementItemId) continue;
 
-    if (line.colourwayId) {
-      const cw = cwMap.get(line.colourwayId);
-      if (!cw) {
-        return {
-          ok: false,
-          error: "Validation failed",
-          fieldErrors: { [`lines.${i}.colourwayId`]: "Colourway not found" },
-        };
-      }
-      const family = cw.design.family as ProductFamily;
-      if (MADE_TO_MEASURE_FAMILIES.has(family)) {
-        return {
-          ok: false,
-          errorCode: "MEASUREMENT_REQUIRED",
-          error: "Validation failed",
-          fieldErrors: {
-            [`lines.${i}.measurementItemId`]:
-              `${family} is made-to-measure — a measurement item must be linked before quoting`,
-          },
-        };
+      if (line.colourwayId) {
+        const cw = cwMap.get(line.colourwayId);
+        if (!cw) {
+          return {
+            ok: false,
+            error: "Validation failed",
+            fieldErrors: { [`lines.${i}.colourwayId`]: "Colourway not found" },
+          };
+        }
+        const family = cw.design.family as ProductFamily;
+        if (MADE_TO_MEASURE_FAMILIES.has(family)) {
+          return {
+            ok: false,
+            errorCode: "MEASUREMENT_REQUIRED",
+            error: "Validation failed",
+            fieldErrors: {
+              [`lines.${i}.measurementItemId`]:
+                `${family} is made-to-measure — a measurement item must be linked before quoting`,
+            },
+          };
+        }
       }
     }
   }
@@ -167,8 +190,9 @@ export async function createQuotation(
         branchId:       branch.id,
         number,
         revision:       0,
-        projectId:      d.projectId,
-        clientId:       clientId,
+        leadId:         quoteLeadId,
+        clientId:       quoteClientId,
+        projectId:      quoteProjectId,
         date,
         validUntil,
         status:         "DRAFT",
@@ -313,7 +337,9 @@ export async function setQuotationStatus(
 
   // Fire domain events after successful state transition. Listeners in
   // kernel/milestones handle milestone auto-completion and stage advance
-  // (see onQuotationAccepted).
+  // (see onQuotationAccepted). clientId is nullable now for lead-scoped
+  // quotes — the event's clientId falls back to empty string, and the
+  // listener guards on projectId before doing anything project-specific.
   if (status === "ACCEPTED") {
     await bus.publish({
       type:        "quotation.accepted",
@@ -321,7 +347,7 @@ export async function setQuotationStatus(
       actorId:     ctx.userId,
       occurredAt:  new Date(),
       quotationId: id,
-      clientId:    q.clientId,
+      clientId:    q.clientId ?? "",
     });
   }
 

@@ -182,22 +182,28 @@ export async function listQuotations(
   }
 
   return {
-    rows: rows.map((r) => ({
-      id: r.id,
-      number: r.number,
-      clientId: r.clientId,
-      clientName: r.project.client.name,
-      clientMobile: r.project.client.mobile,
-      projectId: r.project.id,
-      projectName: r.project.name,
-      date: r.date,
-      validUntil: r.validUntil,
-      status: r.status,
-      total: r.total,
-      lineCount: r._count.lines,
-      ownerName: userMap.get(r.ownerId) ?? "—",
-      expiryBucket: bucketFor(r.status, r.validUntil),
-    })),
+    // Lead-scoped quotations (FIXES-01 §5.1) have no project — hide them
+    // from the client-facing quotations list for now. Next session's UI
+    // wiring adds a "Lead quotations" filter + column.
+    rows: rows
+      .filter((r): r is typeof r & { project: NonNullable<typeof r.project>; clientId: string } =>
+        r.project !== null && r.clientId !== null)
+      .map((r) => ({
+        id: r.id,
+        number: r.number,
+        clientId: r.clientId,
+        clientName: r.project.client.name,
+        clientMobile: r.project.client.mobile,
+        projectId: r.project.id,
+        projectName: r.project.name,
+        date: r.date,
+        validUntil: r.validUntil,
+        status: r.status,
+        total: r.total,
+        lineCount: r._count.lines,
+        ownerName: userMap.get(r.ownerId) ?? "—",
+        expiryBucket: bucketFor(r.status, r.validUntil),
+      })),
     total, page, pageSize,
   };
 }
@@ -235,9 +241,17 @@ export async function getQuotation(
     },
   });
   if (!row) return null;
+  // Lead-scoped quotations (FIXES-01 §5.1) have no project — the detail
+  // renderer (PDF, screen) can't hydrate a client card without one yet.
+  // Returning null is a safe stopgap until the detail page grows a
+  // dedicated lead-scoped branch next session.
+  if (!row.project || !row.projectId || !row.clientId) return null;
+  const project = row.project;
+  const projectId = row.projectId;
+  const clientId = row.clientId;
 
   const branch = await db.branch.findUniqueOrThrow({
-    where: { id: row.branchId },
+    where:  { id: row.branchId },
     select: { name: true, stateCode: true },
   });
 
@@ -249,13 +263,13 @@ export async function getQuotation(
     branchId: row.branchId,
     branchName: branch.name,
     supplierStateCode: branch.stateCode,
-    clientId: row.clientId,
-    clientName: row.project.client.name,
-    clientMobile: row.project.client.mobile,
-    clientEmail: row.project.client.email,
-    clientGstin: row.project.client.gstin,
-    projectName: row.project.name,
-    projectId: row.projectId,
+    clientId,
+    clientName: project.client.name,
+    clientMobile: project.client.mobile,
+    clientEmail: project.client.email,
+    clientGstin: project.client.gstin,
+    projectName: project.name,
+    projectId,
     date: row.date,
     validUntil: row.validUntil,
     termsText: row.termsText,
@@ -321,17 +335,23 @@ export async function listQuotationsForClient(
       _count:  { select: { lines: true } },
     },
   });
-  return rows.map((r) => ({
-    id:          r.id,
-    number:      r.number,
-    revision:    r.revision,
-    date:        r.date,
-    status:      r.status,
-    total:       r.total,
-    lineCount:   r._count.lines,
-    projectId:   r.project.id,
-    projectName: r.project.name,
-  }));
+  // Filter out lead-scoped (no project) — this helper is called with a
+  // clientId, and lead-scoped quotes shouldn't appear here anyway (they
+  // have leadId set, clientId null, so wouldn't match the where clause).
+  // Defensive filter in case of legacy data.
+  return rows
+    .filter((r): r is typeof r & { project: { id: string; name: string } } => r.project !== null)
+    .map((r) => ({
+      id:          r.id,
+      number:      r.number,
+      revision:    r.revision,
+      date:        r.date,
+      status:      r.status,
+      total:       r.total,
+      lineCount:   r._count.lines,
+      projectId:   r.project.id,
+      projectName: r.project.name,
+    }));
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

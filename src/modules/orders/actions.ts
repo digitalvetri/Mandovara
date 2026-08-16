@@ -50,6 +50,16 @@ export async function createOrderFromQuotation(
       error: `Quotation must be ACCEPTED to convert (currently ${q.status})`,
     };
   }
+  // Orders require a project + client. Lead-scoped quotations (§5.1) don't
+  // have those yet — must run convertLead first.
+  if (!q.projectId || !q.clientId) {
+    return {
+      ok: false,
+      error: "This is a lead-scoped quotation. Convert the lead to a client first, then raise the order.",
+    };
+  }
+  const projectId = q.projectId;
+  const clientId = q.clientId;
 
   const branch = await db.branch.findUniqueOrThrow({
     where: { id: q.branchId },
@@ -76,8 +86,8 @@ export async function createOrderFromQuotation(
         organizationId:   ctx.orgId,
         branchId:         q.branchId,
         number,
-        projectId:        q.projectId,
-        clientId:         q.clientId,
+        projectId,
+        clientId,
         quotationId:      q.id,
         date:             now,
         status:           "CONFIRMED",
