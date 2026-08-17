@@ -228,12 +228,78 @@ export async function postGRN(
       await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: nextStatus } });
     }
 
+    // When the PO goes RECEIVED for the first time, auto-create the matching
+    // Expense so vendor payment doesn't need a second data-entry pass. Guarded
+    // by Expense.sourcePoId's unique constraint — a second GRN that flips the
+    // status back and forth can't spawn duplicates. Owner still pays it via
+    // the "Mark paid" button on the To Pay tab.
+    if (nextStatus === "RECEIVED" && po.status !== "RECEIVED") {
+      await autoCreateExpenseForPO(tx, ctx.orgId, po.id, ctx.branchIds[0]);
+    }
+
     return grn;
   });
 
   revalidatePath("/purchase");
   revalidatePath(`/purchase/${po.id}`);
   return { ok: true, data: created };
+}
+
+/** Create a matching Expense when a PO reaches RECEIVED. Uses
+ *  Expense.sourcePoId's unique constraint for idempotency — a duplicate
+ *  attempt on the same PO throws a Prisma P2002 which we swallow (the
+ *  expense already exists; nothing to do). */
+async function autoCreateExpenseForPO(
+  tx:            TxClient,
+  orgId:         string,
+  poId:          string,
+  callerBranchId: string | undefined,
+): Promise<void> {
+  const fullPo = await tx.purchaseOrder.findUniqueOrThrow({
+    where:  { id: poId },
+    select: { id: true, number: true, totalValue: true, vendorId: true },
+  });
+  const vendor = await tx.vendor.findUnique({
+    where:  { id: fullPo.vendorId },
+    select: { name: true },
+  });
+  const vendorName = vendor?.name ?? "Vendor";
+
+  // PurchaseOrder has no branchId in the schema — resolve from the caller's
+  // context, or fall back to any branch of this org so a broken caller still
+  // produces a valid Expense row.
+  let branchId = callerBranchId;
+  if (!branchId) {
+    const anyBranch = await tx.branch.findFirst({
+      where:  { organizationId: orgId },
+      select: { id: true },
+    });
+    branchId = anyBranch?.id;
+  }
+  if (!branchId) return; // no branch anywhere — silently skip
+
+  try {
+    await tx.expense.create({
+      data: {
+        organizationId: orgId,
+        branchId,
+        head:           "Vendor payment",
+        subHead:        vendorName,
+        description:    `${fullPo.number} — ${vendorName}`,
+        amount:         fullPo.totalValue,
+        incurredAt:     new Date(),
+        approvalState:  "APPROVED",   // PO already went through its own approval; skip a second loop
+        paidAt:         null,          // still owes vendor — shows up in To Pay
+        sourcePoId:     fullPo.id,
+      },
+    });
+  } catch (e) {
+    // P2002 unique-constraint violation on sourcePoId = an Expense already
+    // exists for this PO. That's exactly the idempotency case; no-op.
+    const code = (e as { code?: string } | null)?.code;
+    if (code === "P2002") return;
+    throw e;
+  }
 }
 
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {

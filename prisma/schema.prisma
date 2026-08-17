@@ -1730,6 +1730,11 @@ model Expense {
   // Null while the bill is still outstanding. Set when it clears. The "To Pay"
   // KPI counts approvalState=APPROVED AND paidAt IS NULL.
   paidAt         DateTime?
+  // Set when this Expense was auto-created by a Purchase Order reaching
+  // RECEIVED status. Enforced unique so a second GRN on the same PO can't
+  // spawn a duplicate expense. No FK — POs can be archived without touching
+  // the ledger row.
+  sourcePoId     String?       @unique
 
   @@index([organizationId, incurredAt])
   @@index([organizationId, approvalState, paidAt])
