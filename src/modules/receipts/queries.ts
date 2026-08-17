@@ -58,12 +58,20 @@ export interface OutstandingInvoice {
 }
 
 export interface ListReceiptsQuery {
-  clientId?:  string;
-  projectId?: string;
-  search?:    string;
-  sort?:      "recent" | "oldest" | "amount";
-  page?:      number;
-  pageSize?:  number;
+  clientId?:     string;
+  projectId?:    string;
+  search?:       string;
+  sort?:         "recent" | "oldest" | "amount";
+  page?:         number;
+  pageSize?:     number;
+  /** Filter by payment mode (CASH | UPI | NEFT | RTGS | CHEQUE | CARD). */
+  mode?:         string;
+  /** Filter by cheque status (PENDING | CLEARED | BOUNCED). */
+  chequeStatus?: string;
+  /** Only receipts with money that hasn't been applied to any bill yet. */
+  unmatched?:    boolean;
+  /** yyyy-mm — receipts dated inside that calendar month (UTC). */
+  month?:        string;
 }
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -80,8 +88,17 @@ export async function listReceipts(
   const skip     = (page - 1) * pageSize;
 
   const where: Record<string, unknown> = {};
-  if (q.clientId)  where["clientId"]  = q.clientId;
-  if (q.projectId) where["projectId"] = q.projectId;
+  if (q.clientId)     where["clientId"]     = q.clientId;
+  if (q.projectId)    where["projectId"]    = q.projectId;
+  if (q.mode)         where["mode"]         = q.mode;
+  if (q.chequeStatus) where["chequeStatus"] = q.chequeStatus;
+  if (q.unmatched)    where["unallocated"]  = { gt: 0n };
+  if (q.month && /^\d{4}-\d{2}$/.test(q.month)) {
+    const [yy, mm] = q.month.split("-").map(Number) as [number, number];
+    const start = new Date(Date.UTC(yy, mm - 1, 1));
+    const end   = new Date(Date.UTC(yy, mm,     1));
+    where["date"] = { gte: start, lt: end };
+  }
   if (q.search?.trim()) {
     where["number"] = { contains: q.search.trim(), mode: "insensitive" };
   }
