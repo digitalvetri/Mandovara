@@ -257,7 +257,7 @@ export function RecentPaymentsEmpty() {
       <ul className="space-y-1.5 mb-4 text-[11.5px] text-text-dim">
         <li>
           <span className="text-text font-medium">Advance received</span> — money
-          paid before an invoice is raised (kept on account).
+          paid before an invoice is raised (kept for later bills).
         </li>
         <li>
           <span className="text-text font-medium">Payment for MDV/INV-…</span>{" "}

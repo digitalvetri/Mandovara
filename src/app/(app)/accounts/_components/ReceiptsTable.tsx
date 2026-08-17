@@ -18,7 +18,7 @@ const COLUMNS: readonly Column<ReceiptRow>[] = [
   { key: "applied", header: "Applied", align: "right",
     render: (r) => <span className="tabular text-text">{formatINR(r.amount - r.unallocated)}</span> },
   {
-    key: "onaccount", header: "On account", align: "right",
+    key: "onaccount", header: "Kept for later", align: "right",
     render: (r) => (
       <span className={`tabular ${r.unallocated > 0n ? "text-warn" : "text-text-faint"}`}>
         {r.unallocated > 0n ? formatINR(r.unallocated) : "—"}
