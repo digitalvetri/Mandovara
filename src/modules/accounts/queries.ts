@@ -58,6 +58,12 @@ export interface PaymentHistoryPoint {
   count:    number;
 }
 
+export interface PaymentModeSlice {
+  mode:   string;   // CASH | UPI | NEFT | RTGS | CHEQUE | CARD
+  amount: bigint;
+  count:  number;
+}
+
 export interface AccountsOverview {
   invoiced:            bigint;
   received:            bigint;
@@ -74,6 +80,8 @@ export interface AccountsOverview {
   activeBucket:        AgingBucket["key"] | null;
   /** Last 12 months of payments received, oldest → newest, gaps zero-filled */
   paymentHistory:      PaymentHistoryPoint[];
+  /** Last 12 months of payments grouped by payment mode, largest first */
+  paymentModes:        PaymentModeSlice[];
 }
 
 export async function loadAccountsOverview(
@@ -218,8 +226,11 @@ export async function loadAccountsOverview(
     ? openRows.filter((r) => r.bucketKey === opts.bucketFilter)
     : openRows;
 
-  // ── 12-month payment history ────────────────────────────────────
-  const paymentHistory = await buildPaymentHistory(db, today);
+  // ── 12-month payment history + mode breakdown ────────────────────
+  const [paymentHistory, paymentModes] = await Promise.all([
+    buildPaymentHistory(db, today),
+    buildPaymentModes(db, today),
+  ]);
 
   return {
     invoiced,
@@ -240,6 +251,7 @@ export async function loadAccountsOverview(
     })),
     activeBucket: opts.bucketFilter ?? null,
     paymentHistory,
+    paymentModes,
   };
 }
 
@@ -284,4 +296,26 @@ async function buildPaymentHistory(
     });
   }
   return points;
+}
+
+/** Group receipts from the last 12 months by PaymentMode, largest first. */
+async function buildPaymentModes(
+  db: ReturnType<typeof scoped>,
+  today: Date,
+): Promise<PaymentModeSlice[]> {
+  const from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+  const rows = await db.receipt.groupBy({
+    by:      ["mode"],
+    where:   { date: { gte: from } },
+    _sum:    { amount: true },
+    _count:  { _all: true },
+  });
+  return rows
+    .map((r) => ({
+      mode:   r.mode as string,
+      amount: r._sum.amount ?? 0n,
+      count:  r._count._all,
+    }))
+    .filter((s) => s.amount > 0n)
+    .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0));
 }

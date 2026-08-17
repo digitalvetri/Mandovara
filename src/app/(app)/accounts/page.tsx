@@ -8,6 +8,7 @@ import { loadAccountsOverview } from "@/modules/accounts/queries";
 import { ReceiptsTable } from "./_components/ReceiptsTable";
 import { Headline, SectionCard, MoneyOwedList, RecentPaymentsList } from "./_components/AccountsWidgets";
 import { PaymentHistoryChart, type HistoryPoint } from "./_components/PaymentHistoryChart";
+import { PaymentModeChart, type ModeSlice } from "./_components/PaymentModeChart";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,11 @@ export default async function AccountsPage({
     amount:   p.amount.toString(),
     count:    p.count,
   }));
+  const modeSlices: ModeSlice[] = overview.paymentModes.map((m) => ({
+    mode:   m.mode,
+    amount: m.amount.toString(),
+    count:  m.count,
+  }));
 
   return (
     <>
@@ -58,10 +64,15 @@ export default async function AccountsPage({
         clientCount={owedClientCount}
       />
 
-      {/* Payment history chart */}
-      <section className="mb-6 rounded-[14px] bg-surface border border-rule p-5 md:p-6">
-        <PaymentHistoryChart points={historyPoints} />
-      </section>
+      {/* Charts row: monthly history (wide) + mode breakdown (narrow) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 mb-6">
+        <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
+          <PaymentHistoryChart points={historyPoints} />
+        </section>
+        <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
+          <PaymentModeChart slices={modeSlices} />
+        </section>
+      </div>
 
       {/* Two-column body: Money owed | Recent payments */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
