@@ -9,15 +9,13 @@ import { listReceipts } from "@/modules/receipts/queries";
 import { loadAccountsOverview } from "@/modules/accounts/queries";
 import { loadChaseList } from "@/modules/accounts/chase";
 import { ReceiptsTable } from "./_components/ReceiptsTable";
-import {
-  InOutStrip, SectionCard,
-  MoneyOwedList, RecentPaymentsList, RecentOutflowsList,
-  MoneyOwedEmpty, RecentPaymentsEmpty, RecentOutflowsEmpty,
-} from "./_components/AccountsWidgets";
-import { PaymentModeChart, type ModeSlice } from "./_components/PaymentModeChart";
-import { OutflowChart, type OutflowSlice } from "./_components/OutflowChart";
 import { KpiCard } from "./_components/KpiCard";
 import { ChaseList, type ChaseRowUI } from "./_components/ChaseList";
+import { InVsOutChart,   type InOutPoint }        from "./_components/InVsOutChart";
+import { HowLongOwedBar, type HowLongOwedSegment }from "./_components/HowLongOwedBar";
+import { HowPeoplePayBars, type PayModeSlice }    from "./_components/HowPeoplePayBars";
+import { WhereMoneyGoesBars, type ExpenseHeadUI } from "./_components/WhereMoneyGoesBars";
+import { AttentionStrip } from "./_components/AttentionStrip";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 
 export const dynamic = "force-dynamic";
@@ -51,27 +49,20 @@ export default async function AccountsPage({
         }
       />
       <Tabs tabs={TABS} className="mb-6" />
-      {activeTab === "overview"    ? <OverviewTab ctx={ctx} searchParams={params} /> : null}
+      {activeTab === "overview"    ? <OverviewTab ctx={ctx} /> : null}
       {activeTab === "to-collect"  ? <ComingSoon title="To Collect" /> : null}
-      {activeTab === "received"    ? <ComingSoon title="Received"   /> : null}
+      {activeTab === "received"    ? <ReceivedTab ctx={ctx} searchParams={params} /> : null}
       {activeTab === "to-pay"      ? <ComingSoon title="To Pay"     /> : null}
       {activeTab === "spending"    ? <ComingSoon title="Spending"   /> : null}
     </>
   );
 }
 
-// ── Overview tab (the redesigned page body) ───────────────────────
+// ── Overview tab ─────────────────────────────────────────────────
 
-async function OverviewTab({
-  ctx, searchParams,
-}: { ctx: Awaited<ReturnType<typeof devContext>>; searchParams: SearchParams }) {
-  const q    = searchParams.q?.trim();
-  const page = parsePositiveInt(searchParams.page) ?? 1;
-  const sort = (searchParams.sort as "recent" | "oldest" | "amount" | undefined) ?? "recent";
-
-  const [overview, receipts, chase, org] = await Promise.all([
+async function OverviewTab({ ctx }: { ctx: Awaited<ReturnType<typeof devContext>> }) {
+  const [overview, chase, org] = await Promise.all([
     loadAccountsOverview(ctx, {}),
-    listReceipts(ctx, { ...(q != null && { search: q }), page, sort }),
     loadChaseList(ctx, { take: 5 }),
     prisma.organization.findUnique({ where: { id: ctx.orgId }, select: { name: true } }),
   ]);
@@ -79,7 +70,6 @@ async function OverviewTab({
   const kpis = overview.moneyKpis;
   const orgName = org?.name ?? "Mandovara";
 
-  // Chase rows: stringify BigInt + dates before crossing the RSC boundary
   const chaseRows: ChaseRowUI[] = chase.map((c) => ({
     clientId:              c.clientId,
     clientName:            c.clientName,
@@ -90,18 +80,23 @@ async function OverviewTab({
     activePromiseDate:     c.activePromiseDate ? c.activePromiseDate.toISOString() : null,
   }));
 
-  const showMoneyOut = !overview.moneyOut.hidden;
-
-  const modeSlices: ModeSlice[] = overview.paymentModes.map((m) => ({
+  // Serialize chart data across the RSC → client boundary.
+  const inOut: InOutPoint[] = overview.monthlyInOut.map((p) => ({
+    monthKey: p.monthKey, label: p.label,
+    moneyIn:  p.moneyIn.toString(),
+    moneyOut: p.moneyOut.toString(),
+  }));
+  const modeSlices: PayModeSlice[] = overview.paymentModes.map((m) => ({
     mode: m.mode, amount: m.amount.toString(), count: m.count,
   }));
-  const outflowSlices: OutflowSlice[] = overview.outflowKinds.map((k) => ({
-    kind: k.kind, label: k.label, amount: k.amount.toString(), count: k.count,
+  const heads: ExpenseHeadUI[] = overview.expenseHeads.map((h) => ({
+    head: h.head, amount: h.amount.toString(), count: h.count,
   }));
+  const owedSegments = buildOwedSegments(overview.aging);
 
   return (
     <>
-      {/* 4 KPI cards — §5.3. On phone the first is hero-full-width; the other three sit in a 2×2 grid. */}
+      {/* 4 KPI cards — §5.3 */}
       <section className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <KpiCard
           label="To collect"
@@ -157,58 +152,50 @@ async function OverviewTab({
         />
       </div>
 
-      {/* Everything below is Phase-2 hold-over — charts + widgets get
-          rebuilt in Phase 4. Keeping them here for now so the page stays
-          useful during the rebuild. */}
-      {showMoneyOut && (
-        <InOutStrip moneyIn={overview.moneyOut.moneyIn} moneyOut={overview.moneyOut.total} />
-      )}
-
-      <div className={`grid grid-cols-1 ${showMoneyOut ? "lg:grid-cols-2" : ""} gap-4 mb-6`}>
-        <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
-          <PaymentModeChart slices={modeSlices} />
-        </section>
-        {showMoneyOut && (
-          <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
-            <OutflowChart slices={outflowSlices} />
-          </section>
-        )}
-      </div>
-
+      {/* 2×2 chart grid — no pies, all bars (§7) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <SectionCard
-          title="Money owed to you"
-          note={overview.topClients.length > 0 ? `${overview.topClients.length} client${overview.topClients.length === 1 ? "" : "s"}` : undefined}
-        >
-          {overview.topClients.length === 0
-            ? <MoneyOwedEmpty />
-            : <MoneyOwedList rows={overview.topClients} />}
-        </SectionCard>
-        <SectionCard
-          title="Recent payments received"
-          note={overview.recentReceipts.length > 0 ? "Last 8" : undefined}
-        >
-          {overview.recentReceipts.length === 0
-            ? <RecentPaymentsEmpty />
-            : <RecentPaymentsList rows={overview.recentReceipts} />}
-        </SectionCard>
+        <InVsOutChart points={inOut} />
+        <HowLongOwedBar segments={owedSegments} />
+        <WhereMoneyGoesBars heads={heads} />
+        <HowPeoplePayBars modes={modeSlices} />
       </div>
 
-      {showMoneyOut && (
-        <div className="mb-6">
-          <SectionCard
-            title="Recent expenses & salary"
-            note={overview.recentOutflows.length > 0 ? "Last 8" : undefined}
-          >
-            {overview.recentOutflows.length === 0
-              ? <RecentOutflowsEmpty />
-              : <RecentOutflowsList rows={overview.recentOutflows} />}
-          </SectionCard>
-        </div>
-      )}
+      {/* Needs your attention — only if any count > 0 */}
+      <div className="mb-6">
+        <AttentionStrip
+          chequesPending={{
+            count: overview.attention.chequesPending.count,
+            amount: overview.attention.chequesPending.amount.toString(),
+          }}
+          expensesPending={{
+            count: overview.attention.expensesPending.count,
+            amount: overview.attention.expensesPending.amount.toString(),
+          }}
+          unmatchedReceipts={{
+            count: overview.attention.unmatchedReceipts.count,
+            amount: overview.attention.unmatchedReceipts.amount.toString(),
+          }}
+        />
+      </div>
+    </>
+  );
+}
 
-      <div id="all-receipts" className="mb-2 text-[11px] uppercase tracking-[0.14em] text-text-dim">
-        All payments {q ? `matching "${q}"` : ""}
+// ── Received tab (basic — full version lands Phase 5) ────────────
+
+async function ReceivedTab({
+  ctx, searchParams,
+}: { ctx: Awaited<ReturnType<typeof devContext>>; searchParams: SearchParams }) {
+  const q    = searchParams.q?.trim();
+  const page = parsePositiveInt(searchParams.page) ?? 1;
+  const sort = (searchParams.sort as "recent" | "oldest" | "amount" | undefined) ?? "recent";
+
+  const receipts = await listReceipts(ctx, { ...(q != null && { search: q }), page, sort });
+
+  return (
+    <>
+      <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-text-dim">
+        All payments received {q ? `matching "${q}"` : ""}
       </div>
       <ReceiptsTable rows={receipts.rows} />
       <Pager page={page} pageSize={receipts.pageSize} total={receipts.total} />
@@ -223,7 +210,8 @@ function ComingSoon({ title }: { title: string }) {
     <div className="rounded-[14px] bg-surface border border-rule px-6 py-16 text-center">
       <div className="text-[14px] text-text mb-2">{title} — coming soon</div>
       <p className="text-[12px] text-text-dim max-w-md mx-auto">
-        The detail tabs land in the next round. For now, everything you need is on the Overview tab.
+        The detailed view lands in the next round. Everything you need for a fast decision is on the
+        Overview tab.
       </p>
       <Link
         href={"/accounts" as Route}
@@ -237,17 +225,32 @@ function ComingSoon({ title }: { title: string }) {
 
 // ── Bits ──────────────────────────────────────────────────────────
 
+/** Map the existing 5-bucket aging into the 4 segments the spec draws:
+ *  Not yet due · 0–30 late · 31–60 late · 60+ late (§7.2). */
+function buildOwedSegments(
+  aging: Array<{ key: string; amount: bigint }>,
+): HowLongOwedSegment[] {
+  const byKey = new Map(aging.map((b) => [b.key, b.amount]));
+  const zero = 0n;
+  const d60p =
+    (byKey.get("d61_90") ?? zero) + (byKey.get("d90p") ?? zero);
+  return [
+    { key: "current", label: "Not yet due",  amount: (byKey.get("current") ?? zero).toString() },
+    { key: "d0_30",   label: "0–30 late",    amount: (byKey.get("d1_30")   ?? zero).toString() },
+    { key: "d31_60",  label: "31–60 late",   amount: (byKey.get("d31_60")  ?? zero).toString() },
+    { key: "d60p",    label: "60+ late",     amount: d60p.toString() },
+  ];
+}
+
 function DeltaText({
   current, previous, invert,
 }: { current: bigint; previous: bigint; invert?: boolean }) {
   if (previous === 0n) {
     return <span className="text-text-dim">{current === 0n ? "Nothing recorded yet" : "vs last month: new"}</span>;
   }
-  // pct delta with a sign
   const delta = Number(current - previous);
   const pct   = (delta / Number(previous)) * 100;
   const up    = pct >= 0;
-  // For "Came in", up is good (green). For "Spent", up is bad (invert=true) — red.
   const isFavourable = invert ? !up : up;
   const tone = pct === 0
     ? "text-text-dim"

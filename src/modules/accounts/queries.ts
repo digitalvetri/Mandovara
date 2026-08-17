@@ -72,6 +72,29 @@ export interface OutflowRow {
   amount: bigint;
 }
 
+/** One month bucket in the Money-in-vs-out chart (§7.1). */
+export interface MonthlyInOutPoint {
+  monthKey: string;   // YYYY-MM
+  label:    string;   // "Aug" or "Jan '26"
+  moneyIn:  bigint;
+  moneyOut: bigint;
+}
+
+/** One head in the Where-the-money-goes ranked bar chart (§7.3).
+ *  Top 8 raw heads returned; the caller collapses the tail into "Other". */
+export interface ExpenseHeadSlice {
+  head:   string;   // "Rent", "Site labour", "Utilities" …
+  amount: bigint;
+  count:  number;
+}
+
+/** Attention strip counts (§5.1 / spec §10). Only surfaces if any > 0. */
+export interface AttentionCounts {
+  chequesPending: { count: number; amount: bigint };
+  expensesPending: { count: number; amount: bigint };
+  unmatchedReceipts: { count: number; amount: bigint };
+}
+
 /** The 4 KPI cards driving the /accounts Overview header (§5.3). */
 export interface MoneyKpis {
   /** TO COLLECT: sum of open invoice balances across all clients. */
@@ -132,6 +155,12 @@ export interface AccountsOverview {
   };
   /** Outflow donut slices for the last 12 months, largest first. */
   outflowKinds:        OutflowKindSlice[];
+  /** 12-month money-in vs money-out for the trend chart. Oldest → newest. */
+  monthlyInOut:        MonthlyInOutPoint[];
+  /** Top 8 expense heads over the last 12 months. Caller collapses to "Other". */
+  expenseHeads:        ExpenseHeadSlice[];
+  /** Attention strip counts (cheques / expenses / unmatched receipts). */
+  attention:           AttentionCounts;
   /** Last 8 outflows across salary + expense + project expense, newest first. */
   recentOutflows:      OutflowRow[];
 }
@@ -305,6 +334,13 @@ export async function loadAccountsOverview(
   // ── 4 KPI totals for the Overview header (§5.3) ─────────────────
   const moneyKpis = await buildMoneyKpis(ctx, db, today, openRows);
 
+  // ── Phase 4 chart data + attention strip ─────────────────────────
+  const [monthlyInOut, expenseHeads, attention] = await Promise.all([
+    buildMonthlyInOut(ctx, db, today),
+    buildExpenseHeads(ctx, db, today),
+    buildAttentionCounts(ctx, db),
+  ]);
+
   return {
     invoiced,
     received,
@@ -333,6 +369,9 @@ export async function loadAccountsOverview(
     moneyOut:       outflow.summary,
     outflowKinds:   outflow.kinds,
     recentOutflows: outflow.recent,
+    monthlyInOut,
+    expenseHeads,
+    attention,
   };
 }
 
@@ -615,4 +654,144 @@ async function buildToPaySum(
     if (po.expectedAt && po.expectedAt < weekEnd) dueWeek += po.totalValue;
   }
   return { total, dueWeek };
+}
+
+// ── Phase 4 chart data ────────────────────────────────────────────
+
+const MONTH_LABELS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/** 12 months of money-in vs money-out, oldest → newest, zero-filled. */
+async function buildMonthlyInOut(
+  ctx:   RequestContext,
+  db:    ReturnType<typeof scoped>,
+  today: Date,
+): Promise<MonthlyInOutPoint[]> {
+  const from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+  const canOutflow = can(ctx, "expense.view") || can(ctx, "payroll.view");
+
+  const [receipts, expenses, projExps, slips] = await Promise.all([
+    db.receipt.findMany({
+      where:   { date: { gte: from } },
+      select:  { date: true, amount: true },
+    }),
+    canOutflow
+      ? db.expense.findMany({ where: { incurredAt: { gte: from } }, select: { incurredAt: true, amount: true } })
+      : Promise.resolve([]),
+    canOutflow
+      ? db.projectExpense.findMany({ where: { incurredAt: { gte: from } }, select: { incurredAt: true, amount: true } })
+      : Promise.resolve([]),
+    can(ctx, "payroll.view")
+      ? db.payslip.findMany({
+          where:  { run: { status: "PAID", paidAt: { gte: from } } },
+          select: { netPay: true, run: { select: { paidAt: true } } },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  function keyOf(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const inSum: Map<string, bigint>  = new Map();
+  const outSum: Map<string, bigint> = new Map();
+  for (const r of receipts)  inSum.set(keyOf(r.date),     (inSum.get(keyOf(r.date))     ?? 0n) + r.amount);
+  for (const e of expenses)  outSum.set(keyOf(e.incurredAt), (outSum.get(keyOf(e.incurredAt)) ?? 0n) + e.amount);
+  for (const e of projExps)  outSum.set(keyOf(e.incurredAt), (outSum.get(keyOf(e.incurredAt)) ?? 0n) + e.amount);
+  for (const s of slips) {
+    const d = s.run.paidAt;
+    if (!d) continue;
+    outSum.set(keyOf(d), (outSum.get(keyOf(d)) ?? 0n) + s.netPay);
+  }
+
+  const points: MonthlyInOutPoint[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d       = new Date(from.getFullYear(), from.getMonth() + i, 1);
+    const key     = keyOf(d);
+    const label   = d.getMonth() === 0
+      ? `${MONTH_LABELS_SHORT[0]} '${String(d.getFullYear()).slice(-2)}`
+      : MONTH_LABELS_SHORT[d.getMonth()]!;
+    points.push({
+      monthKey: key, label,
+      moneyIn:  inSum.get(key)  ?? 0n,
+      moneyOut: outSum.get(key) ?? 0n,
+    });
+  }
+  return points;
+}
+
+/** Top 8 expense heads over the last 12 months across Expense +
+ *  ProjectExpense. Permission-gated; empty for viewers without
+ *  expense.view. Caller collapses tail into "Other". */
+async function buildExpenseHeads(
+  ctx:   RequestContext,
+  db:    ReturnType<typeof scoped>,
+  today: Date,
+): Promise<ExpenseHeadSlice[]> {
+  if (!can(ctx, "expense.view")) return [];
+  const from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+
+  const [expGroups, projGroups] = await Promise.all([
+    db.expense.groupBy({
+      by:    ["head"],
+      where: { incurredAt: { gte: from } },
+      _sum:  { amount: true },
+      _count: { _all: true },
+    }),
+    db.projectExpense.groupBy({
+      by:    ["head"],
+      where: { incurredAt: { gte: from } },
+      _sum:  { amount: true },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const merged = new Map<string, { amount: bigint; count: number }>();
+  for (const g of expGroups) {
+    const cur = merged.get(g.head) ?? { amount: 0n, count: 0 };
+    cur.amount += g._sum.amount ?? 0n;
+    cur.count  += g._count._all;
+    merged.set(g.head, cur);
+  }
+  for (const g of projGroups) {
+    const cur = merged.get(g.head) ?? { amount: 0n, count: 0 };
+    cur.amount += g._sum.amount ?? 0n;
+    cur.count  += g._count._all;
+    merged.set(g.head, cur);
+  }
+
+  return [...merged.entries()]
+    .map(([head, v]) => ({ head, amount: v.amount, count: v.count }))
+    .filter((s) => s.amount > 0n)
+    .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0));
+}
+
+/** Three counts for the Attention strip. Cheque + expense counts are
+ *  permission-gated so a viewer without payroll/expense sees zeros. */
+async function buildAttentionCounts(
+  ctx: RequestContext,
+  db:  ReturnType<typeof scoped>,
+): Promise<AttentionCounts> {
+  const [chq, exp, unm] = await Promise.all([
+    db.receipt.aggregate({
+      _sum:   { amount: true },
+      _count: { _all: true },
+      where:  { chequeStatus: "PENDING" },
+    }),
+    can(ctx, "expense.view")
+      ? db.expense.aggregate({
+          _sum:   { amount: true },
+          _count: { _all: true },
+          where:  { approvalState: "PENDING" },
+        })
+      : Promise.resolve({ _sum: { amount: 0n }, _count: { _all: 0 } }),
+    db.receipt.aggregate({
+      _sum:   { unallocated: true },
+      _count: { _all: true },
+      where:  { unallocated: { gt: 0n } },
+    }),
+  ]);
+  return {
+    chequesPending:    { count: chq._count._all,  amount: chq._sum.amount    ?? 0n },
+    expensesPending:   { count: exp._count._all,  amount: exp._sum.amount    ?? 0n },
+    unmatchedReceipts: { count: unm._count._all,  amount: unm._sum.unallocated ?? 0n },
+  };
 }
