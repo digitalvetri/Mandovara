@@ -9,9 +9,10 @@ import { GlobalTopbar } from "./GlobalTopbar";
 interface Props {
   userName: string;
   userRole: string;
+  userPermissions: string[];
 }
 
-export function SidebarShell({ userName, userRole }: Props) {
+export function SidebarShell({ userName, userRole, userPermissions }: Props) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -67,7 +68,7 @@ export function SidebarShell({ userName, userRole }: Props) {
           <X size={15} strokeWidth={2} />
         </button>
 
-        <Sidebar userName={userName} userRole={userRole} />
+        <Sidebar userName={userName} userRole={userRole} permissions={userPermissions} />
       </div>
     </>
   );

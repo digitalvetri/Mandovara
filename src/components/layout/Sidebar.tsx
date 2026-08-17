@@ -14,59 +14,67 @@ import {
 import { devLogout } from "@/lib/dev-auth";
 import { MandovaraLeafIcon } from "./GlobalTopbar";
 
-interface NavItem { label: string; href: string; icon: LucideIcon }
+interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  // Permission key from /kernel/rbac/permissions that gates this nav item.
+  // Absent = shown to all authenticated users.
+  perm?: string;
+}
 
 const NAV: readonly { section: string; items: NavItem[] }[] = [
   {
     section: "Overview",
     items: [
-      { label: "Owner Dashboard", href: "/",         icon: LayoutDashboard },
-      { label: "Projects",        href: "/projects", icon: Briefcase       },
+      { label: "Owner Dashboard", href: "/",         icon: LayoutDashboard },   // always shown; label swapped at render
+      { label: "Projects",        href: "/projects", icon: Briefcase,       perm: "project.view" },
     ],
   },
   {
     section: "Revenue",
     items: [
-      { label: "Lead Management",  href: "/leads",      icon: UserPlus },
-      { label: "Client 360",       href: "/clients",    icon: Users },
-      { label: "Quotations (BOQ)", href: "/quotations", icon: FileText },
+      { label: "Lead Management",  href: "/leads",      icon: UserPlus,  perm: "lead.view"       },
+      { label: "Client 360",       href: "/clients",    icon: Users,     perm: "client.view"     },
+      { label: "Quotations (BOQ)", href: "/quotations", icon: FileText,  perm: "quotation.view"  },
     ],
   },
   {
     section: "Catalog & Stock",
     items: [
-      { label: "Product Catalog",    href: "/products",            icon: Package },
-      { label: "Purchase & Vendors", href: "/purchase",            icon: Truck   },
-      { label: "Stocks",              href: "/inventory",           icon: Boxes   },
+      { label: "Product Catalog",    href: "/products",  icon: Package, perm: "catalog.view"    },
+      { label: "Purchase & Vendors", href: "/purchase",  icon: Truck,   perm: "po.view"         },
+      { label: "Stocks",             href: "/inventory", icon: Boxes,   perm: "inventory.view"  },
     ],
   },
   {
     section: "Delivery",
     items: [
-      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin    },
-      { label: "Measurements",          href: "/measurements", icon: Ruler     },
-      { label: "Installation",          href: "/install",      icon: Wrench    },
+      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin,  perm: "sitelog.view"     },
+      { label: "Measurements",          href: "/measurements", icon: Ruler,   perm: "measurement.view" },
+      { label: "Installation",          href: "/install",      icon: Wrench,  perm: "install.view"     },
     ],
   },
   {
     section: "Money",
     items: [
-      { label: "Invoicing & GST",     href: "/invoicing", icon: Receipt },
-      { label: "Accounts & Payments", href: "/accounts",  icon: Wallet  },
+      // invoice.create rather than invoice.view — DESIGNER has view-only but not the Invoicing module
+      { label: "Invoicing & GST",     href: "/invoicing", icon: Receipt, perm: "invoice.create" },
+      { label: "Accounts & Payments", href: "/accounts",  icon: Wallet,  perm: "advance.view"   },
     ],
   },
   {
     section: "People",
     items: [
-      { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },
-      { label: "Payroll",            href: "/payroll",    icon: IndianRupee   },
+      { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },          // all roles
+      { label: "Payroll",            href: "/payroll",    icon: IndianRupee,  perm: "payroll.view" },
     ],
   },
   {
     section: "System",
     items: [
-      { label: "Reports",       href: "/reports", icon: BarChart2   },
-      { label: "Admin & Roles", href: "/admin",   icon: ShieldCheck },
+      { label: "Reports",       href: "/reports", icon: BarChart2,  perm: "report.view.dashboard" },
+      { label: "Admin & Roles", href: "/admin",   icon: ShieldCheck, perm: "admin.settings"       },
     ],
   },
 ];
@@ -95,9 +103,11 @@ function initials(name: string): string {
 interface SidebarProps {
   userName: string;
   userRole: string;
+  permissions: string[];
 }
 
-export function Sidebar({ userName, userRole }: SidebarProps) {
+export function Sidebar({ userName, userRole, permissions }: SidebarProps) {
+  const isOwner = permissions.includes("admin.settings");
   const pathname = usePathname();
   const router   = useRouter();
   const [signing, startSignOut] = useTransition();
@@ -127,22 +137,32 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 pb-3">
-        {NAV.map((section) => (
-          <div key={section.section} className="mb-4">
-            <div className="px-3 mb-1.5 mt-2 text-[10.5px] uppercase tracking-[0.22em] text-sidebar-dim">
-              {section.section}
+        {NAV.map((section) => {
+          const visible = section.items.filter(
+            (item) => !item.perm || permissions.includes(item.perm),
+          );
+          if (visible.length === 0) return null;
+          return (
+            <div key={section.section} className="mb-4">
+              <div className="px-3 mb-1.5 mt-2 text-[10.5px] uppercase tracking-[0.22em] text-sidebar-dim">
+                {section.section}
+              </div>
+              {visible.map((item) => {
+                const label =
+                  item.href === "/" ? (isOwner ? "Owner Dashboard" : "My Dashboard") : item.label;
+                return (
+                  <NavRow
+                    key={item.href}
+                    href={item.href}
+                    label={label}
+                    Icon={item.icon}
+                    active={pathname === item.href}
+                  />
+                );
+              })}
             </div>
-            {section.items.map((item) => (
-              <NavRow
-                key={item.label}
-                href={item.href}
-                label={item.label}
-                Icon={item.icon}
-                active={pathname === item.href}
-              />
-            ))}
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Profile + sign-out */}

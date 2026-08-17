@@ -31,9 +31,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // DB unavailable — use stubs
   }
 
+  const userPermissions = Array.from(ctx.permissions) as string[];
+
   return (
     <div className="min-h-screen">
-      <SidebarShell userName={userName} userRole={userRole} />
+      <SidebarShell userName={userName} userRole={userRole} userPermissions={userPermissions} />
       <main className="md:pl-[264px] pt-[68px]">
         <div className="w-full px-5 sm:px-7 md:px-9 xl:px-11 py-4">{children}</div>
       </main>
