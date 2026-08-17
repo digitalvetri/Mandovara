@@ -53,6 +53,27 @@ export function SectionCard({
   );
 }
 
+// ── Rich empty state for the Money-Owed card ─────────────────────
+export function MoneyOwedEmpty() {
+  return (
+    <div className="px-5 py-6">
+      <p className="text-[12.5px] text-text mb-3">
+        As soon as you raise a tax invoice on a client, any unpaid balance shows
+        up here — one row per client, biggest first.
+      </p>
+      <p className="text-[11.5px] text-text-dim mb-4">
+        Right now every issued bill is settled — there's nothing outstanding.
+      </p>
+      <Link
+        href={"/invoicing/new" as Route}
+        className="inline-flex items-center gap-1.5 text-[12px] text-accent hover:underline"
+      >
+        Create an invoice →
+      </Link>
+    </div>
+  );
+}
+
 // ── Money owed to you (one row per client) ────────────────────────
 export function MoneyOwedList({ rows }: { rows: OutstandingClientRow[] }) {
   return (
@@ -103,12 +124,13 @@ export function RecentPaymentsList({ rows }: { rows: RecentReceiptRow[] }) {
     <ul className="divide-y divide-rule/60">
       {rows.map((r) => (
         <li key={r.id} className="px-5 py-4">
-          <div className="flex items-baseline justify-between gap-3 mb-1.5">
+          <div className="flex items-baseline justify-between gap-3 mb-1">
             <div className="text-[13.5px] text-text truncate min-w-0">{r.clientName}</div>
             <div className="tabular text-[14px] text-text font-medium whitespace-nowrap">
               {formatINR(r.amount)}
             </div>
           </div>
+          <div className="text-[12px] text-text mb-1.5 truncate">{r.purpose}</div>
           <div className="flex items-baseline justify-between gap-3 text-[11.5px] text-text-dim">
             <div className="tabular">
               {formatDate(r.date)}
@@ -125,5 +147,40 @@ export function RecentPaymentsList({ rows }: { rows: RecentReceiptRow[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+// ── Rich empty state for the Recent Payments card ────────────────
+// Renders when there are no receipts yet. Explains what will appear
+// so the empty screen isn't a mystery — mirrors the same categories
+// the real rows use ("Advance", "Payment for INV-...", etc.).
+export function RecentPaymentsEmpty() {
+  return (
+    <div className="px-5 py-6">
+      <p className="text-[12.5px] text-text mb-3">
+        Every payment you receive from a client will appear here — the most recent
+        eight. Each row shows what the money is for.
+      </p>
+      <ul className="space-y-1.5 mb-4 text-[11.5px] text-text-dim">
+        <li>
+          <span className="text-text font-medium">Advance received</span> — money
+          paid before an invoice is raised (kept on account).
+        </li>
+        <li>
+          <span className="text-text font-medium">Payment for MDV/INV-…</span>{" "}
+          — money applied to a specific tax invoice.
+        </li>
+        <li>
+          <span className="text-text font-medium">…balance kept as advance</span>{" "}
+          — extra paid over the invoice amount, held for the next one.
+        </li>
+      </ul>
+      <Link
+        href={"/accounts/new" as Route}
+        className="inline-flex items-center gap-1.5 text-[12px] text-accent hover:underline"
+      >
+        Record your first payment →
+      </Link>
+    </div>
   );
 }

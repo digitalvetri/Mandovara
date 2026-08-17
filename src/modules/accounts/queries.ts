@@ -45,17 +45,8 @@ export interface RecentReceiptRow {
   mode:        string;
   amount:      bigint;
   unallocated: bigint;
-}
-
-export interface PaymentHistoryPoint {
-  /** YYYY-MM key, e.g. "2026-08" */
-  monthKey: string;
-  /** Short label for the axis, e.g. "Aug" or "Aug '26" if year rolls */
-  label:    string;
-  /** Total paise received in this month */
-  amount:   bigint;
-  /** Number of receipts in this month */
-  count:    number;
+  /** Plain-English description of what this payment covers. */
+  purpose:     string;
 }
 
 export interface PaymentModeSlice {
@@ -78,8 +69,6 @@ export interface AccountsOverview {
   topClients:          OutstandingClientRow[];
   recentReceipts:      RecentReceiptRow[];
   activeBucket:        AgingBucket["key"] | null;
-  /** Last 12 months of payments received, oldest → newest, gaps zero-filled */
-  paymentHistory:      PaymentHistoryPoint[];
   /** Last 12 months of payments grouped by payment mode, largest first */
   paymentModes:        PaymentModeSlice[];
 }
@@ -109,9 +98,27 @@ export async function loadAccountsOverview(
     db.receipt.findMany({
       orderBy: { date: "desc" },
       take: 8,
-      select: { id: true, number: true, date: true, mode: true, amount: true, unallocated: true, clientId: true },
+      select: {
+        id: true, number: true, date: true, mode: true, amount: true,
+        unallocated: true, clientId: true,
+        // ReceiptAllocation has no direct invoice relation — just invoiceId.
+        // Resolve numbers via a separate lookup below.
+        allocations: { select: { invoiceId: true } },
+      },
     }),
   ]);
+
+  // Resolve invoice numbers for the recent receipts' allocations
+  const allocInvoiceIds = [
+    ...new Set(recent.flatMap((r) => r.allocations.map((a) => a.invoiceId))),
+  ];
+  const allocInvoices = allocInvoiceIds.length > 0
+    ? await db.invoice.findMany({
+        where: { id: { in: allocInvoiceIds } },
+        select: { id: true, number: true },
+      })
+    : [];
+  const allocInvoiceMap = new Map(allocInvoices.map((i) => [i.id, i.number]));
 
   // Batch-fetch client info
   const allClientIds = [...new Set([
@@ -226,11 +233,8 @@ export async function loadAccountsOverview(
     ? openRows.filter((r) => r.bucketKey === opts.bucketFilter)
     : openRows;
 
-  // ── 12-month payment history + mode breakdown ────────────────────
-  const [paymentHistory, paymentModes] = await Promise.all([
-    buildPaymentHistory(db, today),
-    buildPaymentModes(db, today),
-  ]);
+  // ── 12-month payment-mode breakdown for the donut ───────────────
+  const paymentModes = await buildPaymentModes(db, today);
 
   return {
     invoiced,
@@ -248,54 +252,36 @@ export async function loadAccountsOverview(
       id: r.id, number: r.number, date: r.date,
       clientName: clientMap.get(r.clientId)?.name ?? "—",
       mode: r.mode, amount: r.amount, unallocated: r.unallocated,
+      purpose: describePurpose(
+        r.amount,
+        r.unallocated,
+        r.allocations.map((a) => allocInvoiceMap.get(a.invoiceId) ?? "—"),
+      ),
     })),
     activeBucket: opts.bucketFilter ?? null,
-    paymentHistory,
     paymentModes,
   };
 }
 
-const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-/** Sum receipts by yyyy-mm for the last 12 months, zero-filling gaps. */
-async function buildPaymentHistory(
-  db: ReturnType<typeof scoped>,
-  today: Date,
-): Promise<PaymentHistoryPoint[]> {
-  // Bucket start: first day of (today - 11 months). Inclusive lower bound.
-  const from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
-
-  const rows = await db.receipt.findMany({
-    where:   { date: { gte: from } },
-    select:  { date: true, amount: true },
-    orderBy: { date: "asc" },
-  });
-
-  const sums = new Map<string, { amount: bigint; count: number }>();
-  for (const r of rows) {
-    const key = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
-    const cur = sums.get(key);
-    if (cur) { cur.amount += r.amount; cur.count += 1; }
-    else       sums.set(key, { amount: r.amount, count: 1 });
+/** Plain-English label for what a payment covers, derived from the
+ * unallocated split and any invoices the receipt was applied to. */
+function describePurpose(
+  amount: bigint,
+  unallocated: bigint,
+  invoiceNumbers: string[],
+): string {
+  if (invoiceNumbers.length === 0) {
+    // Nothing tied to an invoice — money is sitting on account.
+    return "Advance received";
   }
-
-  // Emit exactly 12 buckets, oldest → newest, zero-filling gaps.
-  const points: PaymentHistoryPoint[] = [];
-  for (let i = 0; i < 12; i++) {
-    const d       = new Date(from.getFullYear(), from.getMonth() + i, 1);
-    const key     = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label   = d.getMonth() === 0                                  // year-boundary label
-      ? `${MONTH_LABELS[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
-      : MONTH_LABELS[d.getMonth()]!;
-    const bucket  = sums.get(key);
-    points.push({
-      monthKey: key,
-      label,
-      amount:   bucket?.amount ?? 0n,
-      count:    bucket?.count  ?? 0,
-    });
+  const shown = invoiceNumbers.slice(0, 2).join(", ");
+  const more  = invoiceNumbers.length > 2 ? ` +${invoiceNumbers.length - 2} more` : "";
+  const base  = `Payment for ${shown}${more}`;
+  // Partial-advance case: applied to some invoices AND still has money left over.
+  if (unallocated > 0n && unallocated < amount) {
+    return `${base} · balance kept as advance`;
   }
-  return points;
+  return base;
 }
 
 /** Group receipts from the last 12 months by PaymentMode, largest first. */

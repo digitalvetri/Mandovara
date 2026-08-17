@@ -6,8 +6,10 @@ import { devContext } from "@/lib/dev-context";
 import { listReceipts } from "@/modules/receipts/queries";
 import { loadAccountsOverview } from "@/modules/accounts/queries";
 import { ReceiptsTable } from "./_components/ReceiptsTable";
-import { Headline, SectionCard, MoneyOwedList, RecentPaymentsList } from "./_components/AccountsWidgets";
-import { PaymentHistoryChart, type HistoryPoint } from "./_components/PaymentHistoryChart";
+import {
+  Headline, SectionCard, MoneyOwedList, RecentPaymentsList,
+  MoneyOwedEmpty, RecentPaymentsEmpty,
+} from "./_components/AccountsWidgets";
 import { PaymentModeChart, type ModeSlice } from "./_components/PaymentModeChart";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +35,6 @@ export default async function AccountsPage({
   const hasOwed         = overview.outstanding > 0n;
 
   // BigInt can't cross the RSC → client component boundary — stringify amounts.
-  const historyPoints: HistoryPoint[] = overview.paymentHistory.map((p) => ({
-    monthKey: p.monthKey,
-    label:    p.label,
-    amount:   p.amount.toString(),
-    count:    p.count,
-  }));
   const modeSlices: ModeSlice[] = overview.paymentModes.map((m) => ({
     mode:   m.mode,
     amount: m.amount.toString(),
@@ -64,15 +60,10 @@ export default async function AccountsPage({
         clientCount={owedClientCount}
       />
 
-      {/* Charts row: monthly history (wide) + mode breakdown (narrow) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 mb-6">
-        <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
-          <PaymentHistoryChart points={historyPoints} />
-        </section>
-        <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
-          <PaymentModeChart slices={modeSlices} />
-        </section>
-      </div>
+      {/* Payment-mode donut */}
+      <section className="mb-6 rounded-[14px] bg-surface border border-rule p-5 md:p-6">
+        <PaymentModeChart slices={modeSlices} />
+      </section>
 
       {/* Two-column body: Money owed | Recent payments */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
@@ -81,28 +72,18 @@ export default async function AccountsPage({
           title="Money owed to you"
           note={hasOwed ? `${owedClientCount} client${owedClientCount === 1 ? "" : "s"}` : undefined}
         >
-          {overview.topClients.length === 0 ? (
-            <EmptyBox
-              text="Everyone has paid — you're square."
-            />
-          ) : (
-            <MoneyOwedList rows={overview.topClients} />
-          )}
+          {overview.topClients.length === 0
+            ? <MoneyOwedEmpty />
+            : <MoneyOwedList rows={overview.topClients} />}
         </SectionCard>
 
         <SectionCard
           title="Recent payments"
           note={overview.recentReceipts.length > 0 ? "Last 8 received" : undefined}
         >
-          {overview.recentReceipts.length === 0 ? (
-            <EmptyBox
-              text="No payments recorded yet."
-              actionLabel="Record the first one"
-              actionHref="/accounts/new"
-            />
-          ) : (
-            <RecentPaymentsList rows={overview.recentReceipts} />
-          )}
+          {overview.recentReceipts.length === 0
+            ? <RecentPaymentsEmpty />
+            : <RecentPaymentsList rows={overview.recentReceipts} />}
         </SectionCard>
 
       </div>
@@ -114,25 +95,6 @@ export default async function AccountsPage({
       <ReceiptsTable rows={receipts.rows} />
       <Pager page={page} pageSize={receipts.pageSize} total={receipts.total} />
     </>
-  );
-}
-
-function EmptyBox({
-  text, actionLabel, actionHref,
-}: { text: string; actionLabel?: string; actionHref?: string }) {
-  return (
-    <div className="py-10 text-center text-[12.5px] text-text-faint">
-      {text}
-      {actionLabel && actionHref && (
-        <>
-          {" "}
-          <Link href={actionHref as Route} className="text-accent hover:underline">
-            {actionLabel}
-          </Link>
-          .
-        </>
-      )}
-    </div>
   );
 }
 
