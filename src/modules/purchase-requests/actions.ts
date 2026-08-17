@@ -83,7 +83,7 @@ export async function createPurchaseRequest(
     });
 
     return req;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/purchase/requests");
   return { ok: true, data: created };

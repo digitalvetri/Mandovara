@@ -150,7 +150,7 @@ export async function createReceipt(
     }
 
     return receipt;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/receipts");
   revalidatePath("/invoicing");
@@ -223,7 +223,7 @@ export async function bounceReceipt(
         await tx.invoice.update({ where: { id: invId }, data: { status: nextStatus } });
       }
     }
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/receipts");
   revalidatePath("/invoicing");

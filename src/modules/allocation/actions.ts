@@ -59,7 +59,7 @@ export async function allocateLots(
       });
 
       return alloc;
-    });
+    }, { orgId: ctx.orgId });
 
     revalidatePath("/purchase/allocation");
     return {
@@ -115,7 +115,7 @@ export async function releaseAllocation(
         before:         { quantity: existing.quantity.toString() },
       },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/purchase/allocation");
   return { ok: true, data: { id } };

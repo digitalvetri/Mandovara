@@ -180,7 +180,7 @@ export async function createMakeJob(
     });
 
     return job;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/make");
   return { ok: true, data: created };

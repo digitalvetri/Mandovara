@@ -86,7 +86,7 @@ export async function createInstallVisit(
     });
 
     return visit;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/install");
   return { ok: true, data: created };
@@ -247,7 +247,7 @@ export async function confirmInstall(
     if (siblings.every((o) => o.status === "COMPLETED")) {
       await tx.project.update({ where: { id: visit.projectId }, data: { stage: "COMPLETED" } });
     }
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/install");
   revalidatePath(`/install/${d.visitId}`);

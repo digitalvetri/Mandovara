@@ -19,7 +19,7 @@
 
 import type { Prisma } from "@prisma/client";
 import type { RequestContext } from "@/kernel/auth/context";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { AUDIT_EXEMPT } from "@/kernel/db/scoping-map";
 
 const MUTATIONS = new Set<string>([
@@ -73,7 +73,7 @@ export function auditExtensionConfig(ctx: RequestContext) {
           let before: unknown = null;
           if (READ_BEFORE.has(operation) && !isBulk && argsAny.where != null) {
             try {
-              const delegate = (prisma as unknown as Record<string, {
+              const delegate = (orgPrisma(ctx.orgId) as unknown as Record<string, {
                 findFirst: (a: { where?: unknown }) => Promise<unknown>;
               }>)[delegateName(model)];
               if (delegate?.findFirst) {
@@ -97,7 +97,7 @@ export function auditExtensionConfig(ctx: RequestContext) {
               }
             : result;
 
-          await prisma.auditLog.create({
+          await orgPrisma(ctx.orgId).auditLog.create({
             data: {
               organizationId: ctx.orgId,
               actorId: ctx.userId,

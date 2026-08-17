@@ -149,7 +149,7 @@ export async function createProduct(input: unknown): Promise<ActionResult<{ id: 
       await tx.price.createMany({ data: priceRows });
 
       return { id: colourway.id };
-    });
+    }, { orgId: ctx.orgId });
 
     revalidatePath("/products");
     return { ok: true, data: created };

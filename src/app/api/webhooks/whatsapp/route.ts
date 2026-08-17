@@ -11,7 +11,8 @@
 // UI shows a live countdown so staff know how long the free reply window lasts.
 
 import { createHmac, timingSafeEqual } from "crypto";
-import { prisma } from "@/kernel/db/client";
+import { authBootstrapPrisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 
 // ── GET: Meta verification handshake ─────────────────────────────────────────
 
@@ -51,7 +52,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // Resolve the single tenant's org ID
-  const org = await prisma.organization.findFirst({ select: { id: true } });
+  // Bootstrap: which tenant this WABA belongs to is not knowable until we look.
+  const org = await authBootstrapPrisma.organization.findFirst({ select: { id: true } });
   if (!org) return new Response("OK", { status: 200 }); // no org yet
 
   await processPayload(org.id, payload);
@@ -99,7 +101,7 @@ async function handleIncomingMessage(orgId: string, mobile: string): Promise<voi
   const now             = new Date();
   const serviceExpiry   = new Date(now.getTime() + 24 * 60 * 60 * 1_000); // +24h
 
-  await prisma.whatsAppConversation.upsert({
+  await orgPrisma(orgId).whatsAppConversation.upsert({
     where:  { organizationId_mobile: { organizationId: orgId, mobile } },
     create: {
       organizationId:         orgId,
@@ -115,7 +117,7 @@ async function handleIncomingMessage(orgId: string, mobile: string): Promise<voi
 }
 
 async function handleStatusUpdate(orgId: string, status: WaStatus): Promise<void> {
-  const log = await prisma.automationLog.findFirst({
+  const log = await orgPrisma(orgId).automationLog.findFirst({
     where:  { organizationId: orgId, metaMessageId: status.id },
     select: { id: true },
   });
@@ -125,25 +127,25 @@ async function handleStatusUpdate(orgId: string, status: WaStatus): Promise<void
 
   switch (status.status) {
     case "sent":
-      await prisma.automationLog.update({
+      await orgPrisma(orgId).automationLog.update({
         where: { id: log.id },
         data:  { status: "SENT", sentAt: ts },
       });
       break;
     case "delivered":
-      await prisma.automationLog.update({
+      await orgPrisma(orgId).automationLog.update({
         where: { id: log.id },
         data:  { status: "DELIVERED", deliveredAt: ts },
       });
       break;
     case "read":
-      await prisma.automationLog.update({
+      await orgPrisma(orgId).automationLog.update({
         where: { id: log.id },
         data:  { status: "READ", readAt: ts },
       });
       break;
     case "failed":
-      await prisma.automationLog.update({
+      await orgPrisma(orgId).automationLog.update({
         where: { id: log.id },
         data:  { status: "FAILED", error: status.errors?.[0]?.message ?? "Unknown error" },
       });

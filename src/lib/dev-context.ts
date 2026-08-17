@@ -12,7 +12,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/kernel/db/client";
+import { authBootstrapPrisma as prisma } from "@/kernel/db/client";
 import type { RequestContext } from "@/kernel/auth/context";
 import { PERMISSIONS, isPermissionKey, type PermissionKey } from "@/kernel/rbac/permissions";
 import { SESSION_COOKIE, verifySession } from "./session";

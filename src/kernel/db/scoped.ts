@@ -33,6 +33,7 @@ import { Prisma } from "@prisma/client";
 import type { RequestContext } from "@/kernel/auth/context";
 import { auditExtensionConfig } from "@/kernel/audit/log";
 import { prisma } from "./client";
+import { rlsExtensionConfig } from "./rls";
 import { BRANCH_SCOPED, TENANT_SCOPED } from "./scoping-map";
 
 // Returns true for the "DB server not reachable" error that appears when
@@ -62,7 +63,13 @@ export class CrossTenantWriteError extends Error {
 }
 
 export function scoped(ctx: RequestContext) {
-  return prisma.$extends(scopeExtensionConfig(ctx)).$extends(auditExtensionConfig(ctx));
+  // Order matters. The RLS extension is applied LAST so it is the outermost
+  // wrapper: it opens the batched transaction that carries the
+  // `app.current_org_id` GUC, and the scope/audit extensions run inside it.
+  return prisma
+    .$extends(scopeExtensionConfig(ctx))
+    .$extends(auditExtensionConfig(ctx))
+    .$extends(rlsExtensionConfig(ctx.orgId));
 }
 
 /** Scope-only extension. Exported for tests that want to observe scoping in

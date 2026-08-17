@@ -120,7 +120,7 @@ export async function startMeasurementRound(
       },
       select: { id: true, number: true },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath(`/projects/${d.projectId}/measurements`);
   return { ok: true, data: { ...round, resumed: false } };
@@ -251,7 +251,7 @@ export async function reviseMeasurementRound(
       },
       select: { id: true, number: true },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath(`/projects/${parent.projectId}/measurements`);
   return { ok: true, data: next };

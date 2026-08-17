@@ -6,7 +6,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { devContext } from "@/lib/dev-context";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { loadChaseList } from "@/modules/accounts/chase";
 import { formatINR } from "@/kernel/money/format";
 import { ChaseList, type ChaseRowUI } from "../_components/ChaseList";
@@ -36,7 +36,7 @@ export async function ToCollectTab({ ctx, bucket }: Props) {
     // Take up to 100 — bigger and it's a UX problem the owner won't solve
     // by scrolling. Beyond that, filter chips are the answer.
     loadChaseList(ctx, { take: 100 }),
-    prisma.organization.findUnique({ where: { id: ctx.orgId }, select: { name: true } }),
+    orgPrisma(ctx.orgId).organization.findUnique({ where: { id: ctx.orgId }, select: { name: true } }),
   ]);
   const orgName = org?.name ?? "Mandovara";
 

@@ -4,7 +4,7 @@
 
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { loadAccountsOverview } from "@/modules/accounts/queries";
 import { loadChaseList } from "@/modules/accounts/chase";
 import { KpiCard } from "../_components/KpiCard";
@@ -22,7 +22,7 @@ export async function OverviewTab({
   const [overview, chase, org] = await Promise.all([
     loadAccountsOverview(ctx, {}),
     loadChaseList(ctx, { take: 5 }),
-    prisma.organization.findUnique({ where: { id: ctx.orgId }, select: { name: true } }),
+    orgPrisma(ctx.orgId).organization.findUnique({ where: { id: ctx.orgId }, select: { name: true } }),
   ]);
 
   const kpis = overview.moneyKpis;

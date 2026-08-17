@@ -9,13 +9,13 @@
 // domain listeners; the module-scoped `registered` flag guards
 // against double-firing under HMR.
 
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { bus } from "@/kernel/events/bus";
 import type { StockBelowReorderEvent } from "@/kernel/events/types";
 
 async function onStockBelowReorder(e: StockBelowReorderEvent): Promise<void> {
   // Look up the SKU so the notification body is human-readable.
-  const cw = await prisma.colourway.findUnique({
+  const cw = await orgPrisma(e.orgId).colourway.findUnique({
     where:  { id: e.productId },
     select: {
       code: true, colourName: true,
@@ -27,14 +27,14 @@ async function onStockBelowReorder(e: StockBelowReorderEvent): Promise<void> {
     : `SKU ${e.productId}`;
 
   // Everyone who cares: STORE (primary), OWNER (visibility).
-  const recipients = await prisma.user.findMany({
+  const recipients = await orgPrisma(e.orgId).user.findMany({
     where:  { organizationId: e.orgId, role: { in: ["STORE", "OWNER"] }, status: "ACTIVE" },
     select: { id: true },
   });
 
   if (recipients.length === 0) return;
 
-  await prisma.notification.createMany({
+  await orgPrisma(e.orgId).notification.createMany({
     data: recipients.map((u) => ({
       organizationId: e.orgId,
       userId:         u.id,

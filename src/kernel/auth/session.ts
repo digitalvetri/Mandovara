@@ -12,7 +12,7 @@
 //   - password hashing (Argon2id)
 //   - cookie plumbing via next/headers
 
-import { prisma } from "@/kernel/db/client";
+import { authBootstrapPrisma as prisma } from "@/kernel/db/client";
 import type { RequestContext } from "./context";
 import type { PermissionKey } from "@/kernel/rbac/permissions";
 import { PERMISSIONS, isPermissionKey } from "@/kernel/rbac/permissions";

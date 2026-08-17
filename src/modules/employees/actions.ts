@@ -10,7 +10,7 @@
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import type { RequestContext } from "@/kernel/auth/context";
@@ -66,8 +66,8 @@ export async function deleteEmployee(input: unknown): Promise<ActionResult<{ id:
   await db.employee.findUniqueOrThrow({ where: { id }, select: { id: true } });
 
   const [attendanceCount, payslipCount] = await Promise.all([
-    prisma.attendance.count({ where: { employeeId: id } }),
-    prisma.payslip.count({ where: { employeeId: id } }),
+    orgPrisma(ctx.orgId).attendance.count({ where: { employeeId: id } }),
+    orgPrisma(ctx.orgId).payslip.count({ where: { employeeId: id } }),
   ]);
   if (attendanceCount > 0 || payslipCount > 0) {
     return {
@@ -106,7 +106,7 @@ export async function setEmployeeStatus(input: unknown): Promise<ActionResult<{ 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
 async function nextEmployeeCode(ctx: RequestContext): Promise<string> {
-  const highest = await prisma.employee.findFirst({
+  const highest = await orgPrisma(ctx.orgId).employee.findFirst({
     where: { organizationId: ctx.orgId, code: { startsWith: "EMP" } },
     orderBy: { code: "desc" },
     select: { code: true },

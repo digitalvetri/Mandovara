@@ -113,7 +113,7 @@ export async function createOrderFromQuotation(
       })),
     });
     return order;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/orders");
   revalidatePath("/quotations");
@@ -239,7 +239,7 @@ export async function scheduleDispatch(
     });
 
     return visit;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath(`/orders/${d.orderId}`);
   revalidatePath("/orders");

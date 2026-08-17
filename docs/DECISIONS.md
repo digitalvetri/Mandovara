@@ -247,3 +247,50 @@ minimum blind charge, standard fabric and roll widths — remains as specified i
 CLAUDE.md and has NOT been validated against 20 historical jobs with their tailor,
 installer and store keeper. `src/modules/measurement/engine.ts` DEFAULTS are
 spec-sourced placeholders. This is a blocking Phase 0 item that is still open.
+
+---
+
+## 2026-08-18 · §3.2 Row-Level Security, and why it needs a second database role
+
+**Decision:** RLS is enabled and FORCED on all 87 org-owned tables with a
+deny-by-default policy (`"organizationId" = current_org_id()`), and the running
+application connects as `mandovara_app` — a role that is neither superuser nor
+BYPASSRLS — via `APP_DATABASE_URL`.
+
+**Context:** §3.2 requires a policy on every org-owned table and calls a leakage
+suite blocking in CI. Neither existed: `SELECT count(*) FROM pg_class WHERE
+relrowsecurity` returned **0**, and there was no `CREATE POLICY` anywhere in the
+repo. Isolation was enforced solely by the Prisma `scoped(ctx)` extension —
+exactly the "UI filtering is not isolation" failure §3.2 warns about.
+
+The subtle part: **enabling RLS is not sufficient.** Postgres always skips row
+security for superusers and for roles with BYPASSRLS, and the docker-compose /
+Supabase owner is one. An initial pass enabled RLS while the app still connected
+as the owner; a hand-check appeared to show deny-by-default, but the table was
+simply empty. Verified properly, the owner saw all 1,000 rows with no tenant
+set. Hence `scripts/setup-app-role.mjs` and the DATABASE_URL / APP_DATABASE_URL
+split.
+
+A first draft also included an `app.bypass_rls` GUC as a maintenance escape
+hatch. That was removed: any role can `set_config`, so it would have handed the
+application a one-line way to unlock every tenant. Superusers already bypass RLS
+natively, so the seed, importers, migrations and tests (all on DATABASE_URL)
+need no flag.
+
+**Mechanism:** Prisma has no per-query connection hook, so `rlsExtensionConfig`
+batches `set_config('app.current_org_id', …, true)` and the query into one
+sequential `$transaction([...])`, which pins both to the same connection. The
+setting is transaction-local and cannot leak across pooled requests — asserted
+by a test. `withTransaction({ orgId })` does the same for explicit transactions.
+
+**Bootstrap exception:** resolving a login credential or session cookie to a User
+row must happen before the tenant is known. `authBootstrapPrisma` (owner
+connection) exists solely for that lookup and is confined to `dev-auth.ts`,
+`dev-context.ts` and `kernel/auth/session.ts`. Everything downstream uses
+`scoped(ctx)` or `orgPrisma(orgId)`.
+
+**Consequence:** `tests/kernel/rls-isolation.test.ts` (76 assertions) is the
+§12.3 suite. It skips unless `APP_DATABASE_URL` is set, and its first assertion
+fails loudly if the app is ever pointed back at a bypassing role. Cost is one
+extra round trip per query; catalog search p95 remains inside the §14 Phase 1
+budget.

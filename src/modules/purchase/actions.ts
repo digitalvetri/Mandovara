@@ -95,7 +95,7 @@ export async function createPO(
       })),
     });
     return po;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/purchase");
   return { ok: true, data: created };

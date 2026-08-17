@@ -100,7 +100,7 @@ export async function promoteLocalItem(input: unknown): Promise<ActionResult<{ i
         } as Prisma.InputJsonValue,
       },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath(`/projects/${round.projectId}/measurements`);
   revalidatePath(`/projects/${round.projectId}/measurements/${round.id}`);

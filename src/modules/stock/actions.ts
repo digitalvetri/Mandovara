@@ -74,7 +74,7 @@ export async function allocateStock(input: unknown): Promise<ActionResult> {
         overrideReason:   d.overrideReason,
         overrideById:     d.mixedLotOverride ? ctx.userId : undefined,
       });
-    });
+    }, { orgId: ctx.orgId });
   } catch (err) {
     if (err instanceof MixedLotError) {
       return { ok: false, error: err.message, errorCode: "MIXED_LOT" };

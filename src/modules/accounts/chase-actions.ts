@@ -11,7 +11,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
+import { withTransaction } from "@/kernel/db/transaction";
 import { devContext } from "@/lib/dev-context";
 import { requirePermission } from "@/kernel/rbac/guard";
 
@@ -49,14 +50,14 @@ export async function recordPromise(input: unknown): Promise<ActionResult<{ id: 
 
     // Cancel any existing ACTIVE promise for this client first — the new
     // one supersedes it. Keeps "one active promise per client" invariant.
-    await prisma.$transaction(async (tx) => {
+    await withTransaction(async (tx) => {
       await tx.promiseToPay.updateMany({
         where: { organizationId: ctx.orgId, clientId: d.clientId, status: "ACTIVE" },
         data:  { status: "CANCELLED", resolvedAt: new Date(), resolvedById: ctx.userId },
       });
-    });
+    }, { orgId: ctx.orgId });
 
-    const promise = await prisma.promiseToPay.create({
+    const promise = await orgPrisma(ctx.orgId).promiseToPay.create({
       data: {
         organizationId: ctx.orgId,
         clientId:       d.clientId,
@@ -93,7 +94,7 @@ export async function logChaseContact(input: unknown): Promise<ActionResult<null
     requirePermission(ctx, "receipt.view");
 
     const now = new Date();
-    await prisma.client.update({
+    await orgPrisma(ctx.orgId).client.update({
       where: { id: parsed.data.clientId },
       data:  { lastContactedAt: now },
     });
@@ -119,7 +120,7 @@ export async function cancelPromise(promiseId: string): Promise<ActionResult<nul
     const ctx = await devContext();
     requirePermission(ctx, "receipt.create");
 
-    await prisma.promiseToPay.update({
+    await orgPrisma(ctx.orgId).promiseToPay.update({
       where: { id: promiseId },
       data:  {
         status:       "CANCELLED",

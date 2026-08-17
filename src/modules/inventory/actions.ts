@@ -18,7 +18,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { bus } from "@/kernel/events/bus";
 import {
@@ -119,7 +119,7 @@ export async function adjustStock(input: unknown): Promise<ActionResult<{ id: st
     // Signed applied delta = deltaDec (positive = inward, negative = outward).
     const crossing = await checkReorderCrossing(tx, cw.id, deltaDec);
     return { moveId: move.id, crossing };
-  });
+  }, { orgId: ctx.orgId });
 
   // Fire the event AFTER commit — bus handlers create notifications.
   await emitBelowReorderIfCrossed({
@@ -159,7 +159,7 @@ export async function setReorderLevel(input: unknown): Promise<ActionResult<{ id
   // (quantity didn't move) so it doesn't use checkReorderCrossing —
   // setting a threshold above current stock always notifies.
   if (d.level != null) {
-    const bals = await prisma.stockBalance.findMany({
+    const bals = await orgPrisma(ctx.orgId).stockBalance.findMany({
       where:  { colourwayId: d.colourwayId },
       select: { quantity: true },
     });

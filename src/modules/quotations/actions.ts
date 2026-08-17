@@ -227,7 +227,7 @@ export async function createQuotation(
       })),
     });
     return q;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/quotations");
   revalidatePath(`/projects/${d.projectId}`);
@@ -526,7 +526,7 @@ export async function updateQuotationLines(
         total:         totals.total,
       },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath(`/quotations/${d.quotationId}`);
   return { ok: true, data: { id: d.quotationId } };
@@ -650,7 +650,7 @@ export async function appendColourwayToQuotation(
           total:         totals.total,
         },
       });
-    });
+    }, { orgId: ctx.orgId });
 
     revalidatePath(`/quotations/${quotationId}`);
     return { ok: true, data: { quotationId } };

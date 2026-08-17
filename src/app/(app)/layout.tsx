@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SidebarShell } from "@/components/layout/SidebarShell";
 import { devContext } from "@/lib/dev-context";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   let userRole = ctx.roles[0] ?? "STAFF";
 
   try {
-    const user = await prisma.user.findUnique({
+    const user = await orgPrisma(ctx.orgId).user.findUnique({
       where: { id: ctx.userId },
       select: { name: true, role: true, mustChangePassword: true },
     });

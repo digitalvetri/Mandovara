@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 
@@ -84,7 +84,7 @@ export async function updateCompanySettings(input: unknown): Promise<ActionResul
   if (!parsed.success) return zodError(parsed.error);
   const d = parsed.data;
 
-  await prisma.organization.update({
+  await orgPrisma(ctx.orgId).organization.update({
     where: { id: d.orgId },
     data: {
       name: d.name,

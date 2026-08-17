@@ -238,7 +238,7 @@ export async function postGRN(
     }
 
     return grn;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/purchase");
   revalidatePath(`/purchase/${po.id}`);

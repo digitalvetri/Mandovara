@@ -20,7 +20,7 @@
 import { NextResponse } from "next/server";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 
@@ -75,7 +75,7 @@ export async function POST(req: Request): Promise<NextResponse<{ ok: boolean; im
 
   // Confirm the SKU belongs to the caller's org (scoping via prisma extension
   // isn't wired for raw prisma here — do the check explicitly).
-  const cw = await prisma.colourway.findUnique({
+  const cw = await orgPrisma(ctx.orgId).colourway.findUnique({
     where:  { id: colourwayId },
     select: { id: true, organizationId: true },
   });
@@ -98,7 +98,7 @@ export async function POST(req: Request): Promise<NextResponse<{ ok: boolean; im
   const version  = Date.now();
   const imageKey = `${PUBLIC_ROUTE}/${colourwayId}.${ext}?v=${version}`;
 
-  await prisma.colourway.update({
+  await orgPrisma(ctx.orgId).colourway.update({
     where: { id: colourwayId },
     data:  { imageKey },
   });
@@ -121,7 +121,7 @@ export async function DELETE(req: Request): Promise<NextResponse<{ ok: boolean; 
   if (!colourwayId) {
     return NextResponse.json({ ok: false, error: "colourwayId is required" }, { status: 400 });
   }
-  const cw = await prisma.colourway.findUnique({
+  const cw = await orgPrisma(ctx.orgId).colourway.findUnique({
     where:  { id: colourwayId },
     select: { id: true, organizationId: true, imageKey: true },
   });
@@ -137,7 +137,7 @@ export async function DELETE(req: Request): Promise<NextResponse<{ ok: boolean; 
     }
   }
 
-  await prisma.colourway.update({
+  await orgPrisma(ctx.orgId).colourway.update({
     where: { id: colourwayId },
     data:  { imageKey: null },
   });

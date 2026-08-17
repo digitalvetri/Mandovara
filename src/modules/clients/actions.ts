@@ -59,7 +59,7 @@ export async function createClient(input: unknown): Promise<ActionResult<{ id: s
       },
       select: { id: true },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/clients");
   return { ok: true, data: { id: created.id } };

@@ -12,7 +12,7 @@
 
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/kernel/db/client";
+import { authBootstrapPrisma as prisma } from "@/kernel/db/client";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from "./session";
 import { checkRateLimit, recordFailure, clearRateLimit } from "./rate-limit";
 

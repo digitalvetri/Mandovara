@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { Topbar } from "@/components/layout/Topbar";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +56,7 @@ export default async function ProfilePage() {
   const db  = scoped(ctx);
 
   const [user, employee] = await Promise.all([
-    prisma.user.findUnique({
+    orgPrisma(ctx.orgId).user.findUnique({
       where:  { id: ctx.userId },
       select: { name: true, mobile: true, email: true, role: true, createdAt: true },
     }),

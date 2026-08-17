@@ -97,7 +97,7 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
     });
 
     return lead;
-  });
+  }, { orgId: ctx.orgId });
 
   await flush();
   revalidatePath("/leads");
@@ -196,7 +196,7 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id
       to,
       ...(lostReason != null && { lostReason }),
     });
-  });
+  }, { orgId: ctx.orgId });
 
   await flush();
   revalidatePath("/leads");
@@ -343,7 +343,7 @@ export async function convertLead(
     });
 
     return { clientId: client.id, projectId: project.id };
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);

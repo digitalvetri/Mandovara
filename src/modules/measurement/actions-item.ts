@@ -61,7 +61,7 @@ export async function addMeasurementItem(
     });
     await writeCalc(tx, ctx.orgId, item.id, calc);
     return item;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath(`/projects/${round.projectId}/measurements/${d.measurementId}`);
   return { ok: true, data: created };
@@ -104,7 +104,7 @@ export async function updateMeasurementItem(
     // "at most one live CalcResult per item" as an invariant.
     await tx.calcResult.deleteMany({ where: { measurementItemId: d.id } });
     await writeCalc(tx, ctx.orgId, d.id, calc);
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath(`/projects/${existing.measurement.projectId}/measurements/${existing.measurementId}`);
   return { ok: true, data: { id: d.id } };

@@ -172,7 +172,7 @@ export async function createInvoice(
     }
 
     return inv;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/invoicing");
   if (order.projectId) revalidatePath(`/projects/${order.projectId}`);

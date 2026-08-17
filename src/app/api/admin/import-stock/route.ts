@@ -18,7 +18,9 @@
 
 import { NextResponse } from "next/server";
 import { Prisma } from "@/kernel/numbering/series";
-import { prisma } from "@/kernel/db/client";
+import { authBootstrapPrisma } from "@/kernel/db/client";
+import { withTransaction } from "@/kernel/db/transaction";
+import { orgPrisma } from "@/kernel/db/rls";
 import { STOCK_IMPORT_ROWS, type StockImportRow } from "@/modules/stock-import/data";
 
 // Prisma.Decimal is the runtime Decimal ctor exported through the Prisma
@@ -58,11 +60,12 @@ export async function POST(req: Request): Promise<NextResponse<ImportResult | { 
   const url = new URL(req.url);
   const dryRun = url.searchParams.get("dry") === "1";
 
-  const org = await prisma.organization.findFirst({ select: { id: true } });
+  // Bootstrap: single-tenant admin importer resolves its own org.
+  const org = await authBootstrapPrisma.organization.findFirst({ select: { id: true } });
   if (!org) {
     return NextResponse.json({ error: "no organization in DB" }, { status: 412 });
   }
-  const owner = await prisma.user.findFirst({
+  const owner = await orgPrisma(org.id).user.findFirst({
     where:  { organizationId: org.id, role: "OWNER", status: "ACTIVE" },
     select: { id: true },
   });
@@ -82,11 +85,11 @@ export async function POST(req: Request): Promise<NextResponse<ImportResult | { 
     const brandNames  = new Set(STOCK_IMPORT_ROWS.map((r) => r.brand));
     const collectionKeys = new Set(STOCK_IMPORT_ROWS.map((r) => `${r.brand}|${r.collection}`));
     const designCodes = new Set(STOCK_IMPORT_ROWS.map((r) => r.code));
-    const existingBrands = await prisma.brand.findMany({
+    const existingBrands = await orgPrisma(org.id).brand.findMany({
       where:  { organizationId: org.id, name: { in: [...brandNames] } },
       select: { name: true },
     });
-    const existingDesigns = await prisma.design.findMany({
+    const existingDesigns = await orgPrisma(org.id).design.findMany({
       where:  { organizationId: org.id, code: { in: [...designCodes] } },
       select: { code: true },
     });
@@ -102,7 +105,7 @@ export async function POST(req: Request): Promise<NextResponse<ImportResult | { 
   // Real run — one transaction per row so partial failure is contained.
   for (const row of STOCK_IMPORT_ROWS) {
     try {
-      await prisma.$transaction(async (tx) => {
+      await withTransaction(async (tx) => {
         const meta = FAMILY_META[row.family];
 
         // Brand
@@ -220,7 +223,7 @@ export async function POST(req: Request): Promise<NextResponse<ImportResult | { 
           });
         }
         result.stockBalancesSet++;
-      });
+      }, { orgId: org.id });
       result.rowsProcessed++;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

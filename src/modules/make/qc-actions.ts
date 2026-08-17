@@ -94,7 +94,7 @@ export async function submitQC(
         });
       }
     }
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/make");
   revalidatePath(`/make/${d.makeJobId}`);
