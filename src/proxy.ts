@@ -15,7 +15,11 @@ const PUBLIC_PREFIXES = [
   "/favicon.ico",
   "/icons/",
   "/images/",
+  "/fonts/",
   "/catalog/uploads/",
+  "/mandovara-mark.png",
+  "/mandovara-logo.jpg",
+  "/manifest.webmanifest",
 ];
 
 export async function proxy(req: NextRequest) {

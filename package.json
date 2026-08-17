@@ -19,6 +19,7 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@hookform/resolvers": "^5.7.1",
     "@prisma/client": "6.19.0",
     "@react-pdf/renderer": "^4.6.1",

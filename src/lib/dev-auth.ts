@@ -20,6 +20,8 @@ export interface LoginResult {
   error?: string;
   /** Set by devLoginByCredential when the user must rotate their password. */
   mustChangePassword?: boolean;
+  /** The logged-in user's role — used by the client to pick the right landing page. */
+  role?: string;
 }
 
 // Deliberately generic error to prevent user enumeration.
@@ -39,13 +41,13 @@ export async function devLoginByCredential(
   try {
     let user = await prisma.user.findFirst({
       where: { email: q.toLowerCase() },
-      select: { id: true, passwordHash: true, status: true, mustChangePassword: true },
+      select: { id: true, passwordHash: true, status: true, mustChangePassword: true, role: true },
       orderBy: { createdAt: "asc" },
     });
     if (!user) {
       user = await prisma.user.findFirst({
         where: { mobile: q },
-        select: { id: true, passwordHash: true, status: true, mustChangePassword: true },
+        select: { id: true, passwordHash: true, status: true, mustChangePassword: true, role: true },
         orderBy: { createdAt: "asc" },
       });
     }
@@ -82,7 +84,7 @@ export async function devLoginByCredential(
       .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
       .catch((err) => console.error("[auth] lastLoginAt update failed:", err));
 
-    return { ok: true, mustChangePassword: user.mustChangePassword };
+    return { ok: true, mustChangePassword: user.mustChangePassword, role: user.role };
   } catch (e) {
     console.error("[auth] loginByCredential failed:", e);
     return { ok: false, error: "Login failed — please try again in a moment" };
@@ -126,7 +128,7 @@ export async function loginByMobilePin(
     if (!valid) return { ok: false, error: "Incorrect PIN" };
 
     const jar = await cookies();
-    jar.set(COOKIE, user.id, { httpOnly: true, path: "/", maxAge: MAX_AGE, sameSite: "lax" });
+    jar.set(SESSION_COOKIE, user.id, { httpOnly: true, path: "/", maxAge: SESSION_MAX_AGE, sameSite: "lax" });
     return { ok: true };
   } catch {
     return { ok: false, error: "Database unavailable — check DATABASE_URL" };

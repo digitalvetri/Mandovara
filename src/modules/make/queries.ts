@@ -1,4 +1,5 @@
 import { prisma as db } from "@/kernel/db/client";
+import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { MakeJobStatus } from "@/kernel/db/client";
 
@@ -78,6 +79,7 @@ export async function listMakeJobs(
   ctx: RequestContext,
   opts: { status?: MakeJobStatus[] } = {},
 ): Promise<MakeJobRow[]> {
+  requirePermission(ctx, "make.view");
   const jobs = await db.makeJob.findMany({
     where: {
       organizationId: ctx.orgId,
@@ -172,6 +174,7 @@ export async function getMakeJob(
   ctx: RequestContext,
   jobId: string,
 ): Promise<MakeJobDetail | null> {
+  requirePermission(ctx, "make.view");
   const job = await db.makeJob.findFirst({
     where: { id: jobId, organizationId: ctx.orgId },
     select: {

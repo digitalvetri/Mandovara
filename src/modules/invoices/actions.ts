@@ -7,6 +7,7 @@ import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
+import { computeLineTax } from "@/kernel/tax/gst";
 import { devContext } from "@/lib/dev-context";
 import { createInvoiceSchema, cancelInvoiceSchema } from "./schema";
 
@@ -250,6 +251,15 @@ export async function createInvoiceFromOrder(
   if (!order) return { ok: false, error: "Order not found." };
   if (order.status === "CANCELLED") return { ok: false, error: "Cannot invoice a cancelled order." };
 
+  // Determine supply codes for correct CGST/SGST vs IGST routing
+  const [branch, client] = await Promise.all([
+    db.branch.findUnique({ where: { id: order.branchId }, select: { stateCode: true } }),
+    db.client.findUnique({ where: { id: order.clientId }, select: { billingAddress: true } }),
+  ]);
+  const supplierStateCode = branch?.stateCode ?? "33";
+  const billingAddr       = client?.billingAddress as Record<string, string> | null | undefined;
+  const placeOfSupplyCode = (billingAddr?.stateCode ?? supplierStateCode) as string;
+
   // Fetch HSN + gstRate from designs for each colourway
   const colourwayIds = order.lines.filter((l) => l.colourwayId).map((l) => l.colourwayId!);
   const hsnMap = new Map<string, { hsn: string; gstRate: string }>();
@@ -278,11 +288,9 @@ export async function createInvoiceFromOrder(
     const info       = l.colourwayId ? hsnMap.get(l.colourwayId) : undefined;
     const hsn        = info?.hsn ?? "9987";
     const gstRateStr = info?.gstRate ?? "18";
-    const gstBig     = BigInt(Math.round(Number(gstRateStr)));
+    const gstRate    = parseFloat(gstRateStr);
     const taxable    = l.amount;
-    // Tamil Nadu intra-state: equal CGST + SGST split
-    const halfGst    = (taxable * (gstBig / 2n)) / 100n;
-    const amount     = taxable + halfGst * 2n;
+    const tax        = computeLineTax({ taxable, gstRate, supplierStateCode, placeOfSupplyCode });
     return {
       orderLineId: l.id,
       description: l.description,
@@ -292,28 +300,29 @@ export async function createInvoiceFromOrder(
       rate:     l.rate.toString(),
       taxable:  taxable.toString(),
       gstRate:  gstRateStr,
-      cgst:     halfGst.toString(),
-      sgst:     halfGst.toString(),
-      igst:     "0",
-      amount:   amount.toString(),
+      cgst:     tax.cgst.toString(),
+      sgst:     tax.sgst.toString(),
+      igst:     tax.igst.toString(),
+      amount:   (taxable + tax.cgst + tax.sgst + tax.igst).toString(),
     };
   });
 
   if (lines.length === 0) {
-    const cgst = (order.totalValue * 9n) / 100n;
+    const tax = computeLineTax({ taxable: order.totalValue, gstRate: 18, supplierStateCode, placeOfSupplyCode });
     lines.push({
       description: `As per Order ${order.number}`,
       hsn: "9987", quantity: "1.000", unit: "PIECE",
       rate: order.totalValue.toString(), taxable: order.totalValue.toString(),
-      gstRate: "18", cgst: cgst.toString(), sgst: cgst.toString(),
-      igst: "0", amount: (order.totalValue + cgst * 2n).toString(),
+      gstRate: "18",
+      cgst: tax.cgst.toString(), sgst: tax.sgst.toString(), igst: tax.igst.toString(),
+      amount: (order.totalValue + tax.cgst + tax.sgst + tax.igst).toString(),
     });
   }
 
   return createInvoice({
     orderId: order.id, branchId: order.branchId,
     type: "TAX", date: toDate(now), dueDate: toDate(due),
-    placeOfSupplyCode: "33", lines,
+    placeOfSupplyCode, lines,
   });
 }
 

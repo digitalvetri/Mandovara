@@ -8,7 +8,8 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, MapPin, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
-  Ruler, BarChart2,
+  Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
+  Bell, Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -18,63 +19,123 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  // Permission key from /kernel/rbac/permissions that gates this nav item.
-  // Absent = shown to all authenticated users.
   perm?: string;
 }
 
-const NAV: readonly { section: string; items: NavItem[] }[] = [
+// ── Owner sidebar — exact order from design reference ───────────────────────
+const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   {
     section: "Overview",
     items: [
-      { label: "Owner Dashboard", href: "/",         icon: LayoutDashboard },   // always shown; label swapped at render
-      { label: "Projects",        href: "/projects", icon: Briefcase,       perm: "project.view" },
+      { label: "Owner Dashboard", href: "/",         icon: LayoutDashboard },
+      { label: "Projects",        href: "/projects", icon: Briefcase       },
     ],
   },
   {
     section: "Revenue",
     items: [
-      { label: "Lead Management",  href: "/leads",      icon: UserPlus,  perm: "lead.view"       },
-      { label: "Client 360",       href: "/clients",    icon: Users,     perm: "client.view"     },
-      { label: "Quotations (BOQ)", href: "/quotations", icon: FileText,  perm: "quotation.view"  },
+      { label: "Lead Management",  href: "/leads",      icon: UserPlus },
+      { label: "Client 360",       href: "/clients",    icon: Users    },
+      { label: "Quotations (BOQ)", href: "/quotations", icon: FileText },
     ],
   },
   {
     section: "Catalog & Stock",
     items: [
-      { label: "Product Catalog",    href: "/products",  icon: Package, perm: "catalog.view"    },
-      { label: "Purchase & Vendors", href: "/purchase",  icon: Truck,   perm: "po.view"         },
-      { label: "Stocks",             href: "/inventory", icon: Boxes,   perm: "inventory.view"  },
+      { label: "Product Catalog",   href: "/products",  icon: Package },
+      { label: "Purchase & Vendors",href: "/purchase",  icon: Truck   },
+      { label: "Stocks",            href: "/inventory", icon: Boxes   },
     ],
   },
   {
     section: "Delivery",
     items: [
-      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin,  perm: "sitelog.view"     },
-      { label: "Measurements",          href: "/measurements", icon: Ruler,   perm: "measurement.view" },
-      { label: "Installation",          href: "/install",      icon: Wrench,  perm: "install.view"     },
+      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin  },
+      { label: "Measurements",          href: "/measurements", icon: Ruler   },
+      { label: "Installation",          href: "/install",      icon: Wrench  },
     ],
   },
   {
     section: "Money",
     items: [
-      // invoice.create rather than invoice.view — DESIGNER has view-only but not the Invoicing module
-      { label: "Invoicing & GST",     href: "/invoicing", icon: Receipt, perm: "invoice.create" },
-      { label: "Accounts & Payments", href: "/accounts",  icon: Wallet,  perm: "advance.view"   },
+      { label: "Invoicing & GST",    href: "/invoicing", icon: Receipt },
+      { label: "Accounts & Payments",href: "/accounts",  icon: Wallet  },
     ],
   },
   {
     section: "People",
     items: [
-      { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },          // all roles
-      { label: "Payroll",            href: "/payroll",    icon: IndianRupee,  perm: "payroll.view" },
+      { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },
+      { label: "Payroll",            href: "/payroll",    icon: IndianRupee   },
     ],
   },
   {
     section: "System",
     items: [
-      { label: "Reports",       href: "/reports", icon: BarChart2,  perm: "report.view.dashboard" },
-      { label: "Admin & Roles", href: "/admin",   icon: ShieldCheck, perm: "admin.settings"       },
+      { label: "Reports",       href: "/reports",       icon: BarChart2  },
+      { label: "Admin & Roles", href: "/admin",         icon: ShieldCheck },
+      { label: "Notifications", href: "/notifications", icon: Bell        },
+      { label: "Mandovara AI",  href: "/ai",            icon: Sparkles    },
+    ],
+  },
+];
+
+// ── Employee sidebar — exact order from design reference ─────────────────────
+const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
+  {
+    section: "Overview",
+    items: [
+      { label: "My Dashboard", href: "/employee", icon: LayoutDashboard },
+      { label: "Projects",     href: "/projects", icon: Briefcase,       perm: "project.view" },
+    ],
+  },
+  {
+    section: "Work",
+    items: [
+      { label: "Lead Management",  href: "/leads",      icon: UserPlus, perm: "lead.view"      },
+      { label: "Client 360",       href: "/clients",    icon: Users,    perm: "client.view"    },
+      { label: "Quotations (BOQ)", href: "/quotations", icon: FileText, perm: "quotation.view" },
+    ],
+  },
+  {
+    section: "Catalog",
+    items: [
+      { label: "Product Catalog", href: "/products", icon: Package, perm: "catalog.view" },
+    ],
+  },
+  {
+    section: "Field Operations",
+    items: [
+      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin, perm: "sitelog.view"     },
+      { label: "Measurements",          href: "/measurements", icon: Ruler,  perm: "measurement.view" },
+      { label: "Installation",          href: "/install",      icon: Wrench, perm: "install.view"     },
+    ],
+  },
+  {
+    section: "My Work",
+    items: [
+      { label: "My Tasks", href: "/tasks", icon: CheckSquare },
+    ],
+  },
+  {
+    section: "People",
+    items: [
+      { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },
+      { label: "Documents",          href: "/documents",  icon: FolderOpen    },
+      { label: "My Profile",         href: "/profile",    icon: UserCircle    },
+    ],
+  },
+  {
+    section: "Other",
+    items: [
+      { label: "Notifications", href: "/notifications", icon: Bell     },
+      { label: "Mandovara AI",  href: "/ai",            icon: Sparkles },
+    ],
+  },
+  {
+    section: "Admin",
+    items: [
+      { label: "Reports", href: "/reports", icon: BarChart2 },
     ],
   },
 ];
@@ -100,14 +161,19 @@ function initials(name: string): string {
     .slice(0, 2) || "?";
 }
 
+function isActive(pathname: string, href: string): boolean {
+  if (href === "/" || href === "/employee") return pathname === href;
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 interface SidebarProps {
   userName: string;
   userRole: string;
   permissions: string[];
+  isOwner: boolean;
 }
 
-export function Sidebar({ userName, userRole, permissions }: SidebarProps) {
-  const isOwner = permissions.includes("admin.settings");
+export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarProps) {
   const pathname = usePathname();
   const router   = useRouter();
   const [signing, startSignOut] = useTransition();
@@ -119,6 +185,8 @@ export function Sidebar({ userName, userRole, permissions }: SidebarProps) {
       router.refresh();
     });
   }
+
+  const nav = isOwner ? OWNER_NAV : EMPLOYEE_NAV;
 
   return (
     <aside className="h-full w-full bg-sidebar text-sidebar-text flex flex-col">
@@ -137,29 +205,25 @@ export function Sidebar({ userName, userRole, permissions }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 pb-3">
-        {NAV.map((section) => {
-          const visible = section.items.filter(
-            (item) => !item.perm || permissions.includes(item.perm),
-          );
+        {nav.map((section) => {
+          const visible = isOwner
+            ? section.items
+            : section.items.filter((item) => !item.perm || permissions.includes(item.perm));
           if (visible.length === 0) return null;
           return (
             <div key={section.section} className="mb-4">
               <div className="px-3 mb-1.5 mt-2 text-[10.5px] uppercase tracking-[0.22em] text-sidebar-dim">
                 {section.section}
               </div>
-              {visible.map((item) => {
-                const label =
-                  item.href === "/" ? (isOwner ? "Owner Dashboard" : "My Dashboard") : item.label;
-                return (
-                  <NavRow
-                    key={item.href}
-                    href={item.href}
-                    label={label}
-                    Icon={item.icon}
-                    active={pathname === item.href}
-                  />
-                );
-              })}
+              {visible.map((item) => (
+                <NavRow
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  Icon={item.icon}
+                  active={isActive(pathname, item.href)}
+                />
+              ))}
             </div>
           );
         })}
@@ -206,7 +270,6 @@ function NavRow({ href, label, Icon, active }: { href: string; label: string; Ic
           : "text-sidebar-dim hover:bg-sidebar-hover hover:text-sidebar-text",
       ].join(" ")}
     >
-      {/* Always rendered — opacity swap avoids server/client child-count mismatch */}
       <span
         aria-hidden
         className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full transition-opacity ${active ? "opacity-100" : "opacity-0"}`}

@@ -2,6 +2,7 @@
 // The page consumes loadDashboard(ctx) and knows nothing about Prisma.
 
 import { scoped } from "@/kernel/db/scoped";
+import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type {
   ActivityItem, DashboardData, ProjectStage, RevenueMonth, SiteVisit,
@@ -33,6 +34,7 @@ const LIVE_STAGES = [
 ] as const;
 
 export async function loadDashboard(ctx: RequestContext): Promise<DashboardData> {
+  requirePermission(ctx, "report.view.dashboard");
   const db = scoped(ctx);
   const now = new Date();
   const monthStart = startOfMonth(now, 0);

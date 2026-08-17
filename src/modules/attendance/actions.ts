@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { Decimal } from "@prisma/client/runtime/library";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
@@ -90,6 +91,87 @@ export async function lockMonth(input: unknown): Promise<ActionResult<{ count: n
 
   revalidatePath("/attendance");
   return { ok: true, data: { count: result.count } };
+}
+
+// ── Self-service punch (field PWA) ────────────────────────────────────────────
+
+const punchSelfSchema = z.object({
+  clientId:  z.string().min(1),
+  type:      z.enum(["in", "out"]),
+  timestamp: z.string().datetime(),
+  lat:       z.number().optional(),
+  lng:       z.number().optional(),
+});
+
+/**
+ * Self-service punch for the mobile attendance PWA.
+ * Resolves the employee from the logged-in user (Employee.userId).
+ * Idempotent: punch-in upserts, punch-out updates only if inAt exists.
+ */
+export async function punchSelf(
+  input: unknown,
+): Promise<ActionResult<{ id: string; type: "in" | "out" }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "attendance.punch");
+
+  const parsed = punchSelfSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const d = parsed.data;
+
+  const db = scoped(ctx);
+
+  const employee = await db.employee.findUnique({
+    where:  { userId: ctx.userId },
+    select: { id: true },
+  });
+  if (!employee) {
+    return { ok: false, error: "No employee profile is linked to your account." };
+  }
+
+  const ts        = new Date(d.timestamp);
+  const dayStart  = new Date(Date.UTC(ts.getUTCFullYear(), ts.getUTCMonth(), ts.getUTCDate()));
+
+  const existing = await db.attendance.findUnique({
+    where:  { employeeId_date: { employeeId: employee.id, date: dayStart } },
+    select: { id: true, lockedAt: true, inAt: true },
+  });
+  if (existing?.lockedAt) {
+    return { ok: false, error: "Attendance for this day is locked and cannot be edited." };
+  }
+
+  const latDec = d.lat !== undefined ? new Decimal(d.lat.toFixed(7)) : null;
+  const lngDec = d.lng !== undefined ? new Decimal(d.lng.toFixed(7)) : null;
+
+  if (d.type === "in") {
+    const record = await db.attendance.upsert({
+      where:  { employeeId_date: { employeeId: employee.id, date: dayStart } },
+      create: {
+        organizationId: ctx.orgId,
+        employeeId:     employee.id,
+        date:           dayStart,
+        status:         "PRESENT",
+        inAt:           ts,
+        inLat:          latDec,
+        inLng:          lngDec,
+      },
+      update: { status: "PRESENT", inAt: ts, inLat: latDec, inLng: lngDec },
+      select: { id: true },
+    });
+    revalidatePath("/attendance");
+    return { ok: true, data: { id: record.id, type: "in" } };
+  }
+
+  // punch-out
+  if (!existing?.inAt) {
+    return { ok: false, error: "No punch-in found for today. Please punch in first." };
+  }
+  const record = await db.attendance.update({
+    where: { employeeId_date: { employeeId: employee.id, date: dayStart } },
+    data:  { outAt: ts },
+    select: { id: true },
+  });
+  revalidatePath("/attendance");
+  return { ok: true, data: { id: record.id, type: "out" } };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

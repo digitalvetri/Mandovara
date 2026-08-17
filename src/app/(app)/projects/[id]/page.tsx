@@ -27,6 +27,7 @@ import {
 } from "@/modules/projects/queries";
 import { listSiteVisits } from "@/modules/site-visits/queries";
 import { resolveNextAction } from "@/modules/projects/next-action";
+import { getProjectProfitability } from "@/modules/reports/profitability";
 import { StageStepper } from "../_components/StageStepper";
 import { MilestonesPanel } from "../_components/MilestonesPanel";
 import { MeasurementsSection } from "../_components/MeasurementsSection";
@@ -36,6 +37,7 @@ import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
 import { UpcomingVisitsCard } from "../_components/UpcomingVisitsCard";
 import { PaymentsPanel } from "../_components/PaymentsPanel";
 import { ChosenItemsPanel } from "../_components/ChosenItemsPanel";
+import { ProfitabilityPanel } from "../_components/ProfitabilityPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -47,15 +49,19 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const [milestones, tasks, rounds, money, visits, payments, chosen] = await Promise.all([
-    getProjectMilestones(ctx, id),
-    getProjectTasks(ctx, id),
-    getProjectMeasurements(ctx, id),
-    getProjectMoney(ctx, id),
-    listSiteVisits(ctx, { projectId: id, limit: 10 }),
-    getProjectPayments(ctx, id),
-    getProjectChosenItems(ctx, id),
-  ]);
+  const canViewProfitability = ctx.permissions.has("report.view.projects");
+
+  const [milestones, tasks, rounds, money, visits, payments, chosen, profitability] =
+    await Promise.all([
+      getProjectMilestones(ctx, id),
+      getProjectTasks(ctx, id),
+      getProjectMeasurements(ctx, id),
+      getProjectMoney(ctx, id),
+      listSiteVisits(ctx, { projectId: id, limit: 10 }),
+      getProjectPayments(ctx, id),
+      getProjectChosenItems(ctx, id),
+      canViewProfitability ? getProjectProfitability(ctx, id) : null,
+    ]);
 
   const action = resolveNextAction(ctx, { id: p.id, stage: p.stage });
   const receivedTotal = money?.receiptTotal ?? 0n;
@@ -123,6 +129,7 @@ export default async function ProjectDetailPage({
               canCreate={ctx.permissions.has("invoice.create")}
             />
           )}
+          {profitability && <ProfitabilityPanel data={profitability} />}
           <CollapsedPanels projectId={p.id} tasks={tasks} />
         </div>
 

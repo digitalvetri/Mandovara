@@ -4,11 +4,6 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 const TEAL = 0x2ba89a;
-const PARTICLE_COUNT = 130;
-const LINK_DIST = 11;
-const MAX_LINKS = 380;
-
-type Vec3 = { x: number; y: number; z: number };
 
 export function ThreeCanvas() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -29,59 +24,126 @@ export function ThreeCanvas() {
 
     // ── Scene & camera ────────────────────────────────────────────
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 500);
+    const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 500);
     camera.position.set(0, 0, 42);
 
-    // ── Particle field ────────────────────────────────────────────
-    const pPos = new Float32Array(PARTICLE_COUNT * 3);
-    const vel: Vec3[] = [];
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      pPos[i * 3]     = (Math.random() - 0.5) * 64;
-      pPos[i * 3 + 1] = (Math.random() - 0.5) * 52;
-      pPos[i * 3 + 2] = (Math.random() - 0.5) * 22;
-      vel.push({
-        x: (Math.random() - 0.5) * 0.016,
-        y: (Math.random() - 0.5) * 0.016,
-        z: (Math.random() - 0.5) * 0.005,
-      });
+    const group = new THREE.Group();
+    scene.add(group);
+
+    // ── Helper: thin rectangular frame (window outline) ───────────
+    function makeFrame(
+      w: number, h: number, opacity: number,
+      px = 0, py = 0, pz = 0,
+      rx = 0, ry = 0,
+    ) {
+      const hw = w / 2, hh = h / 2;
+      const pts = [
+        new THREE.Vector3(-hw, -hh, 0),
+        new THREE.Vector3( hw, -hh, 0),
+        new THREE.Vector3( hw,  hh, 0),
+        new THREE.Vector3(-hw,  hh, 0),
+        new THREE.Vector3(-hw, -hh, 0),
+      ];
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: TEAL, transparent: true, opacity });
+      const line = new THREE.Line(geo, mat);
+      line.position.set(px, py, pz);
+      line.rotation.x = rx;
+      line.rotation.y = ry;
+      return line;
     }
-    const pGeo  = new THREE.BufferGeometry();
-    const pAttr = new THREE.BufferAttribute(pPos, 3);
-    pGeo.setAttribute("position", pAttr);
-    const pMat = new THREE.PointsMaterial({
-      color: TEAL, size: 0.22, transparent: true, opacity: 0.9, sizeAttenuation: true,
+
+    // ── Helper: window with central cross-bar (mullion) ───────────
+    function makeWindowFrame(
+      w: number, h: number, opacity: number,
+      px = 0, py = 0, pz = 0,
+      rx = 0, ry = 0,
+    ) {
+      const hw = w / 2, hh = h / 2;
+      const pts: THREE.Vector3[] = [
+        // Outer rectangle
+        new THREE.Vector3(-hw, -hh, 0), new THREE.Vector3( hw, -hh, 0),
+        new THREE.Vector3( hw, -hh, 0), new THREE.Vector3( hw,  hh, 0),
+        new THREE.Vector3( hw,  hh, 0), new THREE.Vector3(-hw,  hh, 0),
+        new THREE.Vector3(-hw,  hh, 0), new THREE.Vector3(-hw, -hh, 0),
+        // Horizontal bar (at 1/3 from top)
+        new THREE.Vector3(-hw, hh * 0.35, 0), new THREE.Vector3(hw, hh * 0.35, 0),
+        // Vertical bar (centre)
+        new THREE.Vector3(0, -hh, 0), new THREE.Vector3(0, hh, 0),
+      ];
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: TEAL, transparent: true, opacity });
+      const seg = new THREE.LineSegments(geo, mat);
+      seg.position.set(px, py, pz);
+      seg.rotation.x = rx;
+      seg.rotation.y = ry;
+      return seg;
+    }
+
+    // ── Architectural window frames ───────────────────────────────
+    // Central feature window — larger, front and centre
+    const mainWindow = makeWindowFrame(13, 19, 0.13, 0, 2, 0, 0, 0.06);
+    group.add(mainWindow);
+
+    // Flanking frames — receding into depth
+    const leftFrame  = makeFrame(8,  14, 0.07, -20,  3, -10,  0.05, 0.30);
+    const rightFrame = makeFrame(10, 15, 0.07,  21, -1, -14,  0.0, -0.28);
+    const topFrame   = makeFrame(6,   9, 0.05,  -6, 15, -8,  -0.1,  0.15);
+    const deepFrame  = makeFrame(14, 20, 0.03,   2,  0, -24,  0.0,  0.0);
+    group.add(leftFrame, rightFrame, topFrame, deepFrame);
+
+    // ── Vertical curtain-fold lines (subtle, clustered right) ─────
+    function makeLine(
+      x1: number, y1: number, z: number,
+      x2: number, y2: number,
+      opacity: number,
+    ) {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x1, y1, z),
+        new THREE.Vector3(x2, y2, z),
+      ]);
+      const mat = new THREE.LineBasicMaterial({ color: TEAL, transparent: true, opacity });
+      return new THREE.Line(geo, mat);
+    }
+
+    // Curtain drape on the right side of centre window
+    const DRAPE_X = 7.5;
+    const DRAPE_Z = 0.5;
+    group.add(makeLine(DRAPE_X + 0.0,  11, DRAPE_Z, DRAPE_X - 0.3, -11, 0.05));
+    group.add(makeLine(DRAPE_X + 1.2,  11, DRAPE_Z, DRAPE_X + 0.8, -11, 0.04));
+    group.add(makeLine(DRAPE_X + 2.4,  11, DRAPE_Z, DRAPE_X + 1.9, -11, 0.03));
+    // Left drape
+    const DRAPE_LX = -7.5;
+    group.add(makeLine(DRAPE_LX + 0.0,  11, DRAPE_Z, DRAPE_LX + 0.3, -11, 0.05));
+    group.add(makeLine(DRAPE_LX - 1.2,  11, DRAPE_Z, DRAPE_LX - 0.8, -11, 0.04));
+
+    // Horizon line (subtle room floor-plane vanishing)
+    const horizGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-36, -10, -5),
+      new THREE.Vector3( 36, -10, -5),
+    ]);
+    const horizMat = new THREE.LineBasicMaterial({ color: TEAL, transparent: true, opacity: 0.04 });
+    group.add(new THREE.Line(horizGeo, horizMat));
+
+    // ── Sparse floating dots (much fewer than before) ─────────────
+    const DOT_COUNT = 22;
+    const dotPos  = new Float32Array(DOT_COUNT * 3);
+    const dotVel  = Array.from({ length: DOT_COUNT }, () => ({
+      x: (Math.random() - 0.5) * 0.007,
+      y: (Math.random() - 0.5) * 0.007,
+    }));
+    for (let i = 0; i < DOT_COUNT; i++) {
+      dotPos[i * 3]     = (Math.random() - 0.5) * 52;
+      dotPos[i * 3 + 1] = (Math.random() - 0.5) * 40;
+      dotPos[i * 3 + 2] = (Math.random() - 0.5) * 20;
+    }
+    const dotGeo  = new THREE.BufferGeometry();
+    const dotAttr = new THREE.BufferAttribute(dotPos, 3);
+    dotGeo.setAttribute("position", dotAttr);
+    const dotMat  = new THREE.PointsMaterial({
+      color: TEAL, size: 0.16, transparent: true, opacity: 0.4, sizeAttenuation: true,
     });
-    scene.add(new THREE.Points(pGeo, pMat));
-
-    // ── Connection lines ──────────────────────────────────────────
-    const lPos  = new Float32Array(MAX_LINKS * 6);
-    const lGeo  = new THREE.BufferGeometry();
-    const lAttr = new THREE.BufferAttribute(lPos, 3);
-    lGeo.setAttribute("position", lAttr);
-    lGeo.setDrawRange(0, 0);
-    const lMat = new THREE.LineBasicMaterial({ color: TEAL, transparent: true, opacity: 0.12 });
-    scene.add(new THREE.LineSegments(lGeo, lMat));
-
-    // ── Decorative wireframe shapes ───────────────────────────────
-    const wireMat = new THREE.MeshBasicMaterial({
-      color: TEAL, wireframe: true, transparent: true, opacity: 0.05,
-    });
-
-    const oct1 = new THREE.Mesh(new THREE.OctahedronGeometry(9, 1), wireMat);
-    oct1.position.set(-22, 12, -12);
-    scene.add(oct1);
-
-    const oct2 = new THREE.Mesh(new THREE.OctahedronGeometry(5.5, 0), wireMat.clone());
-    oct2.position.set(22, -10, -6);
-    scene.add(oct2);
-
-    const ico  = new THREE.Mesh(new THREE.IcosahedronGeometry(7, 0), wireMat.clone());
-    ico.position.set(10, 18, -18);
-    scene.add(ico);
-
-    const tor  = new THREE.Mesh(new THREE.TorusGeometry(5, 1.2, 6, 12), wireMat.clone());
-    tor.position.set(-14, -16, -8);
-    scene.add(tor);
+    group.add(new THREE.Points(dotGeo, dotMat));
 
     // ── Mouse parallax ────────────────────────────────────────────
     let mx = 0, my = 0;
@@ -91,7 +153,7 @@ export function ThreeCanvas() {
     };
     window.addEventListener("mousemove", onMouse, { passive: true });
 
-    // ── Container resize observer ─────────────────────────────────
+    // ── Resize ────────────────────────────────────────────────────
     const observer = new ResizeObserver(() => {
       const w = mount.clientWidth;
       const h = mount.clientHeight;
@@ -105,50 +167,35 @@ export function ThreeCanvas() {
     // ── Animation loop ────────────────────────────────────────────
     let raf: number;
     let t = 0;
+    let ry = 0;
 
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      t += 0.005;
+      t  += 0.004;
+      ry += 0.00035;  // ~0.02 deg/frame → full rotation ~17 min
 
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const v = vel[i]!;
-        const b = i * 3;
-        pPos[b]     = (pPos[b]     ?? 0) + v.x;
-        pPos[b + 1] = (pPos[b + 1] ?? 0) + v.y;
-        pPos[b + 2] = (pPos[b + 2] ?? 0) + v.z;
-        if (Math.abs(pPos[b]     ?? 0) > 34) v.x *= -1;
-        if (Math.abs(pPos[b + 1] ?? 0) > 28) v.y *= -1;
-        if (Math.abs(pPos[b + 2] ?? 0) > 12) v.z *= -1;
+      // Scene auto-rotation (very slow, dreamy)
+      group.rotation.y  = ry;
+      group.rotation.x  = Math.sin(t * 0.4) * 0.04;
+
+      // Individual frame micro-breathing
+      mainWindow.rotation.y = 0.06 + Math.sin(t * 0.7) * 0.012;
+      leftFrame.rotation.y  = 0.30 + Math.sin(t * 0.5 + 1.2) * 0.015;
+      rightFrame.rotation.y = -0.28 + Math.sin(t * 0.6 + 2.4) * 0.013;
+
+      // Dot animation
+      for (let i = 0; i < DOT_COUNT; i++) {
+        const v = dotVel[i]!;
+        dotPos[i * 3]     = (dotPos[i * 3]!     ?? 0) + v.x;
+        dotPos[i * 3 + 1] = (dotPos[i * 3 + 1]! ?? 0) + v.y;
+        if (Math.abs(dotPos[i * 3]!)     > 27) v.x *= -1;
+        if (Math.abs(dotPos[i * 3 + 1]!) > 21) v.y *= -1;
       }
-      pAttr.needsUpdate = true;
+      dotAttr.needsUpdate = true;
 
-      let lc = 0;
-      const distSq = LINK_DIST * LINK_DIST;
-      for (let i = 0; i < PARTICLE_COUNT && lc < MAX_LINKS; i++) {
-        const ix = pPos[i * 3]!, iy = pPos[i * 3 + 1]!, iz = pPos[i * 3 + 2]!;
-        for (let j = i + 1; j < PARTICLE_COUNT && lc < MAX_LINKS; j++) {
-          const dx = ix - pPos[j * 3]!;
-          const dy = iy - pPos[j * 3 + 1]!;
-          const dz = iz - pPos[j * 3 + 2]!;
-          if (dx * dx + dy * dy + dz * dz < distSq) {
-            lPos[lc * 6]     = ix;  lPos[lc * 6 + 1] = iy;  lPos[lc * 6 + 2] = iz;
-            lPos[lc * 6 + 3] = pPos[j * 3]!;
-            lPos[lc * 6 + 4] = pPos[j * 3 + 1]!;
-            lPos[lc * 6 + 5] = pPos[j * 3 + 2]!;
-            lc++;
-          }
-        }
-      }
-      lGeo.setDrawRange(0, lc * 2);
-      lAttr.needsUpdate = true;
-
-      oct1.rotation.x = t * 0.17;  oct1.rotation.y = t * 0.22;
-      oct2.rotation.x = -t * 0.13; oct2.rotation.z = t * 0.19;
-      ico.rotation.y  = t * 0.10;  ico.rotation.z  = -t * 0.14;
-      tor.rotation.x  = t * 0.20;  tor.rotation.y  = t * 0.11;
-
-      camera.position.x += (mx * 3 - camera.position.x) * 0.04;
-      camera.position.y += (my * 2.5 - camera.position.y) * 0.04;
+      // Very gentle camera parallax (±1.5 units max)
+      camera.position.x += (mx * 1.5 - camera.position.x) * 0.025;
+      camera.position.y += (my * 1.2 - camera.position.y) * 0.025;
       camera.lookAt(scene.position);
 
       renderer.render(scene, camera);

@@ -68,7 +68,7 @@ export function SidebarShell({ userName, userRole, userPermissions }: Props) {
           <X size={15} strokeWidth={2} />
         </button>
 
-        <Sidebar userName={userName} userRole={userRole} permissions={userPermissions} />
+        <Sidebar userName={userName} userRole={userRole} permissions={userPermissions} isOwner={userRole === "OWNER"} />
       </div>
     </>
   );

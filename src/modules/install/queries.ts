@@ -1,4 +1,5 @@
 import { prisma as db } from "@/kernel/db/client";
+import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { InstallStatus } from "@/kernel/db/client";
 
@@ -44,13 +45,20 @@ export interface EligibleOrder {
 
 export async function listInstallVisits(
   ctx: RequestContext,
-  opts: { status?: InstallStatus[] } = {},
+  opts: { status?: InstallStatus[]; dateFrom?: Date; dateTo?: Date } = {},
 ): Promise<InstallVisitRow[]> {
+  requirePermission(ctx, "install.view");
   const visits = await db.installVisit.findMany({
     where: {
       organizationId: ctx.orgId,
       kind: "INSTALL",
       ...(opts.status?.length ? { status: { in: opts.status } } : {}),
+      ...(opts.dateFrom || opts.dateTo ? {
+        scheduledAt: {
+          ...(opts.dateFrom ? { gte: opts.dateFrom } : {}),
+          ...(opts.dateTo   ? { lte: opts.dateTo   } : {}),
+        },
+      } : {}),
     },
     orderBy: [{ scheduledAt: "asc" }, { number: "asc" }],
     select: {
@@ -103,6 +111,7 @@ export async function listInstallVisits(
 }
 
 export async function getInstallStatusCounts(ctx: RequestContext): Promise<InstallStatusCounts> {
+  requirePermission(ctx, "install.view");
   const groups = await db.installVisit.groupBy({
     by: ["status"],
     where: { organizationId: ctx.orgId, kind: "INSTALL" },
@@ -121,6 +130,7 @@ export async function getInstallStatusCounts(ctx: RequestContext): Promise<Insta
 }
 
 export async function listEligibleOrders(ctx: RequestContext): Promise<EligibleOrder[]> {
+  requirePermission(ctx, "install.view");
   const orders = await db.order.findMany({
     where: {
       organizationId: ctx.orgId,
@@ -162,5 +172,54 @@ export async function listInstallCrews(ctx: RequestContext) {
     where: { organizationId: ctx.orgId, isActive: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
+  });
+}
+
+export interface SnagListRow {
+  id:          string;
+  description: string;
+  status:      string;
+  raisedAt:    Date;
+  roomLabel:   string | null;
+  projectId:   string;
+  projectName: string;
+  clientName:  string;
+}
+
+export async function listOpenSnags(ctx: RequestContext): Promise<SnagListRow[]> {
+  requirePermission(ctx, "install.view");
+  const snags = await db.snag.findMany({
+    where: {
+      organizationId: ctx.orgId,
+      status: { in: ["OPEN", "IN_PROGRESS"] },
+    },
+    orderBy: { raisedAt: "asc" },
+    select: {
+      id: true, description: true, status: true,
+      raisedAt: true, roomLabel: true, projectId: true,
+    },
+  });
+
+  if (snags.length === 0) return [];
+
+  const projectIds = [...new Set(snags.map((s) => s.projectId))];
+  const projects   = await db.project.findMany({
+    where: { id: { in: projectIds } },
+    select: { id: true, name: true, client: { select: { name: true } } },
+  });
+  const projMap = new Map(projects.map((p) => [p.id, p]));
+
+  return snags.map((s) => {
+    const proj = projMap.get(s.projectId);
+    return {
+      id:          s.id,
+      description: s.description,
+      status:      s.status,
+      raisedAt:    s.raisedAt,
+      roomLabel:   s.roomLabel,
+      projectId:   s.projectId,
+      projectName: proj?.name ?? "—",
+      clientName:  proj?.client.name ?? "—",
+    };
   });
 }

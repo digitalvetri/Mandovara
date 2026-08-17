@@ -11,9 +11,9 @@
 // was captured before the change.
 
 import {
-  calcCurtain, calcWallpaper, calcFlooring, calcBlind, calcCarpet, calcFilm,
+  calcCurtain, calcWallpaper, calcFlooring, calcBlind, calcCarpet, calcFilm, calcVerticalGarden,
   type CurtainResult, type WallpaperResult, type FlooringResult,
-  type BlindResult, type CarpetResult, type FilmResult,
+  type BlindResult, type CarpetResult, type FilmResult, type VerticalGardenResult,
 } from "@/kernel/calc";
 import type { AddItemInput, DeductionInput } from "./schema";
 
@@ -63,6 +63,7 @@ const DEFAULTS = {
   filmRollWidthMm:        1524,
   filmWastagePct:         8,
   blindMinChargeSqft:     10,   // default minimum billable per blind
+  vgardenPanelSizeMm:     500,  // 500×500mm is the standard vertical-garden panel size
 };
 
 /**
@@ -82,6 +83,7 @@ export function computeCalcResult(item: EngineItemInput): CalcResultRow {
   if (family === "CARPET_ROLL")                              return fromCarpetRoll(item);
   if (family === "CARPET_TILE")                              return fromCarpetTile(item);
   if (family === "INTERIOR_FILM")                            return fromFilm(item);
+  if (family === "VERTICAL_GARDEN")                          return fromVerticalGarden(item);
 
   return noEngineFallback(item);
 }
@@ -243,6 +245,28 @@ function fromFilm(item: EngineItemInput): CalcResultRow {
     wastagePct:    DEFAULTS.filmWastagePct,
     warnings:      withProvisionalNote(r.warnings),
     inputs:        { ...inputs, __defaults: ["rollWidthMm", "wastagePct"] },
+  };
+}
+
+function fromVerticalGarden(item: EngineItemInput): CalcResultRow {
+  const panelSizeMm = DEFAULTS.vgardenPanelSizeMm;
+  const inputs = {
+    surfaceWidthMm:  item.widthMm,
+    surfaceHeightMm: item.heightMm,
+    panelWidthMm:    panelSizeMm,
+    panelHeightMm:   panelSizeMm,
+  };
+  const r: VerticalGardenResult = calcVerticalGarden(inputs);
+  return {
+    engineVersion: r.engineVersion,
+    materialQty:   r.areaSqft,
+    materialUnit:  r.materialUnit,
+    areaSqft:      r.areaSqft,
+    warnings:      withProvisionalNote([
+      ...r.warnings,
+      `${r.panelsRequired} panels (${panelSizeMm}×${panelSizeMm}mm) · ${r.plantCount} plants · ${r.irrigationRft.toFixed(1)} rft irrigation.`,
+    ]),
+    inputs:        { ...inputs, __defaults: ["panelWidthMm", "panelHeightMm"] },
   };
 }
 

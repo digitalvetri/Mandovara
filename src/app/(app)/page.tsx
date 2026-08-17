@@ -19,12 +19,14 @@ import { RevenueChart } from "./_dashboard/RevenueChart";
 import { ProjectStages } from "./_dashboard/ProjectStages";
 import { SiteVisits } from "./_dashboard/SiteVisits";
 import { RecentActivity } from "./_dashboard/RecentActivity";
+import { DesignerView } from "./_dashboard/DesignerView";
 import { SalesView } from "./_dashboard/SalesView";
 import { MeasureExecView } from "./_dashboard/MeasureExecView";
 import { StoreView } from "./_dashboard/StoreView";
 import { MakeSupervisorView } from "./_dashboard/MakeSupervisorView";
 import { InstallerView } from "./_dashboard/InstallerView";
 import { AccountsView } from "./_dashboard/AccountsView";
+import { HrView } from "./_dashboard/HrView";
 import { TeamAssignments } from "./_dashboard/TeamAssignments";
 
 export const dynamic = "force-dynamic";
@@ -34,10 +36,18 @@ export default async function DashboardPage() {
   const role = ctx.roles[0] ?? "OWNER";
 
   // Role-specific landing — each role sees the data most relevant to their job
-  if (role === "SALES" || role === "DESIGNER") {
+  if (role === "DESIGNER") {
     return (
       <>
-        <Topbar title="My Dashboard" eyebrow={`${role.toLowerCase()} · ${todayEyebrow()}`} />
+        <Topbar title="My Dashboard" eyebrow={`designer · ${todayEyebrow()}`} />
+        <DesignerView ctx={ctx} />
+      </>
+    );
+  }
+  if (role === "SALES") {
+    return (
+      <>
+        <Topbar title="My Dashboard" eyebrow={`sales · ${todayEyebrow()}`} />
         <SalesView ctx={ctx} />
       </>
     );
@@ -83,7 +93,16 @@ export default async function DashboardPage() {
     );
   }
 
-  // OWNER / HR / fallback → full cockpit view
+  if (role === "HR") {
+    return (
+      <>
+        <Topbar title="HR Dashboard" eyebrow={todayEyebrow()} />
+        <HrView ctx={ctx} />
+      </>
+    );
+  }
+
+  // OWNER / fallback → full cockpit view
   let d: DashboardData;
   try {
     d = await loadDashboard(ctx);
