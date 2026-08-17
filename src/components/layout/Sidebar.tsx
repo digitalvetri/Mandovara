@@ -9,7 +9,7 @@ import {
   Boxes, MapPin, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
-  Bell, Sparkles,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -72,10 +72,9 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   {
     section: "System",
     items: [
-      { label: "Reports",       href: "/reports",       icon: BarChart2  },
-      { label: "Admin & Roles", href: "/admin",         icon: ShieldCheck },
-      { label: "Notifications", href: "/notifications", icon: Bell        },
-      { label: "Mandovara AI",  href: "/ai",            icon: Sparkles    },
+      { label: "Reports",       href: "/reports", icon: BarChart2   },
+      { label: "Admin & Roles", href: "/admin",   icon: ShieldCheck },
+      { label: "Mandovara AI",  href: "/ai",      icon: Sparkles    },
     ],
   },
 ];
@@ -128,8 +127,7 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   {
     section: "Other",
     items: [
-      { label: "Notifications", href: "/notifications", icon: Bell     },
-      { label: "Mandovara AI",  href: "/ai",            icon: Sparkles },
+      { label: "Mandovara AI", href: "/ai", icon: Sparkles },
     ],
   },
   {

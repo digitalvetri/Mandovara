@@ -3,15 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { devLoginByCredential } from "@/lib/dev-auth";
-import {
-  Loader2, Eye, EyeOff, ArrowRight, Info,
-  Smartphone, KeyRound,
-} from "lucide-react";
+import { Loader2, Eye, EyeOff, ArrowRight, Info } from "lucide-react";
 import { MandovaraLogo } from "./MandovaraLogo";
 import { CredentialsPanel, DEFAULT_PASSWORD } from "./CredentialsPanel";
-import { PinLoginPanel } from "./PinLoginPanel";
-
-type Tab = "pin" | "password";
 
 function focusStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.borderColor = "#2BA89A";
@@ -24,9 +18,7 @@ function blurStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.boxShadow   = "none";
 }
 
-// ── Password tab panel ────────────────────────────────────────────────────────
-
-function PasswordPanel() {
+export function LoginCard() {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, start]            = useTransition();
@@ -43,7 +35,7 @@ function PasswordPanel() {
     router.refresh();
   }
 
-  async function handleEmailLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!credential.trim() || !password) return;
     setError(null);
@@ -54,8 +46,7 @@ function PasswordPanel() {
         navigate("/change-password?forced=1");
         return;
       }
-      const dest = params.get("from") ?? (res.role === "OWNER" ? "/" : "/employee");
-      navigate(dest);
+      navigate(params.get("from") ?? (res.role === "OWNER" ? "/" : "/employee"));
     });
   }
 
@@ -69,54 +60,93 @@ function PasswordPanel() {
   const canSubmit = credential.trim().length > 0 && password.length > 0;
 
   return (
-    <div className="space-y-4">
-      <form onSubmit={handleEmailLogin} className="space-y-4">
+    <div className="w-full max-w-[400px] mx-auto">
+
+      {/* Logo */}
+      <div className="mb-10">
+        <MandovaraLogo />
+      </div>
+
+      {/* Heading */}
+      <div className="mb-8">
+        <h1
+          style={{
+            color: "#0F2A28",
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 30,
+            fontWeight: 600,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.15,
+            margin: 0,
+          }}
+        >
+          Welcome back
+        </h1>
+        <p className="mt-2.5 text-[14px] leading-snug" style={{ color: "#5A7A78" }}>
+          Sign in to your Mandovara Studio Console
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+
+        {/* Email / Mobile field */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between mb-2">
             <label
-              htmlFor="login-credential"
-              className="text-[11.5px] font-semibold tracking-[0.04em] uppercase"
-              style={{ color: "#4A6462" }}
+              htmlFor="cred"
+              className="text-[11px] font-semibold tracking-[0.08em] uppercase"
+              style={{ color: "#3A5A58" }}
             >
-              Email or Mobile
+              Email or Mobile Number
             </label>
             {SHOW_CREDS_HELPER && (
               <button
                 type="button"
                 onClick={() => setShowCreds((v) => !v)}
-                className="flex items-center gap-1 text-[10.5px] font-medium transition-colors"
+                className="flex items-center gap-1 text-[10.5px] font-medium transition-opacity hover:opacity-70"
                 style={{ color: "#2BA89A" }}
               >
-                <Info size={11} strokeWidth={2} />
+                <Info size={10} strokeWidth={2.2} />
                 View credentials
               </button>
             )}
           </div>
 
           {SHOW_CREDS_HELPER && showCreds && (
-            <CredentialsPanel onSelect={fillCredential} />
+            <div className="mb-2">
+              <CredentialsPanel onSelect={fillCredential} />
+            </div>
           )}
 
           <input
-            id="login-credential"
+            id="cred"
             type="text"
             value={credential}
             onChange={(e) => setCredential(e.target.value)}
-            placeholder="rohit@mandovara.com · +91 98xxxxxxxx"
+            placeholder="rohit@mandovara.com  or  +91 98xxxxxxxx"
             autoComplete="username"
-            className="w-full h-[48px] rounded-[12px] px-4 text-[13.5px] outline-none transition-all"
-            style={{ background: "#F0F8F7", border: "1.5px solid #C8DFD8", color: "#0F2A28" }}
+            className="w-full outline-none transition-all"
+            style={{
+              height: 50,
+              borderRadius: 12,
+              padding: "0 16px",
+              fontSize: 13.5,
+              background: "#F0F8F7",
+              border: "1.5px solid #C8DFD8",
+              color: "#0F2A28",
+            }}
             onFocus={focusStyle}
             onBlur={blurStyle}
           />
         </div>
 
+        {/* Password field */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between mb-2">
             <label
-              htmlFor="login-password"
-              className="text-[11.5px] font-semibold tracking-[0.04em] uppercase"
-              style={{ color: "#4A6462" }}
+              htmlFor="pwd"
+              className="text-[11px] font-semibold tracking-[0.08em] uppercase"
+              style={{ color: "#3A5A58" }}
             >
               Password
             </label>
@@ -130,14 +160,22 @@ function PasswordPanel() {
           </div>
           <div className="relative">
             <input
-              id="login-password"
+              id="pwd"
               type={showPwd ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="Enter your password"
               autoComplete="current-password"
-              className="w-full h-[48px] rounded-[12px] px-4 pr-12 text-[13.5px] outline-none transition-all"
-              style={{ background: "#F0F8F7", border: "1.5px solid #C8DFD8", color: "#0F2A28" }}
+              className="w-full outline-none transition-all"
+              style={{
+                height: 50,
+                borderRadius: 12,
+                padding: "0 48px 0 16px",
+                fontSize: 13.5,
+                background: "#F0F8F7",
+                border: "1.5px solid #C8DFD8",
+                color: "#0F2A28",
+              }}
               onFocus={focusStyle}
               onBlur={blurStyle}
             />
@@ -145,15 +183,18 @@ function PasswordPanel() {
               type="button"
               tabIndex={-1}
               onClick={() => setShowPwd((v) => !v)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-70"
               style={{ color: "#7A9A98" }}
               aria-label={showPwd ? "Hide password" : "Show password"}
             >
-              {showPwd ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
+              {showPwd
+                ? <EyeOff size={16} strokeWidth={1.8} />
+                : <Eye    size={16} strokeWidth={1.8} />}
             </button>
           </div>
         </div>
 
+        {/* Error */}
         {error && (
           <div
             className="px-4 py-3 rounded-[10px] text-[12.5px] leading-snug"
@@ -163,16 +204,21 @@ function PasswordPanel() {
           </div>
         )}
 
+        {/* Sign In button */}
         <button
           type="submit"
           disabled={pending || !canSubmit}
-          className="w-full h-[50px] rounded-[12px] flex items-center justify-center gap-2 text-[14px] font-semibold text-white transition-all duration-200 active:scale-[0.99] mt-1"
+          className="w-full flex items-center justify-center gap-2.5 font-semibold text-white transition-all duration-200 active:scale-[0.99]"
           style={{
+            height: 52,
+            borderRadius: 12,
+            fontSize: 14.5,
+            marginTop: 4,
             background: pending || !canSubmit
               ? "#A8D5CF"
               : "linear-gradient(135deg, #2BA89A 0%, #1A8A7E 100%)",
-            boxShadow:  pending || !canSubmit ? "none" : "0 4px 22px rgba(43,168,154,0.38)",
-            cursor:     pending || !canSubmit ? "not-allowed" : "pointer",
+            boxShadow: pending || !canSubmit ? "none" : "0 6px 24px rgba(43,168,154,0.35)",
+            cursor:    pending || !canSubmit ? "not-allowed" : "pointer",
           }}
         >
           {pending
@@ -180,66 +226,10 @@ function PasswordPanel() {
             : <><span>Sign In</span><ArrowRight size={16} strokeWidth={2.2} /></>}
         </button>
       </form>
-    </div>
-  );
-}
-
-// ── Main login card ───────────────────────────────────────────────────────────
-
-export function LoginCard() {
-  const [activeTab, setActiveTab] = useState<Tab>("pin");
-
-  return (
-    <div className="w-full max-w-[420px] mx-auto">
-
-      {/* Logo */}
-      <div className="mb-8">
-        <MandovaraLogo />
-      </div>
-
-      {/* Heading */}
-      <div className="mb-6">
-        <h1
-          className="text-[28px] font-semibold leading-tight tracking-[-0.02em]"
-          style={{ color: "#0F2A28", fontFamily: "'Fraunces', Georgia, serif" }}
-        >
-          Welcome back
-        </h1>
-        <p className="mt-2 text-[13.5px]" style={{ color: "#5A7A78" }}>
-          Sign in to your studio console
-        </p>
-      </div>
-
-      {/* Tab toggle */}
-      <div
-        className="flex rounded-[12px] p-1 mb-6"
-        style={{ background: "#E8F5F4" }}
-      >
-        {(["pin", "password"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className="flex-1 h-[38px] rounded-[10px] flex items-center justify-center gap-2 text-[12.5px] font-semibold transition-all duration-200"
-            style={
-              activeTab === tab
-                ? { background: "#ffffff", color: "#1B8A7E", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }
-                : { color: "#5A8A86" }
-            }
-          >
-            {tab === "pin"
-              ? <><Smartphone size={13} strokeWidth={2} /> Mobile &amp; PIN</>
-              : <><KeyRound size={13} strokeWidth={2} /> Password</>}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab content */}
-      {activeTab === "pin" ? <PinLoginPanel /> : <PasswordPanel />}
 
       {/* Footer */}
       <div
-        className="mt-8 pt-5 text-center text-[10.5px]"
+        className="mt-10 pt-5 text-center text-[10.5px]"
         style={{ borderTop: "1px solid #E2F0EE", color: "#8AACAA" }}
       >
         Mandovara Business Solutions · RS Puram, Coimbatore

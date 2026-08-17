@@ -763,9 +763,10 @@ model Client {
   lastContactedAt  DateTime?
   createdAt      DateTime   @default(now())
 
-  contacts ContactPerson[]
-  projects Project[]
-  promises PromiseToPay[]
+  contacts  ContactPerson[]
+  projects  Project[]
+  promises  PromiseToPay[]
+  architect Architect? @relation(fields: [architectId], references: [id])
 
   @@unique([organizationId, code])
   @@index([organizationId, mobile])
@@ -816,18 +817,20 @@ model ContactPerson {
 }
 
 model Architect {
-  id             String  @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   code           String
   firmName       String
   contactName    String
   mobile         String
   email          String?
-  commissionPct  Decimal @db.Decimal(5, 2) @default(0)
+  commissionPct  Decimal  @db.Decimal(5, 2) @default(0)
   address        Json?
-  isActive       Boolean @default(true)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   commissions ArchitectCommission[]
+  clients     Client[]
 
   @@unique([organizationId, code])
 }
@@ -842,8 +845,12 @@ model ArchitectCommission {
   amount         BigInt
   paidAt         DateTime?
   paymentRef     String?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  createdAt      DateTime  @default(now())
 
   architect Architect @relation(fields: [architectId], references: [id])
+  project   Project   @relation(fields: [projectId], references: [id])
 
   @@index([organizationId, architectId, paidAt])
 }
@@ -867,7 +874,7 @@ model Project {
   orderValue        BigInt       @default(0)
   createdAt         DateTime     @default(now())
 
-  client       Client           @relation(fields: [clientId], references: [id])
+  client       Client                @relation(fields: [clientId], references: [id])
   members      ProjectMember[]
   rooms        Room[]
   milestones   Milestone[]
@@ -880,6 +887,7 @@ model Project {
   expenses     ProjectExpense[]
   snags        Snag[]
   documents    ProjectDocument[]
+  architectCommissions ArchitectCommission[]
 
   @@unique([organizationId, number])
   @@index([organizationId, stage])

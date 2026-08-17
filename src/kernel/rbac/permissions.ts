@@ -64,6 +64,9 @@ export const PERMISSIONS = {
     "approve.any",
   ],
 
+  // ── Referral partners ──────────────────────────────────────
+  architect: ["view", "create", "update", "commission.pay", "commission.cancel"],
+
   // ── Finance ────────────────────────────────────────────────
   invoice:     ["view", "create", "cancel", "viewMargin", "irnRegenerate", "irnCancel"],
   receipt:     ["view", "create", "allocate", "reverse"],
