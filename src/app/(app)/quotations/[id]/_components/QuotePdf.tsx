@@ -2,8 +2,10 @@
 // Fonts: GeistRegular (normal, has ₹ U+20B9) + NotoSans-Bold (bold, has ₹).
 
 import path from "path";
-import { Document, Page, View, Text, Image, Font, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, Font } from "@react-pdf/renderer";
 import type { QuotationDetail, QuotationLine } from "@/modules/quotations/queries";
+import { rupeesToWords } from "./_words";
+import { pdfStyles as s, WHITE, INK, MUTED, STRIP } from "./_pdf-styles";
 
 // ── fonts ──────────────────────────────────────────────────────────────────
 const FONTS = path.join(process.cwd(), "public", "fonts");
@@ -15,106 +17,6 @@ Font.register({
   ],
 });
 
-// ── colours ────────────────────────────────────────────────────────────────
-const BRAND  = "#1B8A7E";
-const BRANDL = "#E8F5F4";   // light teal tint
-const WHITE  = "#FFFFFF";
-const INK    = "#111827";
-const MUTED  = "#6B7280";
-const RULE   = "#E5E7EB";
-const STRIP  = "#F9FAFB";
-
-// ── usable width: 595 − 64 = 531pt ────────────────────────────────────────
-const s = StyleSheet.create({
-  page: { fontFamily: "Geist", fontSize: 9, color: INK, backgroundColor: WHITE,
-          paddingTop: 28, paddingBottom: 48, paddingHorizontal: 32 },
-
-  // Header
-  header:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-               marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1.5, borderBottomColor: BRAND },
-  logoImg:   { width: 160, height: 50, objectFit: "contain" },
-  quotRight: { alignItems: "flex-end" },
-  quotTitle: { fontSize: 22, fontWeight: "bold", color: BRAND, letterSpacing: 3 },
-  quotNum:   { fontSize: 8.5, color: MUTED, marginTop: 4 },
-  quotRev:   { fontSize: 7.5, color: MUTED, marginTop: 2 },
-
-  // Info strip
-  infoStrip: { flexDirection: "row", backgroundColor: STRIP, borderWidth: 0.75, borderColor: RULE,
-               borderRadius: 4, paddingHorizontal: 14, paddingVertical: 9, marginBottom: 14 },
-  infoCol:   { flex: 1 },
-  infoLbl:   { fontSize: 6.5, color: MUTED, letterSpacing: 0.9, marginBottom: 3 },
-  infoVal:   { fontSize: 8.5, fontWeight: "bold" },
-
-  // Customer + total row
-  custRow:      { flexDirection: "row", gap: 12, marginBottom: 14 },
-  custBox:      { flex: 1, flexDirection: "row", gap: 10, borderWidth: 0.75, borderColor: RULE,
-                  borderRadius: 4, padding: 10, backgroundColor: STRIP, alignItems: "flex-start" },
-  avatar:       { width: 28, height: 28, borderRadius: 14, backgroundColor: BRAND,
-                  justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  avatarLetter: { fontSize: 12, fontWeight: "bold", color: WHITE },
-  custInfo:     { flex: 1 },
-  custName:     { fontSize: 11, fontWeight: "bold", color: INK, marginBottom: 2 },
-  custLine:     { fontSize: 8, color: MUTED, marginTop: 1.5 },
-  custProject:  { fontSize: 8, color: BRAND, marginTop: 3 },
-
-  totalBox:    { width: 170, borderWidth: 0.75, borderColor: BRANDL, borderRadius: 4,
-                 backgroundColor: BRANDL, padding: 12, alignItems: "flex-end" },
-  totalLbl:    { fontSize: 7, color: BRAND, letterSpacing: 1, marginBottom: 4, fontWeight: "bold" },
-  totalAmt:    { fontSize: 18, fontWeight: "bold", color: BRAND },
-  totalIncl:   { fontSize: 7, color: BRAND, marginTop: 3, opacity: 0.7 },
-
-  // Table
-  tableWrap: { marginBottom: 10 },
-  thead:     { flexDirection: "row", backgroundColor: BRAND, paddingVertical: 6,
-               borderRadius: 3, marginBottom: 1 },
-  th:        { fontSize: 6.5, fontWeight: "bold", color: WHITE, letterSpacing: 0.5 },
-  tr:        { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: RULE, paddingVertical: 5 },
-  tdLeft:    { fontSize: 8 },
-  tdRight:   { fontSize: 8, textAlign: "right" },
-  tdMuted:   { fontSize: 6.5, color: MUTED, marginTop: 1.5 },
-  tdOpt:     { fontSize: 6.5, color: BRAND, marginTop: 1.5 },
-
-  // Column widths
-  cNo:   { width: 18,  paddingHorizontal: 3 },
-  cDesc: { flex: 1,    paddingHorizontal: 5 },
-  cQty:  { width: 34,  paddingHorizontal: 3 },
-  cUnit: { width: 28,  paddingHorizontal: 3 },
-  cRate: { width: 76,  paddingHorizontal: 3 },
-  cGst:  { width: 32,  paddingHorizontal: 3 },
-  cAmt:  { width: 76,  paddingHorizontal: 3 },
-
-  // Words + totals split row
-  summaryRow:    { flexDirection: "row", gap: 12, marginBottom: 12 },
-  wordsBox:      { flex: 1, paddingTop: 4 },
-  wordsLbl:      { fontSize: 6.5, fontWeight: "bold", color: MUTED, letterSpacing: 0.8, marginBottom: 4 },
-  wordsText:     { fontSize: 8, color: INK, lineHeight: 1.5 },
-
-  totalsBox:     { width: 230 },
-  totRow:        { flexDirection: "row", justifyContent: "space-between",
-                   paddingVertical: 3.5, borderBottomWidth: 0.5, borderBottomColor: RULE },
-  totLbl:        { fontSize: 8, color: MUTED },
-  totVal:        { fontSize: 8 },
-  grandRow:      { flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-                   backgroundColor: BRAND, paddingVertical: 8, paddingHorizontal: 10,
-                   borderRadius: 3, marginTop: 6 },
-  grandLbl:      { fontSize: 8, fontWeight: "bold", color: WHITE, letterSpacing: 0.8 },
-  grandVal:      { fontSize: 13, fontWeight: "bold", color: WHITE },
-
-  // Tax info + terms split row
-  bottomRow:  { flexDirection: "row", gap: 12, borderTopWidth: 0.75, borderTopColor: RULE, paddingTop: 10 },
-  bottomCol:  { flex: 1 },
-  bottomSec:  { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1, marginBottom: 6 },
-  bottomItem: { flexDirection: "row", marginBottom: 4 },
-  bottomLbl:  { fontSize: 7.5, color: MUTED, width: 90 },
-  bottomVal:  { fontSize: 7.5, color: INK, flex: 1 },
-  termsBullet:{ fontSize: 7.5, color: MUTED, lineHeight: 1.55, marginBottom: 2 },
-
-  // Footer
-  footer:     { position: "absolute", bottom: 20, left: 32, right: 32,
-                borderTopWidth: 0.5, borderTopColor: RULE, paddingTop: 5 },
-  footerRow:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  footerText: { fontSize: 6.5, color: MUTED },
-});
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const U: Record<string, string> = {
@@ -140,27 +42,6 @@ function gstRateLabel(cgst: bigint, taxable: bigint): string {
   if (taxable === 0n) return "";
   const rate = Math.round(Number(cgst * 10000n / taxable)) / 100;
   return `(${Number.isInteger(rate) ? rate : rate.toFixed(1)}%)`;
-}
-
-const ONES = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten",
-  "Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
-const TENS = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
-function _w(x: number): string {
-  if (x === 0) return "";
-  if (x < 20) return ONES[x]!;
-  if (x < 100) return (TENS[Math.floor(x/10)]! + (x%10 ? " "+ONES[x%10]! : "")).trim();
-  return (ONES[Math.floor(x/100)]! + " Hundred" + (x%100 ? " "+_w(x%100) : "")).trim();
-}
-function toWords(rupees: bigint): string {
-  const n = Number(rupees / 100n);
-  if (n <= 0) return "Zero Rupees Only";
-  const parts: string[] = [];
-  let r = n;
-  if (r >= 10000000) { parts.push(_w(Math.floor(r/10000000))+" Crore"); r%=10000000; }
-  if (r >= 100000)   { parts.push(_w(Math.floor(r/100000))+" Lakh");    r%=100000; }
-  if (r >= 1000)     { parts.push(_w(Math.floor(r/1000))+" Thousand");  r%=1000; }
-  if (r > 0)         { parts.push(_w(r)); }
-  return parts.join(" ") + " Only";
 }
 
 const DEFAULT_TERMS = [
@@ -292,7 +173,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
         <View style={s.summaryRow} wrap={false}>
           <View style={s.wordsBox}>
             <Text style={s.wordsLbl}>AMOUNT IN WORDS</Text>
-            <Text style={s.wordsText}>{toWords(q.total)}</Text>
+            <Text style={s.wordsText}>{rupeesToWords(q.total)}</Text>
           </View>
           <View style={s.totalsBox}>
             {taxRows.map(({ label, v }) => (

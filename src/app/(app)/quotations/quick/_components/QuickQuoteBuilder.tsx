@@ -30,7 +30,7 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
   const isLeadScoped = !!leadId;
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? "__new__");
   const [newProjectName, setNewProjectName] = useState<string>("");
-  const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
+  const [branchId] = useState<string>(branches[0]?.id ?? "");
   const [validForDays, setValidForDays] = useState<string>("30");
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);

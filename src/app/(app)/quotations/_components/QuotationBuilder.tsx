@@ -45,7 +45,7 @@ export function QuotationBuilder({ projectId, branches }: Props) {
   const today = new Date();
   const nextMonth = new Date(); nextMonth.setDate(today.getDate() + 30);
 
-  const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
+  const [branchId] = useState(branches[0]?.id ?? "");
   const [placeOfSupplyCode, setPlaceOfSupplyCode] = useState("33");
   const [date] = useState(iso(today));
   const [validUntil] = useState(iso(nextMonth));

@@ -90,6 +90,23 @@ export const devContext = cache(async (): Promise<RequestContext> => {
     redirect("/login");
   }
 
+  // Test-only escape hatch: vitest exercises server actions directly without
+  // a request scope / cookie. Fall back to the first OWNER so gate tests can
+  // resolve an orgId. NODE_ENV is set to "test" by vitest automatically and
+  // cannot be set that way in production or dev.
+  if (process.env["NODE_ENV"] === "test") {
+    try {
+      const owner = await prisma.user.findFirstOrThrow({
+        where: { role: "OWNER" },
+        select: { id: true },
+      });
+      const ctx = await buildContext(owner.id);
+      if (ctx) return ctx;
+    } catch {
+      // fall through to redirect
+    }
+  }
+
   // No cookie at all — the middleware should have caught this. If we reach
   // here it's a bug (or a route missed from the public prefixes). Redirect
   // anyway so the user has a working next step.
