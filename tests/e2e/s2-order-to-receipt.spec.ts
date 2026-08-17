@@ -82,11 +82,13 @@ test("invoicing list loads", async ({ page }) => {
 
 // ── Accounts / Receipts ───────────────────────────────────────────────────────
 
-test("accounts page loads with overdue and receipts panels", async ({ page }) => {
+test("accounts page loads with money summary", async ({ page }) => {
   await page.goto("/accounts");
   await expect(page).not.toHaveTitle(/404|500/);
   await expectNoRuntimeError(page);
-  await expect(page.getByText(/overdue|receipt|advance/i).first()).toBeVisible();
+  // Copy was rewritten to plain English (docs/ACCOUNTS-PAGE.md §3) —
+  // no more accounting vocabulary. Assert on the new labels instead.
+  await expect(page.getByText(/to collect|came in|chase these today/i).first()).toBeVisible();
 });
 
 // ── Inventory (stock balances) ────────────────────────────────────────────────
