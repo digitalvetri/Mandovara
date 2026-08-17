@@ -14,11 +14,9 @@ const EMAIL = "aishwarya@mandovara.com";
 const OLD_PWD = "Mandovara@2026";
 const NEW_PWD = "OneTimeSpec_2026!";
 
-// Login card defaults to the Mobile & PIN tab; every credential login in this
-// spec starts by switching to the Password tab. exact:true avoids matching
-// the "Show password" eye toggle whose aria-label also contains "password".
+// Login card is a single password form now (PIN tab was collapsed in the
+// remote 030cc9a merge). No tab-switch needed.
 async function submitPasswordLogin(page: Page, email: string, password: string) {
-  await page.getByRole("button", { name: "Password", exact: true }).click();
   await page.getByLabel(/email or mobile/i).fill(email);
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
