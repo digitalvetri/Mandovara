@@ -27,6 +27,10 @@ const OWNER_STABLE  = "PlaywrightRun_2026!";
 
 setup("authenticate as owner", async ({ page, context }) => {
   await page.goto("/login");
+  // The login card defaults to the Mobile & PIN tab; owner login uses
+  // the Password tab, so switch to it first. exact:true avoids matching
+  // the "Show password" eye toggle.
+  await page.getByRole("button", { name: "Password", exact: true }).click();
   await page.getByLabel(/email or mobile/i).fill(OWNER_EMAIL);
   await page.getByLabel(/^password$/i).fill(OWNER_TEMP);
   await page.getByRole("button", { name: /sign in/i }).click();
@@ -44,6 +48,7 @@ setup("authenticate as owner", async ({ page, context }) => {
     await page.waitForURL(/\/login/, { timeout: 10_000 });
 
     // Log back in with the new password.
+    await page.getByRole("button", { name: "Password", exact: true }).click();
     await page.getByLabel(/email or mobile/i).fill(OWNER_EMAIL);
     await page.getByLabel(/^password$/i).fill(OWNER_STABLE);
     await page.getByRole("button", { name: /sign in/i }).click();

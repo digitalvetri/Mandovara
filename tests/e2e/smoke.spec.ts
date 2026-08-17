@@ -8,6 +8,8 @@ test("login page renders brand mark and sign-in prompt", async ({ page, context 
   await page.goto("/login");
   // "Welcome back" heading is always visible in the right-panel login card
   await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
-  // Login form has a "Sign In" submit button
-  await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
+  // Login card has the two-tab switcher — always visible regardless of
+  // which tab is active. exact:true avoids the "Show password" eye toggle
+  // whose aria-label also contains "password".
+  await expect(page.getByRole("button", { name: "Password", exact: true })).toBeVisible();
 });

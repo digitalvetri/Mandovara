@@ -8,11 +8,21 @@
 // off /login and off /change-password. Cleanup rotates back to the temp so
 // the next seed cycle keeps the assertion valid.
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const EMAIL = "aishwarya@mandovara.com";
 const OLD_PWD = "Mandovara@2026";
 const NEW_PWD = "OneTimeSpec_2026!";
+
+// Login card defaults to the Mobile & PIN tab; every credential login in this
+// spec starts by switching to the Password tab. exact:true avoids matching
+// the "Show password" eye toggle whose aria-label also contains "password".
+async function submitPasswordLogin(page: Page, email: string, password: string) {
+  await page.getByRole("button", { name: "Password", exact: true }).click();
+  await page.getByLabel(/email or mobile/i).fill(email);
+  await page.getByLabel(/^password$/i).fill(password);
+  await page.getByRole("button", { name: /sign in/i }).click();
+}
 
 test("force-change password flow", async ({ page, context }) => {
   // The test projects inherit an already-authenticated storageState — clear
@@ -21,9 +31,7 @@ test("force-change password flow", async ({ page, context }) => {
 
   // 1. Login with temp password
   await page.goto("/login");
-  await page.getByLabel(/email or mobile/i).fill(EMAIL);
-  await page.getByLabel(/^password$/i).fill(OLD_PWD);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await submitPasswordLogin(page, EMAIL, OLD_PWD);
 
   // 2. Land on /change-password (forced)
   await page.waitForURL(/\/change-password/, { timeout: 10_000 });
@@ -39,15 +47,16 @@ test("force-change password flow", async ({ page, context }) => {
   await page.waitForURL(/\/login/, { timeout: 10_000 });
 
   // 5. Old password no longer works
-  await page.getByLabel(/email or mobile/i).fill(EMAIL);
-  await page.getByLabel(/^password$/i).fill(OLD_PWD);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await submitPasswordLogin(page, EMAIL, OLD_PWD);
   await expect(page.getByText(/invalid email\/mobile or password/i)).toBeVisible({ timeout: 5_000 });
 
   // 6. New password works and lands off /login (not on /change-password — flag cleared)
   await page.getByLabel(/^password$/i).fill(NEW_PWD);
   await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login") && !url.pathname.startsWith("/change-password"), { timeout: 10_000 });
+  await page.waitForURL(
+    (url) => !url.pathname.startsWith("/login") && !url.pathname.startsWith("/change-password"),
+    { timeout: 10_000 },
+  );
 
   // Clean up: restore the seeded password + flag so other tests keep working.
   await page.goto("/change-password");
