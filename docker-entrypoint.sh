@@ -16,6 +16,31 @@ if [ $? -ne 0 ]; then
   echo "✗ prisma migrate deploy failed — aborting"; exit 1
 fi
 
+# §3.2 — the restricted role the app runs under. Must come AFTER migrate
+# deploy so newly created tables are covered by the grants. Idempotent.
+#
+# This DOES fail loud: if APP_DATABASE_URL is configured but the role does not
+# exist, the app cannot connect at all. And if we silently skipped it while
+# APP_DATABASE_URL was unset, the app would fall back to the owner connection
+# and Row-Level Security would be silently unenforced — the worst outcome,
+# because everything would appear to work.
+if [ -n "${APP_DB_PASSWORD:-}" ]; then
+  echo "→ Ensuring restricted app role (RLS)..."
+  node /app/scripts/setup-app-role.mjs
+  if [ $? -ne 0 ]; then
+    echo "✗ setup-app-role failed — aborting (RLS would not be enforced)"; exit 1
+  fi
+elif [ -n "${APP_DATABASE_URL:-}" ]; then
+  echo "✗ APP_DATABASE_URL is set but APP_DB_PASSWORD is not — cannot create or"
+  echo "  rotate the restricted role. Set APP_DB_PASSWORD to the same password"
+  echo "  used in APP_DATABASE_URL. Aborting."
+  exit 1
+else
+  echo "⚠  APP_DB_PASSWORD / APP_DATABASE_URL unset — the app will connect as the"
+  echo "   database OWNER and §3.2 Row-Level Security will NOT be enforced."
+  echo "   See docs/DEPLOY-COOLIFY.md before putting real client data in."
+fi
+
 # One-shot wipe of demo/transactional data. Set WIPE_DEMO_DATA=true in
 # Coolify env, redeploy, wipe runs, then remove the env var to prevent
 # re-wipe on next container restart. Non-fatal on error (server should

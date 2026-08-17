@@ -10,7 +10,14 @@ import { printRowCounts } from "./seed/report";
 import { seedTransactions } from "./seed/transactions";
 
 async function main(): Promise<void> {
-  const db = new PrismaClient({ log: [] });
+  // Explicitly the OWNER connection. The seed writes across tenants and must
+  // not pick up APP_DATABASE_URL (the restricted, RLS-bound role) — see §3.2.
+  const db = new PrismaClient({
+    log: [],
+    ...(process.env["DIRECT_URL"] || process.env["DATABASE_URL"]
+      ? { datasourceUrl: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"]! }
+      : {}),
+  });
   const t0 = Date.now();
 
   process.stdout.write("Seed: wiping existing data...\n");

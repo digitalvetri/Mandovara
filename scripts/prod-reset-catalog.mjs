@@ -96,7 +96,11 @@ async function listRugwayCrops() {
 }
 
 async function main() {
-  const prisma = new PrismaClient();
+  // Owner connection: this script rewrites the catalog across the tenant and
+  // must not run under the restricted RLS role (§3.2).
+  const prisma = new PrismaClient({
+    datasourceUrl: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
+  });
   try {
     // ── Pre-flight: verify data folders are present ─────────────
     for (const dir of [FEDORA_SWATCHES, RUGWAY_CROPS]) {
