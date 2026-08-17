@@ -98,3 +98,26 @@ export class ParseError extends Error {
     this.name = "ParseError";
   }
 }
+
+/**
+ * Abbreviated Indian currency for KPI tiles: ₹1.2 Cr · ₹4.5 L · ₹16,500.
+ *
+ * Three components had each grown their own private `shortINR` using
+ * `toLocaleString("en-IN")`, which the §10 "one formatter" rule exists to
+ * prevent — the lint rule only bans the en-US locale, so the drift went
+ * unnoticed. Grouping below the lakh threshold reuses formatINR so the digit
+ * grouping is identical everywhere.
+ */
+export function formatINRShort(p: Paise): string {
+  const isNegative = p < 0n;
+  const a = abs(p);
+  if (a === 0n) return "₹0";
+
+  const rupees = Number(a) / 100;
+  let body: string;
+  if (rupees >= 10_000_000)   body = `₹${(rupees / 10_000_000).toFixed(1)} Cr`;
+  else if (rupees >= 100_000) body = `₹${(rupees / 100_000).toFixed(1)} L`;
+  else                        body = formatINR(a / 100n * 100n);  // whole rupees
+
+  return isNegative ? `(${body})` : body;
+}

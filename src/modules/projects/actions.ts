@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 "use server";
 
 // Project server actions. Every mutation goes through db.scoped(ctx) + audit
@@ -123,6 +122,7 @@ export async function addMilestone(input: unknown): Promise<ActionResult<{ id: s
   const existing = await db.milestone.count({ where: { projectId: d.projectId } });
   const created = await db.milestone.create({
     data: {
+      organizationId: ctx.orgId,
       projectId:   d.projectId,
       name:        d.name,
       plannedDate: new Date(d.plannedDate),
@@ -220,6 +220,7 @@ export async function addSiteLog(input: unknown): Promise<ActionResult<{ id: str
   const db = scoped(ctx);
   const created = await db.siteLog.create({
     data: {
+      organizationId: ctx.orgId,
       projectId:    d.projectId,
       loggedAt:     new Date(d.loggedAt),
       summary:      d.summary,

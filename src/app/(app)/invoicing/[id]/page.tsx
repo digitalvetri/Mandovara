@@ -32,8 +32,8 @@ export default async function InvoiceDetailPage({
   // button next to it makes that flow one-two-three.
   const waText = encodeURIComponent(
     `Namaste ${inv.clientName.split(/\s+/)[0] ?? inv.clientName},\n\n` +
-    `Please find your invoice ${inv.number} for ₹${(Number(inv.total) / 100).toLocaleString("en-IN")} dated ${formatDate(inv.date)}.\n` +
-    (inv.outstanding > 0n ? `Outstanding: ₹${(Number(inv.outstanding) / 100).toLocaleString("en-IN")} due ${formatDate(inv.dueDate)}.\n` : "") +
+    `Please find your invoice ${inv.number} for ${formatINR(inv.total)} dated ${formatDate(inv.date)}.\n` +
+    (inv.outstanding > 0n ? `Outstanding: ${formatINR(inv.outstanding)} due ${formatDate(inv.dueDate)}.\n` : "") +
     `\n— Mandovara, Coimbatore`,
   );
   const waDigits = inv.clientMobile.replace(/\D/g, "");

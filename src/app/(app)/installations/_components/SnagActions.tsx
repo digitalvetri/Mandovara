@@ -8,13 +8,13 @@ import { SNAG_STATUSES, type SnagStatus } from "@/modules/installations/schema";
 import type { ProjectPickerRow } from "@/modules/installations/queries";
 
 const STATUS_LABEL: Record<SnagStatus, string> = {
-  OPEN: "Open", IN_PROGRESS: "In progress", RESOLVED: "Resolved", VERIFIED: "Verified",
+  OPEN: "Open", IN_PROGRESS: "In progress", RESOLVED: "Resolved", CLOSED: "Closed",
 };
 const STATUS_TONE: Record<string, string> = {
   OPEN:        "bg-bad/12 text-bad",
   IN_PROGRESS: "bg-warn/15 text-warn",
   RESOLVED:    "bg-good/12 text-good",
-  VERIFIED:    "bg-good/15 text-good",
+  CLOSED:      "bg-good/15 text-good",
 };
 
 export function SnagStatusChanger({ id, current }: { id: string; current: string }) {

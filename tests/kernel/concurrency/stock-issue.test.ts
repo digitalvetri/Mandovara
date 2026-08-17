@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Gate: 50 parallel stock issues of the same colourway NEVER oversell.
 // Stock starts at 100 units. 50 issues of 3 units each = 150 total demand.
 // At most 33 issues can succeed (99 units); the rest must fail with NegativeStockError.

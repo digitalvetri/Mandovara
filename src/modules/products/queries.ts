@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Products page repository — delegates to the catalog module's searchDesigns.
 // /products is the catalog surface: Brand → Collection → Design → Colourway.
 
@@ -116,9 +115,12 @@ export async function listProducts(
   const pageSize = Math.min(q.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const page = Math.max(1, q.page ?? 1);
 
-  const familyFilter = q.categoryId && q.categoryId !== "ALL"
-    ? (ProductFamilyEnum.safeParse(q.categoryId).success ? q.categoryId : undefined)
-    : undefined;
+  // Narrow through the parse result so the value is a ProductFamily, not a
+  // bare string — safeParse().success alone does not narrow q.categoryId.
+  const familyParse = q.categoryId && q.categoryId !== "ALL"
+    ? ProductFamilyEnum.safeParse(q.categoryId)
+    : null;
+  const familyFilter = familyParse?.success ? familyParse.data : undefined;
   const brandFilter = q.brandId && q.brandId !== "ALL" ? q.brandId : undefined;
 
   const [result, families, brands, priceBand] = await Promise.all([

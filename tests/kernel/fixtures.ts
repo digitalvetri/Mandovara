@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Shared fixtures for kernel tests.
 // Creates two isolated orgs with one branch and one user each, plus one row
 // per representative TENANT_SCOPED model so cross-tenant isolation can be verified.

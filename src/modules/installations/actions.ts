@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 "use server";
 
 // Installations console actions.
@@ -27,11 +26,13 @@ export async function postSnag(input: unknown): Promise<ActionResult<{ id: strin
   if (!parsed.success) return zodError(parsed.error);
   const d = parsed.data;
   const db = scoped(ctx);
-  const created = await db.snagItem.create({
+  const created = await db.snag.create({
     data: {
+      organizationId: ctx.orgId,
       projectId:   d.projectId,
-      location:    d.location,
+      roomLabel:   d.location,
       description: d.description,
+      raisedById:  ctx.userId,
       status:      "OPEN",
     },
     select: { id: true },
@@ -48,10 +49,10 @@ export async function setSnagStatus(input: unknown): Promise<ActionResult<{ id: 
   if (!parsed.success) return zodError(parsed.error);
   const { id, status } = parsed.data;
   const db = scoped(ctx);
-  const before = await db.snagItem.findUniqueOrThrow({
+  const before = await db.snag.findUniqueOrThrow({
     where: { id }, select: { projectId: true },
   });
-  await db.snagItem.update({ where: { id }, data: { status } });
+  await db.snag.update({ where: { id }, data: { status } });
   revalidatePath("/installations");
   revalidatePath(`/projects/${before.projectId}`);
   return { ok: true, data: { id } };

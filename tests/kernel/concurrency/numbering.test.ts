@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Gate: 1,000 parallel number allocations produce zero gaps and zero duplicates.
 // Uses the real Postgres database via the Mandovara NumberSequence model.
 

@@ -32,8 +32,10 @@ test.describe("Lead List — Phase 2 PDF spec", () => {
     await page.goto("/leads");
     // Card-based layout: no HTML table element
     expect(await page.locator("table").count()).toBe(0);
-    // "+ New Lead" is always visible (topbar action, data-independent)
-    await expect(page.getByRole("link", { name: "+ New Lead" })).toBeVisible();
+    // The topbar action is the data-independent one. The "+ New Lead" link in
+    // LeadsTable renders ONLY in the empty state, so asserting it made this
+    // test pass or fail depending on whether another spec had created a lead.
+    await expect(page.getByRole("link", { name: "New Lead", exact: true })).toBeVisible();
     // Either lead cards (with tel: links) or empty state are rendered
     const hasCards = (await page.locator('a[href^="tel:"]').count()) > 0;
     if (hasCards) {
@@ -53,6 +55,7 @@ test.describe("Lead List — Phase 2 PDF spec", () => {
   test("search filters leads", async ({ page }) => {
     await page.goto("/leads");
     const searchInput = page.locator('input[type="search"]');
+    await searchInput.scrollIntoViewIfNeeded();
     await searchInput.fill("Binu");
     await searchInput.press("Enter");
     await expect(page).toHaveURL(/q=Binu/);
@@ -79,7 +82,7 @@ test.describe("Lead List — Phase 2 PDF spec", () => {
     await page.goto("/leads");
     // No HTML table at any viewport size — purely card-based layout
     expect(await page.locator("table").count()).toBe(0);
-    // Page renders without error
-    await expect(page.getByRole("link", { name: "+ New Lead" })).toBeVisible();
+    // Page renders without error. Topbar action, not the empty-state link.
+    await expect(page.getByRole("link", { name: "New Lead", exact: true })).toBeVisible();
   });
 });

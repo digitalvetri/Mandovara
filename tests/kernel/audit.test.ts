@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Audit + immutability tests.
 // - Every mutation through scoped writes exactly 1 audit row with before/after.
 // - AuditLog rejects UPDATE and DELETE at the DB level.

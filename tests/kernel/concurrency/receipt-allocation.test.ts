@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Gate: parallel receipt allocations against the same invoice NEVER over-allocate.
 // Invoice total Rs 10,000. 5 receipts of Rs 5,000 each all try to allocate in parallel.
 // Max allocatable = Rs 10,000 = 2 successful full allocations.

@@ -1,17 +1,18 @@
-// @ts-nocheck
 // DB-backed integration tests for milestone event listeners.
 // Uses the real Postgres — covers the spec's tests #3 and #4:
 //   - measurement.approved auto-completes MEASUREMENT milestone AND
 //     advances project.stage → QUOTATION (but never regresses).
 //   - advance.received with total < required does NOT complete ADVANCE.
 
+import type { ProductFamily } from "@prisma/client";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma as db } from "@/kernel/db/client";
 import { bus } from "@/kernel/events/bus";
 import { registerMilestoneListeners } from "@/kernel/milestones/listeners";
 import { setupTwoTenants, type Tenant } from "../fixtures";
 
-let A: Tenant;
+// `A` holds the PAIR returned by setupTwoTenants; call sites use A.A / A.B.
+let A: { A: Tenant; B: Tenant };
 
 async function makeProject(t: Tenant, stage: "MEASUREMENT" | "QUOTATION" | "ORDERED"): Promise<string> {
   const p = await db.project.create({
@@ -60,7 +61,7 @@ async function insertMilestone(orgId: string, projectId: string, opts: {
       order:            10,
       status:           opts.status ?? "PENDING",
       templateCode:     opts.code,
-      family:           opts.family ?? null,
+      family:           (opts.family ?? null) as ProductFamily | null,
       sourceEvent:      opts.sourceEvent ?? null,
     },
     select: { id: true },
@@ -69,8 +70,7 @@ async function insertMilestone(orgId: string, projectId: string, opts: {
 }
 
 beforeAll(async () => {
-  const t = await setupTwoTenants(db);
-  A = t;
+  A = await setupTwoTenants(db);
   // The register module is normally side-effect-imported from
   // src/kernel/db/client.ts, but under vitest that import chain
   // sometimes doesn't fire — call directly to be safe.

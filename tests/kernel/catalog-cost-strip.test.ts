@@ -1,4 +1,3 @@
-// @ts-nocheck
 // §12.2 Scenario 6 — real-DB gate: searchDesigns strips COST prices for roles
 // that lack catalog.viewCost.
 //

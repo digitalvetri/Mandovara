@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Owner deny-carveout test — segregation of duties (spec §5 test #5).
 //
 // The Owner role has isOwnerRole=true (grants every permission by
@@ -11,9 +10,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { prisma as db } from "@/kernel/db/client";
 import { resolveContext } from "@/kernel/auth/session";
+import type { PermissionKey } from "@/kernel/rbac/permissions";
 import { setupTwoTenants, type Tenant } from "./fixtures";
 
-const OWNER_DENIES = [
+const OWNER_DENIES: PermissionKey[] = [
   "measurement.create.any", "measurement.create.own",
   "measurement.edit.any",   "measurement.edit.own",
   "measurement.submit.any", "measurement.submit.own",

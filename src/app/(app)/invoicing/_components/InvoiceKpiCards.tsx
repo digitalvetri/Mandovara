@@ -3,6 +3,7 @@
 // · credit notes. Numbers use short-lakh formatting (₹4.0 L) instead
 // of the full string when they get big, so the row scans at a glance.
 
+import { formatINRShort } from "@/kernel/money/format";
 import { Receipt, IndianRupee, AlarmClock, RotateCcw } from "lucide-react";
 import type { InvoiceKpis } from "@/modules/invoices/queries";
 
@@ -19,13 +20,13 @@ export function InvoiceKpiCards({ kpis }: Props) {
       />
       <Card
         label="Invoiced (net)"
-        value={shortINR(kpis.invoicedNet)}
+        value={formatINRShort(kpis.invoicedNet)}
         Icon={IndianRupee}
         tone="solid"
       />
       <Card
         label="Invoiced outstanding"
-        value={shortINR(kpis.outstanding)}
+        value={formatINRShort(kpis.outstanding)}
         sub={kpis.outstanding > 0n ? "on invoiced milestones" : "all clear"}
         Icon={AlarmClock}
         tone={kpis.outstanding > 0n ? "heat" : "solid"}
@@ -89,10 +90,3 @@ function Card({
 // Compact Indian format — 12345678 → "1.2 Cr", 400000 → "4.0 L".
 // Anything under 1 lakh renders in full so no precision is lost on small
 // numbers that fit on the line easily.
-function shortINR(paise: bigint): string {
-  if (paise === 0n) return "₹0";
-  const rupees = Number(paise) / 100;
-  if (rupees >= 10_000_000) return `₹${(rupees / 10_000_000).toFixed(1)} Cr`;
-  if (rupees >= 100_000)    return `₹${(rupees / 100_000).toFixed(1)} L`;
-  return `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
-}

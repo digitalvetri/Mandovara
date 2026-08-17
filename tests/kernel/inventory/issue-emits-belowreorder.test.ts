@@ -1,4 +1,3 @@
-// @ts-nocheck
 // issueStock is the physical-decrement path for the Make + Install flows.
 // When an issue drops on-hand through the reorder line, it must return a
 // crossing telling its caller to publish `stock.belowReorder` after commit.

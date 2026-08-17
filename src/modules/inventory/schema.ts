@@ -1,6 +1,5 @@
 // Zod schemas for the redesigned inventory module.
 //
-// The old @ts-nocheck adjustment schema referenced Product / Warehouse
 // models that don't exist in the current schema. Rewritten against
 // Colourway + StockBalance + StockMove.
 

@@ -2,7 +2,10 @@
 
 import { z } from "zod";
 
-export const SNAG_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED"] as const;
+// Must mirror the Prisma SnagStatus enum exactly. It previously listed
+// "VERIFIED", which does not exist in the enum — setting it would have thrown
+// at the database. @ts-nocheck on the action file hid the mismatch.
+export const SNAG_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
 export type SnagStatus = (typeof SNAG_STATUSES)[number];
 
 export const postSnagSchema = z.object({

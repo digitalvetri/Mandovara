@@ -1,9 +1,23 @@
-﻿// @ts-nocheck
 // Installations console repository.
 
 import { scoped } from "@/kernel/db/scoped";
+import type { ProjectStage } from "@prisma/client";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+
+// Project.stage values that mean "work is in flight" for the install desk.
+const IN_FLIGHT_STAGES = [
+  "ORDERED", "PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING",
+] as ProjectStage[];
+
+// billingAddress is a Json column, not a relation — read the city defensively.
+function cityOf(addr: unknown): string | null {
+  if (addr && typeof addr === "object" && "city" in addr) {
+    const c = (addr as { city?: unknown }).city;
+    return typeof c === "string" ? c : null;
+  }
+  return null;
+}
 
 export interface UpcomingMilestone {
   id: string;
@@ -21,7 +35,7 @@ export interface UpcomingMilestone {
 
 export interface SnagRow {
   id: string;
-  location: string;
+  location: string | null;   // Snag.roomLabel is nullable
   description: string;
   status: string;
   createdAt: Date;
@@ -52,7 +66,7 @@ export async function loadInstallations(
       where: {
         status: { in: ["PENDING", "ACTIVE"] },
         plannedDate: { gte: startOfDayIST(now), lte: horizon },
-        project: { status: { in: ["PLANNING", "ACTIVE"] } },
+        project: { stage: { in: IN_FLIGHT_STAGES } },
       },
       orderBy: { plannedDate: "asc" },
       take: 100,
@@ -62,28 +76,25 @@ export async function loadInstallations(
           select: {
             id: true, number: true, name: true,
             client: {
-              select: {
-                name: true, primaryMobile: true,
-                addresses: { where: { isDefault: true }, take: 1, select: { city: true } },
-              },
+              select: { name: true, mobile: true, billingAddress: true },
             },
           },
         },
       },
     }),
-    db.snagItem.findMany({
+    db.snag.findMany({
       where: {
         status: { in: ["OPEN", "IN_PROGRESS"] },
-        project: { status: { in: ["PLANNING", "ACTIVE"] } },
+        project: { stage: { in: IN_FLIGHT_STAGES } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { raisedAt: "desc" },
       take: 100,
       select: {
-        id: true, location: true, description: true, status: true, createdAt: true,
+        id: true, roomLabel: true, description: true, status: true, raisedAt: true,
         project: { select: { id: true, number: true, name: true } },
       },
     }),
-    db.project.count({ where: { status: "ACTIVE" } }),
+    db.project.count({ where: { stage: { in: IN_FLIGHT_STAGES } } }),
   ]);
 
   return {
@@ -93,12 +104,12 @@ export async function loadInstallations(
       billingPct: m.billingPct.toString(), status: m.status,
       projectId: m.project.id, projectNumber: m.project.number, projectName: m.project.name,
       clientName: m.project.client.name,
-      clientMobile: m.project.client.primaryMobile,
-      city: m.project.client.addresses[0]?.city ?? null,
+      clientMobile: m.project.client.mobile,
+      city: cityOf(m.project.client.billingAddress),
     })),
     snags: snags.map((s) => ({
-      id: s.id, location: s.location, description: s.description,
-      status: s.status, createdAt: s.createdAt,
+      id: s.id, location: s.roomLabel, description: s.description,
+      status: s.status, createdAt: s.raisedAt,
       projectId: s.project.id, projectNumber: s.project.number, projectName: s.project.name,
     })),
     activeProjectCount,
@@ -112,7 +123,7 @@ export async function listActiveProjectsForSnag(ctx: RequestContext): Promise<Pr
   requirePermission(ctx, "project.view");
   const db = scoped(ctx);
   const rows = await db.project.findMany({
-    where: { status: { in: ["PLANNING", "ACTIVE"] } },
+    where: { stage: { in: IN_FLIGHT_STAGES } },
     orderBy: { createdAt: "desc" },
     take: 100,
     select: { id: true, number: true, name: true },

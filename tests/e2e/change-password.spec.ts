@@ -10,7 +10,14 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
-const EMAIL = "aishwarya@mandovara.com";
+// This spec MUTATES a real user's password, so each Playwright project needs
+// its own victim. Running chromium and mobile-android against one shared user
+// in parallel raced: whichever worker rotated first made the other's "login
+// with temp password" fail.
+const EMAIL_BY_PROJECT: Record<string, string> = {
+  chromium:         "aishwarya@mandovara.com",
+  "mobile-android": "karthik@mandovara.com",
+};
 const OLD_PWD = "Mandovara@2026";
 const NEW_PWD = "OneTimeSpec_2026!";
 
@@ -22,7 +29,8 @@ async function submitPasswordLogin(page: Page, email: string, password: string) 
   await page.getByRole("button", { name: /sign in/i }).click();
 }
 
-test("force-change password flow", async ({ page, context }) => {
+test("force-change password flow", async ({ page, context }, testInfo) => {
+  const EMAIL = EMAIL_BY_PROJECT[testInfo.project.name] ?? "aishwarya@mandovara.com";
   // The test projects inherit an already-authenticated storageState — clear
   // cookies so /login actually renders the form instead of redirecting.
   await context.clearCookies();

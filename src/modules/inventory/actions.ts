@@ -15,7 +15,7 @@
 // creates in-app Notifications for STORE + OWNER users.
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { orgPrisma } from "@/kernel/db/rls";
@@ -53,7 +53,7 @@ export async function adjustStock(input: unknown): Promise<ActionResult<{ id: st
   if (!cw.isActive) return { ok: false, error: "Product is inactive" };
 
   const dyeLot = d.dyeLot?.trim() || null;
-  const deltaDec = new Prisma.Decimal(d.delta);
+  const deltaDec = new Decimal(d.delta);
   const ratePaise = typeof d.ratePaise === "bigint" ? d.ratePaise
                   : d.ratePaise ? BigInt(d.ratePaise) : 0n;
 
@@ -64,7 +64,7 @@ export async function adjustStock(input: unknown): Promise<ActionResult<{ id: st
       where:  { colourwayId: cw.id, dyeLot },
       select: { id: true, quantity: true, value: true },
     });
-    const curQty   = existing ? new Prisma.Decimal(existing.quantity) : new Prisma.Decimal(0);
+    const curQty   = existing ? new Decimal(existing.quantity) : new Decimal(0);
     const curVal   = existing?.value ?? 0n;
     const nextQty  = curQty.plus(deltaDec);
     // Value: if adding, use the provided rate; if removing, take away
@@ -151,7 +151,7 @@ export async function setReorderLevel(input: unknown): Promise<ActionResult<{ id
 
   await db.colourway.update({
     where: { id: d.colourwayId },
-    data:  { reorderLevel: d.level == null ? null : new Prisma.Decimal(d.level) },
+    data:  { reorderLevel: d.level == null ? null : new Decimal(d.level) },
   });
 
   // If the new threshold puts current on-hand at/below it, fire the

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Scoping tests: verifies cross-tenant and cross-branch isolation.
 // - A user in org A querying a model owned by org B receives 0 rows.
 // - A branch-scoped user cannot see another branch's data.

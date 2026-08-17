@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use server";
 
 // Leads server actions. Every mutation:
@@ -7,6 +6,7 @@
 //   - writes through db.scoped(ctx) so tenant scope + audit apply (Rules 1, 4)
 //   - emits a domain event after commit (Rule 5)
 
+import type { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
@@ -187,7 +187,7 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id
     });
 
     publish({
-      type: "lead.stageChanged",
+      type: "lead.statusChanged",
       orgId: ctx.orgId,
       actorId: ctx.userId,
       occurredAt: new Date(),
@@ -270,7 +270,7 @@ export async function convertLead(
   };
 
   // All soft project intake fields go into siteAddress JSON — never overload orderValue or expectedInstallAt
-  const projSiteAddr: Record<string, unknown> = {
+  const projSiteAddr: Prisma.InputJsonObject = {
     ...(addr ?? {}),
     ...(projectType       && { projectType }),
     ...(siteCity          && { city: siteCity }),

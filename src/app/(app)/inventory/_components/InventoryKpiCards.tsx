@@ -2,6 +2,7 @@
 // Same visual pattern as InvoiceKpiCards + ProjectKpiCards so every
 // landing page in the app reads consistently.
 
+import { formatINRShort } from "@/kernel/money/format";
 import { Package, AlertTriangle, ShoppingCart, IndianRupee } from "lucide-react";
 import type { InventoryKpis } from "@/modules/inventory/queries";
 
@@ -32,7 +33,7 @@ export function InventoryKpiCards({ kpis }: Props) {
       />
       <Card
         label="Stock value"
-        value={shortINR(kpis.stockValuePaise)}
+        value={formatINRShort(kpis.stockValuePaise)}
         sub="at last cost"
         Icon={IndianRupee}
         tone="solid"
@@ -73,10 +74,3 @@ function Card({
   );
 }
 
-function shortINR(paise: bigint): string {
-  if (paise === 0n) return "—";
-  const rupees = Number(paise) / 100;
-  if (rupees >= 10_000_000) return `₹${(rupees / 10_000_000).toFixed(1)} Cr`;
-  if (rupees >= 100_000)    return `₹${(rupees / 100_000).toFixed(1)} L`;
-  return `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
-}

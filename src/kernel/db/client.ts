@@ -22,8 +22,19 @@ declare global {
 //
 // Without this split the RLS migration is decorative: Postgres silently skips
 // row security for superusers, and the default docker-compose owner is one.
-const runtimeDatasourceUrl =
-  process.env["APP_DATABASE_URL"] || process.env["DATABASE_URL"];
+//
+// Under vitest the harness builds cross-tenant fixtures directly, so it needs
+// the owner connection. The guard mirrors dev-context.ts: NODE_ENV=test AND no
+// NEXT_RUNTIME (vitest never sets NEXT_RUNTIME; Next always does), which closes
+// the "someone typos NODE_ENV=test into production env" hole. The RLS isolation
+// suite builds its own client from APP_DATABASE_URL explicitly, so it still
+// exercises the restricted role.
+const isVitest =
+  process.env["NODE_ENV"] === "test" && !process.env["NEXT_RUNTIME"];
+
+const runtimeDatasourceUrl = isVitest
+  ? process.env["DATABASE_URL"]
+  : process.env["APP_DATABASE_URL"] || process.env["DATABASE_URL"];
 
 /** Reuse the same client across HMR reloads in development. */
 export const prisma: PrismaClient =

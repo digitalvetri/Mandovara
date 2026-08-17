@@ -2,6 +2,7 @@
 // Mirrors the invoicing landing (InvoiceKpiCards) so the shell reads
 // consistently: label · value · icon · muted subline.
 
+import { formatINRShort } from "@/kernel/money/format";
 import { HardHat, Ruler, AlarmClock, IndianRupee } from "lucide-react";
 import type { ProjectKpis } from "@/modules/projects/queries";
 
@@ -33,7 +34,7 @@ export function ProjectKpiCards({ kpis }: Props) {
       />
       <Card
         label="Receivables"
-        value={shortINR(kpis.receivablesTotal)}
+        value={formatINRShort(kpis.receivablesTotal)}
         sub={kpis.receivablesTotal > 0n ? "outstanding across projects" : "nothing due"}
         Icon={IndianRupee}
         tone={kpis.receivablesTotal > 0n ? "heat" : "solid"}
@@ -84,10 +85,3 @@ function Card({
   );
 }
 
-function shortINR(paise: bigint): string {
-  if (paise === 0n) return "₹0";
-  const rupees = Number(paise) / 100;
-  if (rupees >= 10_000_000) return `₹${(rupees / 10_000_000).toFixed(1)} Cr`;
-  if (rupees >= 100_000)    return `₹${(rupees / 100_000).toFixed(1)} L`;
-  return `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
-}

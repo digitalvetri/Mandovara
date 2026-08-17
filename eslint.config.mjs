@@ -113,37 +113,22 @@ export default tseslint.config(
     },
   },
 
-  // Phase-parked module files — @ts-nocheck is intentional while the full
-  // module rewrite is pending (Phases 4-8). Remove each pattern as the module
-  // is implemented and the nocheck is removed.
+  // Module code may not import @prisma/client directly (§10 boundary rule) and
+  // may not use @ts-nocheck. The blanket "phase-parked" override that used to
+  // sit here disabled no-restricted-imports, no-explicit-any, max-lines AND
+  // ban-ts-comment across ~20 module directories — i.e. most of the app — so
+  // the boundary rule the spec calls for was effectively unenforced, and
+  // @ts-nocheck on 7 files (1,692 LOC) hid real bugs: a non-existent
+  // `snagItem` model, `Project.status` (the column is `stage`),
+  // `Client.primaryMobile` (it is `mobile`), a `lead.stageChanged` event that
+  // is not in the union, a "VERIFIED" snag status absent from the enum, and
+  // two creates missing organizationId. All are fixed; the override is gone.
+  //
+  // Only tests/kernel keeps the relaxed prisma-import rule, because test
+  // fixtures legitimately construct cross-tenant data.
   {
-    files: [
-      "src/modules/accounts/**/*.ts",
-      "src/modules/admin/**/*.ts",
-      "src/modules/attendance/**/*.ts",
-      "src/modules/clients/**/*.ts",
-      "src/modules/dashboard/**/*.ts",
-      "src/modules/employees/**/*.ts",
-      "src/modules/followups/**/*.ts",
-      "src/modules/installations/**/*.ts",
-      "src/modules/inventory/**/*.ts",
-      "src/modules/invoices/**/*.ts",
-      "src/modules/leads/**/*.ts",
-      "src/modules/orders/**/*.ts",
-      "src/modules/payroll/**/*.ts",
-      "src/modules/products/**/*.ts",
-      "src/modules/projects/**/*.ts",
-      "src/modules/purchase/**/*.ts",
-      "src/modules/quotations/**/*.ts",
-      "src/modules/receipts/**/*.ts",
-      "src/modules/vendors/**/*.ts",
-      "src/modules/whatsapp/**/*.ts",
-      "tests/kernel/**/*.ts",
-    ],
+    files: ["tests/kernel/**/*.ts"],
     rules: {
-      "@typescript-eslint/ban-ts-comment": "off",
-      // These files reference legacy models; other rules also relax until ported
-      "@typescript-eslint/no-explicit-any": "off",
       "no-restricted-imports": "off",
       "max-lines": "off",
     },
