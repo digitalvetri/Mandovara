@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { FirstRunTour } from "./_components/FirstRunTour";
 import { OverviewTab }   from "./_tabs/OverviewTab";
 import { ToCollectTab }  from "./_tabs/ToCollectTab";
 import { ReceivedTab }   from "./_tabs/ReceivedTab";
@@ -52,6 +54,13 @@ export default async function AccountsPage({
         }
       />
       <Tabs tabs={TABS} className="mb-6" />
+
+      {/* First-run tour — only fires on Overview, once per browser */}
+      {activeTab === "overview" && (
+        <Suspense fallback={null}>
+          <FirstRunTour />
+        </Suspense>
+      )}
 
       {activeTab === "overview"   ? <OverviewTab ctx={ctx} /> : null}
       {activeTab === "to-collect" ? <ToCollectTab ctx={ctx} bucket={params.bucket} /> : null}

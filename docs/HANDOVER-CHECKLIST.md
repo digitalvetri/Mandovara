@@ -34,10 +34,19 @@ One-page checklist for handing this application over to Mandovara. Work through 
 
 ## Known limitations at handover (be honest with the client)
 
-- WhatsApp integration is scaffolded but not wired to a Meta WABA — see CLAUDE.md §9 for what needs to be turned on before it works.
+- WhatsApp integration is scaffolded but not wired to a Meta WABA — see CLAUDE.md §9 for what needs to be turned on before it works. Until then, the /accounts chase list uses a `wa.me` deep-link (opens WhatsApp with a pre-composed message; Rohit still hits Send) — works today, no template approval needed.
 - HR module (attendance, payroll) is schema-complete but no UI yet.
 - E-invoicing (IRN/GST portal) is schema-complete, actual submission flow not wired.
 - Measurement offline sync passes local tests but hasn't been validated on a real Android device in poor connectivity.
+
+### /accounts redesign — what shipped, what's pending
+
+- ✅ Six phases of `docs/ACCOUNTS-PAGE.md` are live: plain-language dictionary, chase-score kernel (33 boundary tests), Overview shell with 4 KPI cards + Chase List + 4 bar charts + Attention strip, 3-tap Record Payment sheet, four detail tabs (To Collect / Received / To Pay / Spending), first-run tour.
+- ⏳ **Bulk reminders** ("send a reminder to every 60+ days late client") from the To Collect tab — deferred. The single-row WhatsApp button in Chase List does the job for now, one client at a time.
+- ⏳ **Vendor-payment tracking** on the To Pay tab — Expense rows have a "Mark paid" button (schema field added in Phase 1); PurchaseOrder rows don't, because the PO status enum tracks receipt-of-goods (`SENT → PARTIAL → RECEIVED`), not payment-of-money. Proper vendor payment needs a schema addition (`PurchaseOrder.paidAt` or a separate `VendorPayment` model).
+- ⏳ **Materialized view for `client_outstanding`** — spec §12 proposed one for scale; kept in reserve. Current shape is a batched Prisma query, fast enough at <1k open invoices per org. Bring the MV in when the Overview load starts crossing 1.5s on real data.
+- ⏳ **`Undo` toast** on the Payment sheet (spec §8) — a receipt-reversal action wrapping bounceReceipt-style logic would let a mis-click get taken back within 8s. Skipped for MVP.
+- ⏳ **Live perf measurement** — do this against the deployed prod once it has 24 months of real receipts. Chrome DevTools → Performance → record → open /accounts → confirm the four KPI numbers appear inside 1.5s and paste the network trace into a follow-up commit if you want a record.
 
 ## Support
 

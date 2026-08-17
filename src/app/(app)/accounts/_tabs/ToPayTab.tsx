@@ -8,6 +8,7 @@ import { formatDate } from "@/kernel/datetime";
 import { can } from "@/kernel/rbac/guard";
 import { loadToPay, type ToPayRow } from "@/modules/accounts/to-pay";
 import { daysLateLabel } from "./_shared";
+import { MarkPaidButton } from "../_components/MarkPaidButton";
 
 interface Props {
   ctx: Awaited<ReturnType<typeof devContext>>;
@@ -112,8 +113,15 @@ function Group({ title, note, rows }: { title: string; note: string; rows: ToPay
                 <span className="tabular">{formatDate(r.dueDate)}</span>
               </div>
             </div>
-            <div className="tabular text-[13.5px] text-text font-medium whitespace-nowrap">
-              {formatINR(r.amount)}
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              <div className="tabular text-[13.5px] text-text font-medium whitespace-nowrap">
+                {formatINR(r.amount)}
+              </div>
+              {/* Mark-paid only on Expense rows for now — PO payment tracking
+                  needs a schema addition (see docs/HANDOVER-CHECKLIST.md). */}
+              {r.kind === "EXPENSE" && (
+                <MarkPaidButton expenseId={r.id.slice("exp:".length)} />
+              )}
             </div>
           </li>
         ))}
