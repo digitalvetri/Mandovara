@@ -21,7 +21,9 @@ import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kern
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import { computeCalcResult } from "@/modules/measurement/engine";
+import type { ProductFamily } from "@prisma/client";
 import type { ActionResult } from "./actions";
+import { findMeasurementGateViolation } from "./lib";
 import { quickQuoteSchema } from "./quick-schemas";
 
 export async function createQuickQuote(
@@ -77,6 +79,30 @@ export async function createQuickQuote(
   for (const l of d.lines) {
     if (!cwMap.has(l.colourwayId)) {
       return { ok: false, error: `Colourway ${l.colourwayId.slice(0, 8)}… not found or inactive.` };
+    }
+  }
+
+  // ── §0.10 / §15.1 measurement gate ─────────────────────────────
+  // Client-scoped quick quotes auto-create a preliminary Measurement round
+  // below, so every line gets a real measurementItemId. Lead-scoped quotes
+  // have no Project to hang a round off — so rather than writing a
+  // made-to-measure line with measurementItemId = null (which is exactly
+  // what §15.1 forbids, with no exception), we refuse the line and tell the
+  // user the next action. Hardware, motors, accessories and service are
+  // still quotable against a bare lead.
+  if (isLeadScoped) {
+    const violation = findMeasurementGateViolation(
+      d.lines,
+      (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,
+      { isLeadScoped: true, labelOf: (id) => cwMap.get(id)?.design.name },
+    );
+    if (violation) {
+      return {
+        ok: false,
+        errorCode: "MEASUREMENT_REQUIRED",
+        error: "Validation failed",
+        fieldErrors: { [`lines.${violation.index}.colourwayId`]: violation.message },
+      };
     }
   }
 

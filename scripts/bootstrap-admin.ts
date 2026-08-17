@@ -24,12 +24,23 @@ const CONFIG = {
     stateCode:     "33",
   },
   admin: {
-    name:     "Rohit",
-    mobile:   "+918940430051",
-    email:    "rohit@mandovara.com",
-    password: "Mandovara@2026",
+    name:   "Rohit",
+    mobile: "+918940430051",
+    email:  "rohit@mandovara.com",
+    // No hardcoded default. Supply it at run time so a real production
+    // password never lives in the repo (or in a shipped sourcemap):
+    //   BOOTSTRAP_ADMIN_PASSWORD='...' pnpm tsx scripts/bootstrap-admin.ts
+    password: process.env["BOOTSTRAP_ADMIN_PASSWORD"] ?? "",
   },
 };
+
+if (!CONFIG.admin.password || CONFIG.admin.password.length < 10) {
+  console.error(
+    "BOOTSTRAP_ADMIN_PASSWORD must be set and at least 10 characters.\n" +
+    "  BOOTSTRAP_ADMIN_PASSWORD='<strong password>' pnpm tsx scripts/bootstrap-admin.ts",
+  );
+  process.exit(1);
+}
 
 async function main(): Promise<void> {
   const db = new PrismaClient();

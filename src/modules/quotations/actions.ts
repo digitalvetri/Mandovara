@@ -13,7 +13,7 @@ import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import { bus } from "@/kernel/events/bus";
 import "@/kernel/events/register";
-import { MADE_TO_MEASURE_FAMILIES } from "./lib";
+import { findMeasurementGateViolation } from "./lib";
 import { createQuotationSchema, setStatusSchema, quotationLineInput, type QuotationLineInput } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -89,38 +89,34 @@ export async function createQuotation(
     : [];
   const cwMap = new Map(colourways.map((c) => [c.id, c]));
 
-  // § 0.10 / § 15.1 — server-side measurement gate. Enforced only for
-  // client-scoped quotes (real projects with measurement rounds). Lead-
-  // scoped quotes are preliminary estimates — no project, no measurements
-  // — so the gate is relaxed. A proper on-site measurement + revised
-  // quote lands after conversion.
-  if (!quoteLeadId) {
-    for (let i = 0; i < d.lines.length; i++) {
-      const line = d.lines[i]!;
-      if (line.measurementItemId) continue;
-
-      if (line.colourwayId) {
-        const cw = cwMap.get(line.colourwayId);
-        if (!cw) {
-          return {
-            ok: false,
-            error: "Validation failed",
-            fieldErrors: { [`lines.${i}.colourwayId`]: "Colourway not found" },
-          };
-        }
-        const family = cw.design.family as ProductFamily;
-        if (MADE_TO_MEASURE_FAMILIES.has(family)) {
-          return {
-            ok: false,
-            errorCode: "MEASUREMENT_REQUIRED",
-            error: "Validation failed",
-            fieldErrors: {
-              [`lines.${i}.measurementItemId`]:
-                `${family} is made-to-measure — a measurement item must be linked before quoting`,
-            },
-          };
-        }
-      }
+  // § 0.10 / § 15.1 — server-side measurement gate. Applies to EVERY quote,
+  // lead-scoped or not: the non-negotiable has no exception. A lead-scoped
+  // quote simply cannot carry a made-to-measure line, because there is no
+  // project to hang a measurement round off — the user must convert the lead
+  // first. Hardware, motors, accessories and service remain quotable.
+  for (let i = 0; i < d.lines.length; i++) {
+    const line = d.lines[i]!;
+    if (line.colourwayId && !cwMap.get(line.colourwayId)) {
+      return {
+        ok: false,
+        error: "Validation failed",
+        fieldErrors: { [`lines.${i}.colourwayId`]: "Colourway not found" },
+      };
+    }
+  }
+  {
+    const violation = findMeasurementGateViolation(
+      d.lines,
+      (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,
+      { isLeadScoped: !!quoteLeadId },
+    );
+    if (violation) {
+      return {
+        ok: false,
+        errorCode: "MEASUREMENT_REQUIRED",
+        error: "Validation failed",
+        fieldErrors: { [`lines.${violation.index}.measurementItemId`]: violation.message },
+      };
     }
   }
 
@@ -429,24 +425,19 @@ export async function updateQuotationLines(
     : [];
   const cwMap = new Map(colourways.map((c) => [c.id, c]));
 
-  for (let i = 0; i < d.lines.length; i++) {
-    const line = d.lines[i]!;
-    if (line.measurementItemId) continue;
-    if (line.colourwayId) {
-      const cw = cwMap.get(line.colourwayId);
-      if (!cw) continue;
-      const family = cw.design.family as ProductFamily;
-      if (MADE_TO_MEASURE_FAMILIES.has(family)) {
-        return {
-          ok: false,
-          errorCode: "MEASUREMENT_REQUIRED",
-          error: "Validation failed",
-          fieldErrors: {
-            [`lines.${i}.measurementItemId`]:
-              `${family} is made-to-measure — a measurement item must be linked before quoting`,
-          },
-        };
-      }
+  {
+    const violation = findMeasurementGateViolation(
+      d.lines,
+      (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,
+      { isLeadScoped: false },
+    );
+    if (violation) {
+      return {
+        ok: false,
+        errorCode: "MEASUREMENT_REQUIRED",
+        error: "Validation failed",
+        fieldErrors: { [`lines.${violation.index}.measurementItemId`]: violation.message },
+      };
     }
   }
 

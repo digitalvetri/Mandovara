@@ -8,7 +8,7 @@ One-page checklist for handing this application over to Mandovara. Work through 
 
 - [ ] **Set `SESSION_SECRET` on Coolify** — 64-char hex from `openssl rand -hex 32`. Rotating this invalidates every logged-in session. See DEPLOY-COOLIFY.md §5.
 - [ ] **Set `COOKIE_SECURE=false` on Coolify** — required while running over plain HTTP (sslip.io). Remove once TLS lands. Without this, login silently fails.
-- [ ] **Remove `ALLOW_DEV_AUTH` from Coolify** — the escape hatch was deleted from the code; the variable is dead weight. Confirm nothing else references it.
+- [ ] **Remove `ALLOW_DEV_AUTH` from Coolify** — the escape hatch has now genuinely been deleted from the code (it was still live and still gating PIN login when this line first claimed otherwise). The variable is dead weight; remove it. `grep -rn ALLOW_DEV_AUTH src/` returns nothing.
 - [ ] **Seed the production database** — `docker exec <app-container> node /app/scripts/prod-reset-catalog.mjs` from Coolify's web terminal. See DEPLOY-COOLIFY.md §8.
 - [ ] **Enable Coolify Postgres backups** — Databases → mandovara-postgres → Backups → add a daily schedule. See DEPLOY-COOLIFY.md "Postgres backups" section.
 - [ ] **Distribute staff credentials** — email/mobile + the temporary password `Mandovara@2026`. Every seeded account is flagged `mustChangePassword=true`, so each staff member is forced to pick their own password on first sign-in.

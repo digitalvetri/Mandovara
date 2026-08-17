@@ -74,7 +74,7 @@ Open the app service → **Environment Variables** tab → add these:
 
 Leave WhatsApp / GSP secrets empty for now — they only matter when Phase 6 / 8 code paths run.
 
-> ⚠️ **Remove any `ALLOW_DEV_AUTH` env var if you set it earlier.** That escape hatch has been deleted from the code; leaving the variable in place does nothing but is misleading. The only way in is now a real email/mobile + password login against a bcrypt hash.
+> ⚠️ **Remove any `ALLOW_DEV_AUTH` env var if you set it earlier.** That escape hatch has been deleted from the code; leaving the variable in place does nothing but is misleading. The two ways in are a real email/mobile + password login and a mobile + 4-digit PIN login, both bcrypt-verified and both issuing an HMAC-signed session cookie. Both are rate-limited to 5 failed attempts per 15 minutes per identifier.
 
 ---
 

@@ -3,7 +3,7 @@ import type { ProductFamily } from "@prisma/client";
 // Made-to-measure families (§1.1, CLAUDE.md).
 // Every quotation line for these families MUST carry a measurementItemId (§0.10 / §15.1).
 // Supporting families — hardware, accessories, service — may be quoted without measurement.
-export const MADE_TO_MEASURE_FAMILIES = new Set<ProductFamily>([
+export const MADE_TO_MEASURE_FAMILIES: ReadonlySet<ProductFamily> = new Set<ProductFamily>([
   "CURTAIN_FABRIC",
   "SHEER",
   "LINING",
@@ -17,3 +17,58 @@ export const MADE_TO_MEASURE_FAMILIES = new Set<ProductFamily>([
   "INTERIOR_FILM",
   "MURAL",
 ]);
+
+// ── §0.10 / §15.1 measurement gate ──────────────────────────────────────────
+// The single implementation of non-negotiable #1: no made-to-measure
+// quotation line may exist without a linked MeasurementItem. It applies to
+// EVERY quotation path — new, revision, and quick — and to lead-scoped
+// quotes as well as client-scoped ones. A lead has no Project and therefore
+// no measurement round, so a made-to-measure line against a lead is refused
+// outright and the user is told to convert the lead first.
+
+export interface GateLine {
+  colourwayId?:       string | null;
+  measurementItemId?: string | null;
+}
+
+export interface GateViolation {
+  index:   number;
+  family:  ProductFamily;
+  /** Plain-English next action, safe to show in a field error. */
+  message: string;
+}
+
+/**
+ * Returns the first line that breaches the gate, or null when all lines pass.
+ *
+ * @param familyOf  resolves a colourwayId to its ProductFamily; return
+ *                  undefined for an unknown colourway (the caller reports
+ *                  that separately as a validation error).
+ * @param opts.isLeadScoped  changes only the wording of the next action.
+ * @param opts.labelOf       optional human label (design name) for the message.
+ */
+export function findMeasurementGateViolation(
+  lines: readonly GateLine[],
+  familyOf: (colourwayId: string) => ProductFamily | undefined,
+  opts: { isLeadScoped: boolean; labelOf?: (colourwayId: string) => string | undefined },
+): GateViolation | null {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!;
+    if (line.measurementItemId) continue;
+    if (!line.colourwayId) continue;
+
+    const family = familyOf(line.colourwayId);
+    if (!family || !MADE_TO_MEASURE_FAMILIES.has(family)) continue;
+
+    const label = opts.labelOf?.(line.colourwayId) ?? family;
+    const message = opts.isLeadScoped
+      ? `${label} is made-to-measure (${family}). Convert this lead to a client ` +
+        `so a measurement round can be captured, or quote only hardware, motor, ` +
+        `accessory and service lines against a lead.`
+      : `${label} is made-to-measure (${family}) — a measurement item must be ` +
+        `linked before quoting.`;
+
+    return { index, family, message };
+  }
+  return null;
+}
