@@ -7,6 +7,7 @@ import { listReceipts } from "@/modules/receipts/queries";
 import { loadAccountsOverview } from "@/modules/accounts/queries";
 import { ReceiptsTable } from "./_components/ReceiptsTable";
 import { Headline, SectionCard, MoneyOwedList, RecentPaymentsList } from "./_components/AccountsWidgets";
+import { PaymentHistoryChart, type HistoryPoint } from "./_components/PaymentHistoryChart";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,14 @@ export default async function AccountsPage({
   const owedClientCount = overview.topClients.length;
   const hasOwed         = overview.outstanding > 0n;
 
+  // BigInt can't cross the RSC → client component boundary — stringify amounts.
+  const historyPoints: HistoryPoint[] = overview.paymentHistory.map((p) => ({
+    monthKey: p.monthKey,
+    label:    p.label,
+    amount:   p.amount.toString(),
+    count:    p.count,
+  }));
+
   return (
     <>
       <Topbar
@@ -48,6 +57,11 @@ export default async function AccountsPage({
         overdue={overview.overdue}
         clientCount={owedClientCount}
       />
+
+      {/* Payment history chart */}
+      <section className="mb-6 rounded-[14px] bg-surface border border-rule p-5 md:p-6">
+        <PaymentHistoryChart points={historyPoints} />
+      </section>
 
       {/* Two-column body: Money owed | Recent payments */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

@@ -47,6 +47,17 @@ export interface RecentReceiptRow {
   unallocated: bigint;
 }
 
+export interface PaymentHistoryPoint {
+  /** YYYY-MM key, e.g. "2026-08" */
+  monthKey: string;
+  /** Short label for the axis, e.g. "Aug" or "Aug '26" if year rolls */
+  label:    string;
+  /** Total paise received in this month */
+  amount:   bigint;
+  /** Number of receipts in this month */
+  count:    number;
+}
+
 export interface AccountsOverview {
   invoiced:            bigint;
   received:            bigint;
@@ -61,6 +72,8 @@ export interface AccountsOverview {
   topClients:          OutstandingClientRow[];
   recentReceipts:      RecentReceiptRow[];
   activeBucket:        AgingBucket["key"] | null;
+  /** Last 12 months of payments received, oldest → newest, gaps zero-filled */
+  paymentHistory:      PaymentHistoryPoint[];
 }
 
 export async function loadAccountsOverview(
@@ -205,6 +218,9 @@ export async function loadAccountsOverview(
     ? openRows.filter((r) => r.bucketKey === opts.bucketFilter)
     : openRows;
 
+  // ── 12-month payment history ────────────────────────────────────
+  const paymentHistory = await buildPaymentHistory(db, today);
+
   return {
     invoiced,
     received,
@@ -223,5 +239,49 @@ export async function loadAccountsOverview(
       mode: r.mode, amount: r.amount, unallocated: r.unallocated,
     })),
     activeBucket: opts.bucketFilter ?? null,
+    paymentHistory,
   };
+}
+
+const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/** Sum receipts by yyyy-mm for the last 12 months, zero-filling gaps. */
+async function buildPaymentHistory(
+  db: ReturnType<typeof scoped>,
+  today: Date,
+): Promise<PaymentHistoryPoint[]> {
+  // Bucket start: first day of (today - 11 months). Inclusive lower bound.
+  const from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+
+  const rows = await db.receipt.findMany({
+    where:   { date: { gte: from } },
+    select:  { date: true, amount: true },
+    orderBy: { date: "asc" },
+  });
+
+  const sums = new Map<string, { amount: bigint; count: number }>();
+  for (const r of rows) {
+    const key = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
+    const cur = sums.get(key);
+    if (cur) { cur.amount += r.amount; cur.count += 1; }
+    else       sums.set(key, { amount: r.amount, count: 1 });
+  }
+
+  // Emit exactly 12 buckets, oldest → newest, zero-filling gaps.
+  const points: PaymentHistoryPoint[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d       = new Date(from.getFullYear(), from.getMonth() + i, 1);
+    const key     = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label   = d.getMonth() === 0                                  // year-boundary label
+      ? `${MONTH_LABELS[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
+      : MONTH_LABELS[d.getMonth()]!;
+    const bucket  = sums.get(key);
+    points.push({
+      monthKey: key,
+      label,
+      amount:   bucket?.amount ?? 0n,
+      count:    bucket?.count  ?? 0,
+    });
+  }
+  return points;
 }
