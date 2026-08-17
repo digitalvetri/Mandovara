@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
-import type { OutstandingClientRow, RecentReceiptRow } from "@/modules/accounts/queries";
+import type { OutstandingClientRow, RecentReceiptRow, OutflowRow } from "@/modules/accounts/queries";
 
 // ── Headline (one big number) ─────────────────────────────────────
 export function Headline({
@@ -11,7 +11,7 @@ export function Headline({
   const nothingDue = owed === 0n;
 
   return (
-    <section className="mb-6 rounded-[14px] bg-surface border border-rule p-6 md:p-8">
+    <section className="mb-4 rounded-[14px] bg-surface border border-rule p-6 md:p-8">
       <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-2">
         You are owed
       </div>
@@ -35,6 +35,39 @@ export function Headline({
         )}
       </div>
     </section>
+  );
+}
+
+// ── Money In / Out / Net strip ───────────────────────────────────
+// Sits directly under Headline. Compares totals over the last 12 months
+// so the shop owner can see if they're net-positive on cash-flow. Only
+// renders when the viewer has permission to see any outflow at all
+// (the `hidden` flag is set upstream in the query).
+export function InOutStrip({
+  moneyIn, moneyOut,
+}: { moneyIn: bigint; moneyOut: bigint }) {
+  const net       = moneyIn - moneyOut;
+  const netTone   = net >= 0n ? "text-good" : "text-bad";
+  const netSign   = net >= 0n ? "" : "−";
+  const netAbs    = net < 0n ? -net : net;
+
+  return (
+    <section className="mb-6 grid grid-cols-3 divide-x divide-rule rounded-[14px] bg-surface border border-rule overflow-hidden">
+      <Stat label="Money in (last 12 mo)"  value={formatINR(moneyIn)}          tone="text-text" />
+      <Stat label="Money out (last 12 mo)" value={formatINR(moneyOut)}         tone="text-text" />
+      <Stat label="Net"                    value={`${netSign}${formatINR(netAbs)}`} tone={netTone} />
+    </section>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className="px-5 py-4 md:px-6 md:py-5">
+      <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-1.5">{label}</div>
+      <div className={`font-display text-[20px] md:text-[24px] font-semibold tabular-nums leading-none ${tone}`}>
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -147,6 +180,66 @@ export function RecentPaymentsList({ rows }: { rows: RecentReceiptRow[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+// ── Recent expenses & salary (unified outflow feed) ──────────────
+const OUTFLOW_KIND_LABEL: Record<OutflowRow["kind"], string> = {
+  SALARY:          "Salary",
+  EXPENSE:         "Overhead",
+  PROJECT_EXPENSE: "Project",
+};
+const OUTFLOW_KIND_TONE: Record<OutflowRow["kind"], string> = {
+  SALARY:          "bg-info/10 text-info",
+  EXPENSE:         "bg-warn/10 text-warn",
+  PROJECT_EXPENSE: "bg-accent/10 text-accent",
+};
+
+export function RecentOutflowsList({ rows }: { rows: OutflowRow[] }) {
+  return (
+    <ul className="divide-y divide-rule/60">
+      {rows.map((r) => (
+        <li key={r.id} className="px-5 py-3.5 flex items-baseline justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-medium uppercase tracking-[0.06em] ${OUTFLOW_KIND_TONE[r.kind]}`}>
+                {OUTFLOW_KIND_LABEL[r.kind]}
+              </span>
+              <div className="text-[13px] text-text truncate">{r.label}</div>
+            </div>
+            <div className="text-[11px] text-text-dim tabular">{formatDate(r.date)}</div>
+          </div>
+          <div className="tabular text-[13.5px] text-text font-medium whitespace-nowrap">
+            −{formatINR(r.amount)}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function RecentOutflowsEmpty() {
+  return (
+    <div className="px-5 py-6">
+      <p className="text-[12.5px] text-text mb-3">
+        Salary payments (from finalised payroll runs) and business expenses
+        will appear here — the most recent eight.
+      </p>
+      <ul className="space-y-1.5 mb-4 text-[11.5px] text-text-dim">
+        <li>
+          <span className="text-text font-medium">Salary</span> — from a paid
+          monthly payroll run.
+        </li>
+        <li>
+          <span className="text-text font-medium">Overhead</span> — rent,
+          utilities, office costs.
+        </li>
+        <li>
+          <span className="text-text font-medium">Project</span> — labour,
+          site travel, materials tagged to a specific project.
+        </li>
+      </ul>
+    </div>
   );
 }
 

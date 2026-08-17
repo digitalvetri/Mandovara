@@ -7,10 +7,12 @@ import { listReceipts } from "@/modules/receipts/queries";
 import { loadAccountsOverview } from "@/modules/accounts/queries";
 import { ReceiptsTable } from "./_components/ReceiptsTable";
 import {
-  Headline, SectionCard, MoneyOwedList, RecentPaymentsList,
-  MoneyOwedEmpty, RecentPaymentsEmpty,
+  Headline, InOutStrip, SectionCard,
+  MoneyOwedList, RecentPaymentsList, RecentOutflowsList,
+  MoneyOwedEmpty, RecentPaymentsEmpty, RecentOutflowsEmpty,
 } from "./_components/AccountsWidgets";
 import { PaymentModeChart, type ModeSlice } from "./_components/PaymentModeChart";
+import { OutflowChart, type OutflowSlice } from "./_components/OutflowChart";
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +42,20 @@ export default async function AccountsPage({
     amount: m.amount.toString(),
     count:  m.count,
   }));
+  const outflowSlices: OutflowSlice[] = overview.outflowKinds.map((k) => ({
+    kind:   k.kind,
+    label:  k.label,
+    amount: k.amount.toString(),
+    count:  k.count,
+  }));
+
+  const showMoneyOut = !overview.moneyOut.hidden;
 
   return (
     <>
       <Topbar
         title="Accounts & Payments"
-        eyebrow="Track money owed to you and record payments received"
+        eyebrow="Money coming in from clients and going out to staff + expenses"
         actions={
           <Link href={"/accounts/new" as Route}>
             <PrimaryButton>+ Record Payment</PrimaryButton>
@@ -53,21 +63,32 @@ export default async function AccountsPage({
         }
       />
 
-      {/* Headline: one big number, plain English */}
+      {/* Headline: single big "you are owed" number */}
       <Headline
         owed={overview.outstanding}
         overdue={overview.overdue}
         clientCount={owedClientCount}
       />
 
-      {/* Payment-mode donut */}
-      <section className="mb-6 rounded-[14px] bg-surface border border-rule p-5 md:p-6">
-        <PaymentModeChart slices={modeSlices} />
-      </section>
+      {/* In / Out / Net strip — visible only if viewer can see any outflow */}
+      {showMoneyOut && (
+        <InOutStrip moneyIn={overview.moneyOut.moneyIn} moneyOut={overview.moneyOut.total} />
+      )}
 
-      {/* Two-column body: Money owed | Recent payments */}
+      {/* Two donuts: How you're paid | Where money goes */}
+      <div className={`grid grid-cols-1 ${showMoneyOut ? "lg:grid-cols-2" : ""} gap-4 mb-6`}>
+        <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
+          <PaymentModeChart slices={modeSlices} />
+        </section>
+        {showMoneyOut && (
+          <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
+            <OutflowChart slices={outflowSlices} />
+          </section>
+        )}
+      </div>
+
+      {/* Two-column lists: Money owed to you | Recent payments received */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-
         <SectionCard
           title="Money owed to you"
           note={hasOwed ? `${owedClientCount} client${owedClientCount === 1 ? "" : "s"}` : undefined}
@@ -78,15 +99,28 @@ export default async function AccountsPage({
         </SectionCard>
 
         <SectionCard
-          title="Recent payments"
-          note={overview.recentReceipts.length > 0 ? "Last 8 received" : undefined}
+          title="Recent payments received"
+          note={overview.recentReceipts.length > 0 ? "Last 8" : undefined}
         >
           {overview.recentReceipts.length === 0
             ? <RecentPaymentsEmpty />
             : <RecentPaymentsList rows={overview.recentReceipts} />}
         </SectionCard>
-
       </div>
+
+      {/* Recent expenses & salary — only if viewer has any outflow permission */}
+      {showMoneyOut && (
+        <div className="mb-6">
+          <SectionCard
+            title="Recent expenses & salary"
+            note={overview.recentOutflows.length > 0 ? "Last 8" : undefined}
+          >
+            {overview.recentOutflows.length === 0
+              ? <RecentOutflowsEmpty />
+              : <RecentOutflowsList rows={overview.recentOutflows} />}
+          </SectionCard>
+        </div>
+      )}
 
       {/* Full receipt log — kept for accounts / audit view */}
       <div id="all-receipts" className="mb-2 text-[11px] uppercase tracking-[0.14em] text-text-dim">

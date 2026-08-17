@@ -1,5 +1,5 @@
 import { scoped } from "@/kernel/db/scoped";
-import { requirePermission } from "@/kernel/rbac/guard";
+import { requirePermission, can } from "@/kernel/rbac/guard";
 import { computeOutstanding } from "@/kernel/money/outstanding";
 import type { RequestContext } from "@/kernel/auth/context";
 
@@ -55,6 +55,23 @@ export interface PaymentModeSlice {
   count:  number;
 }
 
+/** One aggregated bucket in the outflow donut. */
+export interface OutflowKindSlice {
+  kind:   "SALARY" | "EXPENSE" | "PROJECT_EXPENSE";
+  label:  string;
+  amount: bigint;
+  count:  number;
+}
+
+/** One row in the recent outflow feed — unified across payslips, expenses, project expenses. */
+export interface OutflowRow {
+  id:     string;    // prefixed: "pay:xxx" | "exp:xxx" | "prj:xxx"
+  kind:   OutflowKindSlice["kind"];
+  date:   Date;
+  label:  string;    // "Salary — Rajesh (Aug 2026)", "Rent — August", "Site labour — Villa Kannan"
+  amount: bigint;
+}
+
 export interface AccountsOverview {
   invoiced:            bigint;
   received:            bigint;
@@ -71,6 +88,25 @@ export interface AccountsOverview {
   activeBucket:        AgingBucket["key"] | null;
   /** Last 12 months of payments grouped by payment mode, largest first */
   paymentModes:        PaymentModeSlice[];
+  /** Money-out summary for the last 12 months. */
+  moneyOut: {
+    /** Total across all outflow categories, in paise. */
+    total:       bigint;
+    /** Sum of paid payslip netPay. */
+    salary:      bigint;
+    /** Sum of Expense.amount. */
+    expense:     bigint;
+    /** Sum of ProjectExpense.amount. */
+    projectExpense: bigint;
+    /** Total money in over the same period (for the net line). */
+    moneyIn:     bigint;
+    /** True if the viewer lacks permission to see any outflow — hide the whole strip. */
+    hidden:      boolean;
+  };
+  /** Outflow donut slices for the last 12 months, largest first. */
+  outflowKinds:        OutflowKindSlice[];
+  /** Last 8 outflows across salary + expense + project expense, newest first. */
+  recentOutflows:      OutflowRow[];
 }
 
 export async function loadAccountsOverview(
@@ -236,6 +272,9 @@ export async function loadAccountsOverview(
   // ── 12-month payment-mode breakdown for the donut ───────────────
   const paymentModes = await buildPaymentModes(db, today);
 
+  // ── 12-month money-out (salary + expenses) ──────────────────────
+  const outflow = await buildMoneyOut(ctx, db, today);
+
   return {
     invoiced,
     received,
@@ -260,6 +299,9 @@ export async function loadAccountsOverview(
     })),
     activeBucket: opts.bucketFilter ?? null,
     paymentModes,
+    moneyOut:       outflow.summary,
+    outflowKinds:   outflow.kinds,
+    recentOutflows: outflow.recent,
   };
 }
 
@@ -304,4 +346,135 @@ async function buildPaymentModes(
     }))
     .filter((s) => s.amount > 0n)
     .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0));
+}
+
+const MONTH_LABEL_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+interface MoneyOutBundle {
+  summary: AccountsOverview["moneyOut"];
+  kinds:   OutflowKindSlice[];
+  recent:  OutflowRow[];
+}
+
+/** Load 12 months of outflows across salary + expenses + project expenses,
+ * gated per-permission so viewers without the right scope see zeros +
+ * the `hidden` flag set (page then hides the entire strip). */
+async function buildMoneyOut(
+  ctx: RequestContext,
+  db: ReturnType<typeof scoped>,
+  today: Date,
+): Promise<MoneyOutBundle> {
+  const from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+  const canExpense = can(ctx, "expense.view");
+  const canPayroll = can(ctx, "payroll.view");
+
+  // No visibility on any outflow → hide the whole strip.
+  if (!canExpense && !canPayroll) {
+    return {
+      summary: {
+        total: 0n, salary: 0n, expense: 0n, projectExpense: 0n,
+        moneyIn: 0n, hidden: true,
+      },
+      kinds:  [],
+      recent: [],
+    };
+  }
+
+  // Parallel-fetch the three sources the viewer can see.
+  const [paidSlips, expenses, projectExpenses, incomingTotal] = await Promise.all([
+    canPayroll
+      ? db.payslip.findMany({
+          where: { run: { status: "PAID", paidAt: { gte: from } } },
+          select: {
+            id: true, netPay: true, employeeId: true,
+            run: { select: { month: true, year: true, paidAt: true } },
+          },
+          orderBy: { id: "desc" },
+        })
+      : Promise.resolve([]),
+    canExpense
+      ? db.expense.findMany({
+          where:   { incurredAt: { gte: from } },
+          select:  { id: true, amount: true, head: true, description: true, incurredAt: true },
+          orderBy: { incurredAt: "desc" },
+        })
+      : Promise.resolve([]),
+    canExpense
+      ? db.projectExpense.findMany({
+          where:   { incurredAt: { gte: from } },
+          select:  {
+            id: true, amount: true, head: true, description: true, incurredAt: true,
+            project: { select: { name: true } },
+          },
+          orderBy: { incurredAt: "desc" },
+        })
+      : Promise.resolve([]),
+    db.receipt.aggregate({
+      _sum: { amount: true },
+      where: { date: { gte: from } },
+    }),
+  ]);
+
+  // Employee-name lookup for salary rows
+  const employeeIds = [...new Set(paidSlips.map((p) => p.employeeId))];
+  const employees = employeeIds.length > 0
+    ? await db.employee.findMany({
+        where: { id: { in: employeeIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const employeeName = new Map(employees.map((e) => [e.id, e.name]));
+
+  // ── Totals ────────────────────────────────────────────────────
+  const salary        = paidSlips.reduce((s, p) => s + p.netPay, 0n);
+  const expense       = expenses.reduce((s, e) => s + e.amount, 0n);
+  const projectExpense = projectExpenses.reduce((s, e) => s + e.amount, 0n);
+  const total         = salary + expense + projectExpense;
+  const moneyIn       = incomingTotal._sum.amount ?? 0n;
+
+  // ── Donut slices (largest first, zero slices dropped) ─────────
+  const kindsRaw: OutflowKindSlice[] = [
+    { kind: "SALARY",          label: "Salary",           amount: salary,         count: paidSlips.length },
+    { kind: "EXPENSE",         label: "Expenses",         amount: expense,        count: expenses.length },
+    { kind: "PROJECT_EXPENSE", label: "Project spend",    amount: projectExpense, count: projectExpenses.length },
+  ];
+  const kinds = kindsRaw
+    .filter((k) => k.amount > 0n)
+    .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0));
+
+  // ── Unified recent feed: last 8 across all three ──────────────
+  const feed: OutflowRow[] = [
+    ...paidSlips.map((p) => ({
+      id:     `pay:${p.id}`,
+      kind:   "SALARY" as const,
+      date:   p.run.paidAt ?? new Date(),
+      label:  `Salary — ${employeeName.get(p.employeeId) ?? "employee"} (${MONTH_LABEL_SHORT[p.run.month - 1]} ${p.run.year})`,
+      amount: p.netPay,
+    })),
+    ...expenses.map((e) => ({
+      id:     `exp:${e.id}`,
+      kind:   "EXPENSE" as const,
+      date:   e.incurredAt,
+      label:  `${e.head} — ${e.description}`,
+      amount: e.amount,
+    })),
+    ...projectExpenses.map((e) => ({
+      id:     `prj:${e.id}`,
+      kind:   "PROJECT_EXPENSE" as const,
+      date:   e.incurredAt,
+      label:  `${e.head} — ${e.project.name}`,
+      amount: e.amount,
+    })),
+  ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 8);
+
+  return {
+    summary: {
+      total, salary, expense, projectExpense, moneyIn,
+      hidden: false,
+    },
+    kinds,
+    recent: feed,
+  };
 }
