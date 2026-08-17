@@ -16,20 +16,28 @@ export interface FlooringInput {
   herringboneWastagePct?: number;  // default 15
   // ── door openings to subtract from perimeter skirting (running feet)
   doorOpeningsRft?: number;
+  // ── roll goods (sheet vinyl / SPC roll). When set, the result is reported
+  //    as roll length + seams instead of boxes. Absorbed from the former
+  //    /lib/calc/flooring.ts so one calculator serves both (§15.2).
+  rollWidthMm?:     number;
 }
 
 export interface FlooringResult {
-  readonly engineVersion: "flooring@1.2.0";
+  readonly engineVersion: "flooring@2.0.0";
   areaSqft:       number;
   wastagePct:     number;
   areaWithWastage: number;
   boxesRequired:  number;
   skirtingRft:    number | null;  // null if room dimensions not provided
-  materialUnit:   "BOX";
+  materialUnit:   "BOX" | "ROLL";
+  // ── roll goods only, null for box-packed product
+  stripsRequired: number | null;
+  rollLengthM:    number | null;
+  seamCount:      number | null;
   warnings:       string[];
 }
 
-const ENGINE_VERSION  = "flooring@1.2.0" as const;
+const ENGINE_VERSION  = "flooring@2.0.0" as const;
 const MM2_PER_SQFT    = 92_903.04;
 
 const DEFAULT_WASTAGE: Record<LayPattern, number> = {
@@ -49,6 +57,7 @@ export function calcFlooring(input: FlooringInput): FlooringResult {
     diagonalWastagePct    = DEFAULT_WASTAGE.DIAGONAL,
     herringboneWastagePct = DEFAULT_WASTAGE.HERRINGBONE,
     doorOpeningsRft       = 0,
+    rollWidthMm,
   } = input;
 
   const warnings: string[] = [];
@@ -80,6 +89,30 @@ export function calcFlooring(input: FlooringInput): FlooringResult {
   const areaWithWastage = areaSqft * (1 + wastagePct / 100);
   const boxesRequired   = Math.ceil(areaWithWastage / areaPerBoxSqft);
 
+  // ── Roll goods: strips across the room width, seams between them ─────────
+  let stripsRequired: number | null = null;
+  let rollLengthM:    number | null = null;
+  let seamCount:      number | null = null;
+
+  if (rollWidthMm !== undefined) {
+    if (!(rollWidthMm > 0)) {
+      throw new Error(`calcFlooring: rollWidthMm must be > 0, got ${rollWidthMm}`);
+    }
+    if (roomLengthMm === undefined || roomWidthMm === undefined) {
+      warnings.push("Roll goods need room dimensions — strip and seam count omitted.");
+    } else {
+      stripsRequired = Math.ceil(roomWidthMm / rollWidthMm);
+      rollLengthM    = parseFloat(((stripsRequired * roomLengthMm) / 1000).toFixed(3));
+      seamCount      = stripsRequired - 1;
+      if (seamCount > 0) {
+        warnings.push(
+          `${seamCount} seam${seamCount > 1 ? "s" : ""} required — ` +
+          `confirm placement with the client before ordering.`,
+        );
+      }
+    }
+  }
+
   return {
     engineVersion:   ENGINE_VERSION,
     areaSqft:        parseFloat(areaSqft.toFixed(3)),
@@ -87,7 +120,10 @@ export function calcFlooring(input: FlooringInput): FlooringResult {
     areaWithWastage: parseFloat(areaWithWastage.toFixed(3)),
     boxesRequired,
     skirtingRft,
-    materialUnit:    "BOX",
+    materialUnit:    rollWidthMm !== undefined ? "ROLL" : "BOX",
+    stripsRequired,
+    rollLengthM,
+    seamCount,
     warnings,
   };
 }

@@ -87,4 +87,77 @@ describe("calcFlooring — §7.4", () => {
     expect(r.wastagePct).toBe(12);
     expect(r.boxesRequired).toBe(Math.ceil(100 * 1.12 / BOX_AREA));
   });
+
+  // ── Roll goods (sheet vinyl / SPC roll), absorbed from the former
+  //    /lib/calc/flooring.ts so one calculator serves both product kinds.
+  describe("roll goods", () => {
+    it("multiple drops report strips, roll length and seams", () => {
+      const r = calcFlooring({
+        roomLengthMm:   4000,
+        roomWidthMm:    3500,
+        layPattern:     "STRAIGHT",
+        areaPerBoxSqft: BOX_AREA,
+        rollWidthMm:    1220,
+      });
+      expect(r.materialUnit).toBe("ROLL");
+      expect(r.stripsRequired).toBe(3);          // ceil(3500/1220)
+      expect(r.rollLengthM).toBe(12);            // 3 × 4000mm
+      expect(r.seamCount).toBe(2);
+      expect(r.warnings.some((w) => w.includes("2 seams required"))).toBe(true);
+    });
+
+    it("a single seam is reported in the singular", () => {
+      const r = calcFlooring({
+        roomLengthMm:   4000,
+        roomWidthMm:    3500,
+        layPattern:     "STRAIGHT",
+        areaPerBoxSqft: BOX_AREA,
+        rollWidthMm:    2000,
+      });
+      expect(r.seamCount).toBe(1);
+      expect(r.warnings.some((w) => w.includes("1 seam required"))).toBe(true);
+    });
+
+    it("a room narrower than the roll is a single seamless drop", () => {
+      const r = calcFlooring({
+        roomLengthMm:   4000,
+        roomWidthMm:    3500,
+        layPattern:     "STRAIGHT",
+        areaPerBoxSqft: BOX_AREA,
+        rollWidthMm:    3660,
+      });
+      expect(r.stripsRequired).toBe(1);
+      expect(r.seamCount).toBe(0);
+      expect(r.warnings.some((w) => w.includes("seam"))).toBe(false);
+    });
+
+    it("rejects a non-positive roll width", () => {
+      expect(() => calcFlooring({
+        roomLengthMm: 4000, roomWidthMm: 3500,
+        layPattern: "STRAIGHT", areaPerBoxSqft: BOX_AREA, rollWidthMm: 0,
+      })).toThrow(/rollWidthMm must be > 0/);
+    });
+
+    it("warns when roll goods are requested without room dimensions", () => {
+      const r = calcFlooring({
+        areaSqft:       100,
+        layPattern:     "STRAIGHT",
+        areaPerBoxSqft: BOX_AREA,
+        rollWidthMm:    1220,
+      });
+      expect(r.stripsRequired).toBeNull();
+      expect(r.warnings.some((w) => w.includes("need room dimensions"))).toBe(true);
+    });
+
+    it("box-packed product leaves the roll fields null", () => {
+      const r = calcFlooring({
+        roomLengthMm: 4000, roomWidthMm: 3500,
+        layPattern: "STRAIGHT", areaPerBoxSqft: BOX_AREA,
+      });
+      expect(r.materialUnit).toBe("BOX");
+      expect(r.stripsRequired).toBeNull();
+      expect(r.rollLengthM).toBeNull();
+      expect(r.seamCount).toBeNull();
+    });
+  });
 });

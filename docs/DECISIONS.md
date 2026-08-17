@@ -210,3 +210,40 @@
 **Context:** The field attendance page (`/m/attend`) was not scaffolded in Phase 7. All attendance marking is done via the office-surface attendance page. The gate test demonstrates the full lock → run → reconcile flow with real DB records.
 
 **Consequence:** Field staff cannot punch in/out without network connectivity. This is a Phase 8 hardening item alongside the install PWA offline queue.
+
+---
+
+## 2026-08-18 · §7.2 OFFSET formula: the spec contradicts itself — acceptance row wins
+
+**Decision:** The half-drop (OFFSET) wallpaper cut length is
+`ceil(h / repeat) × repeat + repeat/2`, not the formula printed in §7.2's prose.
+
+**Context:** §7.2 states the formula as `ceil((h + repeat/2) / repeat) × repeat`.
+For the canonical 2700mm wall with a 640mm repeat that yields **3200mm** — which is
+byte-identical to a STRAIGHT match, so the same section's required warning
+("half-drop match adds 1 roll") could never fire. §7.2's own acceptance row demands
+**cut 3520mm, 2 strips/roll, 4 rolls**, which holds only when the half-repeat is
+added *after* rounding up. The acceptance row and the warning narrative agree with
+each other and disagree with the prose formula, so the prose is treated as the error.
+
+This was found because the codebase shipped **two** wallpaper calculators that had
+each followed a different half of the contradiction: `src/kernel/calc/wallpaper.ts`
+(which persists `CalcResult` and prices the quotation) implemented the prose formula
+and returned 3 rolls, while `src/lib/calc/wallpaper.ts` (behind the on-site estimator
+panel) implemented the acceptance row and returned 4. A salesperson standing in a
+client's living room saw a different roll count from the one the quotation printed.
+
+**Consequence:** `src/lib/calc/` is deleted; `src/kernel/calc/` is the only material
+maths in the codebase, per §15.2. Its wallpaper engine is versioned `wallpaper@2.0.0`
+and now also carries the repeat-taller-than-wall fallback, input validation, the
+cut-longer-than-roll guard and the stricter deduction predicate (area > 1.5 m² AND
+spans full height AND at least one roll width) that only the /lib copy had.
+`flooring@2.0.0` absorbed roll-goods support (strips, roll length, seams).
+Sent quotations are unaffected — §7.7.4 freezes `calcSnapshot` at send time.
+
+**Still to confirm with Mandovara (Phase 0 gate, outstanding):** every constant in §7
+— fullness ratios, hem and heading allowances, wastage percentages, eyelet spacing,
+minimum blind charge, standard fabric and roll widths — remains as specified in
+CLAUDE.md and has NOT been validated against 20 historical jobs with their tailor,
+installer and store keeper. `src/modules/measurement/engine.ts` DEFAULTS are
+spec-sourced placeholders. This is a blocking Phase 0 item that is still open.

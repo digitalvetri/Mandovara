@@ -20,6 +20,10 @@ export interface CurtainInput {
   bottomHemMm?:         number;          // default 150 (total heading+bottom = 300mm)
   eyeletSpacingMm?:     number;          // default 160
   liningRequired?:      boolean;
+  // Railroading runs the fabric horizontally off a WIDE bolt (§4: 2800mm),
+  // which is a different bolt from the vertical-run width. Defaults to
+  // fabricWidthMm when the same bolt is used for both.
+  railroadedFabricWidthMm?: number;
 }
 
 export interface CurtainResult {
@@ -53,6 +57,7 @@ export function calcCurtain(input: CurtainInput): CurtainResult {
     bottomHemMm         = 150,
     eyeletSpacingMm     = 160,
     liningRequired      = false,
+    railroadedFabricWidthMm = input.fabricWidthMm,
   } = input;
 
   const warnings: string[] = [];
@@ -90,7 +95,7 @@ export function calcCurtain(input: CurtainInput): CurtainResult {
   const canRailroad =
     patternMatch === "FREE" &&
     railroadable &&
-    dropWithAllowances <= fabricWidthMm;
+    dropWithAllowances <= railroadedFabricWidthMm;
 
   let chosenRun: FabricRun = "VERTICAL";
   let fabricMetres = verticalMetres;
