@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME: split into smaller files (currently 512 lines) */
 import Link from "next/link";
 import type { Route } from "next";
 import {

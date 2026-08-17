@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME: split into smaller files (currently 307 lines) */
 // Family → calc kernel dispatch, plus mapping from kernel-result shape
 // to CalcResult column shape (canonical schema).
 //

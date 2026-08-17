@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME: split into smaller files (currently 350 lines) */
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";

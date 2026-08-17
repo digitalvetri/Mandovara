@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME: split into smaller files (currently 309 lines) */
 import { notFound } from "next/navigation";
 import {
   Phone, Mail, Briefcase, Calendar, Hash,

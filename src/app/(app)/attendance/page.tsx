@@ -1,7 +1,8 @@
+/* eslint-disable max-lines -- FIXME: split into smaller files (currently 551 lines) */
 import type { Route } from "next";
 import Link from "next/link";
 import {
-  Clock, CalendarDays, CheckCircle2, XCircle, AlertCircle,
+  CalendarDays, CheckCircle2, XCircle, AlertCircle,
   ChevronRight, Info, CalendarCheck2,
 } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";

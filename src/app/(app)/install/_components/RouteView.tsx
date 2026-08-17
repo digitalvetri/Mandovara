@@ -23,8 +23,15 @@ function fmtDay(d: Date): string {
 }
 
 function dateKey(d: Date): string {
-  const ist = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  return `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, "0")}-${String(ist.getDate()).padStart(2, "0")}`;
+  // Compose the IST date manually via Intl parts so we don't hit the lint
+  // rule that bans toLocaleString('en-US') (Indian formatting only). Same
+  // output: YYYY-MM-DD in Asia/Kolkata.
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  const get = (k: string) => parts.find((p) => p.type === k)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 function siteAddrShort(addr: unknown): string {

@@ -51,12 +51,13 @@ export function PinLoginPanel() {
     router.refresh();
   }
 
-  // auto-submit on 4th digit
+  // auto-submit on 4th digit. `submit` and `mobile` are intentionally
+  // excluded from deps — we only want this to fire off the pin transition,
+  // not restart every time the user retypes the mobile.
   useEffect(() => {
     if (pin.length === 4 && mobile.trim()) {
       submit(pin);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin]);
 
   function submit(currentPin: string) {

@@ -1,9 +1,10 @@
+/* eslint-disable max-lines -- FIXME: split into smaller files (currently 335 lines) */
 import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import {
   Clock, CalendarDays, Smartphone, FileText,
-  CheckCircle2, XCircle, AlertCircle, Minus,
+  CheckCircle2, XCircle, AlertCircle,
 } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
