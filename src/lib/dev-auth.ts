@@ -89,6 +89,50 @@ export async function devLoginByCredential(
   }
 }
 
+export async function loginByMobilePin(
+  mobile: string,
+  pin: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_DEV_AUTH"] !== "true") {
+    return { ok: false, error: "Auth disabled in production" };
+  }
+
+  if (!/^\d{4}$/.test(pin)) {
+    return { ok: false, error: "PIN must be exactly 4 digits" };
+  }
+
+  // Normalize: strip spaces, ensure +91 prefix
+  const digits = mobile.replace(/\D/g, "");
+  const normalized =
+    digits.length === 10 ? `+91${digits}` :
+    digits.length === 12 && digits.startsWith("91") ? `+${digits}` :
+    mobile.trim();
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: { mobile: normalized },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) {
+      return { ok: false, error: "No account found for this mobile number" };
+    }
+
+    if (!user.passwordHash) {
+      return { ok: false, error: "PIN not set for this account. Contact admin." };
+    }
+
+    const valid = await bcrypt.compare(pin, user.passwordHash);
+    if (!valid) return { ok: false, error: "Incorrect PIN" };
+
+    const jar = await cookies();
+    jar.set(COOKIE, user.id, { httpOnly: true, path: "/", maxAge: MAX_AGE, sameSite: "lax" });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Database unavailable — check DATABASE_URL" };
+  }
+}
+
 export async function devLogout(): Promise<void> {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);

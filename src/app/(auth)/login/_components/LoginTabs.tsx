@@ -3,9 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { devLoginByCredential } from "@/lib/dev-auth";
-import { Loader2, Eye, EyeOff, ArrowRight, Info } from "lucide-react";
+import {
+  Loader2, Eye, EyeOff, ArrowRight, Info,
+  Smartphone, KeyRound,
+} from "lucide-react";
 import { MandovaraLogo } from "./MandovaraLogo";
 import { CredentialsPanel, DEFAULT_PASSWORD } from "./CredentialsPanel";
+import { PinLoginPanel } from "./PinLoginPanel";
+
+type Tab = "pin" | "password";
 
 function focusStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.borderColor = "#2BA89A";
@@ -18,7 +24,9 @@ function blurStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.boxShadow   = "none";
 }
 
-export function LoginCard() {
+// ── Password tab panel ────────────────────────────────────────────────────────
+
+function PasswordPanel() {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, start]            = useTransition();
@@ -28,8 +36,6 @@ export function LoginCard() {
   const [showPwd, setShowPwd]       = useState(false);
   const [showCreds, setShowCreds]   = useState(false);
 
-  // Show the seeded-credentials helper only in dev builds. In production
-  // this component simply renders nothing when SHOW_CREDS is false.
   const SHOW_CREDS_HELPER = process.env.NODE_ENV !== "production";
 
   function navigate(dest: string) {
@@ -44,13 +50,12 @@ export function LoginCard() {
     start(async () => {
       const res = await devLoginByCredential(credential.trim(), password);
       if (!res.ok) { setError(res.error ?? "Login failed"); return; }
-      // If this account still holds a temporary password, force the rotation
-      // before letting the user reach their intended destination.
       if (res.mustChangePassword) {
         navigate("/change-password?forced=1");
         return;
       }
-      navigate(params.get("from") ?? "/");
+      const dest = params.get("from") ?? (res.role === "OWNER" ? "/" : "/employee");
+      navigate(dest);
     });
   }
 
@@ -64,27 +69,7 @@ export function LoginCard() {
   const canSubmit = credential.trim().length > 0 && password.length > 0;
 
   return (
-    <div className="w-full max-w-[420px] mx-auto">
-
-      {/* Logo */}
-      <div className="mb-8">
-        <MandovaraLogo />
-      </div>
-
-      {/* Heading */}
-      <div className="mb-7">
-        <h1
-          className="text-[28px] font-semibold leading-tight tracking-[-0.02em]"
-          style={{ color: "#0F2A28", fontFamily: "'Fraunces', Georgia, serif" }}
-        >
-          Welcome back
-        </h1>
-        <p className="mt-2 text-[13.5px]" style={{ color: "#5A7A78" }}>
-          Sign in to your studio console
-        </p>
-      </div>
-
-      {/* ── Email / mobile + password form ─── */}
+    <div className="space-y-4">
       <form onSubmit={handleEmailLogin} className="space-y-4">
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -108,7 +93,6 @@ export function LoginCard() {
             )}
           </div>
 
-          {/* Credentials helper panel — dev only */}
           {SHOW_CREDS_HELPER && showCreds && (
             <CredentialsPanel onSelect={fillCredential} />
           )}
@@ -120,7 +104,6 @@ export function LoginCard() {
             onChange={(e) => setCredential(e.target.value)}
             placeholder="rohit@mandovara.com · +91 98xxxxxxxx"
             autoComplete="username"
-            autoFocus
             className="w-full h-[48px] rounded-[12px] px-4 text-[13.5px] outline-none transition-all"
             style={{ background: "#F0F8F7", border: "1.5px solid #C8DFD8", color: "#0F2A28" }}
             onFocus={focusStyle}
@@ -129,13 +112,22 @@ export function LoginCard() {
         </div>
 
         <div>
-          <label
-            htmlFor="login-password"
-            className="block text-[11.5px] font-semibold mb-1.5 tracking-[0.04em] uppercase"
-            style={{ color: "#4A6462" }}
-          >
-            Password
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label
+              htmlFor="login-password"
+              className="text-[11.5px] font-semibold tracking-[0.04em] uppercase"
+              style={{ color: "#4A6462" }}
+            >
+              Password
+            </label>
+            <a
+              href="/forgot-password"
+              className="text-[11px] font-medium transition-opacity hover:opacity-70"
+              style={{ color: "#2BA89A" }}
+            >
+              Forgot password?
+            </a>
+          </div>
           <div className="relative">
             <input
               id="login-password"
@@ -162,7 +154,6 @@ export function LoginCard() {
           </div>
         </div>
 
-        {/* Error */}
         {error && (
           <div
             className="px-4 py-3 rounded-[10px] text-[12.5px] leading-snug"
@@ -172,7 +163,6 @@ export function LoginCard() {
           </div>
         )}
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={pending || !canSubmit}
@@ -190,6 +180,62 @@ export function LoginCard() {
             : <><span>Sign In</span><ArrowRight size={16} strokeWidth={2.2} /></>}
         </button>
       </form>
+    </div>
+  );
+}
+
+// ── Main login card ───────────────────────────────────────────────────────────
+
+export function LoginCard() {
+  const [activeTab, setActiveTab] = useState<Tab>("pin");
+
+  return (
+    <div className="w-full max-w-[420px] mx-auto">
+
+      {/* Logo */}
+      <div className="mb-8">
+        <MandovaraLogo />
+      </div>
+
+      {/* Heading */}
+      <div className="mb-6">
+        <h1
+          className="text-[28px] font-semibold leading-tight tracking-[-0.02em]"
+          style={{ color: "#0F2A28", fontFamily: "'Fraunces', Georgia, serif" }}
+        >
+          Welcome back
+        </h1>
+        <p className="mt-2 text-[13.5px]" style={{ color: "#5A7A78" }}>
+          Sign in to your studio console
+        </p>
+      </div>
+
+      {/* Tab toggle */}
+      <div
+        className="flex rounded-[12px] p-1 mb-6"
+        style={{ background: "#E8F5F4" }}
+      >
+        {(["pin", "password"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className="flex-1 h-[38px] rounded-[10px] flex items-center justify-center gap-2 text-[12.5px] font-semibold transition-all duration-200"
+            style={
+              activeTab === tab
+                ? { background: "#ffffff", color: "#1B8A7E", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }
+                : { color: "#5A8A86" }
+            }
+          >
+            {tab === "pin"
+              ? <><Smartphone size={13} strokeWidth={2} /> Mobile &amp; PIN</>
+              : <><KeyRound size={13} strokeWidth={2} /> Password</>}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "pin" ? <PinLoginPanel /> : <PasswordPanel />}
 
       {/* Footer */}
       <div
