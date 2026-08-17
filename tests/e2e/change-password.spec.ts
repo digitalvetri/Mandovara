@@ -1,12 +1,16 @@
-// Verifies the full force-change-password flow end-to-end. Run against a DB
-// where rohit@mandovara.com has mustChangePassword=true.
+// Verifies the full force-change-password flow end-to-end.
+//
+// Uses aishwarya (not rohit) so the owner's storageState — which auth.setup
+// rotates during setup — isn't affected.
 //
 // Flow: login with temp → forced to /change-password → submit new →
-// signed out → login with old fails → login with new succeeds and lands on /.
+// signed out → login with old fails → login with new succeeds and lands
+// off /login and off /change-password. Cleanup rotates back to the temp so
+// the next seed cycle keeps the assertion valid.
 
 import { test, expect } from "@playwright/test";
 
-const EMAIL = "rohit@mandovara.com";
+const EMAIL = "aishwarya@mandovara.com";
 const OLD_PWD = "Mandovara@2026";
 const NEW_PWD = "OneTimeSpec_2026!";
 

@@ -92,9 +92,11 @@ export const devContext = cache(async (): Promise<RequestContext> => {
 
   // Test-only escape hatch: vitest exercises server actions directly without
   // a request scope / cookie. Fall back to the first OWNER so gate tests can
-  // resolve an orgId. NODE_ENV is set to "test" by vitest automatically and
-  // cannot be set that way in production or dev.
-  if (process.env["NODE_ENV"] === "test") {
+  // resolve an orgId. NODE_ENV=test is set by vitest automatically; NEXT_RUNTIME
+  // is set whenever code runs inside Next (dev, build, prod runtime, or edge)
+  // and vitest never sets it — the AND closes the "someone typos NODE_ENV=test
+  // into Coolify env" hole.
+  if (process.env["NODE_ENV"] === "test" && !process.env["NEXT_RUNTIME"]) {
     try {
       const owner = await prisma.user.findFirstOrThrow({
         where: { role: "OWNER" },

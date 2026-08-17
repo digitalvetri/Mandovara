@@ -28,6 +28,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://mandovara:mandovara@localhost:5432/mandovara?schema=public
       DIRECT_URL: postgresql://mandovara:mandovara@localhost:5432/mandovara?schema=public
+      # Signed session-cookie secret. Hardcoded test-only value — production
+      # runs its own separate secret set on Coolify. Must be 32+ chars.
+      SESSION_SECRET: ci_test_secret_do_not_use_in_production_c8a4f217b93e6d
+      # No TLS in CI, browser wouldn't store Secure cookies over http://localhost
+      COOKIE_SECURE: "false"
     steps:
       - uses: actions/checkout@v4.2.2
 
