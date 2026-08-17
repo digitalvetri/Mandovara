@@ -6,7 +6,6 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Plus } from "lucide-react";
 import { Topbar, PrimaryButton } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
@@ -26,13 +25,7 @@ export default async function ArchitectsPage() {
       <Topbar
         title="Architects"
         eyebrow={`${rows.length} on record · ${activeCount} active · ${formatINR(outstanding)} commission outstanding`}
-        actions={
-          <Link href={"/architects/new" as Route}>
-            <PrimaryButton>
-              <Plus size={13} className="mr-1" /> New architect
-            </PrimaryButton>
-          </Link>
-        }
+        actions={<PrimaryButton href="/architects/new">New architect</PrimaryButton>}
       />
 
       <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">

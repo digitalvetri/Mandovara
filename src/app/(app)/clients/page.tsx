@@ -1,5 +1,3 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
@@ -40,11 +38,7 @@ export default async function ClientsPage({
       <Topbar
         title="Client 360"
         eyebrow={`${total} client${total === 1 ? "" : "s"} · ${eyebrowFor(type, q)}`}
-        actions={
-          <Link href={"/clients/new" as Route}>
-            <PrimaryButton>New Client</PrimaryButton>
-          </Link>
-        }
+        actions={<PrimaryButton href="/clients/new">New Client</PrimaryButton>}
       />
       <ClientFilters />
       <ClientsTable rows={rows} />

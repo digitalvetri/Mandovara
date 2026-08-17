@@ -1,5 +1,3 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { Download } from "lucide-react";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
@@ -64,9 +62,7 @@ export default async function QuotationsPage({
               <Download size={14} strokeWidth={1.75} />
               Export
             </a>
-            <Link href={"/quotations/new" as Route}>
-              <PrimaryButton>New Quotation</PrimaryButton>
-            </Link>
+            <PrimaryButton href="/quotations/new">New Quotation</PrimaryButton>
           </>
         }
       />

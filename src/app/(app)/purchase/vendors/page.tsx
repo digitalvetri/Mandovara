@@ -31,9 +31,7 @@ export default async function VendorsPage({
                   className="h-[38px] px-3 grid place-items-center rounded-[8px] bg-surface border border-rule text-[12.5px] text-text-dim hover:text-text hover:bg-surface-hover transition-colors">
               POs
             </Link>
-            <Link href={"/purchase/vendors/new" as Route}>
-              <PrimaryButton>New Vendor</PrimaryButton>
-            </Link>
+            <PrimaryButton href="/purchase/vendors/new">New Vendor</PrimaryButton>
           </div>
         }
       />

@@ -1,5 +1,3 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
@@ -43,11 +41,7 @@ export default async function OrdersPage({
         <Topbar
           title="Sales Orders & Dispatch"
           eyebrow={`${dispatchCounts.total} dispatch ${dispatchCounts.total === 1 ? "record" : "records"}`}
-          actions={
-            <Link href={"/orders/dispatch/new" as Route}>
-              <PrimaryButton>New Dispatch</PrimaryButton>
-            </Link>
-          }
+          actions={<PrimaryButton href="/orders/dispatch/new">New Dispatch</PrimaryButton>}
         />
         <OrderTabNav active="dispatch" orderCount={orderCounts.open} dispatchCount={dispatchCounts.total} />
         <DispatchSummaryCards counts={dispatchCounts} />
@@ -73,11 +67,7 @@ export default async function OrdersPage({
       <Topbar
         title="Sales Orders & Dispatch"
         eyebrow={`${total} order${total === 1 ? "" : "s"} · ${eyebrowFor(status, q)}`}
-        actions={
-          <Link href={"/quotations" as Route}>
-            <PrimaryButton>From Quotation</PrimaryButton>
-          </Link>
-        }
+        actions={<PrimaryButton href="/quotations">From Quotation</PrimaryButton>}
       />
       <OrderTabNav active="orders" orderCount={counts.open} dispatchCount={dispatchCounts.total} />
       <OrderSummaryCards counts={counts} />

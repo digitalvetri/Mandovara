@@ -1,6 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Plus } from "lucide-react";
 
 interface TopbarProps {
@@ -43,13 +45,38 @@ export function Topbar({ title, eyebrow, actions }: TopbarProps) {
   );
 }
 
-export function PrimaryButton({ children }: { children: ReactNode }) {
+const PRIMARY_BUTTON_CLS =
+  "inline-flex items-center gap-1.5 h-[38px] px-4 rounded-[8px]" +
+  " bg-accent text-white text-[12.5px] font-medium" +
+  " hover:bg-accent-hover transition-colors whitespace-nowrap cursor-pointer";
+
+/** Gold-adjacent primary CTA. Accepts either `href` (renders a Link) or
+ *  `onClick` (renders a button). Previously always rendered as `<button>`
+ *  which meant wrapping it in a `<Link>` produced invalid `<a><button>`
+ *  nesting — clicks on some browsers stopped propagating to the anchor and
+ *  navigation silently didn't fire (that was the "Record Payment does
+ *  nothing" bug). */
+export function PrimaryButton({
+  children, href, onClick, type,
+}: {
+  children: ReactNode;
+  href?: string;
+  onClick?: () => void;
+  type?: "button" | "submit";
+}) {
+  if (href !== undefined) {
+    return (
+      <Link href={href as Route} className={PRIMARY_BUTTON_CLS}>
+        <Plus size={14} strokeWidth={2.25} />
+        {children}
+      </Link>
+    );
+  }
   return (
     <button
-      type="button"
-      className="inline-flex items-center gap-1.5 h-[38px] px-4 rounded-[8px]
-                 bg-accent text-white text-[12.5px] font-medium
-                 hover:bg-accent-hover transition-colors whitespace-nowrap"
+      type={type ?? "button"}
+      onClick={onClick}
+      className={PRIMARY_BUTTON_CLS}
     >
       <Plus size={14} strokeWidth={2.25} />
       {children}

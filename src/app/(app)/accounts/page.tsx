@@ -1,5 +1,3 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -45,11 +43,7 @@ export default async function AccountsPage({
       <Topbar
         title="Money"
         eyebrow="Every payment coming in and going out — at a glance"
-        actions={
-          <Link href={"/accounts/new" as Route}>
-            <PrimaryButton>Record Payment</PrimaryButton>
-          </Link>
-        }
+        actions={<PrimaryButton href="/accounts/new">Record Payment</PrimaryButton>}
       />
       <Tabs tabs={TABS} className="mb-6" />
 

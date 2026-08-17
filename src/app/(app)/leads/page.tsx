@@ -1,5 +1,3 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import {
@@ -60,11 +58,7 @@ export default async function LeadsPage({
       <Topbar
         title="Lead Management"
         eyebrow={`${total} lead${total === 1 ? "" : "s"} · ${filterEyebrow(stage, q)}`}
-        actions={
-          <Link href={"/leads/new" as Route}>
-            <PrimaryButton>New Lead</PrimaryButton>
-          </Link>
-        }
+        actions={<PrimaryButton href="/leads/new">New Lead</PrimaryButton>}
       />
       <LeadSummaryCards counts={counts} />
       <LeadFilters salesUsers={salesUsers} cities={cities} />

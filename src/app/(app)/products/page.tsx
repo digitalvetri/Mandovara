@@ -5,8 +5,6 @@
 // Every filter mirrors a URL param so the state is shareable and
 // browser-back-safe.
 
-import Link from "next/link";
-import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
@@ -93,11 +91,7 @@ export default async function ProductsPage({
         title="Product Catalog"
         eyebrow={`${totalAll} SKUs · ${result.categories.length} categor${result.categories.length === 1 ? "y" : "ies"}${result.brands.length > 1 ? ` · ${result.brands.length} brands` : ""}`}
         actions={
-          forProject ? null : (
-            <Link href={"/products/new" as Route}>
-              <PrimaryButton>New Product</PrimaryButton>
-            </Link>
-          )
+          forProject ? null : <PrimaryButton href="/products/new">New Product</PrimaryButton>
         }
       />
 
