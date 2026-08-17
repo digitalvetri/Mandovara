@@ -755,13 +755,51 @@ model Client {
   architectId      String?
   ownerId        String?
   notes          String?
+  // Owner-flagged: never surface in the chase list. Sales still see the balance,
+  // but the money page doesn't nudge the owner to call them.
+  doNotChase       Boolean  @default(false)
+  // Bumped by any OUTBOUND CommunicationLog write. Drives the contact-penalty
+  // tier in the chase-score algorithm (docs/ACCOUNTS-PAGE.md §6.1).
+  lastContactedAt  DateTime?
   createdAt      DateTime   @default(now())
 
   contacts ContactPerson[]
   projects Project[]
+  promises PromiseToPay[]
 
   @@unique([organizationId, code])
   @@index([organizationId, mobile])
+  @@index([organizationId, doNotChase, lastContactedAt])
+}
+
+// One active promise per client at a time. When Rohit calls a client and they
+// say "I'll pay Tuesday", he taps Promised and picks a date — the client is
+// suppressed from the chase list until then, and resurfaces (flagged as
+// "missed") if the date passes without payment.
+enum PromiseStatus {
+  ACTIVE
+  KEPT
+  MISSED
+  CANCELLED
+}
+
+model PromiseToPay {
+  id             String        @id @default(cuid())
+  organizationId String
+  clientId       String
+  invoiceId      String?       // optional — usually a promise is per-client
+  promisedDate   DateTime      @db.Date
+  note           String?
+  status         PromiseStatus @default(ACTIVE)
+  createdById    String
+  createdAt      DateTime      @default(now())
+  resolvedAt     DateTime?
+  resolvedById   String?
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([organizationId, clientId, status])
+  @@index([organizationId, promisedDate, status])
 }
 
 model ContactPerson {
@@ -1681,8 +1719,12 @@ model Expense {
   billKey        String?
   incurredAt     DateTime
   approvalState  ApprovalState @default(PENDING)
+  // Null while the bill is still outstanding. Set when it clears. The "To Pay"
+  // KPI counts approvalState=APPROVED AND paidAt IS NULL.
+  paidAt         DateTime?
 
   @@index([organizationId, incurredAt])
+  @@index([organizationId, approvalState, paidAt])
 }
 
 // ─── HR ──────────────────────────────────────────────────────────────────────
