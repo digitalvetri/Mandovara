@@ -19,7 +19,7 @@ const TABS: readonly TabDef[] = [
   { key: "to-collect",  label: "To Collect" },
   { key: "received",    label: "Received" },
   { key: "to-pay",      label: "To Pay" },
-  { key: "spending",    label: "Spending" },
+  { key: "spending",    label: "Expenses" },
 ];
 
 const SPENDING_PERIODS: readonly SpendingPeriod[] = ["this-month", "last-3-months", "this-year"];
@@ -49,7 +49,7 @@ export default async function AccountsPage({
         eyebrow="Every payment coming in and going out — at a glance"
         actions={
           <Link href={"/accounts/new" as Route}>
-            <PrimaryButton>+ Record Payment</PrimaryButton>
+            <PrimaryButton>Record Payment</PrimaryButton>
           </Link>
         }
       />

@@ -10,6 +10,7 @@ import { formatDate } from "@/kernel/datetime";
 import { can } from "@/kernel/rbac/guard";
 import { loadSpending, type SpendingPeriod } from "@/modules/accounts/spending";
 import { WhereMoneyGoesBars, type ExpenseHeadUI } from "../_components/WhereMoneyGoesBars";
+import { NewExpenseButton } from "../_components/NewExpenseForm";
 
 interface Props {
   ctx:    Awaited<ReturnType<typeof devContext>>;
@@ -48,11 +49,11 @@ export async function SpendingTab({ ctx, period, head }: Props) {
 
   return (
     <>
-      {/* Header — total + period toggle */}
+      {/* Header — total + period toggle + New expense button */}
       <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
         <div>
           <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim mb-0.5">
-            {head ? `Spending on ${head}` : "Spending"}
+            {head ? `Expenses on ${head}` : "Expenses"}
           </div>
           <div className="font-display text-[26px] font-semibold tabular-nums text-text leading-none">
             {formatINR(bundle.total)}
@@ -72,7 +73,10 @@ export async function SpendingTab({ ctx, period, head }: Props) {
             )}
           </div>
         </div>
-        <PeriodChips active={period} head={head} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <PeriodChips active={period} head={head} />
+          <NewExpenseButton />
+        </div>
       </div>
 
       {/* Where the money goes — same period as the list */}

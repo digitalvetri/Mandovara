@@ -6,7 +6,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
-import { createProjectExpenseSchema, approveExpenseSchema } from "./schema";
+import { createProjectExpenseSchema, createExpenseSchema, approveExpenseSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -55,6 +55,63 @@ export async function createProjectExpense(
   revalidatePath(`/projects/${d.projectId}`);
   revalidatePath("/expenses");
   return { ok: true, data: { id: expense.id } };
+}
+
+/** Create a general (non-project) Expense. Auto-approved when the
+ *  creator has expense.approve — that's how the owner enters her own
+ *  travel/rent without an approval loop. Everyone else lands as PENDING. */
+export async function createExpense(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "expense.create");
+
+  const parsed = createExpenseSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const d = parsed.data;
+
+  const amount = BigInt(d.amount);
+  if (amount <= 0n) {
+    return { ok: false, error: "Validation failed", fieldErrors: { amount: "Amount must be > 0" } };
+  }
+
+  const db = scoped(ctx);
+
+  // Every Expense needs a branchId. Use the user's first branch, or fall
+  // back to the org's first branch. Single-branch orgs (the Mandovara norm)
+  // never see a picker.
+  const branchId = ctx.branchIds[0]
+    ?? (await db.branch.findFirst({ select: { id: true } }))?.id;
+  if (!branchId) {
+    return { ok: false, error: "No branch configured for this organisation." };
+  }
+
+  // Auto-approve if the creator can approve. Everyone else's expenses
+  // land PENDING and show in Attention.
+  const canApprove = ctx.permissions.has("expense.approve");
+  const approvalState = canApprove ? "APPROVED" : "PENDING";
+
+  try {
+    const expense = await db.expense.create({
+      data: {
+        organizationId: ctx.orgId,
+        branchId,
+        head:           d.head,
+        subHead:        d.subHead ?? null,
+        description:    d.description,
+        amount,
+        incurredAt:     new Date(d.incurredAt),
+        billKey:        d.billKey ?? null,
+        approvalState,
+      },
+      select: { id: true },
+    });
+    revalidatePath("/accounts");
+    return { ok: true, data: { id: expense.id } };
+  } catch (e) {
+    console.error("[expenses] createExpense failed:", e);
+    return { ok: false, error: "Could not save the expense. Please try again." };
+  }
 }
 
 export async function approveExpense(
