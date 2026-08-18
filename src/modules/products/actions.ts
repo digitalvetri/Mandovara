@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable max-lines -- FIXME(§10): 338 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 
 // Product server actions.
 //

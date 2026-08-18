@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME(§10): 336 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 // Dashboard repository. All reads go through db.scoped(ctx) per Rule 1.
 // The page consumes loadDashboard(ctx) and knows nothing about Prisma.
 

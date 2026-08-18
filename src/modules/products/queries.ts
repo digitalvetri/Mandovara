@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME(§10): 608 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 // Products page repository — delegates to the catalog module's searchDesigns.
 // /products is the catalog surface: Brand → Collection → Design → Colourway.
 

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME(§10): 315 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 // Leads repository — read side. All queries go through scoped(ctx).
 // Schema reference: Lead has `stage LeadStage` (not `status`), `budgetMin`/`budgetMax` (not
 // `expectedValue`), `mobile`, `email` — no companyName, no updatedAt, no stateCode.

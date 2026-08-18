@@ -8,6 +8,8 @@ import { seedMasters } from "./seed/masters";
 import { seedMilestoneTemplates } from "./seed/milestone-templates";
 import { printRowCounts } from "./seed/report";
 import { seedTransactions } from "./seed/transactions";
+import { seedDownstream } from "./seed/downstream";
+import { seedOps } from "./seed/ops";
 
 async function main(): Promise<void> {
   // Explicitly the OWNER connection. The seed writes across tenants and must
@@ -54,6 +56,25 @@ async function main(): Promise<void> {
       clientIds: customers.clientIds,
       architectIds: customers.architectIds,
     });
+
+    const downstreamInput = {
+      orgId: masters.orgId,
+      branchId: masters.branchId,
+      userByRole: masters.userByRole,
+      employeeIds: masters.employeeIds,
+      vendorIds: masters.vendorIds,
+      colourwayIds: catalog.colourwayIds,
+      colourwayMeta: catalog.colourwayMeta,
+      sampleBookIds: catalog.sampleBookIds,
+      clientIds: customers.clientIds,
+      architectIds: customers.architectIds,
+    };
+
+    process.stdout.write("Seed: procurement, dye-lot stock, make, install, money...\n");
+    await seedDownstream(db, downstreamInput);
+
+    process.stdout.write("Seed: HR, WhatsApp, overheads, edge cases...\n");
+    await seedOps(db, downstreamInput);
   } else {
     process.stdout.write("Seed: SKIPPING demo customers + transactions (SEED_DEMO_DATA not set).\n");
   }

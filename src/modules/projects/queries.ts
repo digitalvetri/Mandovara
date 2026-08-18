@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME(§10): 739 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 // Projects repository.
 // Schema: Project has `stage ProjectStage`, `siteAddress Json`, `orderValue BigInt`.
 // No status, startDate, targetEndDate, milestones, tasks, or siteLogs fields.

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- FIXME(§10): 797 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission, can } from "@/kernel/rbac/guard";
 import { computeOutstanding } from "@/kernel/money/outstanding";

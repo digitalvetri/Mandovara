@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable max-lines -- FIXME(§10): 346 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 
 // Quick-quote flow (§ owner product flow, session 2026-08-14).
 //

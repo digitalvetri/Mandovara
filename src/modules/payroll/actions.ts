@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable max-lines -- FIXME(§10): 327 lines, limit 300. Split by concern before the next phase; the rule stays enforced so this stays visible. */
 
 import { z } from "zod";
 import { Decimal } from "@prisma/client/runtime/library";

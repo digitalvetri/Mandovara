@@ -58,7 +58,10 @@ try {
   // Belt and braces: strip anything that would defeat row security.
   await db.$executeRawUnsafe(`ALTER ROLE ${APP_ROLE} NOSUPERUSER NOBYPASSRLS`);
 
-  await db.$executeRawUnsafe(`GRANT CONNECT ON DATABASE "${new URL(OWNER_URL).pathname.slice(1).split("?")[0]}" TO ${APP_ROLE}`);
+  const dbName = (OWNER_URL.split("/").pop() ?? "").split("?")[0];
+  if (dbName) {
+    await db.$executeRawUnsafe(`GRANT CONNECT ON DATABASE "${dbName}" TO ${APP_ROLE}`);
+  }
   await db.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO ${APP_ROLE}`);
   await db.$executeRawUnsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${APP_ROLE}`);
   await db.$executeRawUnsafe(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${APP_ROLE}`);
