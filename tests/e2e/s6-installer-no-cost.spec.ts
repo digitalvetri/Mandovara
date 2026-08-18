@@ -41,7 +41,6 @@ const FORBIDDEN = [
 
 async function signIn(page: Page, email: string, password: string): Promise<boolean> {
   await page.goto("/login");
-  await page.getByRole("button", { name: "Password", exact: true }).click();
   await page.getByLabel(/email or mobile/i).fill(email);
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();

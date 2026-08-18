@@ -74,7 +74,9 @@ Open the app service → **Environment Variables** tab → add these:
 
 Leave WhatsApp / GSP secrets empty for now — they only matter when Phase 6 / 8 code paths run.
 
-> ⚠️ **Remove any `ALLOW_DEV_AUTH` env var if you set it earlier.** That escape hatch has been deleted from the code; leaving the variable in place does nothing but is misleading. The two ways in are a real email/mobile + password login and a mobile + 4-digit PIN login, both bcrypt-verified and both issuing an HMAC-signed session cookie. Both are rate-limited to 5 failed attempts per 15 minutes per identifier.
+> ⚠️ **Remove any `ALLOW_DEV_AUTH` env var if you set it earlier.** That escape hatch has been deleted from the code; leaving the variable in place does nothing but is misleading. The only way in is an email/mobile + password login, bcrypt-verified, issuing an HMAC-signed session cookie. Mobile + 4-digit PIN sign-in was removed.
+
+> ⚠️ **Sign-in attempts are not rate-limited.** Login throttling was removed on request, so failed password attempts are unlimited. Consider a WAF or reverse-proxy rate limit in front of `/login` before exposing this on the public internet.
 
 ---
 

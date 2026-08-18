@@ -326,3 +326,41 @@ Splitting them is mechanical churn with real regression risk across code that
 was just stabilised, and it buys nothing verifiable. Each carries an explicit
 `eslint-disable max-lines -- FIXME` naming its line count, so `max-lines` stays
 enforced for every other file and the debt stays visible.
+
+---
+
+## 2026-08-18 · Removed on request: PIN login, login rate limiting, lead-quote gate
+
+**Decision:** Three things added earlier in the same session were removed at the
+user's explicit instruction.
+
+1. **Mobile + 4-digit PIN sign-in is deleted.** `loginByMobilePin`,
+   `PinLoginPanel` and the login card's tab switcher are gone; the password form
+   renders directly. Email/mobile + password is the only sign-in path.
+   The instruction combined "remove the PIN feature" with "full revert", which
+   are incompatible — reverting would have restored a version that set an
+   unsigned session cookie and therefore never worked. Deletion was taken as the
+   coherent reading.
+
+2. **Login rate limiting is deleted.** `src/lib/rate-limit.ts` and its tests are
+   gone and neither login path throttles. Failed sign-in attempts are unlimited.
+   **Consequence:** `/login` is an unbounded password-guessing oracle. Put a
+   rate limit at the proxy or WAF before this is reachable from the internet.
+   Recorded in HANDOVER-CHECKLIST and DEPLOY-COOLIFY.
+
+3. **The §15.1 gate no longer applies to lead-scoped quotations.** A quotation
+   raised against a bare lead may again contain made-to-measure lines with
+   `measurementItemId = null`. Client-scoped quotations are still gated.
+   **Consequence:** this is a standing exemption from CLAUDE.md non-negotiable
+   #1, which states the rule with no exception. A lead quote's quantities have
+   not come from a site measurement — which §1.2 names as the specific way
+   Mandovara loses money on made-to-measure work.
+
+`findMeasurementGateViolation` and its tests are kept: the client-scoped gate
+still uses it, and it remains the single implementation of the rule. The
+lead-scoped test cases are relabelled as function-level only, since no caller
+passes `isLeadScoped: true` any more.
+
+`tests/lib/session-cookie.test.ts` is kept although the login path that
+motivated it is gone — it pins the contract that a bare user id is never an
+acceptable session cookie, so a future login path cannot repeat the mistake.

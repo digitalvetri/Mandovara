@@ -9,12 +9,16 @@
 // - devLogout: clears the session cookie.
 // - devLogin(role): DELETED. Was a "pick any user with role X and become them"
 //   shortcut — a giant impersonation hole. Callers now must supply a password.
+// - loginByMobilePin: REMOVED on request. Mobile + 4-digit-PIN sign-in no
+//   longer exists; email/mobile + password is the only way in.
+//
+// NOTE: there is deliberately no rate limiting on this path — removed on
+// request. Failed sign-in attempts are unlimited and unthrottled.
 
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { authBootstrapPrisma as prisma } from "@/kernel/db/client";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from "./session";
-import { checkRateLimit, recordFailure, clearRateLimit } from "./rate-limit";
 
 export interface LoginResult {
   ok: boolean;
@@ -39,19 +43,6 @@ export async function devLoginByCredential(
     return { ok: false, error: "Enter your email/mobile and password" };
   }
 
-  // Throttle before touching the database or bcrypt — an unthrottled login is
-  // a brute-force oracle, and bcrypt makes each attempt expensive for us too.
-  const rlKey = `login:${q.toLowerCase()}`;
-  const rl = checkRateLimit(rlKey);
-  if (!rl.allowed) {
-    return {
-      ok: false,
-      error:
-        `Too many failed attempts. Try again in ` +
-        `${Math.ceil(rl.retryAfterSec / 60)} minute(s).`,
-    };
-  }
-
   try {
     let user = await prisma.user.findFirst({
       where: { email: q.toLowerCase() },
@@ -65,10 +56,7 @@ export async function devLoginByCredential(
         orderBy: { createdAt: "asc" },
       });
     }
-    if (!user) {
-      recordFailure(rlKey);
-      return { ok: false, error: GENERIC_ERR };
-    }
+    if (!user) return { ok: false, error: GENERIC_ERR };
     if (user.status !== "ACTIVE") {
       return { ok: false, error: "This account is suspended. Contact your administrator." };
     }
@@ -76,11 +64,7 @@ export async function devLoginByCredential(
       return { ok: false, error: "This account has no password set. Contact your administrator." };
     }
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      recordFailure(rlKey);
-      return { ok: false, error: GENERIC_ERR };
-    }
-    clearRateLimit(rlKey);
+    if (!valid) return { ok: false, error: GENERIC_ERR };
 
     const signed = await signSession(user.id);
     const jar = await cookies();
@@ -109,81 +93,6 @@ export async function devLoginByCredential(
   } catch (e) {
     console.error("[auth] loginByCredential failed:", e);
     return { ok: false, error: "Login failed — please try again in a moment" };
-  }
-}
-
-export async function loginByMobilePin(
-  mobile: string,
-  pin: string,
-): Promise<{ ok: boolean; error?: string }> {
-  // ALLOW_DEV_AUTH removed: it was an env-flag escape hatch that re-enabled
-  // this path in production, and docs/HANDOVER-CHECKLIST.md wrongly claimed it
-  // had already been deleted from the code. PIN login is now a first-class,
-  // rate-limited, signed-session path — field staff log in by mobile (§2).
-  if (!/^\d{4}$/.test(pin)) {
-    return { ok: false, error: "PIN must be exactly 4 digits" };
-  }
-
-  // Normalize: strip spaces, ensure +91 prefix
-  const digits = mobile.replace(/\D/g, "");
-  const normalized =
-    digits.length === 10 ? `+91${digits}` :
-    digits.length === 12 && digits.startsWith("91") ? `+${digits}` :
-    mobile.trim();
-
-  // A 4-digit PIN is a 10,000-value space — without throttling it is trivially
-  // brute-forceable. This gate is what makes the PIN acceptable at all.
-  const rlKey = `pin:${normalized}`;
-  const rl = checkRateLimit(rlKey);
-  if (!rl.allowed) {
-    return {
-      ok: false,
-      error:
-        `Too many failed attempts. Try again in ` +
-        `${Math.ceil(rl.retryAfterSec / 60)} minute(s).`,
-    };
-  }
-
-  try {
-    const user = await prisma.user.findFirst({
-      where: { mobile: normalized },
-      select: { id: true, passwordHash: true },
-    });
-
-    if (!user) {
-      recordFailure(rlKey);
-      return { ok: false, error: "No account found for this mobile number" };
-    }
-
-    if (!user.passwordHash) {
-      return { ok: false, error: "PIN not set for this account. Contact admin." };
-    }
-
-    const valid = await bcrypt.compare(pin, user.passwordHash);
-    if (!valid) {
-      recordFailure(rlKey);
-      return { ok: false, error: "Incorrect PIN" };
-    }
-    clearRateLimit(rlKey);
-
-    // MUST be the signed cookie. Setting the bare user id here shipped a
-    // cookie that verifySession() always rejects, so PIN login silently
-    // failed: the user was bounced straight back to /login.
-    const signed = await signSession(user.id);
-    const jar = await cookies();
-    // Same Secure-flag rule as the password path above.
-    const cookieSecure = process.env["COOKIE_SECURE"] !== "false"
-      && process.env["NODE_ENV"] === "production";
-    jar.set(SESSION_COOKIE, signed, {
-      httpOnly: true,
-      secure:   cookieSecure,
-      path:     "/",
-      maxAge:   SESSION_MAX_AGE,
-      sameSite: "lax",
-    });
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Database unavailable — check DATABASE_URL" };
   }
 }
 

@@ -1,8 +1,9 @@
 // Regression guard: every login path must issue an HMAC-SIGNED cookie.
 //
-// loginByMobilePin used to set the bare `user.id` as the cookie value. That
-// cookie can never satisfy verifySession(), so PIN login silently failed —
-// the user appeared to log in and was bounced straight back to /login.
+// The mobile + PIN login that motivated this test has since been removed, but
+// the guard is worth keeping: it pins the contract that a bare user id is
+// never an acceptable session cookie, so a future login path cannot repeat the
+// mistake of setting one.
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { signSession, verifySession } from "@/lib/session";
