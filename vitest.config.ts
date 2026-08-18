@@ -20,12 +20,16 @@ export default defineConfig({
         "src/kernel/money/**/*.ts",
         "src/kernel/tax/**/*.ts",
         "src/kernel/calc/**/*.ts",
+        "src/kernel/einvoice/**/*.ts",
       ],
       exclude: ["**/*.test.ts", "**/index.ts"],
       thresholds: {
         "src/kernel/money/**": { branches: 100, functions: 100, lines: 100, statements: 100 },
         "src/kernel/tax/**":   { branches: 100, functions: 100, lines: 100, statements: 100 },
         "src/kernel/calc/**":  { branches: 100, functions: 100, lines: 100, statements: 100 },
+        // e-invoicing moves money into a government portal — §12.1 treats
+        // financial logic as blocking.
+        "src/kernel/einvoice/**": { branches: 100, functions: 100, lines: 100, statements: 100 },
       },
     },
   },
