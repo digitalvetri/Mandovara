@@ -10,6 +10,7 @@ import {
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
   Sparkles,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -45,6 +46,8 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
       { label: "Product Catalog",   href: "/products",  icon: Package },
       { label: "Purchase & Vendors",href: "/purchase",  icon: Truck   },
       { label: "Stocks",            href: "/inventory", icon: Boxes   },
+      // §0.6 / §15.4 — restoring this was a required handover item.
+      { label: "Dye-lot Allocation",href: "/purchase/allocation", icon: Layers },
     ],
   },
   {

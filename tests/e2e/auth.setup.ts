@@ -26,11 +26,32 @@ const OWNER_TEMP    = "Mandovara@2026";
 const OWNER_STABLE  = "PlaywrightRun_2026!";
 
 setup("authenticate as owner", async ({ page, context }) => {
-  await page.goto("/login");
-  await page.getByLabel(/email or mobile/i).fill(OWNER_EMAIL);
-  await page.getByLabel(/^password$/i).fill(OWNER_TEMP);
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  // Idempotent by design. This setup ROTATES the owner's password, so on a
+  // second run against the same database the seeded temp password no longer
+  // works and the whole suite failed at setup with "104 did not run". Try the
+  // temp password first, then the stable one this setup itself installs.
+  //
+  // No tab click: the login card is a single password form (upstream 9e218f9).
+  async function attempt(password: string): Promise<boolean> {
+    await page.goto("/login");
+    await page.getByLabel(/email or mobile/i).fill(OWNER_EMAIL);
+    await page.getByLabel(/^password$/i).fill(password);
+    await page.getByRole("button", { name: /sign in/i }).click();
+    try {
+      await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const ok = (await attempt(OWNER_TEMP)) || (await attempt(OWNER_STABLE));
+  if (!ok) {
+    throw new Error(
+      `Could not sign in as ${OWNER_EMAIL} with either the seeded password or the ` +
+      `stable spec password. Re-run the seed: SEED_DEMO_DATA=true pnpm db:seed`,
+    );
+  }
 
   // If the seed marked this user with mustChangePassword=true, we're on
   // /change-password?forced=1. Complete the rotation so the saved state

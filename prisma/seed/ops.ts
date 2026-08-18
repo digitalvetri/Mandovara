@@ -276,27 +276,44 @@ async function seedEdgeCases(
 ): Promise<void> {
   const orgId = input.orgId;
 
-  // 1 ── A mixed-lot allocation that was overridden, with a reason and an
-  //      audited approver. This is the case the store console must block by
-  //      default (§0.6) and the one Rohit needs to answer "which lot went to
-  //      which wall" six weeks later.
-  const line = await db.orderLine.findFirst({
-    where: { organizationId: orgId, colourwayId: { not: null } },
-    select: { id: true, colourwayId: true, quantity: true },
+  // 1 ── Dye-lot fixtures (§0.6 / §15.4).
+  //
+  //   (a) an order line that ALREADY carries a mixed-lot override with a
+  //       reason and an approver — the evidence §11 asks for, and what Rohit
+  //       needs six weeks later to answer "which lot went to which wall";
+  //   (b) a clean "gate-ready" line: one lot reserved, a second lot sitting on
+  //       the shelf. Without (b) the mixed-lot gate is only reachable by luck
+  //       — random dye lots gave any given line roughly a 1-in-12 chance of
+  //       having a second lot available, so the §12.2/4 e2e kept skipping.
+  const openLines = await db.orderLine.findMany({
+    where: {
+      organizationId: orgId,
+      colourwayId: { not: null },
+      order: { status: { in: ["CONFIRMED", "PROCUREMENT", "MAKE"] } },
+    },
+    select: { id: true, colourwayId: true },
     orderBy: { id: "asc" },
+    take: 2,
   });
-  if (line?.colourwayId) {
+
+  const overrideLine = openLines[0];
+  if (overrideLine?.colourwayId) {
+    await db.stockBalance.createMany({
+      data: [
+        { organizationId: orgId, colourwayId: overrideLine.colourwayId, dyeLot: "LOT-2606-011", quantity: new Prisma.Decimal(6),  reserved: new Prisma.Decimal(6), value: 720_000n, binLocation: "B2-04" },
+        { organizationId: orgId, colourwayId: overrideLine.colourwayId, dyeLot: "LOT-2607-042", quantity: new Prisma.Decimal(20), reserved: new Prisma.Decimal(2), value: 2_400_000n, binLocation: "B2-05" },
+      ],
+      skipDuplicates: true,
+    });
     await db.allocation.createMany({
       data: [
         {
-          organizationId: orgId, orderLineId: line.id, colourwayId: line.colourwayId,
-          dyeLot: "LOT-2606-011", quantity: new Prisma.Decimal(6),
-          mixedLotOverride: false,
+          organizationId: orgId, orderLineId: overrideLine.id, colourwayId: overrideLine.colourwayId,
+          dyeLot: "LOT-2606-011", quantity: new Prisma.Decimal(6), mixedLotOverride: false,
         },
         {
-          organizationId: orgId, orderLineId: line.id, colourwayId: line.colourwayId,
-          dyeLot: "LOT-2607-042", quantity: new Prisma.Decimal(2),
-          mixedLotOverride: true,
+          organizationId: orgId, orderLineId: overrideLine.id, colourwayId: overrideLine.colourwayId,
+          dyeLot: "LOT-2607-042", quantity: new Prisma.Decimal(2), mixedLotOverride: true,
           overrideReason:
             "Lot 011 short by 2m and the mill has discontinued it. Second lot " +
             "approved by client on site — the two lots go on opposite walls, " +
@@ -304,6 +321,24 @@ async function seedEdgeCases(
           overrideById: users.owner,
         },
       ],
+      skipDuplicates: true,
+    });
+  }
+
+  const gateLine = openLines[1];
+  if (gateLine?.colourwayId) {
+    await db.stockBalance.createMany({
+      data: [
+        { organizationId: orgId, colourwayId: gateLine.colourwayId, dyeLot: "LOT-GATE-A", quantity: new Prisma.Decimal(40), reserved: new Prisma.Decimal(4), value: 4_800_000n, binLocation: "C1-01" },
+        { organizationId: orgId, colourwayId: gateLine.colourwayId, dyeLot: "LOT-GATE-B", quantity: new Prisma.Decimal(40), reserved: new Prisma.Decimal(0), value: 4_800_000n, binLocation: "C1-02" },
+      ],
+      skipDuplicates: true,
+    });
+    await db.allocation.createMany({
+      data: [{
+        organizationId: orgId, orderLineId: gateLine.id, colourwayId: gateLine.colourwayId,
+        dyeLot: "LOT-GATE-A", quantity: new Prisma.Decimal(4), mixedLotOverride: false,
+      }],
       skipDuplicates: true,
     });
   }
