@@ -155,7 +155,10 @@ export function EditableField({
               {label}
             </div>
           )}
-          <div className={`${titleCls} truncate ${isEmpty ? "text-text-faint" : ""}`}>
+          <div
+            className={`${titleCls} truncate ${isEmpty ? "text-text-faint" : ""}`}
+            {...(size === "lg" ? { role: "heading", "aria-level": 1 } : {})}
+          >
             {isEmpty ? "—" : displayText}
           </div>
         </div>
@@ -177,7 +180,10 @@ export function EditableField({
             {label}
           </div>
         )}
-        <div className={`${titleCls} truncate ${isEmpty ? "text-text-faint" : ""}`}>
+        <div
+          className={`${titleCls} truncate ${isEmpty ? "text-text-faint" : ""}`}
+          {...(size === "lg" ? { role: "heading", "aria-level": 1 } : {})}
+        >
           {isEmpty ? placeholder : displayText}
         </div>
       </div>

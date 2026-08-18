@@ -10,10 +10,9 @@
 // E2E_INSTALL_VISIT_ID — a scheduled install visit.
 
 import { test, expect, type Page } from "@playwright/test";
+import { makeJobId, installVisitId } from "./_ids";
 
 const _ORDER_ID        = process.env["E2E_ORDER_ID"];
-const MAKE_JOB_ID      = process.env["E2E_MAKE_JOB_ID"];
-const INSTALL_VISIT_ID = process.env["E2E_INSTALL_VISIT_ID"];
 
 async function expectNoRuntimeError(page: Page) {
   await expect(
@@ -47,8 +46,9 @@ test("make kanban loads with status columns", async ({ page }) => {
 });
 
 test("make job detail renders cut list", async ({ page }) => {
-  test.skip(!MAKE_JOB_ID, "E2E_MAKE_JOB_ID not set");
-  await page.goto(`/make/${MAKE_JOB_ID}`);
+  const id = await makeJobId(page);
+  test.skip(!id, "no make job in the database — run the seed with SEED_DEMO_DATA=true");
+  await page.goto(`/make/${id}`);
   await expect(page).not.toHaveTitle(/404|500/);
   await expectNoRuntimeError(page);
   // Cut list should show panel count or cut length
@@ -65,8 +65,9 @@ test("install schedule page loads", async ({ page }) => {
 });
 
 test("install visit detail renders room lines", async ({ page }) => {
-  test.skip(!INSTALL_VISIT_ID, "E2E_INSTALL_VISIT_ID not set");
-  await page.goto(`/install/${INSTALL_VISIT_ID}`);
+  const id = await installVisitId(page);
+  test.skip(!id, "no install visit in the database — run the seed with SEED_DEMO_DATA=true");
+  await page.goto(`/install/${id}`);
   await expect(page).not.toHaveTitle(/404|500/);
   await expectNoRuntimeError(page);
 });
@@ -89,6 +90,16 @@ test("accounts page loads with money summary", async ({ page }) => {
   // Copy was rewritten to plain English (docs/ACCOUNTS-PAGE.md §3) —
   // no more accounting vocabulary. Assert on the new labels instead.
   await expect(page.getByText(/to collect|came in|chase these today/i).first()).toBeVisible();
+  // Structural check too: the tabs carry role="tab", not role="link".
+  await expect(page.getByRole("tab", { name: "To Collect", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Received", exact: true })).toBeVisible();
+});
+
+test("to-collect tab lists money owed", async ({ page }) => {
+  await page.goto("/accounts?tab=to-collect");
+  await expectNoRuntimeError(page);
+  // Seeded invoices are partially paid, so there is always something to collect.
+  await expect(page.getByText(/₹/).first()).toBeVisible();
 });
 
 // ── Inventory (stock balances) ────────────────────────────────────────────────

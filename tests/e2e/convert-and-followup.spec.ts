@@ -7,20 +7,29 @@
 //   E2E_CLIENT_ID — any existing ACTIVE client
 
 import { test, expect } from "@playwright/test";
+import { leadId, clientId } from "./_ids";
 
-const LEAD_ID = process.env["E2E_LEAD_ID"];
-const CLIENT_ID = process.env["E2E_CLIENT_ID"];
 
 test("lead → client conversion redirects to /clients/[id]", async ({ page }) => {
-  test.skip(!LEAD_ID, "E2E_LEAD_ID not set");
+  const LEAD_ID = await leadId(page);
+  test.skip(!LEAD_ID, "no lead in the database — run the seed with SEED_DEMO_DATA=true");
   await page.goto(`/leads/${LEAD_ID}`);
   await expect(page.getByRole("button", { name: /convert to client/i })).toBeVisible();
   await page.getByRole("button", { name: /convert to client/i }).click();
-  await page.waitForURL(/\/clients\/[a-z0-9]+/i);
+
+  // The button opens a confirmation modal that collects billing details; it
+  // does not navigate on its own. The test used to click and immediately wait
+  // for /clients/[id], so it always timed out.
+  await expect(page.getByRole("heading", { name: "Convert to Client" })).toBeVisible();
+  await page.getByRole("button", { name: /convert & create project/i }).click();
+
+  // Conversion lands on the new project (or the client when no project is made).
+  await page.waitForURL(/\/(clients|projects)\/[a-z0-9-]+/i, { timeout: 20_000 });
 });
 
 test("follow-up can be added from client detail page", async ({ page }) => {
-  test.skip(!CLIENT_ID, "E2E_CLIENT_ID not set");
+  const CLIENT_ID = await clientId(page);
+  test.skip(!CLIENT_ID, "no client in the database — run the seed with SEED_DEMO_DATA=true");
   await page.goto(`/clients/${CLIENT_ID}`);
   await expect(page.getByText(/New follow-up/i)).toBeVisible();
   await page.getByPlaceholder(/What to talk about/i).fill("Smoke: inline followup");

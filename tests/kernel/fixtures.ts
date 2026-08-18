@@ -170,7 +170,27 @@ for (const m of SEEDED_MODELS) {
   }
 }
 
+// This TRUNCATEs every table in the database. That is fine for an ephemeral
+// CI database and it is also why running the suite against your local dev
+// database destroys your seed data — reseed afterwards.
+//
+// The guard below exists because the same command pointed at a remote
+// DATABASE_URL would silently truncate production. Local dev and CI both run
+// Postgres on localhost; a managed database never does.
+function assertDestructiveAllowed(): void {
+  const url = process.env["DATABASE_URL"] ?? "";
+  const isLocal = /@(localhost|127\.0\.0\.1|::1|postgres|db)[:/]/.test(url);
+  if (isLocal || process.env["ALLOW_DESTRUCTIVE_TESTS"] === "true") return;
+  throw new Error(
+    "Refusing to TRUNCATE every table: DATABASE_URL does not look like a local " +
+    "or containerised test database.\n" +
+    `  DATABASE_URL host is not localhost (${url.replace(/:[^:@/]*@/, ":***@")}).\n` +
+    "  If this really is a throwaway database, set ALLOW_DESTRUCTIVE_TESTS=true.",
+  );
+}
+
 async function wipe(db: PrismaClient): Promise<void> {
+  assertDestructiveAllowed();
   await db.$executeRawUnsafe(`
     DO $$ DECLARE r record;
     BEGIN

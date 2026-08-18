@@ -12,12 +12,14 @@
 // a wallpaper measurement is needed via E2E_WALLPAPER_ITEM_ID.
 
 import { test, expect } from "@playwright/test";
+import { projectId } from "./_ids";
 
 const PROJECT_ID        = process.env["E2E_PROJECT_ID"];
 const WALLPAPER_ITEM_ID = process.env["E2E_WALLPAPER_ITEM_ID"];
 
 test("project measurements page shows CalcResult for wallpaper items", async ({ page }) => {
-  test.skip(!PROJECT_ID, "E2E_PROJECT_ID not set");
+  const PROJECT_ID = await projectId(page);
+  test.skip(!PROJECT_ID, "no project in the database — run the seed with SEED_DEMO_DATA=true");
   await page.goto(`/projects/${PROJECT_ID}/measurements`);
   await expect(page).not.toHaveTitle(/404|500/);
   // Measurement items with a CalcResult should show roll count or area

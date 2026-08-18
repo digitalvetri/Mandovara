@@ -1,4 +1,4 @@
-import { prisma as db } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { InstallStatus } from "@/kernel/db/client";
 
@@ -66,7 +66,7 @@ export async function getInstallVisit(
   ctx: RequestContext,
   visitId: string,
 ): Promise<InstallVisitDetail | null> {
-  const visit = await db.installVisit.findFirst({
+  const visit = await orgPrisma(ctx.orgId).installVisit.findFirst({
     where: { id: visitId, organizationId: ctx.orgId, kind: "INSTALL" },
     select: {
       id: true, number: true, scheduledAt: true, assignedAt: true,
@@ -94,7 +94,7 @@ export async function getInstallVisit(
   const snagAssignees = [...new Set(visit.snags.map((s) => s.assignedToId).filter(Boolean))] as string[];
 
   const [project, crew, orderLines, actors, employees] = await Promise.all([
-    db.project.findUnique({
+    orgPrisma(ctx.orgId).project.findUnique({
       where: { id: visit.projectId },
       select: {
         name: true, siteAddress: true,
@@ -102,21 +102,21 @@ export async function getInstallVisit(
         orders: { where: { id: visit.orderId }, select: { number: true }, take: 1 },
       },
     }),
-    visit.crewId ? db.installCrew.findUnique({ where: { id: visit.crewId }, select: { name: true } }) : null,
+    visit.crewId ? orgPrisma(ctx.orgId).installCrew.findUnique({ where: { id: visit.crewId }, select: { name: true } }) : null,
     orderLineIds.length > 0
-      ? db.orderLine.findMany({ where: { id: { in: orderLineIds } }, select: { id: true, description: true, colourwayId: true } })
+      ? orgPrisma(ctx.orgId).orderLine.findMany({ where: { id: { in: orderLineIds } }, select: { id: true, description: true, colourwayId: true } })
       : Promise.resolve([]),
     actorIds.length > 0
-      ? db.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+      ? orgPrisma(ctx.orgId).user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
       : Promise.resolve([]),
     snagAssignees.length > 0
-      ? db.employee.findMany({ where: { id: { in: snagAssignees } }, select: { id: true, name: true } })
+      ? orgPrisma(ctx.orgId).employee.findMany({ where: { id: { in: snagAssignees } }, select: { id: true, name: true } })
       : Promise.resolve([]),
   ]);
 
   const cwIds = [...new Set(orderLines.map((l) => l.colourwayId).filter(Boolean))] as string[];
   const colourways = cwIds.length > 0
-    ? await db.colourway.findMany({ where: { id: { in: cwIds } }, select: { id: true, code: true, colourName: true } })
+    ? await orgPrisma(ctx.orgId).colourway.findMany({ where: { id: { in: cwIds } }, select: { id: true, code: true, colourName: true } })
     : [];
 
   const cwMap       = new Map(colourways.map((c) => [c.id, c]));

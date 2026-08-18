@@ -1,4 +1,4 @@
-import { prisma as db } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { InstallStatus } from "@/kernel/db/client";
@@ -48,7 +48,7 @@ export async function listInstallVisits(
   opts: { status?: InstallStatus[]; dateFrom?: Date; dateTo?: Date } = {},
 ): Promise<InstallVisitRow[]> {
   requirePermission(ctx, "install.view");
-  const visits = await db.installVisit.findMany({
+  const visits = await orgPrisma(ctx.orgId).installVisit.findMany({
     where: {
       organizationId: ctx.orgId,
       kind: "INSTALL",
@@ -76,15 +76,15 @@ export async function listInstallVisits(
   const orderIds   = [...new Set(visits.map((v) => v.orderId))];
 
   const [projects, crews, orders] = await Promise.all([
-    db.project.findMany({
+    orgPrisma(ctx.orgId).project.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, name: true, siteAddress: true, client: { select: { name: true } } },
     }),
     crewIds.length > 0
-      ? db.installCrew.findMany({ where: { id: { in: crewIds } }, select: { id: true, name: true } })
+      ? orgPrisma(ctx.orgId).installCrew.findMany({ where: { id: { in: crewIds } }, select: { id: true, name: true } })
       : Promise.resolve([]),
     orderIds.length > 0
-      ? db.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, number: true } })
+      ? orgPrisma(ctx.orgId).order.findMany({ where: { id: { in: orderIds } }, select: { id: true, number: true } })
       : Promise.resolve([]),
   ]);
 
@@ -112,7 +112,7 @@ export async function listInstallVisits(
 
 export async function getInstallStatusCounts(ctx: RequestContext): Promise<InstallStatusCounts> {
   requirePermission(ctx, "install.view");
-  const groups = await db.installVisit.groupBy({
+  const groups = await orgPrisma(ctx.orgId).installVisit.groupBy({
     by: ["status"],
     where: { organizationId: ctx.orgId, kind: "INSTALL" },
     _count: { id: true },
@@ -131,7 +131,7 @@ export async function getInstallStatusCounts(ctx: RequestContext): Promise<Insta
 
 export async function listEligibleOrders(ctx: RequestContext): Promise<EligibleOrder[]> {
   requirePermission(ctx, "install.view");
-  const orders = await db.order.findMany({
+  const orders = await orgPrisma(ctx.orgId).order.findMany({
     where: {
       organizationId: ctx.orgId,
       status: { in: ["CONFIRMED", "PROCUREMENT", "MAKE", "READY_TO_INSTALL"] },
@@ -147,7 +147,7 @@ export async function listEligibleOrders(ctx: RequestContext): Promise<EligibleO
 
   const orderIds = orders.map((o) => o.id);
   const existing = orderIds.length > 0
-    ? await db.installVisit.findMany({
+    ? await orgPrisma(ctx.orgId).installVisit.findMany({
         where: {
           organizationId: ctx.orgId, kind: "INSTALL",
           orderId: { in: orderIds }, status: { not: "CANCELLED" },
@@ -168,7 +168,7 @@ export async function listEligibleOrders(ctx: RequestContext): Promise<EligibleO
 }
 
 export async function listInstallCrews(ctx: RequestContext) {
-  return db.installCrew.findMany({
+  return orgPrisma(ctx.orgId).installCrew.findMany({
     where: { organizationId: ctx.orgId, isActive: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
@@ -188,7 +188,7 @@ export interface SnagListRow {
 
 export async function listOpenSnags(ctx: RequestContext): Promise<SnagListRow[]> {
   requirePermission(ctx, "install.view");
-  const snags = await db.snag.findMany({
+  const snags = await orgPrisma(ctx.orgId).snag.findMany({
     where: {
       organizationId: ctx.orgId,
       status: { in: ["OPEN", "IN_PROGRESS"] },
@@ -203,7 +203,7 @@ export async function listOpenSnags(ctx: RequestContext): Promise<SnagListRow[]>
   if (snags.length === 0) return [];
 
   const projectIds = [...new Set(snags.map((s) => s.projectId))];
-  const projects   = await db.project.findMany({
+  const projects   = await orgPrisma(ctx.orgId).project.findMany({
     where: { id: { in: projectIds } },
     select: { id: true, name: true, client: { select: { name: true } } },
   });

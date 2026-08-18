@@ -8,9 +8,8 @@
 // E2E_LEAD_ID    — an existing lead.
 
 import { test, expect, type Page } from "@playwright/test";
+import { leadId, projectId } from "./_ids";
 
-const PROJECT_ID = process.env["E2E_PROJECT_ID"];
-const LEAD_ID    = process.env["E2E_LEAD_ID"];
 
 // Discriminating check: Next.js dev error overlay renders the full error type and
 // message in the DOM. If a page throws PrismaClientValidationError (wrong field
@@ -32,8 +31,9 @@ test("leads list loads with table and new-lead entry point", async ({ page }) =>
 });
 
 test("lead detail renders stage, contact, and action buttons", async ({ page }) => {
-  test.skip(!LEAD_ID, "E2E_LEAD_ID not set");
-  await page.goto(`/leads/${LEAD_ID}`);
+  const id = await leadId(page);
+  test.skip(!id, "no lead in the database — run the seed with SEED_DEMO_DATA=true");
+  await page.goto(`/leads/${id}`);
   await expectNoRuntimeError(page);
   await expect(page.getByRole("heading").first()).toBeVisible();
 });
@@ -57,8 +57,9 @@ test("projects list loads", async ({ page }) => {
 });
 
 test("project detail renders with measurement and quotation tabs", async ({ page }) => {
-  test.skip(!PROJECT_ID, "E2E_PROJECT_ID not set");
-  await page.goto(`/projects/${PROJECT_ID}`);
+  const id = await projectId(page);
+  test.skip(!id, "no project in the database — run the seed with SEED_DEMO_DATA=true");
+  await page.goto(`/projects/${id}`);
   await expectNoRuntimeError(page);
   const heading = page.getByRole("heading").first();
   await expect(heading).toBeVisible();
@@ -67,8 +68,9 @@ test("project detail renders with measurement and quotation tabs", async ({ page
 });
 
 test("project measurements page renders room accordion", async ({ page }) => {
-  test.skip(!PROJECT_ID, "E2E_PROJECT_ID not set");
-  await page.goto(`/projects/${PROJECT_ID}/measurements`);
+  const id = await projectId(page);
+  test.skip(!id, "no project in the database — run the seed with SEED_DEMO_DATA=true");
+  await page.goto(`/projects/${id}/measurements`);
   await expect(page).not.toHaveTitle(/404|500/);
   await expectNoRuntimeError(page);
 });

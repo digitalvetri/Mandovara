@@ -8,6 +8,21 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
+// Importing the RAW client outside src/kernel/db silently defeats §3.2: the
+// request-path connection has no `app.current_org_id` set, so every query hits
+// the deny-by-default RLS policy and the page renders empty with no error.
+// Five modules (make, install x2, leads, the installer PWA) were doing exactly
+// this via `import { prisma as db }` and returned zero rows once RLS landed.
+const bannedRawClientImport = {
+  name: "@/kernel/db/client",
+  importNames: ["prisma", "authBootstrapPrisma"],
+  message:
+    "Do not use the raw Prisma client outside src/kernel/db. Use scoped(ctx) " +
+    "for request-path work, or orgPrisma(ctx.orgId) when you must bypass " +
+    "scoping but still need the tenant pinned for Row-Level Security. " +
+    "authBootstrapPrisma is reserved for authentication lookups.",
+};
+
 const bannedPrismaImport = {
   name: "@prisma/client",
   message:
@@ -74,7 +89,7 @@ export default tseslint.config(
       "no-restricted-syntax": ["error", bannedUSLocaleSyntax],
 
       // Custom rule (d): no direct @prisma/client imports outside src/kernel/db — Rule 1
-      "no-restricted-imports": ["error", { paths: [bannedPrismaImport] }],
+      "no-restricted-imports": ["error", { paths: [bannedPrismaImport, bannedRawClientImport] }],
 
       // Custom rule (e): no file over 300 lines — CLAUDE.md §10
       "max-lines": ["error", 300],
@@ -131,6 +146,22 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": "off",
       "max-lines": "off",
+    },
+  },
+
+  // The auth bootstrap is the one place that legitimately needs the raw owner
+  // connection: resolving a login credential or a session cookie to a User row
+  // has to happen BEFORE the tenant is known, so it cannot run under RLS.
+  // Keep this list short — every entry is a hole in §3.2.
+  {
+    files: [
+      "src/lib/dev-auth.ts",
+      "src/lib/dev-context.ts",
+      "src/app/api/webhooks/whatsapp/route.ts",   // resolves the tenant from the WABA payload
+      "src/app/api/admin/import-stock/route.ts",  // single-tenant admin importer
+    ],
+    rules: {
+      "no-restricted-imports": "off",
     },
   },
 

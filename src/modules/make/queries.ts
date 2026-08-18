@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- FIXME: split into smaller files (currently 301 lines) */
-import { prisma as db } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { MakeJobStatus } from "@/kernel/db/client";
@@ -81,7 +81,7 @@ export async function listMakeJobs(
   opts: { status?: MakeJobStatus[] } = {},
 ): Promise<MakeJobRow[]> {
   requirePermission(ctx, "make.view");
-  const jobs = await db.makeJob.findMany({
+  const jobs = await orgPrisma(ctx.orgId).makeJob.findMany({
     where: {
       organizationId: ctx.orgId,
       ...(opts.status?.length ? { status: { in: opts.status } } : {}),
@@ -112,7 +112,7 @@ export async function listMakeJobs(
   const orderIds    = [...new Set(jobs.map((j) => j.orderId))];
 
   // Fetch the first measurementItemId per job via a separate query (avoids nested where in select)
-  const firstLines = await db.makeJobLine.findMany({
+  const firstLines = await orgPrisma(ctx.orgId).makeJobLine.findMany({
     where: { makeJobId: { in: jobIds }, measurementItemId: { not: null } },
     select: { makeJobId: true, measurementItemId: true },
     distinct: ["makeJobId"],
@@ -123,21 +123,21 @@ export async function listMakeJobs(
   const measItemIds = [...new Set(firstLines.map((l) => l.measurementItemId!))];
 
   const [projects, vendors, assignees, orders, measItems] = await Promise.all([
-    db.project.findMany({
+    orgPrisma(ctx.orgId).project.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, name: true, client: { select: { name: true } } },
     }),
     vendorIds.length > 0
-      ? db.vendor.findMany({ where: { id: { in: vendorIds } }, select: { id: true, name: true } })
+      ? orgPrisma(ctx.orgId).vendor.findMany({ where: { id: { in: vendorIds } }, select: { id: true, name: true } })
       : Promise.resolve([]),
     assigneeIds.length > 0
-      ? db.employee.findMany({ where: { id: { in: assigneeIds } }, select: { id: true, name: true } })
+      ? orgPrisma(ctx.orgId).employee.findMany({ where: { id: { in: assigneeIds } }, select: { id: true, name: true } })
       : Promise.resolve([]),
     orderIds.length > 0
-      ? db.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, number: true } })
+      ? orgPrisma(ctx.orgId).order.findMany({ where: { id: { in: orderIds } }, select: { id: true, number: true } })
       : Promise.resolve([]),
     measItemIds.length > 0
-      ? db.measurementItem.findMany({
+      ? orgPrisma(ctx.orgId).measurementItem.findMany({
           where: { id: { in: measItemIds } },
           select: { id: true, measurement: { select: { number: true, status: true } } },
         })
@@ -176,7 +176,7 @@ export async function getMakeJob(
   jobId: string,
 ): Promise<MakeJobDetail | null> {
   requirePermission(ctx, "make.view");
-  const job = await db.makeJob.findFirst({
+  const job = await orgPrisma(ctx.orgId).makeJob.findFirst({
     where: { id: jobId, organizationId: ctx.orgId },
     select: {
       id: true, number: true, status: true, priority: true,
@@ -208,7 +208,7 @@ export async function getMakeJob(
   const actorIds    = [...new Set(job.events.map((e) => e.actorId))];
 
   const [project, vendor, assignedTo, orderLines, measItems, actors] = await Promise.all([
-    db.project.findUnique({
+    orgPrisma(ctx.orgId).project.findUnique({
       where: { id: job.projectId },
       select: {
         name: true,
@@ -217,29 +217,29 @@ export async function getMakeJob(
       },
     }),
     job.vendorId
-      ? db.vendor.findUnique({ where: { id: job.vendorId }, select: { name: true } })
+      ? orgPrisma(ctx.orgId).vendor.findUnique({ where: { id: job.vendorId }, select: { name: true } })
       : null,
     job.assignedToId
-      ? db.employee.findUnique({ where: { id: job.assignedToId }, select: { name: true } })
+      ? orgPrisma(ctx.orgId).employee.findUnique({ where: { id: job.assignedToId }, select: { name: true } })
       : null,
-    db.orderLine.findMany({
+    orgPrisma(ctx.orgId).orderLine.findMany({
       where: { id: { in: job.lines.map((l) => l.orderLineId) } },
       select: { id: true, description: true, colourwayId: true },
     }),
     measItemIds.length > 0
-      ? db.measurementItem.findMany({
+      ? orgPrisma(ctx.orgId).measurementItem.findMany({
           where: { id: { in: measItemIds } },
           select: { id: true, measurement: { select: { number: true, status: true } } },
         })
       : Promise.resolve([]),
     actorIds.length > 0
-      ? db.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+      ? orgPrisma(ctx.orgId).user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
       : Promise.resolve([]),
   ]);
 
   const cwIds = [...new Set(orderLines.map((l) => l.colourwayId).filter(Boolean))] as string[];
   const colourways = cwIds.length > 0
-    ? await db.colourway.findMany({ where: { id: { in: cwIds } }, select: { id: true, code: true, colourName: true } })
+    ? await orgPrisma(ctx.orgId).colourway.findMany({ where: { id: { in: cwIds } }, select: { id: true, code: true, colourName: true } })
     : [];
 
   const cwMap       = new Map(colourways.map((c) => [c.id, c]));

@@ -4,7 +4,7 @@
 // `expectedValue`), `mobile`, `email` — no companyName, no updatedAt, no stateCode.
 
 import { scoped } from "@/kernel/db/scoped";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
@@ -244,7 +244,7 @@ export async function getLeadCities(ctx: RequestContext): Promise<string[]> {
   requirePermission(ctx, "lead.view");
   // $queryRaw for DISTINCT on a JSON field — Prisma groupBy can't target JSON paths.
   // organizationId is applied manually; RLS is the second wall.
-  const rows = await prisma.$queryRaw<{ city: string }[]>`
+  const rows = await orgPrisma(ctx.orgId).$queryRaw<{ city: string }[]>`
     SELECT DISTINCT "siteAddress"->>'city' AS city
     FROM "Lead"
     WHERE "organizationId" = ${ctx.orgId}
