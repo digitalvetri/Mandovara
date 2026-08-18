@@ -50,6 +50,16 @@ if [ "${WIPE_DEMO_DATA:-false}" = "true" ]; then
   node /app/scripts/wipe-demo-data.mjs || echo "→ wipe failed, continuing anyway"
 fi
 
+# Boot guard: with FORCE RLS on User, an owner role that cannot bypass RLS makes
+# the pre-tenant login lookup return zero rows — every sign-in fails and nobody
+# can get in, with nothing in the logs. Refuse to serve rather than lock the
+# studio out silently.
+echo "→ Verifying auth bootstrap can read User under RLS..."
+node /app/scripts/check-auth-bootstrap.mjs
+if [ $? -ne 0 ]; then
+  echo "✗ auth bootstrap check failed — aborting before serving traffic"; exit 1
+fi
+
 echo "→ Checking DB state..."
 CHECK=$(node /app/check-empty.mjs 2>&1)
 CHECK_EXIT=$?

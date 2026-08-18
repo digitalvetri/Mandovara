@@ -83,6 +83,13 @@ COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nextjs:nodejs scripts/check-empty.mjs         /app/check-empty.mjs
 COPY --chown=nextjs:nodejs scripts/wipe-demo-data.mjs      /app/scripts/wipe-demo-data.mjs
 
+# §3.2 Row-Level Security. Both are invoked by docker-entrypoint.sh on every
+# boot, so they MUST be in the image — without them the entrypoint aborts.
+#   setup-app-role       creates/rotates the restricted mandovara_app role
+#   check-auth-bootstrap refuses to serve if login would be impossible under RLS
+COPY --chown=nextjs:nodejs scripts/setup-app-role.mjs      /app/scripts/setup-app-role.mjs
+COPY --chown=nextjs:nodejs scripts/check-auth-bootstrap.mjs /app/scripts/check-auth-bootstrap.mjs
+
 # One-shot catalog reset — wipes brand/collection/design/colourway and
 # reloads Rugway + Fedora with real swatch images copied onto the
 # mounted /app/public/catalog volume. Baked in with its source-image
