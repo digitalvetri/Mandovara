@@ -9,7 +9,7 @@ import {
   Boxes, MapPin, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
-  Sparkles,
+  
   Layers,
   type LucideIcon,
 } from "lucide-react";
