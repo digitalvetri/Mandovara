@@ -20,7 +20,7 @@ import { Plus, Trash2 } from "lucide-react";
 import {
   updateProductSchema, RUG_SIZE_TIERS, SELL_UNIT_OPTIONS, GST_SLABS,
 } from "@/modules/products/schema";
-import { updateProduct } from "@/modules/products/actions";
+import { updateProduct } from "@/modules/products/actions-part2";
 import type { ProductEditSnapshot } from "@/modules/products/queries";
 import { EntityForm } from "@/components/data/EntityForm";
 

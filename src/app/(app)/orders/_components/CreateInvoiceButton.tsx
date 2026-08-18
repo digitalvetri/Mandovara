@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { createInvoiceFromOrder } from "@/modules/invoices/actions";
+import { createInvoiceFromOrder } from "@/modules/invoices/actions-part2";
 
 export function CreateInvoiceButton({ orderId }: { orderId: string }) {
   const router = useRouter();

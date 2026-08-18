@@ -72,3 +72,15 @@ export function findMeasurementGateViolation(
   }
   return null;
 }
+
+// Shared Zod → ActionResult mapper. Lives here rather than in either action
+// file so both can use it after actions.ts was split for the §10 line limit.
+export function zodError<T>(err: import("zod").ZodError): {
+  ok: false; error: string; fieldErrors: Record<string, string>; data?: T;
+} {
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of err.issues) {
+    fieldErrors[issue.path.map(String).join(".")] = issue.message;
+  }
+  return { ok: false, error: "Validation failed", fieldErrors };
+}

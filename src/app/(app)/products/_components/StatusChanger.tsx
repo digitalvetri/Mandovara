@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PRODUCT_STATUSES } from "@/modules/products/schema";
-import { setProductStatus } from "@/modules/products/actions";
+import { setProductStatus } from "@/modules/products/actions-part2";
 
 const LABEL: Record<string, string> = {
   ACTIVE: "Active", INACTIVE: "Inactive", DISCONTINUED: "Discontinued",

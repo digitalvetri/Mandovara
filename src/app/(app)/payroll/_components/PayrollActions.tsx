@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { approvePayroll, sendPayslip } from "@/modules/payroll/actions";
+import { approvePayroll, sendPayslip } from "@/modules/payroll/actions-part2";
 
 // ── Approve payroll run ────────────────────────────────────────────────────────
 

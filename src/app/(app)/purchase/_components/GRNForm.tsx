@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { postGRN } from "@/modules/purchase/grn-actions";
+import { postGRN } from "@/modules/purchase/grn-actions-part2";
 import type { POLineRow } from "@/modules/purchase/queries";
 
 interface LineState {

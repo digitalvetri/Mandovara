@@ -10,7 +10,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { cancelInvoice } from "@/modules/invoices/actions";
+import { cancelInvoice } from "@/modules/invoices/actions-part2";
 
 interface Props {
   id: string;

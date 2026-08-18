@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { convertLead } from "@/modules/leads/actions";
+import { convertLead } from "@/modules/leads/actions-part2";
 
 interface Props {
   id: string;

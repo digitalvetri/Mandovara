@@ -14,7 +14,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle, Loader2, UserCheck } from "lucide-react";
-import { approveQuotationForConversion } from "@/modules/quotations/actions";
+import { approveQuotationForConversion } from "@/modules/quotations/actions-lines";
 import { ConvertLeadModal } from "./ConvertLeadModal";
 
 export interface LeadScopedQuote {

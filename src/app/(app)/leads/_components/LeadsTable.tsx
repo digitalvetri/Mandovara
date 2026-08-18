@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type { LeadRow } from "@/modules/leads/queries";
 import { SOURCE_LABEL } from "@/modules/leads/schema";
-import { deleteLead } from "@/modules/leads/actions";
+import { deleteLead } from "@/modules/leads/actions-part2";
 import { MoreMenu, type MenuItem } from "@/components/data/MoreMenu";
 import { StatusPill } from "./StatusPill";
 

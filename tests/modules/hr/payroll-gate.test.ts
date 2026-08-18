@@ -24,7 +24,8 @@ import {
   type SalaryStructure,
   type StatutorySlabInput,
 } from "../../../src/kernel/payroll/compute";
-import { runPayroll as _runPayroll, approvePayroll as _approvePayroll } from "../../../src/modules/payroll/actions";
+import { runPayroll as _runPayroll } from "../../../src/modules/payroll/actions";
+import { approvePayroll as _approvePayroll } from "../../../src/modules/payroll/actions-part2";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

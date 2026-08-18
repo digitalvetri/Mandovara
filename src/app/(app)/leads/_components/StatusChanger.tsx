@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LEAD_STATUSES } from "@/modules/leads/schema";
-import { changeLeadStatus } from "@/modules/leads/actions";
+import { changeLeadStage } from "@/modules/leads/actions";
 
 const LABEL: Record<string, string> = {
   NEW: "New", CONTACTED: "Contacted", QUALIFIED: "Qualified",
@@ -22,7 +22,7 @@ export function StatusChanger({ id, current }: { id: string; current: string }) 
   function commit(to: string, reason?: string) {
     setError(null);
     startTransition(async () => {
-      const res = await changeLeadStatus({ id, to, ...(reason != null && { lostReason: reason }) });
+      const res = await changeLeadStage({ id, to, ...(reason != null && { lostReason: reason }) });
       if (!res.ok) {
         setError(res.fieldErrors?.["lostReason"] ?? res.error ?? "Could not update status");
         return;

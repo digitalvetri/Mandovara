@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { Receipt, ArrowRight, Plus, AlertCircle, Loader2 } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
-import { createInvoiceFromOrder } from "@/modules/invoices/actions";
+import { createInvoiceFromOrder } from "@/modules/invoices/actions-part2";
 import type { ProjectPayments, ProjectPaymentInvoice } from "@/modules/projects/queries";
 
 interface Props {

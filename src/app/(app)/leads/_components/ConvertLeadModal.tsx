@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { X, UserCheck, Building2, MapPin, IndianRupee, CalendarDays, ClipboardList, Home, Landmark } from "lucide-react";
-import { convertLead } from "@/modules/leads/actions";
+import { convertLead } from "@/modules/leads/actions-part2";
 
 const PROJECT_TYPES = ["Residential", "Commercial", "Office", "Retail", "Hospitality", "Other"] as const;
 

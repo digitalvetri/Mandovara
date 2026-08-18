@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Save } from "lucide-react";
-import { updateQuotationLines } from "@/modules/quotations/actions";
+import { updateQuotationLines } from "@/modules/quotations/actions-status";
 import type { EditLine } from "./QuotePreviewA4";
 import type { SerializedQuotation } from "../_types";
 import {

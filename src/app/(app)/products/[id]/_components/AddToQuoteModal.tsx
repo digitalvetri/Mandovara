@@ -16,7 +16,7 @@ import type { Route } from "next";
 import { Loader2, X, Plus, ArrowRight } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
-import { appendColourwayToQuotation } from "@/modules/quotations/actions";
+import { appendColourwayToQuotation } from "@/modules/quotations/actions-lines";
 import type { OpenQuotationOption } from "@/modules/quotations/queries";
 
 interface Props {

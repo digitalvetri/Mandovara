@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { setQuotationStatus, rejectQuotation } from "@/modules/quotations/actions";
+import { setQuotationStatus } from "@/modules/quotations/actions-part2";
+import { rejectQuotation } from "@/modules/quotations/actions-status";
 import { createOrderFromQuotation } from "@/modules/orders/actions";
 
 interface Props {
