@@ -3,6 +3,9 @@ import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { getQuotation, type QuotationDetail } from "@/modules/quotations/queries";
 import { QuotationHeader } from "./_components/QuotationHeader";
+import { scoped } from "@/kernel/db/scoped";
+import { isEstimate } from "@/modules/quotations/lib";
+import { canReissue } from "@/modules/quotations/reissue-schemas";
 import { QuotationWorkspace } from "./_components/QuotationWorkspace";
 import type { SerializedQuotation } from "./_types";
 
@@ -70,9 +73,30 @@ export default async function QuotationDetailPage({
   const canApprove = can(ctx, "quotation.approve");
   const serialized = serializeQuotation(q);
 
+  // Work out up front whether this estimate can become a firm quotation, so
+  // the button can say WHY not instead of just being absent.
+  let reissueBlockedReason: string | undefined;
+  if (isEstimate(q.lines)) {
+    const approvedItems = q.projectId
+      ? await scoped(ctx).measurementItem.count({
+          where: { room: { projectId: q.projectId }, measurement: { status: "APPROVED" } },
+        })
+      : 0;
+    const pre = canReissue({
+      isEstimate: true,
+      projectId: q.projectId,
+      approvedMeasurementItems: approvedItems,
+    });
+    if (!pre.ok) reissueBlockedReason = pre.reason;
+  }
+
   return (
     <>
-      <QuotationHeader quotation={serialized} canApprove={canApprove} />
+      <QuotationHeader
+        quotation={serialized}
+        canApprove={canApprove}
+        {...(reissueBlockedReason ? { reissueBlockedReason } : {})}
+      />
       <QuotationWorkspace quotation={serialized} canApprove={canApprove} />
     </>
   );

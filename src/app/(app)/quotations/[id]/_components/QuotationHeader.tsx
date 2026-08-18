@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { StatusPill } from "../../_components/StatusPill";
 import { StatusChanger } from "../../_components/StatusChanger";
+import { ReissueButton } from "./ReissueButton";
 import type { SerializedQuotation } from "../_types";
 import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 
@@ -74,10 +75,12 @@ function ClientAvatar({ name }: { name: string }) {
 
 interface Props {
   quotation: SerializedQuotation;
+  /** Set when the estimate cannot yet be reissued; explains why. */
+  reissueBlockedReason?: string;
   canApprove: boolean;
 }
 
-export function QuotationHeader({ quotation, canApprove }: Props) {
+export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }: Props) {
   const [copied, setCopied] = useState(false);
 
   const isIntraState = BigInt(quotation.igstStr) === 0n;
@@ -158,6 +161,10 @@ export function QuotationHeader({ quotation, canApprove }: Props) {
 
         <div className="ml-auto flex items-center gap-2 flex-wrap shrink-0">
           <StatusChanger id={quotation.id} current={quotation.status} canApprove={canApprove} />
+          {/* Only an estimate has anything to reissue. */}
+          {isEstimate(quotation.lines) && quotation.status !== "REVISED" && (
+            <ReissueButton quotationId={quotation.id} blockedReason={reissueBlockedReason} />
+          )}
           <a
             href={`/api/quotations/${quotation.id}/pdf`}
             download

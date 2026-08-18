@@ -31,6 +31,14 @@ async function submitPasswordLogin(page: Page, email: string, password: string) 
 
 // Sign in with the rotated password and set it back to the seeded temp,
 // leaving mustChangePassword unset — enough for this spec to re-run.
+// The submit button is gated on React state (current filled, length, match).
+// Clicking straight after fill() raced that state and hit a disabled button.
+async function clickChangePassword(page: Page) {
+  const btn = page.getByRole("button", { name: /change password/i });
+  await expect(btn).toBeEnabled();
+  await btn.click();
+}
+
 test("force-change password flow", async ({ page, context }, testInfo) => {
   const EMAIL = EMAIL_BY_PROJECT[testInfo.project.name] ?? "aishwarya@mandovara.com";
   // The test projects inherit an already-authenticated storageState — clear
@@ -63,7 +71,7 @@ test("force-change password flow", async ({ page, context }, testInfo) => {
   await page.getByLabel(/current password/i).fill(OLD_PWD);
   await page.getByLabel(/^new password$/i).fill(NEW_PWD);
   await page.getByLabel(/confirm new password/i).fill(NEW_PWD);
-  await page.getByRole("button", { name: /change password/i }).click();
+  await clickChangePassword(page);
 
   // 4. Signed out, back at /login
   await page.waitForURL(/\/login/, { timeout: 10_000 });
@@ -85,6 +93,6 @@ test("force-change password flow", async ({ page, context }, testInfo) => {
   await page.getByLabel(/current password/i).fill(NEW_PWD);
   await page.getByLabel(/^new password$/i).fill(OLD_PWD);
   await page.getByLabel(/confirm new password/i).fill(OLD_PWD);
-  await page.getByRole("button", { name: /change password/i }).click();
+  await clickChangePassword(page);
   await page.waitForURL(/\/login/, { timeout: 10_000 });
 });
