@@ -161,7 +161,10 @@ export async function seedDownstream(
   const projExpRows:  Prisma.ProjectExpenseCreateManyInput[] = [];
 
   // dye-lot balances accumulate across orders: colourwayId|dyeLot → {qty, value}
-  const balances = new Map<string, { colourwayId: string; dyeLot: string | null; qty: number; value: bigint }>();
+  // `reserved` must track the Allocation rows we create below — the allocation
+  // console computes available = onHand − reserved, so leaving reserved at 0
+  // overstates what is actually free to promise.
+  const balances = new Map<string, { colourwayId: string; dyeLot: string | null; qty: number; reserved: number; value: bigint }>();
 
   let poN = 0, grnN = 0, mjN = 0, insN = 0, invN = 0, rcptN = 0;
 
@@ -227,9 +230,11 @@ export async function seedDownstream(
       });
 
       const key = `${line.colourwayId}|${dyeLot ?? ""}`;
-      const cur = balances.get(key) ?? { colourwayId: line.colourwayId!, dyeLot, qty: 0, value: 0n };
-      cur.qty   += qty;
-      cur.value += BigInt(line.rate) * BigInt(qty);
+      const cur = balances.get(key)
+        ?? { colourwayId: line.colourwayId!, dyeLot, qty: 0, reserved: 0, value: 0n };
+      cur.qty      += qty;
+      cur.reserved += qty;   // the Allocation created just below reserves it all
+      cur.value    += BigInt(line.rate) * BigInt(qty);
       balances.set(key, cur);
 
       // Reserve the lot against this order line — single lot, no override.
@@ -408,7 +413,7 @@ export async function seedDownstream(
   // StockBalance is materialised from the ledger, never hand-written elsewhere.
   await batch(db.stockBalance, [...balances.values()].map((b) => ({
     organizationId: orgId, colourwayId: b.colourwayId, dyeLot: b.dyeLot,
-    quantity: new Prisma.Decimal(b.qty), reserved: new Prisma.Decimal(0),
+    quantity: new Prisma.Decimal(b.qty), reserved: new Prisma.Decimal(b.reserved),
     value: b.value,
   })) as Prisma.StockBalanceCreateManyInput[]);
 

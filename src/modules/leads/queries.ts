@@ -4,7 +4,7 @@
 // `expectedValue`), `mobile`, `email` — no companyName, no updatedAt, no stateCode.
 
 import { scoped } from "@/kernel/db/scoped";
-import { orgPrisma } from "@/kernel/db/rls";
+import { withTransaction } from "@/kernel/db/transaction";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
@@ -243,15 +243,23 @@ export async function getLeadSummaryCounts(ctx: RequestContext): Promise<LeadSum
 export async function getLeadCities(ctx: RequestContext): Promise<string[]> {
   requirePermission(ctx, "lead.view");
   // $queryRaw for DISTINCT on a JSON field — Prisma groupBy can't target JSON paths.
-  // organizationId is applied manually; RLS is the second wall.
-  const rows = await orgPrisma(ctx.orgId).$queryRaw<{ city: string }[]>`
-    SELECT DISTINCT "siteAddress"->>'city' AS city
-    FROM "Lead"
-    WHERE "organizationId" = ${ctx.orgId}
-      AND "siteAddress"->>'city' IS NOT NULL
-      AND "siteAddress"->>'city' != ''
-    ORDER BY city
-  `;
+  //
+  // MUST go through withTransaction({ orgId }). orgPrisma()'s extension hooks
+  // `$allModels`, and a raw query is not a model operation — so it would run
+  // with no `app.current_org_id` set and the RLS policy would return zero rows.
+  // Verified: the bare form returned 0 while the same count via a model op
+  // returned 262.
+  const rows = await withTransaction(
+    (tx) => tx.$queryRaw<{ city: string }[]>`
+      SELECT DISTINCT "siteAddress"->>'city' AS city
+      FROM "Lead"
+      WHERE "organizationId" = ${ctx.orgId}
+        AND "siteAddress"->>'city' IS NOT NULL
+        AND "siteAddress"->>'city' != ''
+      ORDER BY city
+    `,
+    { orgId: ctx.orgId },
+  );
   return rows.map((r) => r.city);
 }
 

@@ -49,6 +49,12 @@ export function rlsExtensionConfig(orgId: string) {
  *
  * This is NOT a substitute for `scoped(ctx)`: it applies no branch scoping and
  * writes no audit rows. Prefer `scoped(ctx)` in request-path module code.
+ *
+ * LIMITATION — raw queries: the extension hooks `$allModels`, so `$queryRaw`,
+ * `$executeRaw` and friends are NOT model operations and bypass it entirely.
+ * They run with no tenant set and therefore return nothing under RLS. For raw
+ * SQL use `withTransaction(fn, { orgId })`, which sets the GUC on the
+ * transaction's own connection.
  */
 export function orgPrisma(orgId: string) {
   return prisma.$extends(rlsExtensionConfig(orgId));
