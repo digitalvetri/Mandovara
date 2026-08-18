@@ -73,7 +73,7 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
       </div>
 
       {/* ── Mobile: hamburger + brand ── */}
-      <div className="md:hidden flex items-center gap-3 px-4">
+      <div className="md:hidden flex items-center gap-2 pl-3 pr-1 shrink-0">
         <button
           type="button"
           onClick={onMenuOpen}
@@ -84,7 +84,7 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
         </button>
         <MandovaraLeafIcon size={28} />
         <div
-          className="text-sidebar-text font-semibold text-[15px] tracking-[0.06em]"
+          className="hidden sm:block text-sidebar-text font-semibold text-[15px] tracking-[0.06em]"
           style={{ fontFamily: "'Fraunces', Georgia, serif" }}
         >
           Mandovara
@@ -92,7 +92,7 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
       </div>
 
       {/* ── Right panel: search + actions + user ── */}
-      <div className="flex-1 flex items-center gap-2 px-4 md:px-5 min-w-0">
+      <div className="flex-1 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 md:px-5 min-w-0">
 
         {/* Inline global search */}
         <GlobalSearch />
@@ -102,12 +102,14 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
         {/* Notification bell */}
         <NotificationBell />
 
-        {/* Follow-up calendar */}
+        {/* Follow-up calendar — hidden on the narrowest screens, where the
+            action row would otherwise overflow the viewport. Reachable from
+            the sidebar nav on every device. */}
         <Link
           href={"/calendar" as Route}
           title="Follow-up Calendar"
           aria-label="Open follow-up calendar"
-          className="h-[38px] w-[38px] grid place-items-center rounded-[8px] text-text-dim hover:text-accent hover:bg-surface transition-colors"
+          className="hidden sm:grid h-[38px] w-[38px] place-items-center rounded-[8px] text-text-dim hover:text-accent hover:bg-surface transition-colors"
         >
           <CalendarDays size={16} strokeWidth={1.6} />
         </Link>

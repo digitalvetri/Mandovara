@@ -8,6 +8,7 @@ import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { orgPrisma } from "@/kernel/db/rls";
 import { Topbar } from "@/components/layout/Topbar";
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +86,7 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <Topbar title="My Profile" />
+      <Topbar title="My Profile" actions={<InstallAppButton />} />
 
       {/* ── HERO CARD ─────────────────────────────────────────────────────── */}
       <div className="rounded-[16px] border border-border bg-surface mb-5 overflow-hidden">

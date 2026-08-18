@@ -40,7 +40,7 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
         eyebrow={`${totalActive.toLocaleString("en-IN")} active rounds across the studio`}
       />
 
-      <div className="flex items-center gap-2 pb-4">
+      <div className="flex flex-wrap items-center gap-2 pb-4">
         <FilterChip label="All"        href="/measurements"                      active={!status} count={totalActive} />
         {STATUSES.map((s) => (
           <FilterChip
@@ -51,14 +51,14 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
             count={totalCounts[s]}
           />
         ))}
-        <form action="/measurements" method="GET" className="ml-auto">
+        <form action="/measurements" method="GET" className="w-full sm:w-auto sm:ml-auto min-w-0">
           {status && <input type="hidden" name="status" value={status} />}
           <input
             type="search"
             name="search"
             defaultValue={search}
             placeholder="Round number, project, client..."
-            className="h-[32px] w-[280px] rounded-[6px] border border-rule bg-transparent px-2 text-[12px] text-text placeholder:text-text-faint"
+            className="h-[32px] w-full sm:w-[280px] rounded-[6px] border border-rule bg-transparent px-2 text-[12px] text-text placeholder:text-text-faint"
           />
         </form>
       </div>

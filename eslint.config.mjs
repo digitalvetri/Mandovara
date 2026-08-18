@@ -165,6 +165,24 @@ export default tseslint.config(
     },
   },
 
+  // The service worker runs in a ServiceWorkerGlobalScope, not a browser
+  // window — `self`, `caches`, `clients`, `Response` and `fetch` are its
+  // globals. It is plain JS shipped from public/, not part of the TS build.
+  {
+    files: ["public/sw.js"],
+    languageOptions: {
+      globals: {
+        self: "readonly",
+        caches: "readonly",
+        clients: "readonly",
+        fetch: "readonly",
+        Response: "readonly",
+        URL: "readonly",
+        Promise: "readonly",
+      },
+    },
+  },
+
   // Prettier last — disable rules that would conflict with formatting
   prettier,
 );

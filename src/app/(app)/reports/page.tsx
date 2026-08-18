@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Topbar } from "@/components/layout/Topbar";
-import { formatINR } from "@/kernel/money/format";
+import { formatINR, formatINRShort } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { shortNumber } from "@/lib/short-number";
 import { getReportKpis } from "@/modules/reports/kpi";
@@ -50,9 +50,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       {/* ── KPI cards ─────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <KpiCard label="Revenue" value={formatINR(kpi.revenue)} href="/invoicing" note="ex-GST" />
-        <KpiCard label="Collections" value={formatINR(kpi.collections)} href="/accounts" />
-        <KpiCard label="Outstanding" value={formatINR(kpi.outstanding)} href={"/invoicing?status=ISSUED" as Route} warn={kpi.outstanding > 0n} />
+        <KpiCard label="Revenue" value={formatINRShort(kpi.revenue)} href="/invoicing" note="ex-GST" />
+        <KpiCard label="Collections" value={formatINRShort(kpi.collections)} href="/accounts" />
+        <KpiCard label="Outstanding" value={formatINRShort(kpi.outstanding)} href={"/invoicing?status=ISSUED" as Route} warn={kpi.outstanding > 0n} />
         <KpiCard label="Active Projects" value={String(kpi.activeProjects)} href="/projects" />
         <KpiCard label="New Leads" value={String(kpi.newLeads)} href="/leads" note={periodLabel} />
         <KpiCard label="Overview" value={String(kpi.readyToInstall)} href={"/orders?status=READY_TO_INSTALL" as Route} />
@@ -159,10 +159,13 @@ function KpiCard({ label, value, href, note, warn }: {
   return (
     <Link
       href={href as Route}
-      className="rounded-[12px] bg-surface border border-rule p-4 flex flex-col gap-1 hover:bg-surface-hover hover:border-accent/30 transition-colors group"
+      className="rounded-[12px] bg-surface border border-rule p-4 flex flex-col gap-1 min-w-0 hover:bg-surface-hover hover:border-accent/30 transition-colors group"
     >
       <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">{label}</div>
-      <div className={`font-data text-[22px] leading-none tabular font-semibold mt-1 ${warn ? "text-bad" : "text-text"} group-hover:text-accent transition-colors`}>
+      <div
+        title={value}
+        className={`font-data text-[18px] sm:text-[22px] leading-none tabular font-semibold mt-1 truncate ${warn ? "text-bad" : "text-text"} group-hover:text-accent transition-colors`}
+      >
         {value}
       </div>
       {note && <div className="text-[10px] text-text-faint mt-0.5">{note}</div>}

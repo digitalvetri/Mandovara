@@ -60,8 +60,8 @@ export function OrderFilters() {
   }
 
   return (
-    <div className="flex items-center gap-4 mb-4">
-      <div className="flex items-center gap-1 border border-rule rounded-[8px] bg-surface p-0.5 overflow-x-auto">
+    <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="flex items-center gap-1 border border-rule rounded-[8px] bg-surface p-0.5 max-w-full overflow-x-auto">
         {STATUS_TABS.map((tab) => {
           const active = currentStatus === tab.key;
           return (
@@ -80,8 +80,8 @@ export function OrderFilters() {
         })}
       </div>
 
-      <form onSubmit={onSearchSubmit} className="flex-1 max-w-[360px]">
-        <label className="flex items-center gap-2 h-[32px] px-3 bg-surface border border-rule rounded-[8px]">
+      <form onSubmit={onSearchSubmit} className="w-full sm:w-auto sm:flex-1 sm:max-w-[360px] min-w-0">
+        <label className="flex items-center gap-2 h-[32px] px-3 bg-surface border border-rule rounded-[8px] min-w-0">
           <Search size={13} strokeWidth={1.75} className="text-text-muted" />
           <input
             type="search"
