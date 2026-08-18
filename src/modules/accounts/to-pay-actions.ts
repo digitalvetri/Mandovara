@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/kernel/db/client";
+import { orgPrisma } from "@/kernel/db/rls";
 import { devContext } from "@/lib/dev-context";
 import { requirePermission } from "@/kernel/rbac/guard";
 
@@ -35,7 +35,7 @@ export async function markExpensePaid(input: unknown): Promise<ActionResult<null
     requirePermission(ctx, "expense.approve");   // same permission that approves the expense
 
     // Only mark an APPROVED expense as paid — refuse to shortcut past approval.
-    const expense = await prisma.expense.findUnique({
+    const expense = await orgPrisma(ctx.orgId).expense.findUnique({
       where:  { id: parsed.data.expenseId },
       select: { id: true, approvalState: true, paidAt: true, organizationId: true },
     });
@@ -49,7 +49,7 @@ export async function markExpensePaid(input: unknown): Promise<ActionResult<null
       return { ok: false, error: "Already marked paid" };
     }
 
-    await prisma.expense.update({
+    await orgPrisma(ctx.orgId).expense.update({
       where: { id: expense.id },
       data:  { paidAt: new Date() },
     });
