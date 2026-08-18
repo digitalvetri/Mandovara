@@ -35,9 +35,7 @@ One-page checklist for handing this application over to Mandovara. Work through 
 
 ## Known limitations at handover (be honest with the client)
 
-- **Sign-in is not rate-limited.** Login throttling was removed on request; failed password attempts are unlimited. Put a rate limit in front of `/login` at the proxy before this is reachable from the public internet.
 - **Mobile + 4-digit PIN sign-in has been removed.** Field staff sign in with email/mobile + password like everyone else.
-- **Made-to-measure lines can be quoted against a bare lead** with no `MeasurementItem`. This is a deliberate exemption from CLAUDE.md non-negotiable #1, which otherwise forbids it; client-scoped quotations are still gated. A quote raised from a lead is an estimate, and the quantities on it have not come from a site measurement.
 - WhatsApp integration is scaffolded but not wired to a Meta WABA — see CLAUDE.md §9 for what needs to be turned on before it works. Until then, the /accounts chase list uses a `wa.me` deep-link (opens WhatsApp with a pre-composed message; Rohit still hits Send) — works today, no template approval needed. Templates, per-message cost logging and the service-window countdown now have seed data, but nothing dispatches automatically.
 - HR: attendance and payroll pages exist and are seeded (45 days of attendance with month-lock, an approved payroll run with payslips). Offline punch from the field is still deferred — see the Phase 7 entry in docs/DECISIONS.md.
 - E-invoicing (IRN/GST portal) is schema-complete, actual submission flow not wired.

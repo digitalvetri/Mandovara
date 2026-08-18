@@ -22,6 +22,8 @@ import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kern
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import { computeCalcResult } from "@/modules/measurement/engine";
+import type { ProductFamily } from "@prisma/client";
+import { findMeasurementGateViolation } from "./lib";
 import type { ActionResult } from "./actions";
 import { quickQuoteSchema } from "./quick-schemas";
 
@@ -83,11 +85,25 @@ export async function createQuickQuote(
 
   // ── §0.10 / §15.1 measurement gate ─────────────────────────────
   // Client-scoped quick quotes auto-create a preliminary Measurement round
-  // below, so every line gets a real measurementItemId.
-  //
-  // REMOVED ON REQUEST: lead-scoped quick quotes are no longer gated. A
-  // made-to-measure line against a bare lead is written with
-  // measurementItemId = null.
+  // below, so every line gets a real measurementItemId. Lead-scoped quotes
+  // have no Project to hang a round off — so rather than writing a
+  // made-to-measure line with measurementItemId = null (exactly what §15.1
+  // forbids, with no exception), refuse it and name the next action.
+  if (isLeadScoped) {
+    const violation = findMeasurementGateViolation(
+      d.lines,
+      (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,
+      { isLeadScoped: true, labelOf: (id) => cwMap.get(id)?.design.name },
+    );
+    if (violation) {
+      return {
+        ok: false,
+        errorCode: "MEASUREMENT_REQUIRED",
+        error: "Validation failed",
+        fieldErrors: { [`lines.${violation.index}.colourwayId`]: violation.message },
+      };
+    }
+  }
 
   // ── Compute per-line tax and document totals up front ─────────
   const supplierStateCode = branch.stateCode;

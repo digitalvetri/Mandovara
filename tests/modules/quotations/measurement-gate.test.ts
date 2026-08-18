@@ -1,14 +1,11 @@
 // §0.10 / §15.1 — no made-to-measure quotation line without a linked
 // MeasurementItem.
 //
-// SCOPE (important): the gate is applied to CLIENT-scoped quotations only.
-// The lead-scoped exemption was reinstated on request, so a quotation raised
-// against a bare lead may contain made-to-measure lines with
-// measurementItemId = null. These tests cover the pure decision function;
-// the `isLeadScoped: true` cases below document what the function WOULD
-// return, not what the system currently enforces on that path — see
-// quotations/actions.ts and quick-actions.ts, which no longer call it for
-// lead-scoped quotes.
+// SCOPE: enforced on EVERY quotation path — new, revision and quick — and for
+// lead-scoped quotes as well as client-scoped ones. §15.1 states the rule with
+// no exception. A lead has no Project and therefore no measurement round, so a
+// made-to-measure line against a bare lead is refused and the user is told to
+// convert the lead first.
 
 import { describe, it, expect } from "vitest";
 import type { ProductFamily } from "@prisma/client";
@@ -61,9 +58,7 @@ describe("§15.1 measurement gate", () => {
     });
   });
 
-  // NOT WIRED UP: kept because the function still supports the mode and the
-  // wording is user-facing, but no caller passes isLeadScoped: true today.
-  describe("lead-scoped wording (function-level only — not enforced)", () => {
+  describe("lead-scoped quotes", () => {
     it("blocks wallpaper against a bare lead and names the next action", () => {
       const v = findMeasurementGateViolation(
         [{ colourwayId: "wallpaper" }],

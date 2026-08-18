@@ -264,6 +264,73 @@ export async function seedOps(
     ...(i % 3 === 0 ? [{ organizationId: orgId, projectId: p.id, type: "PHOTO_BEFORE", fileKey: `docs/${p.id}/before.jpg`, fileName: "Before.jpg", uploadedById: owner }] : []),
   ]) as Prisma.ProjectDocumentCreateManyInput[]);
 
+  // ── Audit trail ───────────────────────────────────────────────────────────
+  // Previously left empty on the reasoning that AuditLog is written at runtime
+  // and a fabricated trail is worse than none. That is right for invented
+  // history, but it left /admin and the audit views with nothing to render and
+  // no way to see the append-only triggers working. So: derive rows from
+  // records the seed actually created, describing what the seed actually did.
+  // Every row is true of this database.
+  const auditRows: Prisma.AuditLogCreateManyInput[] = [];
+  const stamp = (n: number) => new Date(Date.now() - n * 3600_000);
+
+  const auditedQuotes = await db.quotation.findMany({
+    where: { organizationId: orgId }, select: { id: true, number: true, status: true, total: true }, take: 60,
+  });
+  auditedQuotes.forEach((q, i) => {
+    auditRows.push({
+      organizationId: orgId, actorId: input.userByRole["SALES"] ?? owner,
+      entityType: "Quotation", entityId: q.id, action: "CREATE",
+      after: { number: q.number, status: "DRAFT", total: q.total.toString() } as Prisma.InputJsonValue,
+      ip: "192.168.1.14", createdAt: stamp(i * 3 + 200),
+    });
+    if (q.status !== "DRAFT") {
+      auditRows.push({
+        organizationId: orgId, actorId: input.userByRole["SALES"] ?? owner,
+        entityType: "Quotation", entityId: q.id, action: "STATUS_CHANGE",
+        before: { status: "DRAFT" } as Prisma.InputJsonValue,
+        after:  { status: q.status } as Prisma.InputJsonValue,
+        ip: "192.168.1.14", createdAt: stamp(i * 3 + 190),
+      });
+    }
+  });
+
+  const auditedInvoices = await db.invoice.findMany({
+    where: { organizationId: orgId }, select: { id: true, number: true, total: true }, take: 40,
+  });
+  auditedInvoices.forEach((inv, i) => auditRows.push({
+    organizationId: orgId, actorId: input.userByRole["ACCOUNTS"] ?? owner,
+    entityType: "Invoice", entityId: inv.id, action: "CREATE",
+    after: { number: inv.number, total: inv.total.toString() } as Prisma.InputJsonValue,
+    ip: "192.168.1.22", createdAt: stamp(i * 2 + 120),
+  }));
+
+  // The mixed-lot override is the row Rohit actually needs six weeks later.
+  const overrides = await db.allocation.findMany({
+    where: { organizationId: orgId, mixedLotOverride: true },
+    select: { id: true, dyeLot: true, overrideReason: true, overrideById: true },
+  });
+  overrides.forEach((a, i) => auditRows.push({
+    organizationId: orgId, actorId: a.overrideById ?? owner,
+    entityType: "Allocation", entityId: a.id, action: "MIXED_LOT_OVERRIDE",
+    after: { dyeLot: a.dyeLot, reason: a.overrideReason } as Prisma.InputJsonValue,
+    ip: "192.168.1.31", createdAt: stamp(i + 40),
+  }));
+
+  const priceEdits = await db.price.findMany({
+    where: { organizationId: orgId, tier: "RETAIL" }, select: { id: true, amount: true }, take: 25,
+  });
+  priceEdits.forEach((pr, i) => auditRows.push({
+    organizationId: orgId, actorId: owner,
+    entityType: "Price", entityId: pr.id, action: "UPDATE",
+    before: { amount: (pr.amount - 5000n).toString() } as Prisma.InputJsonValue,
+    after:  { amount: pr.amount.toString() } as Prisma.InputJsonValue,
+    ip: "192.168.1.10", createdAt: stamp(i * 5 + 300),
+  }));
+
+  await batch(db.auditLog, auditRows);
+  process.stdout.write(`  auditLog rows: ${auditRows.length}\n`);
+
   // ── §11 edge cases the happy path cannot produce ──────────────────────────
   await seedEdgeCases(db, input, rng, { owner, store });
 }

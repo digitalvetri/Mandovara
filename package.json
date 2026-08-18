@@ -19,12 +19,10 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
     "@hookform/resolvers": "^5.7.1",
     "@prisma/client": "6.19.0",
     "@react-pdf/renderer": "^4.6.1",
     "@sentry/nextjs": "^10.70.0",
-    "@types/three": "^0.185.4",
     "bcryptjs": "^3.0.3",
     "idb": "^8.0.3",
     "lucide-react": "^1.28.0",
@@ -33,7 +31,6 @@
     "react-dom": "19.2.8",
     "react-hook-form": "^7.84.0",
     "recharts": "^3.10.1",
-    "three": "^0.185.1",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },

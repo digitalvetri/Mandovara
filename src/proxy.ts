@@ -5,7 +5,14 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
 // Paths that never need authentication (change-password itself is gated
 // server-side against a valid session — putting it here just means the
 // middleware doesn't force a redirect; the page still checks the cookie).
-const PUBLIC_PATHS = ["/login", "/change-password", "/api/health"];
+// /sw.js and /offline MUST be public. A service worker script served behind a
+// redirect is rejected outright by the browser ("The script resource is behind
+// a redirect, which is disallowed"), so gating it broke registration for any
+// signed-out visitor — and with no service worker there is no install prompt.
+// The worker itself caches nothing sensitive; see public/sw.js.
+const PUBLIC_PATHS = [
+  "/login", "/change-password", "/api/health", "/sw.js", "/offline",
+];
 // Path prefixes always allowed (webhooks use their own HMAC; /api/admin/
 // endpoints use a token header; the rest are static assets).
 const PUBLIC_PREFIXES = [

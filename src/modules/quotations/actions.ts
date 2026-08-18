@@ -90,11 +90,11 @@ export async function createQuotation(
     : [];
   const cwMap = new Map(colourways.map((c) => [c.id, c]));
 
-  // § 0.10 / § 15.1 — server-side measurement gate.
-  //
-  // REMOVED ON REQUEST: the gate no longer applies to lead-scoped quotations.
-  // A quote raised against a bare lead may contain made-to-measure lines with
-  // measurementItemId = null. Client-scoped quotes are still gated.
+  // § 0.10 / § 15.1 — server-side measurement gate. Applies to EVERY quote,
+  // lead-scoped or not: the non-negotiable has no exception. A lead-scoped
+  // quote cannot carry a made-to-measure line, because there is no project to
+  // hang a measurement round off — the user must convert the lead first.
+  // Hardware, motors, accessories and service remain quotable against a lead.
   for (let i = 0; i < d.lines.length; i++) {
     const line = d.lines[i]!;
     if (line.colourwayId && !cwMap.get(line.colourwayId)) {
@@ -105,11 +105,11 @@ export async function createQuotation(
       };
     }
   }
-  if (!quoteLeadId) {
+  {
     const violation = findMeasurementGateViolation(
       d.lines,
       (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,
-      { isLeadScoped: false },
+      { isLeadScoped: !!quoteLeadId },
     );
     if (violation) {
       return {

@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ThreeCanvas } from "./_components/ThreeCanvas";
 import { LoginCard } from "./_components/LoginTabs";
 import { MandovaraLogo, MandovaraLogoLight } from "./_components/MandovaraLogo";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
@@ -22,8 +21,9 @@ export default async function LoginPage() {
         className="hidden lg:flex flex-1 relative overflow-hidden"
         style={{ background: "#0B1918" }}
       >
-        {/* Three.js architectural scene — fills the left panel */}
-        <ThreeCanvas />
+        {/* Static brand panel. The three.js scene that used to live here was
+            removed: three is not in §2's stack, it shipped ~600KB to a login
+            page, and it is decoration rather than function. */}
 
         {/* Dot-grid texture overlay */}
         <div

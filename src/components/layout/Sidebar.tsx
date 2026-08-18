@@ -77,7 +77,6 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
     items: [
       { label: "Reports",       href: "/reports", icon: BarChart2   },
       { label: "Admin & Roles", href: "/admin",   icon: ShieldCheck },
-      { label: "Mandovara AI",  href: "/ai",      icon: Sparkles    },
     ],
   },
 ];
@@ -130,7 +129,6 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   {
     section: "Other",
     items: [
-      { label: "Mandovara AI", href: "/ai", icon: Sparkles },
     ],
   },
   {

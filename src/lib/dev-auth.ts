@@ -12,13 +12,14 @@
 // - loginByMobilePin: REMOVED on request. Mobile + 4-digit-PIN sign-in no
 //   longer exists; email/mobile + password is the only way in.
 //
-// NOTE: there is deliberately no rate limiting on this path — removed on
-// request. Failed sign-in attempts are unlimited and unthrottled.
+// Rate limited: 5 failed attempts per 15 minutes per identifier, in-process.
+// See src/lib/rate-limit.ts for the single-container caveat.
 
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { authBootstrapPrisma as prisma } from "@/kernel/db/client";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from "./session";
+import { checkRateLimit, recordFailure, clearRateLimit } from "./rate-limit";
 
 export interface LoginResult {
   ok: boolean;
@@ -43,6 +44,19 @@ export async function devLoginByCredential(
     return { ok: false, error: "Enter your email/mobile and password" };
   }
 
+  // Throttle before touching the database or bcrypt — an unthrottled login is
+  // a brute-force oracle, and bcrypt makes each attempt expensive for us too.
+  const rlKey = `login:${q.toLowerCase()}`;
+  const rl = checkRateLimit(rlKey);
+  if (!rl.allowed) {
+    return {
+      ok: false,
+      error:
+        `Too many failed attempts. Try again in ` +
+        `${Math.ceil(rl.retryAfterSec / 60)} minute(s).`,
+    };
+  }
+
   try {
     let user = await prisma.user.findFirst({
       where: { email: q.toLowerCase() },
@@ -56,7 +70,10 @@ export async function devLoginByCredential(
         orderBy: { createdAt: "asc" },
       });
     }
-    if (!user) return { ok: false, error: GENERIC_ERR };
+    if (!user) {
+      recordFailure(rlKey);
+      return { ok: false, error: GENERIC_ERR };
+    }
     if (user.status !== "ACTIVE") {
       return { ok: false, error: "This account is suspended. Contact your administrator." };
     }
@@ -64,7 +81,11 @@ export async function devLoginByCredential(
       return { ok: false, error: "This account has no password set. Contact your administrator." };
     }
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) return { ok: false, error: GENERIC_ERR };
+    if (!valid) {
+      recordFailure(rlKey);
+      return { ok: false, error: GENERIC_ERR };
+    }
+    clearRateLimit(rlKey);
 
     const signed = await signSession(user.id);
     const jar = await cookies();

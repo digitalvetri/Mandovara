@@ -98,3 +98,47 @@ test("orders list loads", async ({ page }) => {
   await expectNoRuntimeError(page);
   await expect(page.getByText(/order/i).first()).toBeVisible();
 });
+
+// ── Transactional chain ───────────────────────────────────────────────────────
+// The tests above assert that each surface in the flow renders. These assert
+// that the chain actually holds together in the data: a project reached by
+// following links from a lead carries the measurement, quotation and order that
+// the enquiry produced, and the numbers agree at each hop.
+
+test("a quotation links back to a project, and both render their identifiers", async ({ page }) => {
+  // Driven from the quotation end so both halves of the link are guaranteed to
+  // exist — picking a project first often lands on one still at enquiry stage.
+  await page.goto("/quotations");
+  await expectNoRuntimeError(page);
+  // "/quotations/new" and "/quotations/quick" are sibling routes, not records.
+  const hrefs = await page.locator('a[href^="/quotations/"]')
+    .evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute("href") ?? ""));
+  const quoteHref = hrefs.find((h) => !/\/quotations\/(new|quick)$/.test(h));
+  test.skip(!quoteHref, "no quotation records — seed with SEED_DEMO_DATA=true");
+
+  await page.goto(quoteHref!);
+  await expectNoRuntimeError(page);
+
+  // The document identifies itself and carries money.
+  await expect(page.getByText(/MDV\/QT-/).first()).toBeVisible();
+  await expect(page.getByText(/₹/).first()).toBeVisible();
+
+  // And it hangs off a real project, reachable by following the link.
+  const projectLink = page.locator('a[href^="/projects/"]').first();
+  test.skip(await projectLink.count() === 0, "this quotation is lead-scoped (no project yet)");
+  await page.goto((await projectLink.getAttribute("href"))!);
+  await expectNoRuntimeError(page);
+  await expect(page.getByText(/MDV\/PRJ-/).first()).toBeVisible();
+});
+
+test("every quotation line on a sent quote carries a measurement (§15.1)", async ({ page }) => {
+  // The gate is enforced server-side; this checks the consequence is visible.
+  // A made-to-measure line with no measurement should not exist at all, so a
+  // quotation detail page must never render a line marked as unmeasured.
+  await page.goto("/quotations");
+  const link = page.locator('a[href^="/quotations/"]').first();
+  test.skip(await link.count() === 0, "no quotations — seed with SEED_DEMO_DATA=true");
+  await page.goto((await link.getAttribute("href"))!);
+  await expectNoRuntimeError(page);
+  await expect(page.getByText(/no measurement|unmeasured|measurement required/i)).toHaveCount(0);
+});

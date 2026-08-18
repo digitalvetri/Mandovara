@@ -1,65 +1,81 @@
-// §12.2 Scenario 3 — Wallpaper wall with offset repeat: verify roll count and
-// warning; change to free match; verify it drops by one roll.
+// §12.2 Scenario 3 — "Measure a wallpaper wall with an offset repeat; verify
+// the roll count and the warning; change to free match; verify it drops by
+// one roll."
 //
-// The calc engine behavior is fully verified in tests/kernel/calc/wallpaper.test.ts
-// where the §7.2 worked examples are tested with 100% branch coverage:
-//   - "700mm OFFSET repeat → 4 rolls, half-drop warning fires"
-//   - "4000×2700 FREE match → 3 rolls" (same wall)
-//   Together these prove OFFSET → FREE drops the roll count by 1.
+// This drives the real on-site estimator at /measure, which is the surface a
+// designer uses in a client's living room. It is the end-to-end proof of the
+// calc-engine consolidation: that panel used to call a SECOND, divergent
+// wallpaper implementation under src/lib/calc which returned 4 rolls where the
+// engine that priced the quotation returned 3. Both now come from
+// src/kernel/calc, so what the salesperson reads is what the quote charges.
 //
-// This E2E spec verifies the calc result is DISPLAYED in the browser on the
-// project measurements page. For the pattern-match change flow, a project with
-// a wallpaper measurement is needed via E2E_WALLPAPER_ITEM_ID.
+// Canonical §7.2 case: 4000×2700 wall, 530mm × 10.05m roll, 640mm repeat.
+//   OFFSET → cut 3520mm, 2 strips/roll, 4 rolls, "adds 1 roll" warning
+//   FREE   → cut 2700mm, 3 strips/roll, 3 rolls
 
-import { test, expect } from "@playwright/test";
-import { projectId } from "./_ids";
+import { test, expect, type Page } from "@playwright/test";
 
-const PROJECT_ID        = process.env["E2E_PROJECT_ID"];
-const WALLPAPER_ITEM_ID = process.env["E2E_WALLPAPER_ITEM_ID"];
+async function setNum(page: Page, label: string, value: string) {
+  const field = page.locator("label", { hasText: label }).locator('input[type="number"]');
+  await field.first().fill(value);
+  await field.first().blur();
+}
 
-test("project measurements page shows CalcResult for wallpaper items", async ({ page }) => {
-  const PROJECT_ID = await projectId(page);
-  test.skip(!PROJECT_ID, "no project in the database — run the seed with SEED_DEMO_DATA=true");
-  await page.goto(`/projects/${PROJECT_ID}/measurements`);
-  await expect(page).not.toHaveTitle(/404|500/);
-  // Measurement items with a CalcResult should show roll count or area
-  // "roll" is present for wallpaper; fallback if no wallpaper items in this project
-  const rollText = page.getByText(/roll|sqft|metre/i).first();
-  await expect(rollText).toBeVisible({ timeout: 5000 });
-});
+async function rollsRequired(page: Page): Promise<string> {
+  const hero = page.locator("div", { hasText: /^Rolls required$/ }).first();
+  // The numeral is the sibling display inside the same HeroNumber block.
+  return (await hero.locator("xpath=following-sibling::div[1]//span[1]").innerText()).trim();
+}
 
-// Note: the OFFSET-vs-FREE roll count delta is fully proven in:
-//   tests/kernel/calc/wallpaper.test.ts
-//   - "700mm OFFSET repeat → fewer strips per roll, more rolls, warning fires" (4 rolls)
-//   - "4000×2700 FREE match → 3 strips/roll, 8 strips, 3 rolls" (3 rolls)
-// 100% branch coverage on calcWallpaper() is enforced in CI (vitest.config.ts).
-// The E2E tests below verify the UI renders and responds to pattern-match changes.
+test.describe("§12.2/3 — wallpaper offset vs free match", () => {
+  test("offset repeat costs a roll, and dropping to free match gives it back", async ({ page }) => {
+    await page.goto("/measure");
 
-test("wallpaper measurement page: pattern-match change updates roll count", async ({ page }) => {
-  test.skip(
-    !WALLPAPER_ITEM_ID,
-    "E2E_WALLPAPER_ITEM_ID not set — set to a MeasurementItem id with family=WALLPAPER " +
-    "and patternMatch=OFFSET to verify live calc change when switching to FREE.",
-  );
+    // The estimator opens on the wallpaper panel; make sure it is there.
+    await expect(page.getByText("Wall width (mm)")).toBeVisible({ timeout: 15_000 });
 
-  // Navigate to the measurement item edit or detail view
-  await page.goto(`/projects/${PROJECT_ID}/measurements`);
-  await expect(page).not.toHaveTitle(/404|500/);
+    await setNum(page, "Wall width (mm)", "4000");
+    await setNum(page, "Wall height (mm)", "2700");
+    await setNum(page, "Roll width (mm)", "530");
+    await setNum(page, "Roll length (m)", "10.05");
+    // §7.2's worked examples are stated with no wastage.
+    await setNum(page, "Wastage (%)", "0");
 
-  // The roll count from CalcResult should be visible
-  const rollCountBefore = page.getByTestId(`roll-count-${WALLPAPER_ITEM_ID}`);
-  await expect(rollCountBefore).toBeVisible();
-  const rollsBefore = await rollCountBefore.textContent();
+    // ── Offset (half-drop) ────────────────────────────────────────────────
+    await page.locator("label", { hasText: "Pattern match" }).locator("select").selectOption("OFFSET");
+    await setNum(page, "Pattern repeat (mm)", "640");
+    await page.waitForTimeout(300);
 
-  // Trigger edit of the measurement item and change pattern match
-  await page.getByTestId(`edit-item-${WALLPAPER_ITEM_ID}`).click();
-  await page.getByLabel(/pattern match/i).selectOption("FREE");
-  await page.getByRole("button", { name: /save|update/i }).click();
+    const offsetRolls = await rollsRequired(page);
+    expect(offsetRolls, "half-drop on a 640mm repeat needs 4 rolls").toBe("4");
 
-  // After save, roll count should be lower
-  const rollCountAfter = page.getByTestId(`roll-count-${WALLPAPER_ITEM_ID}`);
-  await expect(rollCountAfter).toBeVisible();
-  const rollsAfter = await rollCountAfter.textContent();
+    // Cut length is extended to clear the half-repeat: ceil(2700/640)*640 + 320.
+    await expect(page.getByText(/3520/).first()).toBeVisible();
+    // The warning is what the client actually reads on the quote.
+    await expect(page.getByText(/half-drop match/i).first()).toBeVisible();
+    await expect(page.getByText(/adds 1 roll/i).first()).toBeVisible();
 
-  expect(Number(rollsAfter)).toBeLessThan(Number(rollsBefore));
+    // ── Switch to free match ──────────────────────────────────────────────
+    await page.locator("label", { hasText: "Pattern match" }).locator("select").selectOption("FREE");
+    await page.waitForTimeout(300);
+
+    const freeRolls = await rollsRequired(page);
+    expect(freeRolls, "a free match on the same wall needs 3 rolls").toBe("3");
+    expect(
+      Number(offsetRolls) - Number(freeRolls),
+      "the pattern match must cost exactly one roll",
+    ).toBe(1);
+
+    // No half-drop warning once the repeat no longer applies.
+    await expect(page.getByText(/half-drop match/i)).toHaveCount(0);
+  });
+
+  test("the estimator reports the engine version it used", async ({ page }) => {
+    await page.goto("/measure");
+    await expect(page.getByText("Wall width (mm)")).toBeVisible({ timeout: 15_000 });
+    // Traceability: a quote must be attributable to the formula that produced
+    // it (§7.7.1). Anything other than the kernel version means a second
+    // engine has crept back in.
+    await expect(page.getByText(/wallpaper@2\.0\.0/)).toBeVisible();
+  });
 });
