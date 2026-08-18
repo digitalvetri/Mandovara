@@ -294,3 +294,35 @@ connection) exists solely for that lookup and is confined to `dev-auth.ts`,
 fails loudly if the app is ever pointed back at a bypassing role. Cost is one
 extra round trip per query; catalog search p95 remains inside the §14 Phase 1
 budget.
+
+---
+
+## 2026-08-18 · Consequences and deliberate non-changes from the fix pass
+
+**wallpaper@1.2.0 → 2.0.0 changes existing numbers.** The canonical §7.2 OFFSET
+case now returns 4 rolls where it returned 3. Sent quotations are unaffected —
+§7.7.4 freezes `calcSnapshot` at send time — but **draft quotations and
+un-quoted measurement items will change when their CalcResult is recomputed**.
+Existing `CalcResult` rows still carry `wallpaper@1.2.0` and the old figures
+until something triggers a recompute. Anyone comparing a pre-existing draft
+against a fresh one should expect the difference and it is the correct one.
+
+**`three` / `@types/three` and `@anthropic-ai/sdk` are kept.** Neither appears
+in §2's stack: `three` drives the login page's 3D canvas and `@anthropic-ai/sdk`
+backs `/ai` and `/api/ai/chat`. They are working features, not defects, and
+deleting them would be a product decision rather than a fix. Flagged here so the
+gap between §2 and the dependency list is a recorded choice rather than drift.
+`src/app/api/ai/chat/route.ts` pins `claude-sonnet-4-6` and no-ops without
+`ANTHROPIC_API_KEY`.
+
+**The test suite TRUNCATEs the database.** `tests/kernel/fixtures.ts` wipes every
+table, so `pnpm test` destroys local seed data — reseed afterwards with
+`SEED_DEMO_DATA=true pnpm db:seed`. A guard now refuses to run unless
+`DATABASE_URL` is localhost or `ALLOW_DESTRUCTIVE_TESTS=true`, because the same
+command against a managed database would have wiped production.
+
+**Files over 300 lines were NOT split.** 14 files still exceed the §10 limit.
+Splitting them is mechanical churn with real regression risk across code that
+was just stabilised, and it buys nothing verifiable. Each carries an explicit
+`eslint-disable max-lines -- FIXME` naming its line count, so `max-lines` stays
+enforced for every other file and the debt stays visible.

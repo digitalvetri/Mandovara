@@ -6,6 +6,7 @@ One-page checklist for handing this application over to Mandovara. Work through 
 
 ## Required before handover
 
+- [ ] **Set `APP_DB_PASSWORD` and `APP_DATABASE_URL` on Coolify** — §3.2 Row-Level Security only applies when the app connects as the restricted `mandovara_app` role. If `APP_DATABASE_URL` is unset the app falls back to the database owner and **RLS is silently not enforced**. The container entrypoint creates/rotates the role from `APP_DB_PASSWORD` and aborts if only one of the pair is set. See `docs/DECISIONS.md`.
 - [ ] **Set `SESSION_SECRET` on Coolify** — 64-char hex from `openssl rand -hex 32`. Rotating this invalidates every logged-in session. See DEPLOY-COOLIFY.md §5.
 - [ ] **Set `COOKIE_SECURE=false` on Coolify** — required while running over plain HTTP (sslip.io). Remove once TLS lands. Without this, login silently fails.
 - [ ] **Remove `ALLOW_DEV_AUTH` from Coolify** — the escape hatch has now genuinely been deleted from the code (it was still live and still gating PIN login when this line first claimed otherwise). The variable is dead weight; remove it. `grep -rn ALLOW_DEV_AUTH src/` returns nothing.
@@ -16,7 +17,7 @@ One-page checklist for handing this application over to Mandovara. Work through 
 ## Required before real client data goes in
 
 - [ ] **TLS** — point a real domain (e.g. `app.mandovara.com`) at `147.93.105.212`, enable Let's Encrypt in Coolify. Then delete `COOKIE_SECURE=false` from env. See `docs/DEPLOY-TLS.md`.
-- [ ] **Restore dye-lot UI** — removed from the sidebar/allocation console earlier per request. CLAUDE.md §0.6 lists this as a non-negotiable for interior furnishing operations (mixed-lot allocation = the "wallpaper doesn't match" incident).
+- [x] **Dye-lot UI restored** — `/purchase/allocation` is back in the sidebar with the mixed-lot gate rendered as a red inline block (§6.3.6). Covered by `tests/e2e/s4-dye-lot-gate.spec.ts`.
 
 ## Recommended within the first week
 
@@ -34,10 +35,20 @@ One-page checklist for handing this application over to Mandovara. Work through 
 
 ## Known limitations at handover (be honest with the client)
 
-- WhatsApp integration is scaffolded but not wired to a Meta WABA — see CLAUDE.md §9 for what needs to be turned on before it works. Until then, the /accounts chase list uses a `wa.me` deep-link (opens WhatsApp with a pre-composed message; Rohit still hits Send) — works today, no template approval needed.
-- HR module (attendance, payroll) is schema-complete but no UI yet.
+- WhatsApp integration is scaffolded but not wired to a Meta WABA — see CLAUDE.md §9 for what needs to be turned on before it works. Until then, the /accounts chase list uses a `wa.me` deep-link (opens WhatsApp with a pre-composed message; Rohit still hits Send) — works today, no template approval needed. Templates, per-message cost logging and the service-window countdown now have seed data, but nothing dispatches automatically.
+- HR: attendance and payroll pages exist and are seeded (45 days of attendance with month-lock, an approved payroll run with payslips). Offline punch from the field is still deferred — see the Phase 7 entry in docs/DECISIONS.md.
 - E-invoicing (IRN/GST portal) is schema-complete, actual submission flow not wired.
 - Measurement offline sync passes local tests but hasn't been validated on a real Android device in poor connectivity.
+- **§7 calculation constants are still spec defaults, not Mandovara's.** Fullness ratios, hem and heading allowances, wastage percentages, eyelet spacing, minimum blind charge and standard fabric/roll widths have NOT been validated against 20 historical jobs with their tailor, installer and store keeper. This is the outstanding Phase 0 gate and it directly affects quoted quantities.
+- 14 files still exceed the §10 300-line limit. They carry explicit
+  `eslint-disable max-lines -- FIXME` comments naming the count; the rule stays
+  enforced so the debt is visible rather than silently excluded.
+- `AuditLog` is intentionally empty in the seed — it is written by the
+  application at runtime, and fabricating an audit trail would be worse than
+  leaving it empty.
+- Four of the six §12.2 e2e scenarios are page-level coverage rather than full
+  transactional walkthroughs. Scenarios 4 (dye-lot gate) and 6 (installer sees
+  no cost/margin) are implemented end to end.
 
 ### /accounts redesign — what shipped, what's pending
 
