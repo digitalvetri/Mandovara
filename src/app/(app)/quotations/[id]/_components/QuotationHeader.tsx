@@ -10,6 +10,7 @@ import {
 import { StatusPill } from "../../_components/StatusPill";
 import { StatusChanger } from "../../_components/StatusChanger";
 import type { SerializedQuotation } from "../_types";
+import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -139,6 +140,16 @@ export function QuotationHeader({ quotation, canApprove }: Props) {
           {quotation.number}
         </h1>
         <StatusPill status={quotation.status} />
+        {/* Nothing on this document came from a site measurement. Say so where
+            it is read, not just on the PDF. */}
+        {isEstimate(quotation.lines) && (
+          <span
+            title={ESTIMATE_CAVEAT}
+            className="inline-flex items-center gap-1 text-[10.5px] uppercase tracking-[0.12em] px-2 py-[3px] rounded-[5px] bg-heat/15 text-heat border border-heat/30"
+          >
+            Estimate
+          </span>
+        )}
         {quotation.revision > 0 && (
           <span className="tabular text-[12px] text-text-dim bg-surface border border-rule px-2.5 py-1 rounded-[5px]">
             Rev {quotation.revision}

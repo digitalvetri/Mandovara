@@ -1,4 +1,6 @@
-import { Download } from "lucide-react";
+import { Download, FileText } from "lucide-react";
+import Link from "next/link";
+import type { Route } from "next";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
@@ -62,6 +64,17 @@ export default async function QuotationsPage({
               <Download size={14} strokeWidth={1.75} />
               Export
             </a>
+            {/* The fast path: a formal price for a website or phone enquiry,
+                with no catalogue pick, project or measurement required. */}
+            <Link
+              href={"/quotations/estimate" as Route}
+              className="inline-flex items-center gap-1.5 h-[38px] px-4 rounded-[8px]
+                         border border-rule bg-surface text-[12.5px] text-text-dim
+                         hover:text-text hover:border-accent/60 transition-colors whitespace-nowrap"
+            >
+              <FileText size={14} strokeWidth={1.75} />
+              Quick estimate
+            </Link>
             <PrimaryButton href="/quotations/new">New Quotation</PrimaryButton>
           </>
         }

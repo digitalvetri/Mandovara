@@ -84,3 +84,19 @@ export function zodError<T>(err: import("zod").ZodError): {
   }
   return { ok: false, error: "Validation failed", fieldErrors };
 }
+
+// ── Estimate vs quotation ───────────────────────────────────────────────────
+// A quotation is an ESTIMATE when nothing on it came from a site measurement.
+// Derived rather than stored: a stored flag would drift the moment a line was
+// added or relinked, and this is exactly the question a reader cares about.
+//
+// §15.1 still blocks a CATALOG made-to-measure line without a MeasurementItem.
+// This covers the other case — a free-text ballpark for a website enquiry,
+// which is legitimate but must never be mistaken for a measured quote (§1.2:
+// Mandovara loses money exactly when someone quotes before measuring).
+export function isEstimate(lines: readonly { measurementItemId?: string | null }[]): boolean {
+  return lines.length > 0 && lines.every((l) => !l.measurementItemId);
+}
+
+export const ESTIMATE_CAVEAT =
+  "Indicative only. Final quantities and price are confirmed after site measurement.";

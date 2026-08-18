@@ -11,7 +11,7 @@
 import type { Page } from "@playwright/test";
 
 // Route segments that live alongside :id and must never be mistaken for one.
-const NOT_AN_ID = new Set(["new", "edit", "quick", "requests", "vendors", "dispatch", "conflicts"]);
+const NOT_AN_ID = new Set(["new", "edit", "quick", "estimate", "requests", "vendors", "dispatch", "conflicts"]);
 
 async function firstIdFrom(page: Page, listPath: string, hrefPrefix: string): Promise<string | null> {
   await page.goto(listPath);

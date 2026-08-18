@@ -110,10 +110,10 @@ test("a quotation links back to a project, and both render their identifiers", a
   // exist — picking a project first often lands on one still at enquiry stage.
   await page.goto("/quotations");
   await expectNoRuntimeError(page);
-  // "/quotations/new" and "/quotations/quick" are sibling routes, not records.
+  // "/quotations/new", "/quick" and "/estimate" are sibling routes, not records.
   const hrefs = await page.locator('a[href^="/quotations/"]')
     .evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute("href") ?? ""));
-  const quoteHref = hrefs.find((h) => !/\/quotations\/(new|quick)$/.test(h));
+  const quoteHref = hrefs.find((h) => !/\/quotations\/(new|quick|estimate)$/.test(h));
   test.skip(!quoteHref, "no quotation records — seed with SEED_DEMO_DATA=true");
 
   await page.goto(quoteHref!);

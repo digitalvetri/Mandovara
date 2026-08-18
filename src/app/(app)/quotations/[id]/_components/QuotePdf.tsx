@@ -4,6 +4,7 @@
 import path from "path";
 import { Document, Page, View, Text, Image, Font } from "@react-pdf/renderer";
 import type { QuotationDetail, QuotationLine } from "@/modules/quotations/queries";
+import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 import { rupeesToWords } from "./_words";
 import { pdfStyles as s, WHITE, INK, MUTED, STRIP } from "./_pdf-styles";
 
@@ -43,6 +44,12 @@ function gstRateLabel(cgst: bigint, taxable: bigint): string {
   const rate = Math.round(Number(cgst * 10000n / taxable)) / 100;
   return `(${Number.isInteger(rate) ? rate : rate.toFixed(1)}%)`;
 }
+
+const ESTIMATE_TERMS = [
+  ESTIMATE_CAVEAT,
+  "Estimate is valid until the date mentioned above.",
+  "A firm quotation follows the site measurement.",
+];
 
 const DEFAULT_TERMS = [
   "Quotation is valid until the date mentioned above.",
@@ -99,14 +106,23 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
     ...(q.roundOff !== 0n ? [{ label: "Round-off", v: q.roundOff }] : []),
   ];
 
-  const terms = q.termsText
-    ? q.termsText.split("\n").filter(Boolean)
-    : DEFAULT_TERMS;
-
   const avatarLetter = q.clientName.trim()[0]?.toUpperCase() ?? "M";
 
+  // Nothing on this document came from a site measurement, so it must not read
+  // as a firm quotation (§1.2 — quoting before measuring is where the margin
+  // goes). The reader sees the difference in the title and in the terms.
+  const estimate = isEstimate(q.lines);
+
+  const baseTerms = q.termsText
+    ? q.termsText.split("\n").filter(Boolean)
+    : (estimate ? ESTIMATE_TERMS : DEFAULT_TERMS);
+  // The caveat is not optional on an estimate, even with custom terms.
+  const terms = estimate && !baseTerms.includes(ESTIMATE_CAVEAT)
+    ? [ESTIMATE_CAVEAT, ...baseTerms]
+    : baseTerms;
+
   return (
-    <Document title={`Quotation ${q.number}`} author="Mandovara" creator="Mandovara Interior OS">
+    <Document title={`${estimate ? "Estimate" : "Quotation"} ${q.number}`} author="Mandovara" creator="Mandovara Interior OS">
       <Page size="A4" style={s.page}>
 
         {/* ── HEADER ─────────────────────────────────────────────────── */}
@@ -121,7 +137,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
             )
           }
           <View style={s.quotRight}>
-            <Text style={s.quotTitle}>QUOTATION</Text>
+            <Text style={s.quotTitle}>{estimate ? "ESTIMATE" : "QUOTATION"}</Text>
             <Text style={s.quotNum}>{q.number}</Text>
             {q.revision > 0 && <Text style={s.quotRev}>Revision {q.revision}</Text>}
           </View>
