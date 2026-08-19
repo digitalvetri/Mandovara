@@ -1,110 +1,172 @@
 @import "tailwindcss";
 
-/* ── Design tokens — Sovereign / Midnight Court (dark by default)
-      Per master spec §6.2. Light "Porcelain" via [data-theme="light"] or .light */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design tokens — "Studio Porcelain" (light, default) / "Malachite" (dark)
+
+   Master spec §6.2. Two rules govern this file:
+
+   1. TOKEN NAMES ARE FROZEN. ~1,400 utility usages across 331 components
+      reference these names (bg-surface ×383, text-fault ×152, bg-accent ×97).
+      Re-key the VALUES to change the look; never rename a token.
+
+   2. EVERY TEXT COLOUR CLEARS 4.5:1 on every ground it is used against
+      (§6.3.11). The light values below are not hand-picked — they were solved
+      for the lightest, most saturated oklch that still clears the floor on
+      #FFF, the page ground and surface-2. Re-tinting by eye will break it.
+
+   The accent is Mandovara's own brand teal, taken from the butterfly mark
+   (#2BA89A). It is the one colour that is not ours to change; the palette is
+   built around it, darkened to #007E70 on light grounds so it can carry text.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 @theme {
-  /* Ink surfaces */
-  --color-ink:           oklch(0.18 0.045 265);   /* #0B1020 ground        */
-  --color-surface:       oklch(0.24 0.042 265);   /* #131A2E card/panel    */
-  --color-surface-2:     oklch(0.28 0.045 265);   /* #1A2340 raised        */
-  --color-surface-hover: oklch(0.28 0.045 265);
-  --color-border:        oklch(0.36 0.038 265);   /* #26314F rule          */
-  --color-rule:          oklch(0.36 0.038 265);
-  --color-rule-strong:   oklch(0.45 0.038 265);
+  /* ── Ground & surfaces ─────────────────────────────────────────────
+     Warm porcelain rather than pure grey: the 180° hue at very low chroma
+     keeps the whole canvas sympathetic to the teal instead of fighting it. */
+  --color-ink:           oklch(0.965 0.005 180);   /* #F2F5F4 page ground   */
+  --color-bg:            oklch(0.965 0.005 180);
+  --color-surface:       oklch(1.000 0.000 0);     /* #FFFFFF card          */
+  --color-surface-2:     oklch(0.950 0.006 180);   /* inset / table stripe  */
+  --color-surface-hover: oklch(0.932 0.008 180);
+  --color-border:        oklch(0.885 0.009 180);
+  --color-rule:          oklch(0.885 0.009 180);
+  --color-rule-strong:   oklch(0.800 0.011 180);
 
-  /* Ground alias */
-  --color-bg:            oklch(0.18 0.045 265);
+  /* ── Text — three steps, all above the floor ───────────────────── */
+  --color-text:          oklch(0.245 0.020 200);   /* #152324  16.1:1 */
+  --color-text-muted:    oklch(0.470 0.016 200);   /* #4B5859   6.8:1 */
+  --color-text-dim:      oklch(0.470 0.016 200);
+  --color-text-subtle:   oklch(0.532 0.014 200);   /* #636F6F   4.5:1 */
+  --color-text-faint:    oklch(0.532 0.014 200);
 
-  /* Text */
-  --color-text:          oklch(0.94 0.008 265);   /* #EDEFF5 primary       */
-  --color-text-muted:    oklch(0.68 0.028 265);   /* #8792AC secondary     */
-  --color-text-dim:      oklch(0.68 0.028 265);
-  --color-text-subtle:   oklch(0.50 0.030 265);
-  --color-text-faint:    oklch(0.50 0.030 265);
+  /* ── Sidebar — a deep teal-ink rail against the light canvas.
+     The contrast between rail and canvas is what makes this read as
+     considered rather than merely bright. */
+  --color-sidebar:       oklch(0.190 0.030 195);
+  --color-sidebar-hover: oklch(0.255 0.033 195);
+  --color-sidebar-text:  oklch(0.970 0.006 190);   /* 16.9:1 on rail */
+  --color-sidebar-dim:   oklch(0.730 0.020 190);   /*  7.7:1 on rail */
 
-  /* Sidebar (aligned to ink, slightly darker) */
-  --color-sidebar:       oklch(0.14 0.040 265);
-  --color-sidebar-hover: oklch(0.20 0.042 265);
-  --color-sidebar-text:  oklch(0.94 0.008 265);
-  --color-sidebar-dim:   oklch(0.68 0.028 265);
+  /* ── Brand accent — the one hero colour. Primary action, active nav,
+     focus ring, data bars. Nothing else. */
+  --color-accent:        oklch(0.516 0.105 182);   /* #007B6C  4.5:1 text, 5.0:1 as button */
+  --color-accent-hover:  oklch(0.470 0.100 182);
+  --color-accent-dim:    oklch(0.400 0.090 182);
+  --color-accent-tint:   oklch(0.516 0.105 182 / 0.10);
 
-  /* Antique gold — decorative only (hairlines, secondary badges, avatars) */
-  --color-gold:          oklch(0.72 0.115 85);    /* #C9A227 */
-  --color-gold-strong:   oklch(0.83 0.105 85);    /* #E5C55C */
-  --color-gold-lit:      oklch(0.83 0.105 85);
-  --color-gold-dim:      oklch(0.55 0.090 85);
-  --color-gold-tint:     oklch(0.72 0.115 85 / 0.13);
+  /* ── Gold — demoted from co-star to a rare hairline and the avatar chip.
+     Kept as a token because :focus-visible, .hairline and /styleguide read it. */
+  --color-gold:          oklch(0.534 0.105 85);    /* #89670E  4.5:1 */
+  --color-gold-strong:   oklch(0.490 0.100 85);
+  --color-gold-lit:      oklch(0.490 0.100 85);
+  --color-gold-dim:      oklch(0.660 0.090 85);
+  --color-gold-tint:     oklch(0.534 0.105 85 / 0.12);
 
-  /* Accent — Mandovara brand teal #2BA89A (matches mandovara.com) */
-  --color-accent:        oklch(0.64 0.093 191);   /* #2BA89A teal  */
-  --color-accent-hover:  oklch(0.70 0.090 191);   /* lighter teal  */
-  --color-accent-dim:    oklch(0.48 0.085 191);   /* deeper teal   */
-  --color-accent-tint:   oklch(0.64 0.093 191 / 0.12);
+  /* ── Status — dot + word, never colour alone (§6.3.11) ─────────── */
+  --color-solid:         oklch(0.514 0.135 158);   /* ready · paid · installed */
+  --color-heat:          oklch(0.542 0.130 62);    /* in progress · pending    */
+  --color-fault:         oklch(0.556 0.190 25);    /* overdue · snag · mismatch*/
+  --color-info:          oklch(0.532 0.130 250);
+  --color-good:          oklch(0.514 0.135 158);
+  --color-warn:          oklch(0.542 0.130 62);
+  --color-bad:           oklch(0.556 0.190 25);
+  --color-signal:        oklch(0.514 0.135 158);
+  --color-alarm:         oklch(0.556 0.190 25);
+  --color-caution:       oklch(0.542 0.130 62);
+  --color-neutral:       oklch(0.470 0.016 200);
 
-  /* Status (spec: solid/heat/fault/info) */
-  --color-solid:         oklch(0.78 0.145 165);   /* ready, paid, installed */
-  --color-heat:          oklch(0.78 0.130 75);    /* in progress, pending   */
-  --color-fault:         oklch(0.66 0.190 20);    /* overdue, snag, lot mismatch */
-  --color-info:          oklch(0.62 0.140 255);
-  --color-good:          oklch(0.78 0.145 165);
-  --color-warn:          oklch(0.78 0.130 75);
-  --color-bad:           oklch(0.66 0.190 20);
-  --color-signal:        oklch(0.78 0.145 165);
-  --color-alarm:         oklch(0.66 0.190 20);
-  --color-caution:       oklch(0.78 0.130 75);
-  --color-neutral:       oklch(0.68 0.028 265);
+  /* ── Aliases read by /styleguide. "paper" is the foreground on ink. */
+  --color-paper:         oklch(0.245 0.020 200);
+  --color-paper-dim:     oklch(0.470 0.016 200);
+  --color-paper-faint:   oklch(0.532 0.014 200);
+  --color-ink-raised:    oklch(1.000 0.000 0);
+  --color-ink-hover:     oklch(0.932 0.008 180);
+  --color-ink-sunken:    oklch(0.950 0.006 180);
 
-  /* Paper aliases used by the /styleguide page */
-  --color-paper:         oklch(0.94 0.008 265);
-  --color-paper-dim:     oklch(0.68 0.028 265);
-  --color-paper-faint:   oklch(0.50 0.030 265);
-  --color-ink-raised:    oklch(0.24 0.042 265);
-  --color-ink-hover:     oklch(0.28 0.045 265);
-  --color-ink-sunken:    oklch(0.14 0.040 265);
-
-  /* Type — Fraunces / Inter / Geist Mono / Noto Sans Tamil */
+  /* ── Type ──────────────────────────────────────────────────────── */
   --font-display: var(--font-display), "Fraunces", Georgia, serif;
   --font-body:    var(--font-body),    "Inter", system-ui, sans-serif;
   --font-data:    var(--font-data),    "Geist Mono", "SF Mono", monospace;
   --font-tamil:   var(--font-tamil),   "Noto Sans Tamil", sans-serif;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 14px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* ── Elevation. Light theme only, per §6.2: dark lifts with border +
+     surface-2 instead. Tinted with the ground hue so shadows read as
+     depth rather than dirt. */
+  --shadow-sm: 0 1px 2px oklch(0.245 0.020 200 / 0.05),
+               0 1px 1px oklch(0.245 0.020 200 / 0.04);
+  --shadow-md: 0 2px 4px oklch(0.245 0.020 200 / 0.05),
+               0 4px 12px oklch(0.245 0.020 200 / 0.06);
+  --shadow-lg: 0 8px 24px oklch(0.245 0.020 200 / 0.09),
+               0 2px 6px oklch(0.245 0.020 200 / 0.05);
 }
 
-/* ── Light theme — "Porcelain" (§6.2). Toggled by `.light` on <html>. */
-:root.light {
-  --color-ink:           oklch(0.985 0.005 85);   /* #F8F7F4 */
-  --color-bg:            oklch(0.985 0.005 85);
-  --color-surface:       oklch(1.000 0.000 0);    /* #FFFFFF */
-  --color-surface-2:     oklch(0.975 0.005 85);
-  --color-surface-hover: oklch(0.955 0.006 85);
-  --color-border:        oklch(0.895 0.008 85);   /* #E4E1D8 */
-  --color-rule:          oklch(0.895 0.008 85);
-  --color-rule-strong:   oklch(0.800 0.010 85);
+/* ═══ Dark theme — "Malachite" ═══════════════════════════════════════
+   Re-keyed off the old blue-navy (hue 265) onto the brand's own teal-green
+   (hue 190). The ground now belongs to the same family as the logo, which is
+   what stops the accent looking like a sticker applied to someone else's
+   chrome. Every value clears 4.5:1 with headroom — 7.6:1 for the accent. */
+:root.dark {
+  --color-ink:           oklch(0.155 0.022 190);
+  --color-bg:            oklch(0.155 0.022 190);
+  --color-surface:       oklch(0.205 0.024 190);
+  --color-surface-2:     oklch(0.245 0.026 190);
+  --color-surface-hover: oklch(0.245 0.026 190);
+  --color-border:        oklch(0.315 0.024 190);
+  --color-rule:          oklch(0.315 0.024 190);
+  --color-rule-strong:   oklch(0.400 0.024 190);
 
-  --color-text:          oklch(0.180 0.010 260);  /* #141B22 */
-  --color-text-muted:    oklch(0.450 0.010 260);
-  --color-text-dim:      oklch(0.450 0.010 260);
-  --color-text-subtle:   oklch(0.600 0.010 260);
-  --color-text-faint:    oklch(0.600 0.010 260);
+  --color-text:          oklch(0.965 0.006 190);   /* 16.1:1 */
+  --color-text-muted:    oklch(0.735 0.018 190);   /*  7.6:1 */
+  --color-text-dim:      oklch(0.735 0.018 190);
+  --color-text-subtle:   oklch(0.600 0.020 190);   /*  4.6:1 */
+  --color-text-faint:    oklch(0.600 0.020 190);
 
-  --color-sidebar:       oklch(0.965 0.006 85);
-  --color-sidebar-hover: oklch(0.935 0.008 85);
-  --color-sidebar-text:  oklch(0.180 0.010 260);
-  --color-sidebar-dim:   oklch(0.450 0.010 260);
+  --color-sidebar:       oklch(0.125 0.022 190);
+  --color-sidebar-hover: oklch(0.205 0.026 190);
+  --color-sidebar-text:  oklch(0.965 0.006 190);
+  --color-sidebar-dim:   oklch(0.735 0.018 190);
 
-  --color-gold:          oklch(0.65 0.115 85);    /* #B8912F */
-  --color-gold-strong:   oklch(0.72 0.115 85);
-  --color-gold-lit:      oklch(0.72 0.115 85);
-  --color-gold-tint:     oklch(0.65 0.115 85 / 0.13);
-  --color-accent:        oklch(0.59 0.093 191);   /* teal, slightly deeper for light bg */
-  --color-accent-hover:  oklch(0.64 0.093 191);   /* #2BA89A */
-  --color-accent-tint:   oklch(0.59 0.093 191 / 0.10);
+  --color-accent:        oklch(0.720 0.115 182);   /* #37BCAA  7.6:1 */
+  --color-accent-hover:  oklch(0.790 0.105 182);
+  --color-accent-dim:    oklch(0.520 0.095 182);
+  --color-accent-tint:   oklch(0.720 0.115 182 / 0.14);
+
+  --color-gold:          oklch(0.780 0.095 85);
+  --color-gold-strong:   oklch(0.860 0.085 85);
+  --color-gold-lit:      oklch(0.860 0.085 85);
+  --color-gold-dim:      oklch(0.600 0.080 85);
+  --color-gold-tint:     oklch(0.780 0.095 85 / 0.14);
+
+  --color-solid:         oklch(0.760 0.150 158);
+  --color-heat:          oklch(0.800 0.135 72);
+  --color-fault:         oklch(0.680 0.190 22);
+  --color-info:          oklch(0.720 0.120 235);
+  --color-good:          oklch(0.760 0.150 158);
+  --color-warn:          oklch(0.800 0.135 72);
+  --color-bad:           oklch(0.680 0.190 22);
+  --color-signal:        oklch(0.760 0.150 158);
+  --color-alarm:         oklch(0.680 0.190 22);
+  --color-caution:       oklch(0.800 0.135 72);
+  --color-neutral:       oklch(0.735 0.018 190);
+
+  --color-paper:         oklch(0.965 0.006 190);
+  --color-paper-dim:     oklch(0.735 0.018 190);
+  --color-paper-faint:   oklch(0.600 0.020 190);
+  --color-ink-raised:    oklch(0.205 0.024 190);
+  --color-ink-hover:     oklch(0.245 0.026 190);
+  --color-ink-sunken:    oklch(0.125 0.022 190);
+
+  /* §6.2: no shadows in the dark theme — surfaces lift with border + tone. */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
 }
 
-/* ── Base ──────────────────────────────────────────────────────── */
+/* ── Base ───────────────────────────────────────────────────────────── */
 html, body {
   font-family: var(--font-body);
   font-size: 13px;
@@ -130,44 +192,112 @@ html, body {
 
 .hairline {
   height: 1px;
-  background: var(--color-gold);
-  opacity: 0.55;
+  background: var(--color-accent);
+  opacity: 0.5;
   width: 100%;
 }
 
+/* Elevation helpers — no-ops in dark, where the shadow tokens are `none`. */
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+.elev-lg { box-shadow: var(--shadow-lg); }
+
+/* ── Chrome controls ────────────────────────────────────────────────
+   The topbar and rail are dark in BOTH themes — that L-shaped chrome is the
+   frame the light canvas sits inside. Controls mounted on it therefore cannot
+   use the surface tokens, which flip with the theme and would render a white
+   pill with white text in Studio Porcelain. These derive from the sidebar
+   tokens instead, so they follow the chrome rather than the canvas.
+   Dropdown PANELS still use bg-surface: they float over the canvas, not the
+   chrome, and should read as part of it. */
+.on-chrome {
+  background-color: color-mix(in oklab, var(--color-sidebar-text) 8%, transparent);
+  border-color:     color-mix(in oklab, var(--color-sidebar-text) 15%, transparent);
+  color:            var(--color-sidebar-dim);
+  transition: background-color 140ms cubic-bezier(.2,0,0,1),
+              color            140ms cubic-bezier(.2,0,0,1);
+}
+.on-chrome:hover {
+  background-color: color-mix(in oklab, var(--color-sidebar-text) 15%, transparent);
+  color:            var(--color-sidebar-text);
+}
+.on-chrome-text  { color: var(--color-sidebar-text); }
+.on-chrome-dim   { color: var(--color-sidebar-dim); }
+.on-chrome-rule  { background-color: color-mix(in oklab, var(--color-sidebar-text) 18%, transparent); }
+
+/* §6.3.11 — a 2px ring in the accent, not the demoted gold. */
 :focus-visible {
-  outline: 2px solid var(--color-gold);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-/* ── Theme-aware native form controls ─────────────────────────── */
-/* Ensures inputs/selects/textareas are readable in both dark and
-   light themes without relying on browser defaults or hardcoded
-   white backgrounds. Applied globally so every form in the app
-   inherits the correct surface/text/border tokens. */
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-select,
-textarea {
-  color-scheme: dark;            /* date/time pickers follow dark theme */
-  color: var(--color-text);
-  background-color: var(--color-surface-2);
-}
-input::placeholder,
-textarea::placeholder {
-  color: var(--color-text-muted);
-  opacity: 1;                    /* Firefox reduces opacity by default */
-}
-select option {
-  background-color: var(--color-surface-2);
-  color: var(--color-text);
-}
+/* Everything below sits in @layer base. Tailwind v4 puts utilities in
+   @layer utilities, and an UNLAYERED rule beats any layered one regardless of
+   specificity — so element selectors written outside a layer silently defeat
+   `bg-transparent`, `bg-surface` and friends. That is exactly what made the
+   topbar search render as a white box on the dark chrome even after the rule
+   was wrapped in :where(). Layering it is the actual fix. */
+@layer base {
+  /* ── Theme-aware native form controls ───────────────────────────────
+     Light is the default now, so the base rule declares `light` and the dark
+     theme overrides it. Getting this backwards makes date pickers unreadable. */
+  /* Wrapped in :where() so these carry ZERO specificity. Without it the
+     element selector (0,3,1) beats every Tailwind colour utility (0,1,0), and
+     `bg-transparent` on an input silently does nothing — which is how the
+     global search field ended up rendering as a white box on the dark chrome. */
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
+  :where(select),
+  :where(textarea) {
+    color-scheme: light;
+    color: var(--color-text);
+    background-color: var(--color-surface);
+  }
+  :where(:root.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
+  :where(:root.dark select),
+  :where(:root.dark textarea) {
+    color-scheme: dark;
+    background-color: var(--color-surface-2);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-text-subtle);
+    opacity: 1;                    /* Firefox reduces opacity by default */
+  }
 
-/* Light-theme overrides — keep colour-scheme in sync */
-:root.light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-:root.light select,
-:root.light textarea {
-  color-scheme: light;
+  /* ── Native <select>, styled once ──────────────────────────────────
+     ~40 components render a raw <select> — filter rows, form fields, the
+     measurement PWA. Restyling each one would be a 40-file sweep; styling the
+     element itself fixes all of them at once and keeps the OS picker, which is
+     the right control on a phone at a site.
+
+     The chevron is a background image because a <select> cannot carry a
+     pseudo-element reliably across browsers, and a background image cannot use
+     currentColor — hence one encoded SVG per theme. */
+  :where(select) {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    background-size: 12px 12px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23636F6F' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+    transition: border-color 140ms cubic-bezier(.2,0,0,1);
+  }
+  :where(:root.dark select) {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%239DADAC' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  }
+  :where(select:hover)          { border-color: var(--color-rule-strong); }
+  :where(select:focus-visible)  { border-color: var(--color-accent); }
+
+  select option {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+  }
+  :root.dark select option { background-color: var(--color-surface-2); }
 }
 
 /* Disabled / read-only visual cues */
@@ -184,9 +314,9 @@ textarea:read-only {
 
 .skeleton {
   background: linear-gradient(90deg,
-    var(--color-surface) 0%,
-    var(--color-surface-2) 50%,
-    var(--color-surface) 100%);
+    var(--color-surface-2) 0%,
+    var(--color-surface-hover) 50%,
+    var(--color-surface-2) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }

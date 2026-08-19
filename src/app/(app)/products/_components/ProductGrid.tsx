@@ -9,7 +9,7 @@ export function ProductGrid({
 }: { rows: ProductRow[]; forProject?: string; itemId?: string }) {
   if (rows.length === 0) return null;
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+    <div className="grid gap-3 sm:gap-3.5 grid-cols-2 sm:[grid-template-columns:repeat(auto-fill,minmax(208px,1fr))]">
       {rows.map((r) => <ProductCard key={r.id} row={r} forProject={forProject} itemId={itemId} />)}
     </div>
   );

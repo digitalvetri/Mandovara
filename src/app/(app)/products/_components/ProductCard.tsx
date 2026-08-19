@@ -31,7 +31,7 @@ export function ProductCard({
       className="group relative flex flex-col rounded-[14px] border border-rule bg-surface overflow-hidden transition-all duration-200 hover:bg-surface-hover hover:border-rule/80 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
     >
       {/* Image well — fixed 4:5 portrait, image fills uniformly */}
-      <div className="relative aspect-[4/5] bg-ink border-b border-rule/60 overflow-hidden">
+      <div className="relative aspect-square bg-surface-2 border-b border-rule/60 overflow-hidden">
         {row.imageKey ? (
           <img
             src={row.imageKey}
@@ -53,7 +53,7 @@ export function ProductCard({
         {/* Dye-lot pin — top-right */}
         {row.dyeLotHint && (
           <div
-            className="absolute top-2.5 right-2.5 h-6 min-w-[24px] px-1.5 flex items-center justify-center rounded-full bg-gold text-ink text-[10px] font-semibold tabular tracking-tight shadow-[0_0_0_2px_rgba(11,16,32,0.85)]"
+            className="absolute top-2.5 right-2.5 h-6 min-w-[24px] px-1.5 flex items-center justify-center rounded-full bg-gold text-white text-[10px] font-semibold tabular tracking-tight ring-2 ring-surface"
             title={`Dye lot: ${row.dyeLotHint}`}
           >
             {row.dyeLotHint}

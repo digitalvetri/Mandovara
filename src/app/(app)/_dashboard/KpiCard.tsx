@@ -7,10 +7,13 @@ interface KpiCardProps {
   icon?: string;  // emoji icon for the card
 }
 
-const toneStyle: Record<KpiCardProps["trendTone"], { text: string; bg: string }> = {
-  good: { text: "#2BA89A", bg: "rgba(43,168,154,0.10)" },
-  warn: { text: "#C97B30", bg: "rgba(201,123,48,0.10)" },
-  bad:  { text: "#C94040", bg: "rgba(201,64,64,0.10)"  },
+// Token classes, not literals: these used to be frozen hex values keyed to
+// the old dark palette, so the trend pill kept its Midnight Court colours
+// after the theme changed and lost contrast on a light card.
+const toneClass: Record<KpiCardProps["trendTone"], string> = {
+  good: "text-solid bg-solid/10",
+  warn: "text-heat  bg-heat/10",
+  bad:  "text-fault bg-fault/10",
 };
 
 const defaultIcon: Record<string, string> = {
@@ -21,18 +24,17 @@ const defaultIcon: Record<string, string> = {
 };
 
 export function KpiCard({ label, value, subtitle, trend, trendTone, icon }: KpiCardProps) {
-  const tone = toneStyle[trendTone];
+  const tone = toneClass[trendTone];
   const displayIcon = icon ?? defaultIcon[label];
 
   return (
     <div
-      className="rounded-[14px] bg-surface border border-rule px-5 py-4 relative overflow-hidden"
-      style={{ borderLeft: "3px solid #2BA89A" }}
+      className="rounded-[14px] bg-surface border border-rule border-l-[3px] border-l-accent px-5 py-4 relative overflow-hidden shadow-sm"
     >
       {/* Subtle teal glow top-right */}
       <div
         className="absolute top-0 right-0 w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: "radial-gradient(circle, rgba(43,168,154,0.06) 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, var(--color-accent-tint) 0%, transparent 70%)" }}
         aria-hidden
       />
 
@@ -42,8 +44,7 @@ export function KpiCard({ label, value, subtitle, trend, trendTone, icon }: KpiC
         </div>
         {displayIcon && (
           <div
-            className="h-7 w-7 rounded-[8px] flex items-center justify-center text-[13px] shrink-0"
-            style={{ background: "rgba(43,168,154,0.10)", color: "#2BA89A" }}
+            className="h-7 w-7 rounded-[8px] flex items-center justify-center text-[13px] shrink-0 bg-accent/10 text-accent"
           >
             {displayIcon}
           </div>
@@ -57,8 +58,7 @@ export function KpiCard({ label, value, subtitle, trend, trendTone, icon }: KpiC
       <div className="mt-3 flex items-center justify-between gap-2">
         <div className="text-[11px] text-text-dim truncate flex-1">{subtitle}</div>
         <span
-          className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full tabular shrink-0"
-          style={{ color: tone.text, background: tone.bg }}
+          className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full tabular shrink-0 ${tone}`}
         >
           {trend}
         </span>

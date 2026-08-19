@@ -412,3 +412,67 @@ Turbopack compile of four routes at once (it was timing out at the 30s default
 and taking the whole suite with it); and a failed run now uploads the Playwright
 report as an artifact, since Actions logs need authentication to download and a
 red run was otherwise unreadable from outside the repo.
+
+---
+
+## The palette is re-keyed onto the brand's own colour
+
+*2026-08-19*
+
+The owner asked for "a neat colourful and a premium design … change the colour
+combo". §1.6 lists the design system as locked, so this is a deliberate,
+owner-instructed amendment to §6.1–6.2 rather than drift; CLAUDE.md was updated
+in the same commit, because §0 says the file wins when code and spec disagree
+and a stale §6.2 would have had the next fresh session revert all of this as a
+violation.
+
+**What did not change, and why.** `--color-accent` was already Mandovara's own
+brand teal, taken from the butterfly mark in `public/mandovara-logo.jpg`. That
+is not ours to change. "Change the colour combo", from the person who owns the
+brand, means the navy and gold *around* it. So the accent stayed and everything
+else was rebuilt to belong to it: the dark theme moved off blue-navy (hue 265)
+onto the same teal-green family (hue 190), and antique gold was demoted from
+co-star to a rare hairline.
+
+**Light is now the default.** Studio Porcelain — warm near-white canvas, deep
+teal-ink rail — replaces Midnight Court as the default surface. The original
+rationale for dark-by-default was "this is a showroom-and-site product", but a
+site visit in Coimbatore daylight is the hardest reading condition this app has,
+and the brand's own material is teal on white. Malachite (dark) is a first-class
+opt-in, not an afterthought. The mechanism inverted with it: light is `:root`,
+dark is a `dark` class, previously the reverse.
+
+**Contrast was solved, not chosen.** Every text colour in both themes clears
+4.5:1 (§6.3.11) against white, the page ground and surface-2. The light values
+are the output of a solver that walks `oklch` lightness down until the worst of
+the three grounds clears the floor — which is why they are odd numbers like
+`0.516` rather than round ones. Deepening the page ground from 0.981 to 0.965
+for card separation invalidated the first pass and every value had to be
+re-solved. **Re-tinting these by eye will break the floor; re-run the solver.**
+
+### Three findings worth keeping
+
+1. **Unlayered CSS beats layered CSS regardless of specificity.** The global
+   `input`/`select` rules were written outside any layer, so they defeated
+   Tailwind's `@layer utilities` — `bg-transparent` on the topbar search input
+   did nothing, and it rendered as a white box on the dark chrome. Wrapping the
+   selectors in `:where()` did *not* fix it; only moving them into `@layer base`
+   did. Element-level rules in this codebase belong in `@layer base`.
+
+2. **Chrome is not canvas.** The topbar and rail are dark in *both* themes, so
+   controls mounted on them cannot use the surface tokens — those flip with the
+   theme and produced a white pill with white text. Hence `.on-chrome`, derived
+   from the sidebar tokens. Dropdown panels deliberately keep `bg-surface`:
+   they float over the canvas, not the chrome.
+
+3. **Style the element, not the 40 call sites.** ~40 components render a raw
+   `<select>`, which was the cheapest-looking thing in the product. Styling
+   `:where(select)` once — appearance, border, radius, and a per-theme encoded
+   SVG chevron, since a `<select>` cannot carry a pseudo-element and a
+   background image cannot use `currentColor` — fixed all of them without
+   touching a single one. The same logic drove keeping the native element: on a
+   phone at a site, the OS picker beats any custom listbox.
+
+`components/ui/` held only `Tabs` and `Tooltip` despite §2 specifying shadcn/ui,
+which is why every screen hand-rolled its own button and card. `Button`, `Card`,
+`Badge`, `LotChip` and `Select` now exist as the shared set.

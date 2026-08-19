@@ -108,7 +108,7 @@ export function ScheduleMenu() {
         type="button"
         aria-label="Schedule"
         onClick={() => setOpen(!open)}
-        className="h-[38px] w-[38px] grid place-items-center rounded-[8px] bg-surface border border-rule text-text-dim hover:text-text hover:bg-surface-hover transition-colors relative"
+        className="h-[38px] w-[38px] grid place-items-center rounded-[8px] on-chrome border relative"
       >
         <CalIcon size={15} strokeWidth={1.75} />
         {meetings.length > 0 && (

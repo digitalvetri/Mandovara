@@ -109,7 +109,7 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
           href={"/calendar" as Route}
           title="Follow-up Calendar"
           aria-label="Open follow-up calendar"
-          className="hidden sm:grid h-[38px] w-[38px] place-items-center rounded-[8px] text-text-dim hover:text-accent hover:bg-surface transition-colors"
+          className="hidden sm:grid h-[38px] w-[38px] place-items-center rounded-[8px] border on-chrome"
         >
           <CalendarDays size={16} strokeWidth={1.6} />
         </Link>
@@ -118,22 +118,21 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
         <ThemeToggle />
 
         {/* Vertical divider */}
-        <div className="hidden sm:block w-px h-5 mx-0.5 shrink-0 bg-rule" />
+        <div className="hidden sm:block w-px h-5 mx-0.5 shrink-0 on-chrome-rule" />
 
         {/* User chip */}
-        <div className="hidden sm:flex items-center gap-2.5 h-[38px] px-3 rounded-[10px] shrink-0 cursor-default bg-surface border border-rule">
+        <div className="hidden sm:flex items-center gap-2.5 h-[38px] px-3 rounded-[10px] shrink-0 cursor-default border on-chrome">
           {/* Avatar with gold accent to distinguish from teal CTA */}
           <div
-            className="h-[26px] w-[26px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-            style={{ background: "#C9A227" }}
+            className="h-[26px] w-[26px] rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-accent text-white"
           >
             {ini}
           </div>
           <div className="leading-none hidden lg:block">
-            <div className="text-[12px] font-medium text-sidebar-text">
+            <div className="text-[12px] font-medium on-chrome-text">
               {userName}
             </div>
-            <div className="text-[10px] mt-[2.5px] text-sidebar-dim">
+            <div className="text-[10px] mt-[2.5px] on-chrome-dim">
               {ROLE_LABEL[userRole] ?? userRole}
             </div>
           </div>
@@ -146,7 +145,7 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
           disabled={signing}
           title="Sign out"
           aria-label="Sign out"
-          className="h-[38px] w-[38px] grid place-items-center rounded-[8px] text-text-dim hover:text-accent hover:bg-surface transition-colors disabled:opacity-40"
+          className="h-[38px] w-[38px] grid place-items-center rounded-[8px] border on-chrome disabled:opacity-40"
         >
           <LogOut size={15} strokeWidth={1.7} />
         </button>

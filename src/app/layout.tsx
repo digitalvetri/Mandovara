@@ -36,8 +36,8 @@ export const viewport: Viewport = {
   maximumScale: 5,
   viewportFit: "cover",   // respect the notch when installed full-screen
   themeColor: [
-    { media: "(prefers-color-scheme: dark)",  color: "#0B1020" },
-    { media: "(prefers-color-scheme: light)", color: "#0F2A28" },
+    { media: "(prefers-color-scheme: dark)",  color: "#0A1817" },
+    { media: "(prefers-color-scheme: light)", color: "#FAFBFB" },
   ],
 };
 
@@ -45,9 +45,12 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const cookieStore = await cookies();
+  // Studio Porcelain (light) is the default surface: it matches the brand's
+  // own world, and a site visit in Coimbatore daylight is the hardest reading
+  // condition this app has. Malachite (dark) is opt-in via the toggle.
   const savedTheme = cookieStore.get("theme")?.value;
-  const htmlClass = savedTheme === "light"
-    ? `${fontClassNames} light`
+  const htmlClass = savedTheme === "dark"
+    ? `${fontClassNames} dark`
     : fontClassNames;
 
   // suppressHydrationWarning silences warnings from browser extensions

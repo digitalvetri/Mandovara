@@ -90,7 +90,7 @@ This is an **Interior OS**: the vocabulary of the trade is native — *fullness,
 
 ### 1.6 Decisions locked (do not re-litigate) / still open
 
-**Locked:** single tenant, multi-branch-ready schema · catalog hierarchy is **Brand → Collection → Design → Colourway (SKU)**, not category-first · every made-to-measure quote line requires a `MeasurementItem` · dye lot on every roll-based receipt · measurement stored in **millimetres**, displayed in the user's chosen unit · money as BigInt paise · design system §6 · the module set in §8 · the phase order in §14.
+**Locked:** single tenant, multi-branch-ready schema · catalog hierarchy is **Brand → Collection → Design → Colourway (SKU)**, not category-first · every made-to-measure quote line requires a `MeasurementItem` · dye lot on every roll-based receipt · measurement stored in **millimetres**, displayed in the user's chosen unit · money as BigInt paise · design system §6 (**palette re-keyed 19 Aug 2026 on the owner's instruction — see the note at §6.1; the structure, type scale, UX doctrine and screen set are unchanged and remain locked**) · the module set in §8 · the phase order in §14.
 
 **Open (use placeholders, flag in README):** exact fullness/wastage constants per family (validated in Phase 0) · whether stitching is in-house or job-worked (schema supports both via `MakeJob.vendorId` nullable) · GSTIN and e-invoice applicability (only if AATO > ₹5 crore — confirm before Phase 5) · sample-book deposit policy.
 
@@ -1281,46 +1281,74 @@ model Setting {
 
 ### 6.1 Direction
 
-Regal restraint over decoration. Deep ink surfaces, a disciplined antique-gold accent, serif display type, generous air — the confidence of a private bank, applied to an interiors house that sells taste for a living. **The UI must not look cheaper than what Mandovara sells.**
+> **Revised 19 Aug 2026 at the owner's request** ("neat, colourful, premium; change the colour combo"). The direction below replaces the original antique-gold-on-navy scheme. Everything in §6.1–6.2 is now descriptive of `src/app/globals.css`; §6.3–6.4 are unchanged.
 
-Gold is reserved exclusively for brand moments and the single primary action per screen — that discipline is what makes it feel royal rather than gaudy.
+Restraint over decoration, but built on the brand's own colour rather than a borrowed one. **Studio Porcelain** is the default surface: a warm near-white canvas framed by an L-shaped rail of deep teal-ink, with Mandovara's own brand teal as the single hero accent. **Malachite** is the dark theme, re-keyed off the same teal-green hue so the accent belongs to its ground instead of sitting on it. **The UI must not look cheaper than what Mandovara sells.**
+
+The accent is `#2BA89A`, taken from the butterfly mark — the one colour in this system that is not ours to choose. On light grounds it deepens to `#007B6C` so it can carry text at 4.5:1. It is reserved for the single primary action per screen, the active nav item, the focus ring and data bars. Nothing else.
+
+Antique gold is **demoted**, not deleted: it survives as the rare hairline and the sample-book chip. Its tokens stay defined because `:focus-visible`, `.hairline` and `/styleguide` read them.
+
+Colour discipline is enforced arithmetically, not by eye. Every text colour in both themes clears **4.5:1** on every ground it is used against; the light values were solved for the lightest, most saturated `oklch` that still clears the floor. Re-tinting by hand will break it — re-solve instead.
 
 **Signature element:** the **swatch chip** — a 4px rounded colour block carrying the actual colourway hex or swatch image, on the left edge of every catalog row, quote line, cut-list line and install line. Scan the left margin and read the whole job by colour. Second signature: KPI numerals in mono with a hairline gold underline that draws in once on load (240ms).
 
 ### 6.2 Tokens
 
 ```css
-@import "tailwindcss";
+/* src/app/globals.css is the source of truth; this is the shape of it.
+   TOKEN NAMES ARE FROZEN — ~1,400 utility usages depend on them. Re-key the
+   VALUES to change the look; never rename a token. */
 
-@theme {
-  /* Dark — "Midnight Court" (default; this is a showroom-and-site product) */
-  --color-ink:         oklch(0.18 0.045 265);   /* #0B1020 */
-  --color-surface:     oklch(0.24 0.042 265);   /* #131A2E */
-  --color-surface-2:   oklch(0.28 0.045 265);   /* #1A2340 */
-  --color-border:      oklch(0.36 0.038 265);   /* #26314F */
-  --color-text:        oklch(0.94 0.008 265);   /* #EDEFF5 */
-  --color-text-muted:  oklch(0.68 0.028 265);   /* #8792AC */
-  --color-text-subtle: oklch(0.50 0.030 265);
+@theme {                                  /* Studio Porcelain — light, DEFAULT */
+  --color-ink:        oklch(0.965 0.005 180);   /* #F2F5F4 page ground */
+  --color-surface:    oklch(1.000 0.000 0);     /* #FFFFFF card        */
+  --color-surface-2:  oklch(0.950 0.006 180);
+  --color-border:     oklch(0.885 0.009 180);
+  --color-text:       oklch(0.245 0.020 200);   /* #152324  16.1:1     */
+  --color-text-muted: oklch(0.470 0.016 200);   /* #4B5859   6.8:1     */
+  --color-text-subtle:oklch(0.532 0.014 200);   /* #636F6F   4.5:1     */
 
-  --color-gold:        oklch(0.72 0.115 85);    /* #C9A227 */
-  --color-gold-strong: oklch(0.83 0.105 85);    /* #E5C55C */
-  --color-gold-tint:   oklch(0.72 0.115 85 / 0.13);
+  --color-sidebar:      oklch(0.190 0.030 195); /* the dark rail       */
+  --color-sidebar-text: oklch(0.970 0.006 190);
 
-  --color-solid:       oklch(0.78 0.145 165);   /* ready, paid, installed */
-  --color-heat:        oklch(0.78 0.130 75);    /* in progress, pending */
-  --color-fault:       oklch(0.66 0.190 20);    /* overdue, snag, lot mismatch */
-  --color-info:        oklch(0.62 0.140 255);
+  --color-accent:     oklch(0.516 0.105 182);   /* #007B6C brand teal  */
+  --color-gold:       oklch(0.534 0.105 85);    /* demoted to hairline */
 
-  --font-display: "Fraunces", Georgia, serif;
-  --font-body:    "Inter", system-ui, sans-serif;
-  --font-data:    "Geist Mono", "SF Mono", monospace;
-  --font-tamil:   "Noto Sans Tamil", sans-serif;
+  --color-solid:      oklch(0.514 0.135 158);   /* ready · paid        */
+  --color-heat:       oklch(0.542 0.130 62);    /* in progress         */
+  --color-fault:      oklch(0.556 0.190 25);    /* overdue · mismatch  */
+  --color-info:       oklch(0.532 0.130 250);
 
-  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 14px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+  --shadow-sm/md/lg: …                          /* light theme only    */
+}
+
+:root.dark {                              /* Malachite — dark, opt-in */
+  --color-ink:     oklch(0.155 0.022 190);
+  --color-surface: oklch(0.205 0.024 190);
+  --color-text:    oklch(0.965 0.006 190);
+  --color-accent:  oklch(0.720 0.115 182);      /* #37BCAA  7.6:1      */
+  --shadow-sm/md/lg: none;                      /* lifts with border   */
 }
 ```
 
-**Light theme "Porcelain"** (`[data-theme="light"]`) for showroom presentation and printing: `--color-ink:#F8F7F4 · --color-surface:#FFFFFF · --color-border:#E4E1D8 · --color-text:#141B22 · --color-gold:#B8912F`.
+**Theme mechanism:** light is `:root` and is the default; dark is opt-in via a
+`dark` class on `<html>`, set from the `theme` cookie in `app/layout.tsx` and
+toggled by `ThemeToggle`. (It was the inverse before this revision — a `light`
+class over a dark default.)
+
+**Cascade layers matter here.** Element-level rules (`input`, `select`) live in
+`@layer base`. Tailwind v4 puts utilities in `@layer utilities`, and an
+*unlayered* rule beats any layered one regardless of specificity — so an
+unlayered `input { background: … }` silently defeats `bg-transparent` on every
+input in the app.
+
+**Chrome vs canvas.** The topbar and rail are dark in *both* themes. Controls
+mounted on them use the `.on-chrome` utility, which derives from the sidebar
+tokens; using `bg-surface` there renders a white pill with white text in the
+light theme. Dropdown *panels* still use `bg-surface` — they float over the
+canvas, not the chrome.
 
 **Type:** Fraunces (display, weight 560, tracking −0.015em, `font-optical-sizing:auto`) · Inter (UI body, 13px base) · **Geist Mono with `tabular-nums` for every numeral** — ₹, mm, metres, sqft, roll counts, dates · Noto Sans Tamil on field surfaces.
 Scale: display 32/38 · h1 26/32 · h2 20/28 · h3 16/24 · body 13/20 · caption 12/16 · eyebrow 11 caps +0.08em.

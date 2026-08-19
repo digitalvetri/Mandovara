@@ -37,7 +37,7 @@ export function HeroImage({
       )}
       {dyeLotHint && (
         <span
-          className="absolute top-3 right-6 h-[26px] min-w-[26px] px-2 inline-flex items-center justify-center rounded-full bg-gold text-ink text-[11px] font-semibold tabular tracking-tight shadow-[0_0_0_2px_rgba(11,16,32,0.85)]"
+          className="absolute top-3 right-6 h-[26px] min-w-[26px] px-2 inline-flex items-center justify-center rounded-full bg-gold text-white text-[11px] font-semibold tabular tracking-tight ring-2 ring-surface"
           title={`Dye lot: ${dyeLotHint}`}
         >
           {dyeLotHint}
@@ -57,7 +57,7 @@ function Pin({ position }: { position: "top-left" | "top-right" | "bottom-left" 
   return (
     <span
       aria-hidden
-      className={`absolute ${cls} h-[5px] w-[5px] rounded-full bg-gold shadow-[0_0_0_1px_rgba(11,16,32,0.9),0_0_6px_rgba(201,162,39,0.35)]`}
+      className={`absolute ${cls} h-[5px] w-[5px] rounded-full bg-gold ring-1 ring-surface`}
     />
   );
 }

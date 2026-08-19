@@ -231,7 +231,7 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
       {/* Profile + sign-out */}
       <div className="border-t border-white/[0.08] px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-accent/85 text-[#0B1020] flex items-center justify-center text-[12px] font-semibold tracking-wider shrink-0">
+          <div className="h-9 w-9 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-semibold tracking-wider shrink-0">
             {initials(userName)}
           </div>
           <div className="flex-1 min-w-0">
@@ -271,8 +271,7 @@ function NavRow({ href, label, Icon, active }: { href: string; label: string; Ic
     >
       <span
         aria-hidden
-        className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
-        style={{ background: "#2BA89A" }}
+        className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
       />
       <Icon size={17} strokeWidth={1.6} className="shrink-0" />
       <span className="truncate">{label}</span>

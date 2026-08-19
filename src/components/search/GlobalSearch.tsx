@@ -103,13 +103,15 @@ export function GlobalSearch() {
       {/* ── Search bar ── */}
       <div className={[
         "flex items-center gap-2.5 h-[38px] px-3.5 rounded-[10px] border transition-all",
+        // Sits on the dark chrome, so it derives from the sidebar tokens
+        // rather than the surface tokens — see .on-chrome in globals.css.
         open
-          ? "bg-surface border-accent/50"
-          : "bg-surface border-rule hover:border-accent/40",
+          ? "on-chrome on-chrome-text !border-accent"
+          : "on-chrome",
       ].join(" ")}>
         {loading
           ? <Loader2 size={13.5} strokeWidth={1.8} className="shrink-0 text-accent animate-spin" />
-          : <Search  size={13.5} strokeWidth={1.8} className="shrink-0 text-text-dim" />}
+          : <Search  size={13.5} strokeWidth={1.8} className="shrink-0 on-chrome-dim" />}
         <input
           ref={inputRef}
           value={query}
@@ -119,10 +121,10 @@ export function GlobalSearch() {
             if (e.key === "Escape") { setOpen(false); inputRef.current?.blur(); }
           }}
           placeholder="Search projects, clients, designs…"
-          className="flex-1 bg-transparent text-[12.5px] text-text placeholder:text-text-dim outline-none"
+          className="flex-1 bg-transparent text-[12.5px] on-chrome-text placeholder:opacity-70 outline-none"
         />
         {!open && (
-          <kbd className="hidden sm:inline-flex items-center text-[9.5px] px-1.5 py-[3px] rounded-[5px] text-text-dim bg-surface-2 border border-rule shrink-0">
+          <kbd className="hidden sm:inline-flex items-center text-[9.5px] px-1.5 py-[3px] rounded-[5px] border on-chrome shrink-0">
             Ctrl K
           </kbd>
         )}
