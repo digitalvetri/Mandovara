@@ -104,7 +104,7 @@ export function resolveNextAction(
         enabled,
         disabledReason: enabled ? null :
           "Quotations are prepared by sales / designers.",
-        href: `/quotations`,
+        href: `/quotations?project=${id}`,
       };
     }
 

@@ -177,3 +177,16 @@ function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
   }
   return { ok: false, error: "Validation failed", fieldErrors };
 }
+
+export interface AssignableUser { id: string; name: string; role: string; }
+
+export async function listAssignableUsers(): Promise<AssignableUser[]> {
+  const ctx = await devContext();
+  const db  = scoped(ctx);
+  const rows = await db.user.findMany({
+    where:   { status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    select:  { id: true, name: true, role: true },
+  });
+  return rows;
+}

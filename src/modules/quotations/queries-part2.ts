@@ -118,15 +118,16 @@ export async function getQuotation(
 }
 
 export interface QuotationInlineRow {
-  id:         string;
-  number:     string;
-  revision:   number;
-  date:       Date;
-  status:     string;
-  total:      bigint;
-  lineCount:  number;
-  projectId:  string;
-  projectName: string;
+  id:          string;
+  number:      string;
+  revision:    number;
+  date:        Date;
+  status:      string;
+  total:       bigint;
+  lineCount:   number;
+  // null for lead-scoped quotations (no project until conversion)
+  projectId:   string | null;
+  projectName: string | null;
 }
 
 /** Small-table list for embedding in a client detail or lead detail
@@ -169,6 +170,35 @@ export async function listQuotationsForClient(
     }));
 }
 
+/** Lead-scoped quotations for the lead detail inline table. */
+export async function listLeadScopedQuotations(
+  ctx:    RequestContext,
+  leadId: string,
+): Promise<QuotationInlineRow[]> {
+  requirePermission(ctx, "quotation.view");
+  const db = scoped(ctx);
+  const rows = await db.quotation.findMany({
+    where:   { leadId },
+    orderBy: [{ date: "desc" }, { revision: "desc" }],
+    take:    20,
+    select: {
+      id: true, number: true, revision: true, date: true, status: true, total: true,
+      _count: { select: { lines: true } },
+    },
+  });
+  return rows.map((r) => ({
+    id:          r.id,
+    number:      r.number,
+    revision:    r.revision,
+    date:        r.date,
+    status:      r.status,
+    total:       r.total,
+    lineCount:   r._count.lines,
+    projectId:   null,
+    projectName: null,
+  }));
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 type WhereInput = Record<string, unknown>;
@@ -183,6 +213,7 @@ export function buildWhere(q: ListQuotationsQuery): WhereInput {
     ];
   }
   if (q.status && q.status !== "ALL") where["status"] = q.status;
+  if (q.projectId) where["projectId"] = q.projectId;
   if (q.dateFrom || q.dateTo) {
     const dateFilter: WhereInput = {};
     if (q.dateFrom) dateFilter["gte"] = q.dateFrom;

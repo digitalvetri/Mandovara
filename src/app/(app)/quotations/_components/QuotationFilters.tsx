@@ -16,7 +16,11 @@ const STATUS_OPTIONS: { key: string; label: string }[] = [
   { key: "EXPIRED",          label: "Expired" },
 ];
 
-export function QuotationFilters() {
+interface QuotationFiltersProps {
+  projectId?: string;
+}
+
+export function QuotationFilters({ projectId }: QuotationFiltersProps) {
   const router = useRouter();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
@@ -30,6 +34,8 @@ export function QuotationFilters() {
   useEffect(() => setSearch(currentSearch), [currentSearch]);
 
   function push(next: URLSearchParams) {
+    // Always preserve the project filter when navigating within a project context
+    if (projectId) next.set("project", projectId);
     startTransition(() => {
       const s = next.toString();
       router.push(s.length > 0 ? `/quotations?${s}` : "/quotations");
@@ -50,7 +56,9 @@ export function QuotationFilters() {
   }
 
   function reset() {
-    startTransition(() => router.push("/quotations"));
+    startTransition(() =>
+      router.push(projectId ? `/quotations?project=${projectId}` : "/quotations"),
+    );
   }
 
   const hasFilters =

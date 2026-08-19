@@ -1,9 +1,9 @@
 "use client";
 
-// Quotation builder — project-centric, matching the Mandovara measure-to-install flow.
-// Start from a project (pass ?project=<id> in the URL). Lines are added manually.
-// The §0.10 measurement gate is enforced server-side; measurementItemId is optional
-// only for non-made-to-measure lines (accessories, services, etc.).
+// Quotation builder — works in two modes:
+//   1. project mode (projectId): the normal Mandovara measure-to-install flow.
+//   2. lead mode (leadId + leadName): preliminary estimate before site visit/conversion.
+// In lead mode the §0.10 measurement gate is relaxed server-side (no project = no measurements).
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -27,8 +27,10 @@ interface LineInput {
 }
 
 interface Props {
-  projectId: string;
-  branches: BranchOption[];
+  branches:   BranchOption[];
+  projectId?: string;
+  leadId?:    string;
+  leadName?:  string;
 }
 
 const EMPTY_LINE: LineInput = {
@@ -37,7 +39,7 @@ const EMPTY_LINE: LineInput = {
   roomLabel: "", measurementItemId: "",
 };
 
-export function QuotationBuilder({ projectId, branches }: Props) {
+export function QuotationBuilder({ projectId, leadId, leadName, branches }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -51,14 +53,17 @@ export function QuotationBuilder({ projectId, branches }: Props) {
   const [validUntil] = useState(iso(nextMonth));
   const [lines, setLines] = useState<LineInput[]>([{ ...EMPTY_LINE }]);
 
-  if (!projectId) {
+  const isLeadMode    = !!leadId && !projectId;
+  const isProjectMode = !!projectId;
+
+  if (!isLeadMode && !isProjectMode) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-14 text-center">
-        <div className="text-[15px] font-display text-text mb-2">Start from a project</div>
+        <div className="text-[15px] font-display text-text mb-2">Start from a project or lead</div>
         <p className="text-[12.5px] text-text-muted max-w-[420px] mx-auto">
-          Quotations in Mandovara are always linked to a project. Open a project and use its{" "}
-          <strong>Quotation</strong> tab — or navigate here with{" "}
-          <code className="font-data text-[11px]">?project=&lt;id&gt;</code>.
+          Quotations in Mandovara are linked to a project. Open a project and use its{" "}
+          <strong>Quotation</strong> tab, or navigate from a lead record to create a
+          preliminary estimate.
         </p>
       </div>
     );
@@ -88,8 +93,13 @@ export function QuotationBuilder({ projectId, branches }: Props) {
     if (placeOfSupplyCode.length !== 2) { setServerError("State code must be 2 digits."); return; }
 
     startTransition(async () => {
+      const party = isLeadMode
+        ? { leadId }
+        : { projectId };
+
       const res = await createQuotation({
-        projectId, branchId, date, validUntil, placeOfSupplyCode,
+        ...party,
+        branchId, date, validUntil, placeOfSupplyCode,
         lines: valid.map((l) => ({
           description:  l.description.trim(),
           quantity:     Number(l.quantity) || 1,
@@ -121,10 +131,20 @@ export function QuotationBuilder({ projectId, branches }: Props) {
                  maxLength={2} className={fld} placeholder="33 = Tamil Nadu" />
         </label>
         <div>
-          <div className={lbl}>Project</div>
-          <div className="h-[34px] flex items-center text-[11.5px] text-text-muted font-data">{projectId}</div>
+          <div className={lbl}>{isLeadMode ? "Lead" : "Project"}</div>
+          <div className="h-[34px] flex items-center text-[11.5px] text-text-muted font-data">
+            {isLeadMode ? leadName : projectId}
+          </div>
         </div>
       </div>
+
+      {isLeadMode && (
+        <div className="rounded-[8px] bg-info/8 border border-info/25 px-4 py-3 text-[12.5px] text-text-muted">
+          This is a preliminary estimate for a lead. Measurements are not required yet —
+          after the client accepts and converts, raise a proper project quotation with
+          site measurements attached.
+        </div>
+      )}
 
       {/* Lines */}
       <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">

@@ -7,6 +7,7 @@ import { buildWhere, orderFor } from "./queries-part2";
 export interface ListQuotationsQuery {
   search?: string;
   status?: QuotationStatus | "ALL";
+  projectId?: string;
   dateFrom?: Date;
   dateTo?: Date;
   page?: number;

@@ -141,6 +141,47 @@ html, body {
   border-radius: var(--radius-sm);
 }
 
+/* ── Theme-aware native form controls ─────────────────────────── */
+/* Ensures inputs/selects/textareas are readable in both dark and
+   light themes without relying on browser defaults or hardcoded
+   white backgrounds. Applied globally so every form in the app
+   inherits the correct surface/text/border tokens. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  color-scheme: dark;            /* date/time pickers follow dark theme */
+  color: var(--color-text);
+  background-color: var(--color-surface-2);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;                    /* Firefox reduces opacity by default */
+}
+select option {
+  background-color: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+/* Light-theme overrides — keep colour-scheme in sync */
+:root.light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+:root.light select,
+:root.light textarea {
+  color-scheme: light;
+}
+
+/* Disabled / read-only visual cues */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input:read-only:not([type="checkbox"]),
+textarea:read-only {
+  opacity: 0.7;
+}
+
 .skeleton {
   background: linear-gradient(90deg,
     var(--color-surface) 0%,

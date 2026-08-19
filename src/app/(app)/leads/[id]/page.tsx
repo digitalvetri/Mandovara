@@ -4,7 +4,7 @@ import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
-import { listQuotationsForClient } from "@/modules/quotations/queries";
+import { listQuotationsForClient, listLeadScopedQuotations } from "@/modules/quotations/queries";
 import { QuotationsInlineTable } from "@/components/data/QuotationsInlineTable";
 import { LEAD_SOURCES } from "@/modules/leads/schema";
 import { StatusPill } from "../_components/StatusPill";
@@ -52,22 +52,24 @@ export default async function LeadDetailPage({
     convertedProjectId = proj?.id ?? null;
   }
 
-  const quotations = lead.convertedClientId
-    ? await listQuotationsForClient(ctx, lead.convertedClientId)
-    : [];
-
-  // FIXES-01 §5.1 — fetch lead-scoped quotations (leadId matches this lead)
-  // to drive the two-approval Convert-to-Client card.
-  const leadScopedQuoteRows = lead.convertedClientId
-    ? []
-    : await db.quotation.findMany({
-        where:   { leadId: id },
-        orderBy: { date: "desc" },
-        select:  {
-          id: true, number: true, status: true, total: true,
-          ownerConvertApprovedAt: true,
-        },
-      });
+  // Client-scoped quotations (after conversion) vs lead-scoped (before)
+  const [quotations, leadScopedQuoteRows] = await Promise.all([
+    lead.convertedClientId
+      ? listQuotationsForClient(ctx, lead.convertedClientId)
+      : listLeadScopedQuotations(ctx, id),
+    // FIXES-01 §5.1 — fetch lead-scoped quotes separately for the
+    // two-approval Convert-to-Client card (needs ownerConvertApprovedAt).
+    lead.convertedClientId
+      ? Promise.resolve([] as { id: string; number: string; status: string; total: bigint; ownerConvertApprovedAt: Date | null }[])
+      : db.quotation.findMany({
+          where:   { leadId: id },
+          orderBy: { date: "desc" },
+          select:  {
+            id: true, number: true, status: true, total: true,
+            ownerConvertApprovedAt: true,
+          },
+        }),
+  ]);
   const leadScopedQuotes: LeadScopedQuote[] = leadScopedQuoteRows.map((q) => ({
     id:     q.id,
     number: q.number,
@@ -170,12 +172,14 @@ export default async function LeadDetailPage({
             emptyHint={
               isConverted
                 ? "No quotations yet. Start one from the button above or with Quick Quote."
-                : "Convert this lead to a client first, then send a quotation."
+                : "No quotations yet. Create one to send a price to this lead."
             }
-            {...(isConverted ? {
-              seeAllHref: "/quotations" as const,
-              newHref:    "/quotations/new" as const,
-            } : {})}
+            newHref={
+              isConverted
+                ? "/quotations/new" as const
+                : `/quotations/new?lead=${lead.id}` as const
+            }
+            {...(isConverted ? { seeAllHref: "/quotations" as const } : {})}
           />
 
           {/* Follow-up & Activity — anchor for the action bar */}

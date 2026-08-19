@@ -115,7 +115,7 @@ function Field(props: FieldProps) {
 }
 
 const fieldCls =
-  "w-full h-[34px] px-3 bg-white/60 border border-rule rounded-[6px] text-[12.5px] outline-none focus:border-accent transition-colors";
+  "w-full h-[34px] px-3 bg-surface-2 border border-rule rounded-[6px] text-[12.5px] text-text placeholder:text-text-muted outline-none focus:border-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed read-only:opacity-70";
 
 // Namespace the ergonomics — one import per module.
 export const EntityForm = Object.assign(EntityFormImpl, { Field, fieldCls });

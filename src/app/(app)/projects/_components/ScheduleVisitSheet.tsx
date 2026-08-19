@@ -8,12 +8,12 @@
 // (NewVisitButton) but that one asks the user to type a project cuid.
 // Here we know the project — one less form field to fill.
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { X, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
-import { createSiteVisit } from "@/modules/site-visits/actions";
+import { createSiteVisit, listAssignableUsers, type AssignableUser } from "@/modules/site-visits/actions";
 import { formatDate } from "@/kernel/datetime";
 
 const PURPOSES = [
@@ -48,6 +48,11 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
   const [error, setError]             = useState<string | null>(null);
   const [success, setSuccess]         = useState<SuccessState | null>(null);
   const [pending, start]              = useTransition();
+  const [users, setUsers]             = useState<AssignableUser[]>([]);
+
+  useEffect(() => {
+    listAssignableUsers().then(setUsers).catch(() => setUsers([]));
+  }, []);
 
   if (!open) return null;
 
@@ -177,15 +182,22 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
             />
           </Field>
 
-          <Field label="Assign to (user id)">
-            <input
-              type="text"
+          <Field label="Assign to">
+            <select
               value={assigneeId}
               onChange={(e) => setAssigneeId(e.target.value)}
               className={inputCls}
-              placeholder="user cuid"
               required
-            />
+            >
+              {users.length === 0 && (
+                <option value={assigneeId}>{assigneeId ? "Loading…" : "Select team member"}</option>
+              )}
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} — {u.role.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
           </Field>
 
           <Field label="Notes (optional)">

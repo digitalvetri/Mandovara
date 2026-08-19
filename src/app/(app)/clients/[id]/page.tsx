@@ -11,6 +11,7 @@ import { getClient } from "@/modules/clients/queries";
 import { listQuotationsForClient } from "@/modules/quotations/queries";
 import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 import { BillingAddressCard } from "../_components/BillingAddressCard";
+import { StartMeasurementFromClientButton } from "../_components/StartMeasurementFromClientButton";
 
 const STAGE_LABEL: Record<string, string> = {
   ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
@@ -43,13 +44,22 @@ export default async function ClientDetailPage({
         eyebrow={`${client.type} · ${client.mobile} · Since ${client.createdAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}`}
       />
 
-      <div className="flex justify-end pb-3">
+      <div className="flex justify-end gap-2 pb-3">
         <Link
           href={`/quotations/quick?client=${client.id}` as Route}
-          className="inline-flex items-center gap-1.5 rounded-[8px] bg-gold px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-gold-strong transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule bg-surface px-3 py-1.5 text-[12px] text-text-dim hover:text-text hover:border-accent/60 transition-colors"
         >
           <Zap size={13} /> New quick quote
         </Link>
+        <StartMeasurementFromClientButton
+          clientId={client.id}
+          projects={client.projects.map((p) => ({ id: p.id, name: p.name, stage: p.stage }))}
+          canMeasure={
+            ctx.permissions.has("measurement.create.any") ||
+            ctx.permissions.has("measurement.create.own") ||
+            ctx.permissions.has("measurement.create")
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">

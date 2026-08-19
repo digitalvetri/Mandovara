@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createSiteVisit } from "@/modules/site-visits/actions";
+import { createSiteVisit, listAssignableUsers, type AssignableUser } from "@/modules/site-visits/actions";
 import type { ProjectSelectOption } from "@/modules/projects/queries";
 
 const PURPOSES = [
@@ -20,7 +20,12 @@ export function NewVisitButton({ projects }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<AssignableUser[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    listAssignableUsers().then(setUsers).catch(() => setUsers([]));
+  }, []);
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -85,8 +90,15 @@ export function NewVisitButton({ projects }: Props) {
                 </select>
               </Field>
 
-              <Field label="Assign to (User ID)">
-                <input type="text" name="assignedToId" required placeholder="User ID…" className={inputCls} />
+              <Field label="Assign to">
+                <select name="assignedToId" required className={inputCls}>
+                  <option value="">Select team member…</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} — {u.role.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Initial observations">

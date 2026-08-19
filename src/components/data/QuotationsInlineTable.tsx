@@ -87,7 +87,7 @@ export function QuotationsInlineTable({ rows, newHref, emptyHint }: QuotationsIn
                     )}
                   </Link>
                 </td>
-                <td className="px-3 py-2.5 text-text-dim truncate max-w-[220px]">{r.projectName}</td>
+                <td className="px-3 py-2.5 text-text-dim truncate max-w-[220px]">{r.projectName ?? "—"}</td>
                 <td className="px-3 py-2.5 tabular text-text-dim">{formatDate(r.date)}</td>
                 <td className="px-3 py-2.5"><QuoteStatusPill status={r.status} /></td>
                 <td className="px-3 py-2.5 text-right tabular text-text-dim">{r.lineCount}</td>
