@@ -102,7 +102,7 @@ export function GlobalSearch() {
 
       {/* ── Search bar ── */}
       <div className={[
-        "flex items-center gap-2.5 h-[38px] px-3.5 rounded-[10px] border transition-all",
+        "flex items-center gap-2.5 h-[38px] px-3.5 rounded-[10px] border transition-all overflow-hidden",
         // Sits on the dark chrome, so it derives from the sidebar tokens
         // rather than the surface tokens — see .on-chrome in globals.css.
         open
@@ -121,7 +121,7 @@ export function GlobalSearch() {
             if (e.key === "Escape") { setOpen(false); inputRef.current?.blur(); }
           }}
           placeholder="Search projects, clients, designs…"
-          className="flex-1 bg-transparent text-[12.5px] on-chrome-text placeholder:opacity-70 outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[12.5px] on-chrome-text placeholder:opacity-70 outline-none"
         />
         {!open && (
           <kbd className="hidden sm:inline-flex items-center text-[9.5px] px-1.5 py-[3px] rounded-[5px] border on-chrome shrink-0">
