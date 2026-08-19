@@ -225,6 +225,32 @@ html, body {
 .on-chrome-dim   { color: var(--color-sidebar-dim); }
 .on-chrome-rule  { background-color: color-mix(in oklab, var(--color-sidebar-text) 18%, transparent); }
 
+/* ── Sidebar rail decoration ────────────────────────────────────────
+   Line art of the trade's own instruments, at a whisper. The opacity lives
+   here rather than in the SVG so the asset stays a drawing and the two themes
+   can carry it at different strengths — Malachite's ground is darker, so the
+   same art reads louder there and is pulled back.
+
+   Both layers are inert: pointer-events none, aria-hidden on the element, and
+   the nav sits above them on z-index. Nothing here may touch legibility —
+   sidebar text stays at 16.9:1 over the rail with the motif applied. */
+.chrome-motif {
+  background-image: url("/sidebar-motif.svg");
+  background-repeat: repeat-y;
+  background-position: top left;
+  background-size: 264px auto;
+  opacity: 0.075;
+}
+:root.dark .chrome-motif { opacity: 0.055; }
+
+/* Depth: lit from the top, settling into shadow at the foot — the vignette a
+   real panel has. Sits over the motif so the art recedes as it descends. */
+.chrome-veil {
+  background:
+    radial-gradient(120% 55% at 12% 0%, color-mix(in oklab, var(--color-accent) 16%, transparent) 0%, transparent 62%),
+    linear-gradient(180deg, transparent 45%, color-mix(in oklab, black 32%, transparent) 100%);
+}
+
 /* §6.3.11 — a 2px ring in the accent, not the demoted gold. */
 :focus-visible {
   outline: 2px solid var(--color-accent);

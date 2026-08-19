@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="900" viewBox="0 0 264 900" fill="none">
+  <!--
+    Sidebar motif — the instruments of the trade, drawn as line art.
+    A wallpaper roll, a swatch fan, a paint roller, a damask ornament and a
+    measuring rule: what is actually on the floor of a furnishing house.
+
+    Everything is drawn SMALL and kept whole inside x 18..246. The first pass
+    used shapes roughly twice this size; cropped by the 264px rail they stopped
+    reading as objects and became smudges. At this scale each one is legible
+    and the space between them is doing as much work as the art.
+
+    Tiles vertically (repeat-y); art clears y=0 and y=900 so the seam never
+    cuts a shape. Stroked in the rail's text colour — the opacity that makes it
+    a whisper lives in CSS, so this file stays a drawing, not a tint.
+  -->
+  <defs>
+    <!-- A roll lying to the right, seen end-on. -->
+    <g id="roll">
+      <ellipse cx="0" cy="0" rx="9.5" ry="14"/>
+      <ellipse cx="0" cy="0" rx="5.5" ry="8"/>
+      <ellipse cx="0" cy="0" rx="2" ry="3"/>
+      <path d="M0,-14 H42 M0,14 H42"/>
+      <path d="M42,-14 a9.5,14 0 0 1 0,28"/>
+    </g>
+
+    <!-- Half a damask: three tapering leaves off a curved stem, mirrored in
+         place. Pointed tips, not round lobes — a lobed shape at this size
+         reads as a clover, which is what the first attempt looked like. -->
+    <g id="damask-half">
+      <path d="M0,34 C-4,20 -10,10 -20,2"/>
+      <path d="M-20,2 C-12,-2 -4,-12 0,-26 C-8,-20 -17,-10 -20,2 Z"/>
+      <path d="M-19,4 C-27,-2 -38,-4 -49,0 C-40,7 -28,9 -19,4 Z"/>
+      <path d="M-13,16 C-22,18 -31,26 -35,37 C-25,34 -16,26 -13,16 Z"/>
+      <path d="M-49,0 C-56,3 -58,11 -54,17"/>
+    </g>
+
+    <!-- A swatch card, pivoting from the rivet at the origin. -->
+    <g id="swatch">
+      <rect x="7" y="-5.5" width="54" height="11" rx="5"/>
+      <path d="M55,-5.5 v11" opacity="0.5"/>
+    </g>
+  </defs>
+
+  <g stroke="#EFF5F4" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- Damask ornament, centred near the head of the rail. -->
+    <g transform="translate(150 96)">
+      <use href="#damask-half"/>
+      <use href="#damask-half" transform="scale(-1 1)"/>
+      <path d="M0,34 C-2,44 2,44 0,54"/>
+    </g>
+
+    <!-- Two rolls, stacked and offset. -->
+    <g transform="translate(34 250) rotate(-11)"><use href="#roll"/></g>
+    <g transform="translate(58 292) rotate(-4)"><use href="#roll"/></g>
+
+    <!-- Swatch fan, splayed from a single rivet. -->
+    <g transform="translate(150 430)">
+      <g transform="rotate(-30)"><use href="#swatch"/></g>
+      <g transform="rotate(-15)"><use href="#swatch"/></g>
+      <g><use href="#swatch"/></g>
+      <g transform="rotate(15)"><use href="#swatch"/></g>
+      <circle cx="0" cy="0" r="2.8"/>
+    </g>
+
+    <!-- Paint roller. -->
+    <g transform="translate(34 578) rotate(-8)">
+      <rect x="0" y="0" width="48" height="16" rx="8"/>
+      <path d="M9,1 V15 M18,0.5 V15.5 M27,0.5 V15.5 M36,1 V15" opacity="0.4"/>
+      <path d="M24,16 v8 h18 a6,6 0 0 1 6,6 v13"/>
+      <rect x="41" y="45" width="12" height="26" rx="5.5"/>
+    </g>
+
+    <!-- A single roll near the foot, echoing the pair above. -->
+    <g transform="translate(158 736) rotate(7)"><use href="#roll"/></g>
+
+    <!-- A measuring rule — the one thing this trade never guesses. -->
+    <g opacity="0.55" transform="translate(38 830)">
+      <path d="M0,0 h46"/>
+      <path d="M0,-4 v8 M46,-4 v8 M15.3,-2.5 v5 M30.6,-2.5 v5"/>
+    </g>
+  </g>
+</svg>

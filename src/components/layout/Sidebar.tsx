@@ -188,9 +188,12 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
   const nav = isOwner ? OWNER_NAV : EMPLOYEE_NAV;
 
   return (
-    <aside className="h-full w-full bg-sidebar text-sidebar-text flex flex-col">
+    <aside className="relative h-full w-full bg-sidebar text-sidebar-text flex flex-col overflow-hidden">
+      {/* Decoration only — see .chrome-motif / .chrome-veil in globals.css. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 chrome-motif" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 chrome-veil" />
       {/* Brand — mobile drawer only; desktop brand lives in GlobalTopbar */}
-      <div className="md:hidden flex items-center gap-3 px-5 pt-5 pb-4 border-b border-sidebar-dim/20">
+      <div className="relative z-10 md:hidden flex items-center gap-3 px-5 pt-5 pb-4 border-b border-sidebar-dim/20">
         <MandovaraLeafIcon size={32} />
         <div>
           <div className="font-display text-[17px] tracking-[0.06em] font-semibold leading-none text-sidebar-text">
@@ -203,7 +206,7 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 pb-3">
+      <nav className="relative z-10 flex-1 overflow-y-auto px-3 pb-3">
         {nav.map((section) => {
           const visible = isOwner
             ? section.items
@@ -229,7 +232,7 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
       </nav>
 
       {/* Profile + sign-out */}
-      <div className="border-t border-white/[0.08] px-4 py-3.5">
+      <div className="relative z-10 border-t border-white/[0.08] px-4 py-3.5">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-semibold tracking-wider shrink-0">
             {initials(userName)}

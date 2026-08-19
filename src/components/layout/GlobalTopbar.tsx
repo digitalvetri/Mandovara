@@ -51,11 +51,11 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 h-[68px] flex items-stretch bg-sidebar border-b border-rule">
+    <header className="fixed inset-x-0 top-0 z-40 h-[68px] flex items-stretch bg-sidebar">
 
       {/* ── Brand block — 264px, aligns with the wider sidebar ── */}
       <div
-        className="hidden md:flex items-center gap-3 shrink-0 px-5 border-r border-rule"
+        className="hidden md:flex items-center gap-3 shrink-0 px-5"
         style={{ width: "264px" }}
       >
         <MandovaraLeafIcon size={38} />
