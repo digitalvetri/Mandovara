@@ -25,7 +25,18 @@ const OWNER_TEMP    = "Mandovara@2026";
 // meet the changePassword min-length policy (10 chars).
 const OWNER_STABLE  = "PlaywrightRun_2026!";
 
+// The dev server compiles routes on first request, so this — the very first
+// test to touch the app — pays for /login, the sign-in action, /change-password
+// and /dashboard all at once. On a cold CI runner that exceeds Playwright's
+// 30s default and the whole suite fails at setup with "76 did not run".
+// Everything after this runs against a warm server at normal speed.
+setup.setTimeout(180_000);
+
 setup("authenticate as owner", async ({ page, context }) => {
+  // Warm the login route before the timed interaction below, so a slow first
+  // compile is not mistaken for a failed sign-in.
+  await page.goto("/login", { waitUntil: "domcontentloaded", timeout: 120_000 });
+
   // Idempotent by design. This setup ROTATES the owner's password, so on a
   // second run against the same database the seeded temp password no longer
   // works and the whole suite failed at setup with "104 did not run". Try the
@@ -38,7 +49,9 @@ setup("authenticate as owner", async ({ page, context }) => {
     await page.getByLabel(/^password$/i).fill(password);
     await page.getByRole("button", { name: /sign in/i }).click();
     try {
-      await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+      // Generous: the sign-in action, /change-password and /dashboard may all
+      // still be compiling on the first attempt against a cold server.
+      await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 60_000 });
       return true;
     } catch {
       return false;

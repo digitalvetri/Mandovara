@@ -352,16 +352,57 @@ async function seedEdgeCases(
   //       the shelf. Without (b) the mixed-lot gate is only reachable by luck
   //       — random dye lots gave any given line roughly a 1-in-12 chance of
   //       having a second lot available, so the §12.2/4 e2e kept skipping.
-  const openLines = await db.orderLine.findMany({
-    where: {
-      organizationId: orgId,
-      colourwayId: { not: null },
-      order: { status: { in: ["CONFIRMED", "PROCUREMENT", "MAKE"] } },
+  //
+  //  Both fixtures have to land on lines the console will actually RENDER.
+  //  /purchase/allocation shows the 200 most recent open orders by date and
+  //  hides any line that is already fully allocated. Picking by `id asc` (a
+  //  cuid, unrelated to date) put the fixture outside that window on a clean
+  //  database, so the e2e passed locally and failed in CI. Select the same way
+  //  the console does, and only take lines with room left to allocate.
+  const openOrders = await db.order.findMany({
+    where:   { organizationId: orgId, status: { in: ["CONFIRMED", "PROCUREMENT", "MAKE"] } },
+    orderBy: [{ date: "desc" }, { id: "asc" }],
+    take:    40,
+    select: {
+      id: true,
+      lines: {
+        where:   { colourwayId: { not: null } },
+        orderBy: { id: "asc" },
+        select:  { id: true, colourwayId: true, quantity: true },
+      },
     },
-    select: { id: true, colourwayId: true },
-    orderBy: { id: "asc" },
-    take: 2,
   });
+
+  const candidates = openOrders.flatMap((o) => o.lines);
+  // The override fixture reserves 6 + 2 and the gate fixture reserves 4; both
+  // must leave the line short so it stays on the "needs material" list.
+  const roomy = candidates.filter((l) => Number(l.quantity) > 9);
+  const alreadyAllocated = new Set(
+    (await db.allocation.findMany({
+      where:  { organizationId: orgId, orderLineId: { in: roomy.map((l) => l.id) } },
+      select: { orderLineId: true },
+    })).map((a) => a.orderLineId),
+  );
+
+  // Distinct colourways, so each fixture's lots belong to exactly one line.
+  const openLines: { id: string; colourwayId: string | null }[] = [];
+  const usedColourways = new Set<string>();
+  for (const l of roomy) {
+    if (openLines.length === 2) break;
+    if (alreadyAllocated.has(l.id)) continue;
+    if (!l.colourwayId || usedColourways.has(l.colourwayId)) continue;
+    usedColourways.add(l.colourwayId);
+    openLines.push({ id: l.id, colourwayId: l.colourwayId });
+  }
+
+  if (openLines.length < 2) {
+    // Never let this fail silently: the §12.2/4 dye-lot e2e depends on it, and
+    // a missing fixture reads as "the gate is broken" rather than "no data".
+    console.warn(
+      `⚠  dye-lot fixtures: needed 2 open order lines with room to allocate, found ${openLines.length}. ` +
+        "The §12.2/4 mixed-lot e2e will fail.",
+    );
+  }
 
   const overrideLine = openLines[0];
   if (overrideLine?.colourwayId) {

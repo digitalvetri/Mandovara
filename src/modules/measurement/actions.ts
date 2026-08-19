@@ -28,45 +28,6 @@ import {
 } from "./schema";
 import { type ActionResult, zodError, canEditRound } from "./actions-shared";
 
-export interface ColourwayOption {
-  id: string;
-  code: string;
-  colourName: string;
-  designName: string;
-  brandName: string;
-}
-
-export async function searchColourwaysByFamily(family: string): Promise<ColourwayOption[]> {
-  const ctx = await devContext();
-  const db  = scoped(ctx);
-  const rows = await db.colourway.findMany({
-    where: {
-      isActive: true,
-      design: { family: family as never, isActive: true },
-    },
-    orderBy: [{ design: { collection: { brand: { name: "asc" } } } }, { colourName: "asc" }],
-    take: 80,
-    select: {
-      id: true,
-      code: true,
-      colourName: true,
-      design: {
-        select: {
-          name: true,
-          collection: { select: { brand: { select: { name: true } } } },
-        },
-      },
-    },
-  });
-  return rows.map((r) => ({
-    id:         r.id,
-    code:       r.code,
-    colourName: r.colourName,
-    designName: r.design.name,
-    brandName:  r.design.collection.brand.name,
-  }));
-}
-
 // Result shape:
 //   - ok + data + resumed  → caller may navigate to the round
 //   - ok + needsRooms       → caller opens the room-setup sheet first

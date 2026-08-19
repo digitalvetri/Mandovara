@@ -364,3 +364,51 @@ passes `isLeadScoped: true` any more.
 `tests/lib/session-cookie.test.ts` is kept although the login path that
 motivated it is gone — it pins the contract that a bare user id is never an
 acceptable session cookie, so a future login path cannot repeat the mistake.
+
+---
+
+## CI runs the app under Row-Level Security, and seeds demo data
+
+*2026-08-19*
+
+Three CI failures, three separate causes, all of them the same shape: the
+pipeline was not running what it claimed to run.
+
+1. **`pnpm db:seed` had no `SEED_DEMO_DATA=true`.** The seed plants catalog and
+   users only unless that flag is set, so CI ran the §12.2 end-to-end scenarios
+   against a database with zero clients, projects, orders and stock. The step's
+   own comment said it existed to give the specs "a baseline of realistic
+   data" — it just never passed the flag. The demo seed is ~4s and ~56k rows,
+   comfortably inside §11's 60s gate, so there is no reason not to.
+
+2. **The dye-lot fixture was planted where the console cannot see it.**
+   `/purchase/allocation` renders the 200 most recent open orders by date;
+   `prisma/seed/ops.ts` picked its fixture lines by `id asc` — a cuid, unrelated
+   to date. On a developer database seeded incrementally the fixture happened to
+   fall inside the window; on a clean database it did not. The fixture now
+   selects the same way the console does (open status, `date desc`), skips lines
+   that are already fully allocated, and warns loudly if it cannot place itself.
+   **This is the general lesson: a fixture that a UI test depends on must be
+   chosen by the same predicate the UI uses, not by a proxy for it.**
+
+3. **§12.3, which CLAUDE.md calls blocking in CI, was skipping in CI.**
+   `tests/kernel/rls-isolation.test.ts` is guarded by
+   `describe.skipIf(!APP_DATABASE_URL)` — deliberately, because running those
+   assertions as the owner would pass while proving nothing. CI never set
+   `APP_DATABASE_URL`, so all 76 assertions were silently skipped and the unit
+   step went green. CI now creates the restricted `mandovara_app` role after
+   `migrate deploy` and points both the test harness and the Playwright web
+   server at it, so the whole e2e suite also exercises the app under real row
+   security rather than as a superuser.
+
+**Consequence:** the job is slower — e2e roughly 4.5 min against ~1.7 min
+without RLS — and `timeout-minutes` went 15 → 25. That is the correct trade:
+a fast pipeline that skips its blocking gate is worth less than a slow one that
+runs it.
+
+Two smaller fixes alongside: `auth.setup.ts` now allows 180s and pre-warms
+`/login`, because it is the first test to touch the app and pays for the cold
+Turbopack compile of four routes at once (it was timing out at the 30s default
+and taking the whole suite with it); and a failed run now uploads the Playwright
+report as an artifact, since Actions logs need authentication to download and a
+red run was otherwise unreadable from outside the repo.

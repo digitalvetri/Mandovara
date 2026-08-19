@@ -133,3 +133,14 @@ export async function writeCalc(
 export function computeCalcRow(d: AddItemInput): CalcResultRow {
   return computeCalcResult(d);
 }
+
+/** A colourway as offered in the measurement item picker. Lives here rather
+ *  than beside its query in actions-catalog.ts, because a `"use server"`
+ *  module may only export async functions. */
+export interface ColourwayOption {
+  id: string;
+  code: string;
+  colourName: string;
+  designName: string;
+  brandName: string;
+}
