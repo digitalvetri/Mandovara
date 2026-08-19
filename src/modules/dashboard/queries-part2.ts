@@ -6,8 +6,8 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
-import type { DashboardData, TeamAssignmentRow } from "@/app/(app)/_dashboard/types";
-import { ACTIVE_PROJECT_STAGES, LIVE_STAGES, OPEN_LEAD_STAGES, TEAM_PROJECTS_PREVIEW } from "./queries";
+import type { DashboardData } from "@/app/(app)/_dashboard/types";
+import { ACTIVE_PROJECT_STAGES, OPEN_LEAD_STAGES } from "./queries";
 import { Db, addDays, endOfMonth, loadProjectStages, loadRecentActivity, loadRevenueByMonth, loadSiteVisits, percentChange, startOfMonth, sumInvoices } from "./queries-part2-loaders";
 
 export async function loadDashboard(ctx: RequestContext): Promise<DashboardData> {
@@ -24,7 +24,6 @@ export async function loadDashboard(ctx: RequestContext): Promise<DashboardData>
     overdueAgg, overdueCount, overdueClients,
     revenueByMonth, projectStages,
     siteVisits, activity,
-    teamAssignments,
   ] = await Promise.all([
     sumInvoices(db, monthStart, endOfMonth(monthStart)),
     sumInvoices(db, prevMonthStart, monthStart),
@@ -58,7 +57,6 @@ export async function loadDashboard(ctx: RequestContext): Promise<DashboardData>
     loadProjectStages(db),
     loadSiteVisits(db, now),
     loadRecentActivity(db),
-    loadTeamAssignments(db),
   ]);
 
   const revenueMtd = revThisMonth;
@@ -86,47 +84,7 @@ export async function loadDashboard(ctx: RequestContext): Promise<DashboardData>
     projectStages,
     siteVisits,
     activity,
-    teamAssignments,
   };
-}
-
-async function loadTeamAssignments(db: Db): Promise<TeamAssignmentRow[]> {
-  // Live projects only — completed/cancelled work isn't a "load".
-  const projects = await db.project.findMany({
-    where:   { stage: { in: [...LIVE_STAGES] } },
-    orderBy: [{ createdAt: "desc" }],
-    select:  { id: true, number: true, name: true, stage: true, ownerId: true },
-  });
-  if (projects.length === 0) return [];
-
-  const ownerIds = [...new Set(projects.map((p) => p.ownerId).filter(Boolean))];
-  const users = ownerIds.length
-    ? await db.user.findMany({
-        where:  { id: { in: ownerIds } },
-        select: { id: true, name: true, role: true },
-      })
-    : [];
-  const userById = new Map(users.map((u) => [u.id, u]));
-
-  const byOwner = new Map<string, TeamAssignmentRow>();
-  for (const p of projects) {
-    const u = userById.get(p.ownerId);
-    if (!u) continue;
-    const row = byOwner.get(u.id) ?? {
-      userId:      u.id,
-      userName:    u.name,
-      role:        u.role,
-      activeCount: 0,
-      projects:    [],
-    };
-    row.activeCount += 1;
-    if (row.projects.length < TEAM_PROJECTS_PREVIEW) {
-      row.projects.push({ id: p.id, number: p.number, name: p.name, stage: p.stage });
-    }
-    byOwner.set(u.id, row);
-  }
-
-  return Array.from(byOwner.values()).sort((a, b) => b.activeCount - a.activeCount);
 }
 
 export * from "./queries-part2-loaders";

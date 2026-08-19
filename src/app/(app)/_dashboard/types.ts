@@ -31,21 +31,6 @@ export interface ActivityItem {
   when: string;
 }
 
-export interface TeamAssignmentProject {
-  id: string;
-  number: string;
-  name: string;
-  stage: string;
-}
-
-export interface TeamAssignmentRow {
-  userId: string;
-  userName: string;
-  role: string;
-  activeCount: number;
-  projects: TeamAssignmentProject[]; // capped list for the widget
-}
-
 export interface DashboardData {
   revenueMtd: Paise;
   revenueMtdPrev: Paise;
@@ -67,5 +52,4 @@ export interface DashboardData {
   projectStages: ProjectStage[];
   siteVisits: SiteVisit[];
   activity: ActivityItem[];
-  teamAssignments: TeamAssignmentRow[];
 }
