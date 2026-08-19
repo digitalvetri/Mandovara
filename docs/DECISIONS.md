@@ -476,3 +476,69 @@ re-solved. **Re-tinting these by eye will break the floor; re-run the solver.**
 `components/ui/` held only `Tabs` and `Tooltip` despite §2 specifying shadcn/ui,
 which is why every screen hand-rolled its own button and card. `Button`, `Card`,
 `Badge`, `LotChip` and `Select` now exist as the shared set.
+
+---
+
+## The dye-lot allocation console is removed
+
+*2026-08-19 — owner instruction*
+
+Removed at the owner's request. Recorded here because it retires a rule that
+CLAUDE.md stated three times as non-negotiable (§0.6, §15.4, and the Appendix,
+which called the mixed-lot gate one of seven load-bearing capabilities), and a
+future session reading only the spec would otherwise rebuild it. §0.6, §1.3,
+§1.5, §1.6, §6.3.6, §6.4, §8, §12.2, §14 Phase 4 and §15.4 were all amended in
+the same commit.
+
+**Scope chosen: the console, not the concept.** "Dye-lot allocation" has two
+boundaries in this codebase and they are very different jobs — the console
+(~876 lines, code only, reversible) versus dye lot as a data concept (5 schema
+locations across 45+ files, requiring a destructive migration). The owner chose
+the console. So:
+
+- **Gone:** `/purchase/allocation`, its sidebar entry, `src/modules/allocation/*`,
+  `src/kernel/stock/allocate.ts`, the mixed-lot gate, `tests/e2e/s4-dye-lot-gate.spec.ts`,
+  the `allocation.*` and `stock.allocate` / `stock.override` permissions, and the
+  seed's gate fixture.
+- **Kept:** `GRNLine.dyeLot`, `StockBalance.dyeLot`, `StockMove.dyeLot`,
+  `InstallLine.dyeLotUsed`, and the `Allocation` model itself (retained but never
+  written or read). No migration, no data dropped.
+
+**What this costs, stated plainly:** "which lot went on which wall" is still
+answerable from the ledger. "This lot is spoken for" is not. §1.5 listed
+dye-lot discipline as a *mitigated* risk on the strength of the gate; that row
+now reads unmitigated, and discipline is a floor process rather than a system
+control.
+
+### Two things the removal exposed
+
+1. **`src/modules/stock/actions.ts` had zero callers.** A second, fully-built
+   allocation entry point duplicating the console's server action, reachable
+   from nothing. It went with the console. Worth noting that nothing in the
+   type system or lint config flags an exported server action that no UI
+   imports — it was found only by grepping for callers before deleting.
+
+2. **Removing the reserver made every existing reservation permanent.** The
+   seed set `StockBalance.reserved` to mirror its `Allocation` rows, which was
+   correct while a console existed to release them. With the console gone the
+   holds could never be lifted, and the effect was not subtle: **2,073 of 2,074
+   balances fully reserved**, leaving exactly two lotted SKUs showing as
+   available across a 1,229-SKU catalog. The seed no longer pre-reserves;
+   available lotted stock went from 2 to 1,269.
+
+   The general lesson: deleting the only writer of a field does not neutralise
+   it — it freezes whatever value it already held. Check for existing rows
+   before removing the code that maintains them. **Production carries the same
+   hazard:** any real reservations made through the console before this commit
+   are now unreleasable, and `StockBalance.reserved` should be zeroed there once
+   the owner confirms no other process depends on it.
+
+### A repeat of an earlier mistake, caught in test
+
+Rewriting the §12.2/2 traceability spec, the "stocked end" first asserted
+against `/inventory` (which aggregates one row per SKU and has no lot column at
+all), then against an unfiltered `/products` — page 1 of 1,229 SKUs sorted A–Z,
+where nothing need be in stock. Both were the same error as the seed fixture in
+the CI commit above: **asserting on something that has to be found, without
+guaranteeing it is in the window the user is looking at.** The spec now uses
+`?inStock=1`, and that parameter is load-bearing, not incidental.

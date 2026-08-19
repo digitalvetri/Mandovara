@@ -50,7 +50,7 @@ const PERM_START_MEASUREMENT = [
 ] as const;
 const PERM_BUILD_QUOTATION = ["quotation.create"] as const;
 const PERM_SEND_QUOTATION  = ["quotation.send"]   as const;
-const PERM_ALLOCATE        = ["allocation.create"] as const;
+const PERM_STOCK           = ["stock.view"] as const;   // what /inventory gates on
 const PERM_SCHEDULE_INSTALL = ["install.create"]  as const;
 
 function hasAny(ctx: RequestContext, keys: readonly string[]): boolean {
@@ -120,14 +120,14 @@ export function resolveNextAction(
       };
 
     case "PROCUREMENT": {
-      const enabled = hasAny(ctx, PERM_ALLOCATE);
+      const enabled = hasAny(ctx, PERM_STOCK);
       return {
         kind:  "ALLOCATE_MATERIAL",
-        label: "Allocate material",
-        cta:   "Open allocation console",
+        label: "Material in procurement",
+        cta:   "Open stock ledger",
         enabled,
         disabledReason: enabled ? null :
-          "Dye-lot allocation is handled by the store team.",
+          "Stock is handled by the store team.",
         href: `/inventory`,
       };
     }

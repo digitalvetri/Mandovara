@@ -17,7 +17,7 @@ One-page checklist for handing this application over to Mandovara. Work through 
 ## Required before real client data goes in
 
 - [ ] **TLS** — point a real domain (e.g. `app.mandovara.com`) at `147.93.105.212`, enable Let's Encrypt in Coolify. Then delete `COOKIE_SECURE=false` from env. See `docs/DEPLOY-TLS.md`.
-- [x] **Dye-lot UI restored** — `/purchase/allocation` is back in the sidebar with the mixed-lot gate rendered as a red inline block (§6.3.6). Covered by `tests/e2e/s4-dye-lot-gate.spec.ts`.
+- [x] **Dye-lot allocation removed** — `/purchase/allocation`, the mixed-lot gate and `tests/e2e/s4-dye-lot-gate.spec.ts` were removed on 19 Aug 2026 at the owner's instruction. Lots are still captured at GRN, carried on stock balances and named on install lines; they are simply no longer reserved against order lines. See §0.6 and docs/DECISIONS.md.
 
 ## Recommended within the first week
 

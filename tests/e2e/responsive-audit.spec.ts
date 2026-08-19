@@ -17,7 +17,7 @@ const ROUTES = [
   "/installations", "/inventory", "/invoicing", "/invoicing/new", "/leads",
   "/leads/new", "/make", "/measure", "/measurements", "/notifications",
   "/orders", "/orders/dispatch/new", "/payroll", "/products", "/products/new",
-  "/profile", "/projects", "/projects/new", "/purchase", "/purchase/allocation",
+  "/profile", "/projects", "/projects/new", "/purchase",
   "/purchase/new", "/purchase/requests", "/purchase/vendors",
   "/purchase/vendors/new", "/quotations", "/quotations/new", "/quotations/quick",
   "/reports", "/samples", "/site-visits", "/tasks", "/whatsapp",

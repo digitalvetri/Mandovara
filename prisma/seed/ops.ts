@@ -348,17 +348,15 @@ async function seedEdgeCases(
   //   (a) an order line that ALREADY carries a mixed-lot override with a
   //       reason and an approver — the evidence §11 asks for, and what Rohit
   //       needs six weeks later to answer "which lot went to which wall";
-  //   (b) a clean "gate-ready" line: one lot reserved, a second lot sitting on
-  //       the shelf. Without (b) the mixed-lot gate is only reachable by luck
-  //       — random dye lots gave any given line roughly a 1-in-12 chance of
-  //       having a second lot available, so the §12.2/4 e2e kept skipping.
+  //   The "gate-ready" fixture that used to sit beside it went with the
+  //   allocation console on 19 Aug 2026 — nothing reserves lots any more, so
+  //   there is no gate for it to arm.
   //
-  //  Both fixtures have to land on lines the console will actually RENDER.
-  //  /purchase/allocation shows the 200 most recent open orders by date and
-  //  hides any line that is already fully allocated. Picking by `id asc` (a
-  //  cuid, unrelated to date) put the fixture outside that window on a clean
-  //  database, so the e2e passed locally and failed in CI. Select the same way
-  //  the console does, and only take lines with room left to allocate.
+  //  Kept selecting by date rather than `id asc` (a cuid, unrelated to date):
+  //  that is what once put the fixture outside the console's visible window on
+  //  a clean database and made the e2e pass locally but fail in CI. The rule
+  //  outlives the console — a fixture should be chosen the way its consumer
+  //  chooses, not by a proxy for it.
   const openOrders = await db.order.findMany({
     where:   { organizationId: orgId, status: { in: ["CONFIRMED", "PROCUREMENT", "MAKE"] } },
     orderBy: [{ date: "desc" }, { id: "asc" }],
@@ -374,8 +372,7 @@ async function seedEdgeCases(
   });
 
   const candidates = openOrders.flatMap((o) => o.lines);
-  // The override fixture reserves 6 + 2 and the gate fixture reserves 4; both
-  // must leave the line short so it stays on the "needs material" list.
+  // The override fixture reserves 6 + 2, so the line must be longer than that.
   const roomy = candidates.filter((l) => Number(l.quantity) > 9);
   const alreadyAllocated = new Set(
     (await db.allocation.findMany({
@@ -388,19 +385,17 @@ async function seedEdgeCases(
   const openLines: { id: string; colourwayId: string | null }[] = [];
   const usedColourways = new Set<string>();
   for (const l of roomy) {
-    if (openLines.length === 2) break;
+    if (openLines.length === 1) break;
     if (alreadyAllocated.has(l.id)) continue;
     if (!l.colourwayId || usedColourways.has(l.colourwayId)) continue;
     usedColourways.add(l.colourwayId);
     openLines.push({ id: l.id, colourwayId: l.colourwayId });
   }
 
-  if (openLines.length < 2) {
-    // Never let this fail silently: the §12.2/4 dye-lot e2e depends on it, and
-    // a missing fixture reads as "the gate is broken" rather than "no data".
+  if (openLines.length < 1) {
     console.warn(
-      `⚠  dye-lot fixtures: needed 2 open order lines with room to allocate, found ${openLines.length}. ` +
-        "The §12.2/4 mixed-lot e2e will fail.",
+      "⚠  dye-lot fixture: no open order line with room to allocate — the §11 " +
+        "mixed-lot override edge case will be absent from the seed.",
     );
   }
 
@@ -408,8 +403,8 @@ async function seedEdgeCases(
   if (overrideLine?.colourwayId) {
     await db.stockBalance.createMany({
       data: [
-        { organizationId: orgId, colourwayId: overrideLine.colourwayId, dyeLot: "LOT-2606-011", quantity: new Prisma.Decimal(6),  reserved: new Prisma.Decimal(6), value: 720_000n, binLocation: "B2-04" },
-        { organizationId: orgId, colourwayId: overrideLine.colourwayId, dyeLot: "LOT-2607-042", quantity: new Prisma.Decimal(20), reserved: new Prisma.Decimal(2), value: 2_400_000n, binLocation: "B2-05" },
+        { organizationId: orgId, colourwayId: overrideLine.colourwayId, dyeLot: "LOT-2606-011", quantity: new Prisma.Decimal(6),  reserved: new Prisma.Decimal(0), value: 720_000n, binLocation: "B2-04" },
+        { organizationId: orgId, colourwayId: overrideLine.colourwayId, dyeLot: "LOT-2607-042", quantity: new Prisma.Decimal(20), reserved: new Prisma.Decimal(0), value: 2_400_000n, binLocation: "B2-05" },
       ],
       skipDuplicates: true,
     });
@@ -429,24 +424,6 @@ async function seedEdgeCases(
           overrideById: users.owner,
         },
       ],
-      skipDuplicates: true,
-    });
-  }
-
-  const gateLine = openLines[1];
-  if (gateLine?.colourwayId) {
-    await db.stockBalance.createMany({
-      data: [
-        { organizationId: orgId, colourwayId: gateLine.colourwayId, dyeLot: "LOT-GATE-A", quantity: new Prisma.Decimal(40), reserved: new Prisma.Decimal(4), value: 4_800_000n, binLocation: "C1-01" },
-        { organizationId: orgId, colourwayId: gateLine.colourwayId, dyeLot: "LOT-GATE-B", quantity: new Prisma.Decimal(40), reserved: new Prisma.Decimal(0), value: 4_800_000n, binLocation: "C1-02" },
-      ],
-      skipDuplicates: true,
-    });
-    await db.allocation.createMany({
-      data: [{
-        organizationId: orgId, orderLineId: gateLine.id, colourwayId: gateLine.colourwayId,
-        dyeLot: "LOT-GATE-A", quantity: new Prisma.Decimal(4), mixedLotOverride: false,
-      }],
       skipDuplicates: true,
     });
   }

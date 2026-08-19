@@ -14,7 +14,7 @@
 3. **Migrations only.** `prisma migrate dev` / `prisma migrate deploy`. **Never `prisma db push`.** Schema history versioned from commit one.
 4. **Money is `BigInt` paise, never float.** Measurements are `Decimal(10,2)` in **millimetres**. Areas `Decimal(12,3)` in sqft. Fabric `Decimal(10,3)` in metres.
 5. **Every measurement drives a calculation, and every calculation is a pure function in `/lib/calc`** with unit tests. No material maths anywhere else in the codebase. This is the heart of the product — see §7.
-6. **Dye lot is not optional.** Every roll of wallpaper, fabric and carpet carries a `dyeLot`. Material reserved for one job must come from one lot. The UI must make it impossible to allocate mixed lots to a single room without an explicit, reasoned override.
+6. **Dye lot is recorded, no longer reserved.** *(Amended 19 Aug 2026 at the owner's instruction — the allocation console was removed.)* Every roll of wallpaper, fabric and carpet still carries a `dyeLot`: captured at GRN, carried on `StockBalance` and `StockMove`, and named on the install line that records what physically went on the wall. What is gone is the **reservation** step — nothing locks a lot to an order line, and there is no mixed-lot gate to enforce. "Which lot went on which wall" remains answerable from the ledger; "this lot is spoken for" does not. The `Allocation` model is retained in the schema but is no longer written to or read.
 7. **RBAC enforced server-side** in route handlers and server actions, never only hidden in the UI.
 8. **Every outbound WhatsApp writes an `AutomationLog` row keyed by `idempotencyKey` before sending.** Retries are no-ops. Store the message **category** — utility ₹0.115 vs marketing ₹0.8631 is a 7.5× cost difference.
 9. **Financial, calculation and stock logic ships with tests** (§12). A GST, material-calculation, dye-lot or payroll path without a test is incomplete.
@@ -65,7 +65,7 @@ Mandovara runs a **measure-to-install** business on tools built for neither. Con
 - **Rohit (MD):** *"When I open my phone in the morning I want to see every live project's stage, what's stuck, and what money is due — in 30 seconds."* / *"When a client says the wallpaper doesn't match, I want to know which lot went to which wall."*
 - **Sales / designer:** *"When I'm standing in a client's living room I want to measure, photograph, pick a design from the catalog and have the fabric quantity computed before I leave."*
 - **Measurement executive:** *"When I do a site visit I want a checklist per room so I never come back for a second measurement."*
-- **Store keeper:** *"When I allocate material to a job I want the system to stop me mixing dye lots."*
+- **Store keeper:** *"When I receive material I want the lot recorded, so six weeks later we can say which lot went where."* (The original job — *"stop me mixing dye lots"* — was retired with the allocation console, 19 Aug 2026.)
 - **Tailor / make unit:** *"When a curtain job reaches me I want the cut list and the stitch spec, not a WhatsApp message."*
 - **Installer:** *"When I reach a site I want to know exactly what goes in which room and what to collect."*
 - **Accounts:** *"When an advance is taken against a project I want it adjusted automatically on the final invoice."*
@@ -85,12 +85,12 @@ This is an **Interior OS**: the vocabulary of the trade is native — *fullness,
 | Field staff will measure on a phone rather than paper | **High** | Measurement PWA: one window per screen, ≥56px targets, works fully offline, photo per item, Tamil labels, completes a 4-room villa in under 15 minutes |
 | Our material formulas match what Mandovara actually does | **High** | §7 formulas are configurable per product family; Phase 0 sits with their tailor and validates every constant against 20 historical jobs before Phase 2 |
 | The 1,000+ design catalog can be loaded | Med | Brand → Collection → Design → Colourway importer with per-row error report; brand PDFs and swatch images bulk-attached |
-| Dye-lot discipline will be followed | Med | System blocks mixed-lot allocation by default; override needs a reason and is audited |
+| Dye-lot discipline will be followed | **Now unmitigated** | The system records lots but no longer blocks mixing — the gate was removed 19 Aug 2026 at the owner's instruction. Discipline is a floor process, not a system control. |
 | Motorized blinds/curtains add a service dimension | Low | `requiresPowerPoint`, `remoteCount`, `warrantyMonths` fields on the install sheet |
 
 ### 1.6 Decisions locked (do not re-litigate) / still open
 
-**Locked:** single tenant, multi-branch-ready schema · catalog hierarchy is **Brand → Collection → Design → Colourway (SKU)**, not category-first · every made-to-measure quote line requires a `MeasurementItem` · dye lot on every roll-based receipt · measurement stored in **millimetres**, displayed in the user's chosen unit · money as BigInt paise · design system §6 (**palette re-keyed 19 Aug 2026 on the owner's instruction — see the note at §6.1; the structure, type scale, UX doctrine and screen set are unchanged and remain locked**) · the module set in §8 · the phase order in §14.
+**Locked:** single tenant, multi-branch-ready schema · catalog hierarchy is **Brand → Collection → Design → Colourway (SKU)**, not category-first · every made-to-measure quote line requires a `MeasurementItem` · dye lot recorded on every roll-based receipt (**reservation and the mixed-lot gate removed 19 Aug 2026 — see §0.6**) · measurement stored in **millimetres**, displayed in the user's chosen unit · money as BigInt paise · design system §6 (**palette re-keyed 19 Aug 2026 on the owner's instruction — see the note at §6.1; the structure, type scale, UX doctrine and screen set are unchanged and remain locked**) · the module set in §8 · the phase order in §14.
 
 **Open (use placeholders, flag in README):** exact fullness/wastage constants per family (validated in Phase 0) · whether stitching is in-house or job-worked (schema supports both via `MakeJob.vendorId` nullable) · GSTIN and e-invoice applicability (only if AATO > ₹5 crore — confirm before Phase 5) · sample-book deposit policy.
 
@@ -1361,7 +1361,7 @@ Motion: 140/200/260ms `cubic-bezier(.2,0,0,1)`; respect `prefers-reduced-motion`
 3. **Optimistic UI + Undo toasts** for every non-financial mutation. Financial mutations confirm explicitly and name the amount.
 4. **The measurement PWA is the product's front door.** One item per screen, ≥56px targets, numeric keypad, unit toggle, photo capture, Tamil labels, **fully offline with an IndexedDB queue**. A four-room villa must be measurable in under 15 minutes with no signal.
 5. **Live calculation.** Type a width and the fabric metres, roll count or box count updates in the same breath, with the warning line beneath it ("railroading saves 6.4 m", "pattern repeat adds 1 roll"). This is the moment the product earns its price.
-6. **Dye lot is visible everywhere.** Lot code renders as a mono chip beside every allocation, cut-list line and install line. A mixed-lot allocation is blocked with a red inline gate, not a toast.
+6. **Dye lot is visible everywhere.** Lot code renders as a mono chip beside every stock balance, cut-list line and install line. *(The mixed-lot inline gate went with the allocation console, 19 Aug 2026.)*
 7. **Empty states are invitations** — icon, one line, the primary action. Never a bare table.
 8. **Skeletons, never spinners.** No full-page loading state in the product.
 9. **Keyboard-first office:** every row focusable, `Enter` opens, `n` new, `/` filter, `⌘Enter` submit.
@@ -1378,7 +1378,6 @@ Motion: 140/200/260ms `cubic-bezier(.2,0,0,1)`; respect `prefers-reduced-motion`
 - `/projects/[id]/measurements` — room accordion; each item a card with dimensions, family, photo, and the **live calc result** with its warnings.
 - `/m/measure/[projectId]` — the field PWA. Room picker → add item → surface type → width/height with unit toggle → family → heading/mount → photo → next. Offline queue indicator. One-thumb operation.
 - `/quotations/[id]` — split view: line grid left, live branded PDF right. Lines pull from measurement items; rate auto-fills from the client's tier; GST computed per line. Discount below floor routes to approval. Revision compare shows added/removed/changed.
-- `/purchase/allocation` — the dye-lot console: order lines needing material, available lots with quantities, one-click allocate, **hard block on mixed lots** with a reasoned override.
 - `/make` — kanban QUEUED / CUTTING / STITCHING / FINISHING / QC / READY. Card = room, panels, cut length, fabric issued. **Print cut list** is the primary action.
 - `/install` — calendar and route view by crew and day; visit sheet with room-by-room lines, dye lot used, photo capture, client signature.
 - `/m/install/[visitId]` — installer PWA: room list, tick off, photo, capture signature, raise snag.
@@ -1525,7 +1524,7 @@ Vertical garden: `areaSqft` → panel count by panel size, plus irrigation runni
 | 5 | Quotation | Quotation, QuotationLine | 3 |
 | 6 | Order | Order, OrderLine | 3 |
 | 7 | Procurement | Vendor, PurchaseOrder, POLine, GRN, GRNLine | 4 |
-| 8 | Stock & Dye Lot | StockMove, StockBalance, Allocation | 4 |
+| 8 | Stock & Dye Lot | StockMove, StockBalance (~~Allocation~~ — console removed 19 Aug 2026, model retained unused) | 4 |
 | 9 | Make | MakeJob, MakeJobLine | 5 |
 | 10 | Installation | InstallCrew, InstallVisit, InstallLine, Snag | 5 |
 | 11 | Invoicing & GST | Invoice, InvoiceLine, Advance | 6 |
@@ -1603,9 +1602,9 @@ Without this, no performance budget or acceptance criterion can be proved.
 
 ### 12.2 E2E (Playwright) — all must pass before launch
 1. Enquiry → schedule measurement → measure offline on mobile → sync → quote → send on WhatsApp → accept → order.
-2. Order → PO → GRN with dye lot → allocate → make job → cut list printed → install visit → client signature → invoice → receipt.
+2. Order → PO → GRN with dye lot → make job → cut list printed → install visit → client signature → invoice → receipt. The lot must be traceable from stock to install line.
 3. Measure a wallpaper wall with an offset repeat; verify roll count and the warning; change to free match; verify it drops by one roll.
-4. Attempt a mixed-lot allocation; verify the block; override with a reason; verify the audit row.
+4. *(Retired 19 Aug 2026 with the allocation console. Was: attempt a mixed-lot allocation; verify the block; override with a reason; verify the audit row.)*
 5. Issue a sample book, let it pass due, verify the overdue nudge fires and the library shows the holder.
 6. Log in as INSTALLER; verify cost price and margin appear nowhere in any network response.
 
@@ -1660,8 +1659,8 @@ Quotation builder with live PDF, revisions, discount approval, GST per line. **E
 ✅ *Gate:* build a 25-line multi-room quote keyboard-only in under 8 minutes; attempt a curtain line without a measurement and show it blocked server-side; GST suite passes.
 
 ### Phase 4 — Procurement, stock & dye lot
-Vendors, PO, GRN with dye lot and roll lengths, append-only `StockMove`, materialised `StockBalance`, the allocation console with the mixed-lot gate.
-✅ *Gate:* 50 parallel allocations of the same colourway never over-allocate (paste output); direct UPDATE on `StockMove` fails at the DB; mixed-lot block and audited override both demonstrated.
+Vendors, PO, GRN with dye lot and roll lengths, append-only `StockMove`, materialised `StockBalance`. *(The allocation console and its mixed-lot gate were removed 19 Aug 2026 — see §0.6.)*
+✅ *Gate:* direct UPDATE on `StockMove` fails at the DB; stock issue under concurrency never drives a balance negative.
 
 ### Phase 5 — Make & Installation
 Make kanban, cut list generated **from `CalcResult`**, fabric issue and wastage capture. Install crews, calendar and route, installer PWA with photo and signature, snag register.
@@ -1686,7 +1685,7 @@ WhatsApp templates with Meta approval gating, two-way inbox with service-window 
 1. **No made-to-measure quotation line without a `MeasurementItem`.** Enforced server-side, not just in the form.
 2. **`/lib/calc` is pure, versioned, and 100% branch-covered.** Material maths exists nowhere else.
 3. **Sent quotes freeze their `calcSnapshot`.** An engine change never re-prices a sent quote.
-4. **Dye lot on every roll-based receipt; mixed-lot allocation blocked** without a reasoned, audited override.
+4. **Dye lot on every roll-based receipt**, and carried through stock to the install line. *(The mixed-lot block was removed 19 Aug 2026 at the owner's instruction — see §0.6. Recording is still non-negotiable; blocking is gone.)*
 5. **`StockMove` and `AuditLog` are append-only** at the database level.
 6. **Money is BigInt paise; measurements are millimetres.** One formatter, one converter.
 7. **Document numbers from `NumberSequence` inside the transaction.** Gap-free.
@@ -1710,7 +1709,7 @@ Mandovara is a **measure-to-install** house. Their own published process is *enq
 |---|---|
 | **Site measurement module + field PWA** | Every order begins here. Without it the system starts at the quote, i.e. after the data was already written on paper. |
 | **Material calculation engine (§7)** | Fabric metres, wallpaper rolls, flooring boxes. This is where margin is made and lost, and it is done by hand today. |
-| **Dye-lot tracking and mixed-lot gate** | The single most expensive recurring failure in furnishing. Generic batch tracking does not model it. |
+| **Dye-lot tracking** ~~and mixed-lot gate~~ | The single most expensive recurring failure in furnishing. Tracking remains; the gate was removed 19 Aug 2026 at the owner's instruction. |
 | **Make / cut-and-stitch job cards** | Curtains and upholstery are manufactured. There is no production step in the signed scope at all. |
 | **Installation scheduling and installer PWA** | Their process literally ends in installation. Dispatch-and-challan does not describe it. |
 | **Sample-book library** | ₹5,000–₹15,000 per book, walking out of the showroom, untracked. |

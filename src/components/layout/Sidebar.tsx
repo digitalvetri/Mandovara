@@ -9,7 +9,6 @@ import {
   Boxes, MapPin, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
-  Layers,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -45,7 +44,6 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
       { label: "Product Catalog",   href: "/products",  icon: Package },
       { label: "Purchase & Vendors",href: "/purchase",  icon: Truck   },
       { label: "Stocks",            href: "/inventory", icon: Boxes   },
-      { label: "Dye-lot Allocation",href: "/purchase/allocation", icon: Layers },
     ],
   },
   {

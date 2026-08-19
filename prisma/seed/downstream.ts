@@ -161,9 +161,14 @@ export async function seedDownstream(
   const projExpRows:  Prisma.ProjectExpenseCreateManyInput[] = [];
 
   // dye-lot balances accumulate across orders: colourwayId|dyeLot → {qty, value}
-  // `reserved` must track the Allocation rows we create below — the allocation
-  // console computes available = onHand − reserved, so leaving reserved at 0
-  // overstates what is actually free to promise.
+  //
+  // `reserved` stays 0. It used to mirror the Allocation rows below, because
+  // the allocation console computed available = onHand − reserved. That console
+  // was removed on 19 Aug 2026, and with it every means of RELEASING a
+  // reservation — so seeded holds became permanent. The effect was stark:
+  // 2,073 of 2,074 balances fully reserved, leaving exactly two lotted SKUs
+  // showing as available across a 1,229-SKU catalog. Nothing reserves stock
+  // any more, so nothing should arrive pre-reserved.
   const balances = new Map<string, { colourwayId: string; dyeLot: string | null; qty: number; reserved: number; value: bigint }>();
 
   let poN = 0, grnN = 0, mjN = 0, insN = 0, invN = 0, rcptN = 0;
@@ -233,11 +238,11 @@ export async function seedDownstream(
       const cur = balances.get(key)
         ?? { colourwayId: line.colourwayId!, dyeLot, qty: 0, reserved: 0, value: 0n };
       cur.qty      += qty;
-      cur.reserved += qty;   // the Allocation created just below reserves it all
       cur.value    += BigInt(line.rate) * BigInt(qty);
       balances.set(key, cur);
 
-      // Reserve the lot against this order line — single lot, no override.
+      // Historical record of which lot went to which order line. Retained
+      // because the Allocation model is retained; nothing reads it in the UI.
       allocRows.push({
         organizationId: orgId, orderLineId: line.id, colourwayId: line.colourwayId!,
         dyeLot, quantity: new Prisma.Decimal(qty), mixedLotOverride: false,

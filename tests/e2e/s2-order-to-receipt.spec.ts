@@ -29,11 +29,10 @@ test("purchase orders list loads", async ({ page }) => {
   await expect(page.getByText(/purchase/i).first()).toBeVisible();
 });
 
-// ── Allocation console — UI removed. Backend actions + Prisma models
-//    remain as safe scaffolding; only the /purchase/allocation route is
-//    gone. Dye-lot allocation logic is still covered at the module
-//    level in tests/kernel/concurrency/stock-issue.test.ts and the
-//    mixed-lot integration test in tests/integration/.
+// ── Dye-lot allocation console — removed at the owner's request, 19 Aug 2026.
+//    Lots are no longer RESERVED against order lines; they are still recorded
+//    at goods-receipt, carried on stock balances and named on install lines.
+//    The traceability chain below tests what remains.
 
 // ── Make (cut & stitch) ───────────────────────────────────────────────────────
 
@@ -112,17 +111,29 @@ test("inventory page loads with balance list", async ({ page }) => {
 });
 
 // ── Transactional chain ───────────────────────────────────────────────────────
-// §12.2 Scenario 2 end to end: the same dye lot must be traceable from the
-// goods receipt, through the allocation that reserved it, to the install line
-// that records what physically went on the wall. That chain is the whole
-// answer to "the wallpaper doesn't match — which lot went where?".
+// §12.2 Scenario 2 end to end: the same dye lot must be traceable from what
+// came into stock to the install line that records what physically went on the
+// wall. That chain is the whole answer to "the wallpaper doesn't match — which
+// lot went where?", and removing the allocation console did not remove it: the
+// reservation step is gone, the record is not.
 
-test("a dye lot is recorded at both ends of the chain — reserved, then fitted", async ({ page }) => {
-  // Reserved end: the allocation console shows the lot held against a line.
-  await page.goto("/purchase/allocation");
+test("a dye lot is recorded at both ends of the chain — stocked, then fitted", async ({ page }) => {
+  // Stocked end: the catalog card carries a dye-lot pin for anything held in
+  // stock under a lot ("MIX" when a SKU spans more than one). Asserted on the
+  // pin's title rather than the visible text, because the label is shortened
+  // to its last six characters to fit the pin.
+  //
+  // NOT /inventory: that list is one row per SKU and deliberately aggregates
+  // across lots, so it has no lot column to assert on.
+  //
+  // ?inStock=1 is load-bearing, not incidental: the pin only renders for a SKU
+  // that actually has stock, and unfiltered the catalog opens on page 1 of
+  // 1,229 SKUs sorted A–Z, where nothing need be in stock at all. Asserting
+  // without the filter is asserting that a needle happens to be on page one.
+  await page.goto("/products?inStock=1");
   await expectNoRuntimeError(page);
-  const reservedLot = page.getByText(/LOT-[A-Z0-9-]+/).first();
-  await expect(reservedLot, "no reserved lot on the allocation console").toBeVisible({ timeout: 15_000 });
+  const stockedLot = page.locator('[title^="Dye lot:"]').first();
+  await expect(stockedLot, "no dye-lot pin on any in-stock SKU").toBeVisible({ timeout: 15_000 });
 
   // Fitted end: the install sheet records the lot that physically went up.
   // Without both halves, "which lot went on which wall" is unanswerable —

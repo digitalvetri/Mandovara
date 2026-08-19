@@ -60,7 +60,9 @@ describe("resolveNextAction — stage → CTA mapping", () => {
     ["ENQUIRY",      "SCHEDULE_VISIT",     "Schedule a site visit"],
     ["QUOTATION",    "BUILD_QUOTATION",    "Build the quotation"],
     ["ORDERED",      "RAISE_PROCUREMENT",  "Raise purchase requests"],
-    ["PROCUREMENT",  "ALLOCATE_MATERIAL",  "Allocate material"],
+    // Label changed when the dye-lot allocation console was removed — the
+    // stage still exists, but there is nothing to allocate to any more.
+    ["PROCUREMENT",  "ALLOCATE_MATERIAL",  "Material in procurement"],
     ["INSTALLATION", "SCHEDULE_INSTALL",   "Schedule installation"],
     ["CANCELLED",    "PROJECT_CANCELLED",  "This project was cancelled"],
   ])("stage=%s → kind=%s / label=%s", (stage, kind, label) => {
