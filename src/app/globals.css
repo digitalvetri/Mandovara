@@ -354,6 +354,18 @@ textarea:read-only {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* §6.1 signature — the hairline gold underline that draws in once beneath
+   every KPI numeral on load. 240ms per spec, 140ms delay so the hero row
+   animates in after the shell paints. */
+.kpi-underline {
+  transform: scaleX(0);
+  animation: kpi-underline-draw 240ms cubic-bezier(0.2, 0, 0, 1) 140ms both;
+}
+@keyframes kpi-underline-draw {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
