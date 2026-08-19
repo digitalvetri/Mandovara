@@ -32,20 +32,37 @@ export default defineConfig({
       testMatch: /auth\.setup\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
-    // All test projects depend on setup and inherit the saved session
+    // All test projects depend on setup and inherit the saved session.
+    // Both chromium/mobile-android EXCLUDE the RBAC matrix — it fires 270
+    // rapid page loads and starves scenario tests in parallel. Run it in
+    // its own project via `pnpm test:e2e --project=rbac-matrix`.
     {
       name: "chromium",
+      testIgnore: /rbac-matrix\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], storageState: AUTH_FILE },
       dependencies: ["setup"],
     },
     {
       name: "mobile-android",
+      testIgnore: /rbac-matrix\.spec\.ts/,
       use: { ...devices["Pixel 5"], storageState: AUTH_FILE },
+      dependencies: ["setup"],
+    },
+    // Dedicated project: chromium-only, single worker, no cross-spec
+    // contention. Not part of the default `pnpm test:e2e` — invoke with
+    // `pnpm test:e2e --project=rbac-matrix`.
+    {
+      name: "rbac-matrix",
+      testMatch: /rbac-matrix\.spec\.ts/,
+      fullyParallel: false,
+      use: { ...devices["Desktop Chrome"], storageState: AUTH_FILE },
       dependencies: ["setup"],
     },
   ],
   webServer: {
-    command: `./node_modules/.bin/next dev --port ${PORT}`,
+    // pnpm exec resolves the local `next` binary on both POSIX and Windows;
+    // `./node_modules/.bin/next` breaks on Windows cmd/PowerShell.
+    command: `pnpm exec next dev --port ${PORT}`,
     url: BASE_URL,
     // Never reuse: a stale server on this port may be a different build, or the
     // same build without APP_DATABASE_URL, which would quietly skip RLS.
