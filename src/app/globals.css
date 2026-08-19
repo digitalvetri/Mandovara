@@ -122,8 +122,8 @@
   --color-text:          oklch(0.965 0.006 190);   /* 16.1:1 */
   --color-text-muted:    oklch(0.735 0.018 190);   /*  7.6:1 */
   --color-text-dim:      oklch(0.735 0.018 190);
-  --color-text-subtle:   oklch(0.600 0.020 190);   /*  4.6:1 */
-  --color-text-faint:    oklch(0.600 0.020 190);
+  --color-text-subtle:   oklch(0.624 0.020 190);   /*  4.5:1 on surface-2 */
+  --color-text-faint:    oklch(0.624 0.020 190);
 
   --color-sidebar:       oklch(0.125 0.022 190);
   --color-sidebar-hover: oklch(0.205 0.026 190);
@@ -155,7 +155,7 @@
 
   --color-paper:         oklch(0.965 0.006 190);
   --color-paper-dim:     oklch(0.735 0.018 190);
-  --color-paper-faint:   oklch(0.600 0.020 190);
+  --color-paper-faint:   oklch(0.624 0.020 190);
   --color-ink-raised:    oklch(0.205 0.024 190);
   --color-ink-hover:     oklch(0.245 0.026 190);
   --color-ink-sunken:    oklch(0.125 0.022 190);
