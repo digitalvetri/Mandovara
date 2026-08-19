@@ -26,7 +26,7 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   {
     section: "Overview",
     items: [
-      { label: "Owner Dashboard", href: "/",         icon: LayoutDashboard },
+      { label: "Dashboard",        href: "/",         icon: LayoutDashboard },
       { label: "Projects",        href: "/projects", icon: Briefcase       },
     ],
   },

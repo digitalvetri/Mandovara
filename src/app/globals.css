@@ -114,7 +114,8 @@
    (hue 190). The ground now belongs to the same family as the logo, which is
    what stops the accent looking like a sticker applied to someone else's
    chrome. Every value clears 4.5:1 with headroom — 7.6:1 for the accent. */
-:root.dark {
+:root.dark,
+:root[data-theme="dark"] {
   --color-ink:           oklch(0.155 0.022 190);
   --color-bg:            oklch(0.155 0.022 190);
   --color-surface:       oklch(0.205 0.024 190);

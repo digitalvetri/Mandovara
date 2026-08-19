@@ -15,10 +15,18 @@
  * offline story for data; this worker only keeps the shell loadable.
  */
 
-const VERSION      = "mandovara-v1";
+const VERSION      = "mandovara-v2";
 const SHELL_CACHE  = `${VERSION}-shell`;
 const ASSET_CACHE  = `${VERSION}-assets`;
 const OFFLINE_URL  = "/offline";
+
+// In dev mode (localhost / 127.0.0.1) Turbopack reuses the same /_next/static/
+// chunk URLs as file content changes, so caching them produces stale bundles.
+// Never cache build output in dev — only the static app shell.
+const DEV = (
+  self.location.hostname === "localhost" ||
+  self.location.hostname === "127.0.0.1"
+);
 
 const SHELL = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png"];
 
@@ -41,6 +49,7 @@ self.addEventListener("activate", (event) => {
 });
 
 function isImmutableAsset(url) {
+  if (DEV) return false; // Turbopack dev chunks are NOT immutable — never cache them
   return (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/fonts/") ||

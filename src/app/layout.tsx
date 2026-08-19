@@ -49,14 +49,13 @@ export default async function RootLayout({
   // own world, and a site visit in Coimbatore daylight is the hardest reading
   // condition this app has. Malachite (dark) is opt-in via the toggle.
   const savedTheme = cookieStore.get("theme")?.value;
-  const htmlClass = savedTheme === "dark"
-    ? `${fontClassNames} dark`
-    : fontClassNames;
+  const isDark = savedTheme === "dark";
+  const htmlClass = isDark ? `${fontClassNames} dark` : fontClassNames;
 
   // suppressHydrationWarning silences warnings from browser extensions
   // (MetaMask, Grammarly, etc.) that inject attributes onto <html> after SSR.
   return (
-    <html lang="en" className={htmlClass} suppressHydrationWarning>
+    <html lang="en" className={htmlClass} data-theme={isDark ? "dark" : "light"} suppressHydrationWarning>
       <body className="bg-bg text-text font-body">
         {children}
         <ServiceWorkerRegistrar />
