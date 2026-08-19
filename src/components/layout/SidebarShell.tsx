@@ -48,27 +48,28 @@ export function SidebarShell({ userName, userRole, userPermissions }: Props) {
       {/* ── Sidebar panel ── */}
       <div
         className={[
-          // Shared: fixed, left edge, full bottom
           "fixed left-0 bottom-0 z-50 transition-transform duration-200 ease-in-out",
-          // Mobile: full height from top, 260px wide, slides in/out
-          "top-0 w-[272px]",
+          // Mobile: 288px drawer, full height, slides in/out
+          "top-0 w-[288px]",
           open ? "translate-x-0" : "-translate-x-full",
-          // Desktop: always visible, starts below the 68px global topbar
-          "md:top-[68px] md:w-[264px] md:translate-x-0",
+          // Desktop: always visible below the 68px topbar; width from --sidebar-w
+          "md:top-[68px] md:translate-x-0",
         ].join(" ")}
+        style={{ ["--desktop-w" as string]: "var(--sidebar-w)" }}
       >
-        {/* Mobile close button inside the drawer */}
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          aria-label="Close navigation menu"
-          className="md:hidden absolute top-3 right-3 z-10 h-8 w-8 grid place-items-center rounded-[7px] transition-colors"
-          style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.06)" }}
-        >
-          <X size={15} strokeWidth={2} />
-        </button>
+        <div className="md:w-[var(--sidebar-w)] h-full w-full">
+          {/* Mobile close button inside the drawer */}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close navigation menu"
+            className="md:hidden absolute top-3.5 right-3.5 z-10 h-9 w-9 grid place-items-center rounded-[8px] text-sidebar-dim hover:text-sidebar-text hover:bg-sidebar-hover transition-colors"
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
 
-        <Sidebar userName={userName} userRole={userRole} permissions={userPermissions} isOwner={userRole === "OWNER"} />
+          <Sidebar userName={userName} userRole={userRole} permissions={userPermissions} isOwner={userRole === "OWNER"} />
+        </div>
       </div>
     </>
   );

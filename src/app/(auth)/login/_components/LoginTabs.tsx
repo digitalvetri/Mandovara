@@ -7,10 +7,11 @@ import { Loader2, Eye, EyeOff, ArrowRight, Info } from "lucide-react";
 import { MandovaraLogo } from "./MandovaraLogo";
 import { CredentialsPanel, DEFAULT_PASSWORD } from "./CredentialsPanel";
 
+// Input focus/blur handlers — a subtle brand-teal ring on focus.
 function focusStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.borderColor = "#2BA89A";
   e.currentTarget.style.background  = "#ffffff";
-  e.currentTarget.style.boxShadow   = "0 0 0 3px rgba(43,168,154,0.12)";
+  e.currentTarget.style.boxShadow   = "0 0 0 4px rgba(43,168,154,0.14)";
 }
 function blurStyle(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.style.borderColor = "#C8DFD8";
@@ -42,10 +43,7 @@ export function LoginCard() {
     start(async () => {
       const res = await devLoginByCredential(credential.trim(), password);
       if (!res.ok) { setError(res.error ?? "Login failed"); return; }
-      if (res.mustChangePassword) {
-        navigate("/change-password?forced=1");
-        return;
-      }
+      if (res.mustChangePassword) { navigate("/change-password?forced=1"); return; }
       navigate(params.get("from") ?? (res.role === "OWNER" ? "/" : "/employee"));
     });
   }
@@ -60,36 +58,42 @@ export function LoginCard() {
   const canSubmit = credential.trim().length > 0 && password.length > 0;
 
   return (
-    <div className="w-full max-w-[400px] mx-auto">
+    // Mobile: the whole thing sits inside a soft white card that floats on
+    // the brand wash. Desktop keeps it flush to the right panel (no card
+    // ring, no shadow — the panel itself is the container there).
+    <div className="w-full max-w-[420px] mx-auto lg:max-w-[400px] lg:bg-transparent lg:shadow-none lg:border-0 lg:p-0 lg:rounded-none bg-white rounded-[20px] p-6 sm:p-8 shadow-[0_20px_60px_-20px_rgba(43,168,154,0.20),0_2px_8px_rgba(15,42,40,0.06)] border border-[#E7F1EF]">
 
-      {/* Logo */}
-      <div className="mb-10">
+      {/* Logo — bigger and more generous on mobile */}
+      <div className="mb-8 lg:mb-10">
         <MandovaraLogo />
       </div>
 
       {/* Heading */}
-      <div className="mb-8">
+      <div className="mb-7 lg:mb-8">
         <h1
           style={{
             color: "#0F2A28",
             fontFamily: "'Fraunces', Georgia, serif",
-            fontSize: 30,
             fontWeight: 600,
             letterSpacing: "-0.02em",
-            lineHeight: 1.15,
+            lineHeight: 1.1,
             margin: 0,
+            fontSize: "clamp(26px, 7vw, 32px)",
           }}
         >
           Welcome back
         </h1>
-        <p className="mt-2.5 text-[14px] leading-snug" style={{ color: "#5A7A78" }}>
+        <p
+          className="mt-2.5 leading-snug"
+          style={{ color: "#5A7A78", fontSize: "clamp(13.5px, 3.6vw, 14.5px)" }}
+        >
           Sign in to your Mandovara Studio Console
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
 
-        {/* Email / Mobile field */}
+        {/* Email / Mobile */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label
@@ -121,16 +125,17 @@ export function LoginCard() {
           <input
             id="cred"
             type="text"
+            inputMode="email"
             value={credential}
             onChange={(e) => setCredential(e.target.value)}
             placeholder="rohit@mandovara.com  or  +91 98xxxxxxxx"
             autoComplete="username"
             className="w-full outline-none transition-all"
             style={{
-              height: 50,
-              borderRadius: 12,
-              padding: "0 16px",
-              fontSize: 13.5,
+              height: 54,
+              borderRadius: 14,
+              padding: "0 18px",
+              fontSize: 15,
               background: "#F0F8F7",
               border: "1.5px solid #C8DFD8",
               color: "#0F2A28",
@@ -140,7 +145,7 @@ export function LoginCard() {
           />
         </div>
 
-        {/* Password field */}
+        {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label
@@ -152,7 +157,7 @@ export function LoginCard() {
             </label>
             <a
               href="/forgot-password"
-              className="text-[11px] font-medium transition-opacity hover:opacity-70"
+              className="text-[11.5px] font-medium transition-opacity hover:opacity-70"
               style={{ color: "#2BA89A" }}
             >
               Forgot password?
@@ -168,10 +173,10 @@ export function LoginCard() {
               autoComplete="current-password"
               className="w-full outline-none transition-all"
               style={{
-                height: 50,
-                borderRadius: 12,
-                padding: "0 48px 0 16px",
-                fontSize: 13.5,
+                height: 54,
+                borderRadius: 14,
+                padding: "0 52px 0 18px",
+                fontSize: 15,
                 background: "#F0F8F7",
                 border: "1.5px solid #C8DFD8",
                 color: "#0F2A28",
@@ -183,13 +188,13 @@ export function LoginCard() {
               type="button"
               tabIndex={-1}
               onClick={() => setShowPwd((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-70"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-[10px] transition-opacity hover:opacity-70"
               style={{ color: "#7A9A98" }}
               aria-label={showPwd ? "Hide password" : "Show password"}
             >
               {showPwd
-                ? <EyeOff size={16} strokeWidth={1.8} />
-                : <Eye    size={16} strokeWidth={1.8} />}
+                ? <EyeOff size={17} strokeWidth={1.8} />
+                : <Eye    size={17} strokeWidth={1.8} />}
             </button>
           </div>
         </div>
@@ -197,39 +202,40 @@ export function LoginCard() {
         {/* Error */}
         {error && (
           <div
-            className="px-4 py-3 rounded-[10px] text-[12.5px] leading-snug"
+            role="alert"
+            className="px-4 py-3 rounded-[12px] text-[13px] leading-snug"
             style={{ background: "#FFF0EE", border: "1px solid #FFCBC4", color: "#B83A2E" }}
           >
             {error}
           </div>
         )}
 
-        {/* Sign In button */}
+        {/* Sign In — 56px, generous touch target */}
         <button
           type="submit"
           disabled={pending || !canSubmit}
           className="w-full flex items-center justify-center gap-2.5 font-semibold text-white transition-all duration-200 active:scale-[0.99]"
           style={{
-            height: 52,
-            borderRadius: 12,
-            fontSize: 14.5,
-            marginTop: 4,
+            height: 56,
+            borderRadius: 14,
+            fontSize: 15.5,
+            marginTop: 6,
             background: pending || !canSubmit
               ? "#A8D5CF"
               : "linear-gradient(135deg, #2BA89A 0%, #1A8A7E 100%)",
-            boxShadow: pending || !canSubmit ? "none" : "0 6px 24px rgba(43,168,154,0.35)",
+            boxShadow: pending || !canSubmit ? "none" : "0 8px 26px rgba(43,168,154,0.32)",
             cursor:    pending || !canSubmit ? "not-allowed" : "pointer",
           }}
         >
           {pending
             ? <Loader2 size={18} className="animate-spin" />
-            : <><span>Sign In</span><ArrowRight size={16} strokeWidth={2.2} /></>}
+            : <><span>Sign In</span><ArrowRight size={17} strokeWidth={2.2} /></>}
         </button>
       </form>
 
       {/* Footer */}
       <div
-        className="mt-10 pt-5 text-center text-[10.5px]"
+        className="mt-8 lg:mt-10 pt-5 text-center text-[10.5px]"
         style={{ borderTop: "1px solid #E2F0EE", color: "#8AACAA" }}
       >
         Mandovara Business Solutions · RS Puram, Coimbatore

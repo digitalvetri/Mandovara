@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LoginCard } from "./_components/LoginTabs";
-import { MandovaraLogo, MandovaraLogoLight } from "./_components/MandovaraLogo";
+import { MandovaraLogoLight } from "./_components/MandovaraLogo";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -102,18 +102,32 @@ export default async function LoginPage() {
         </div>
       </div>
 
-      {/* ─── RIGHT: Login form ─────────────────────────────────────── */}
-      <div
-        className="w-full lg:w-[480px] xl:w-[520px] min-h-screen flex flex-col"
-        style={{ background: "#FFFFFF", borderLeft: "1px solid #E0EEEC" }}
-      >
-        {/* Mobile logo — only shown when the left panel is hidden */}
-        <div className="lg:hidden px-8 pt-10 pb-2">
-          <MandovaraLogo />
-        </div>
+      {/* ─── RIGHT: Login form ───────────────────────────────────────
+             On mobile the whole viewport is this panel — a subtle brand
+             wash + a card. LoginCard owns the mark; we do NOT print it
+             again outside the card, which was creating a duplicated
+             logo and a big empty gap on phones. */}
+      <div className="w-full lg:w-[480px] xl:w-[520px] min-h-screen flex flex-col relative">
+        {/* Desktop border seam */}
+        <div aria-hidden className="hidden lg:block absolute inset-y-0 left-0 w-px bg-[#E0EEEC]" />
 
-        {/* Form — centred vertically */}
-        <div className="flex-1 flex items-center justify-center px-8 xl:px-12 py-10">
+        {/* Mobile-only brand wash — a whisper of teal so the login stops
+            looking like a blank sheet under a card. Desktop keeps flat #FFF. */}
+        <div
+          aria-hidden
+          className="lg:hidden absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(120% 60% at 50% 0%, rgba(43,168,154,0.09), transparent 55%), radial-gradient(90% 55% at 50% 100%, rgba(43,168,154,0.06), transparent 60%), #F6FBFA",
+          }}
+        />
+        <div aria-hidden className="hidden lg:block absolute inset-0" style={{ background: "#FFFFFF" }} />
+
+        {/* Form — centred vertically, generous mobile padding, safe-area aware. */}
+        <div
+          className="relative flex-1 flex items-center justify-center px-5 sm:px-8 xl:px-12 pt-8 lg:pt-10 pb-8 lg:pb-10"
+          style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0), 24px)" }}
+        >
           <Suspense>
             <LoginCard />
           </Suspense>

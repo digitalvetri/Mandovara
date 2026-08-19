@@ -93,6 +93,11 @@
   --radius-md: 10px;
   --radius-lg: 16px;
 
+  /* Sidebar width — one source of truth for the rail, topbar brand block,
+     and <main> left-padding. Grows on wider viewports so the sidebar feels
+     spacious on desktop without cramping the workspace on 1366-class laptops. */
+  --sidebar-w: 272px;
+
   /* ── Elevation. Light theme only, per §6.2: dark lifts with border +
      surface-2 instead. Tinted with the ground hue so shadows read as
      depth rather than dirt. */
@@ -238,7 +243,7 @@ html, body {
   background-image: url("/sidebar-motif.svg");
   background-repeat: repeat-y;
   background-position: top left;
-  background-size: 264px auto;
+  background-size: var(--sidebar-w) auto;
   opacity: 0.075;
 }
 :root.dark .chrome-motif { opacity: 0.055; }
@@ -353,6 +358,22 @@ textarea:read-only {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Rail scroll — a hair-thin scrollbar that only shows on very short viewports
+   where the sidebar nav genuinely cannot fit. Not "hide the scrollbar and
+   hope"; the layout is fixed so this rarely triggers, but when it does the
+   visible thumb belongs to the chrome rather than the OS. */
+.rail-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--color-sidebar-text) 20%, transparent) transparent; }
+.rail-scroll::-webkit-scrollbar { width: 4px; }
+.rail-scroll::-webkit-scrollbar-track { background: transparent; }
+.rail-scroll::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--color-sidebar-text) 18%, transparent); border-radius: 2px; }
+.rail-scroll::-webkit-scrollbar-thumb:hover { background: color-mix(in oklab, var(--color-sidebar-text) 32%, transparent); }
+
+/* Wider sidebar on larger viewports. Single declaration set covers desktop
+   breakpoints; the rail, main padding and topbar brand block all read
+   --sidebar-w from :root so a change here propagates everywhere. */
+@media (min-width: 1280px) { :root { --sidebar-w: 288px; } }
+@media (min-width: 1536px) { :root { --sidebar-w: 300px; } }
 
 /* §6.1 signature — the hairline gold underline that draws in once beneath
    every KPI numeral on load. 240ms per spec, 140ms delay so the hero row

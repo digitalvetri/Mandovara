@@ -9,7 +9,6 @@ import {
   Boxes, MapPin, Briefcase, Wrench, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
-  
   Layers,
   type LucideIcon,
 } from "lucide-react";
@@ -46,7 +45,6 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
       { label: "Product Catalog",   href: "/products",  icon: Package },
       { label: "Purchase & Vendors",href: "/purchase",  icon: Truck   },
       { label: "Stocks",            href: "/inventory", icon: Boxes   },
-      // §0.6 / §15.4 — restoring this was a required handover item.
       { label: "Dye-lot Allocation",href: "/purchase/allocation", icon: Layers },
     ],
   },
@@ -81,7 +79,6 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   },
 ];
 
-// ── Employee sidebar — exact order from design reference ─────────────────────
 const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   {
     section: "Overview",
@@ -114,9 +111,7 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   },
   {
     section: "My Work",
-    items: [
-      { label: "My Tasks", href: "/tasks", icon: CheckSquare },
-    ],
+    items: [{ label: "My Tasks", href: "/tasks", icon: CheckSquare }],
   },
   {
     section: "People",
@@ -127,15 +122,8 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
     ],
   },
   {
-    section: "Other",
-    items: [
-    ],
-  },
-  {
     section: "Admin",
-    items: [
-      { label: "Reports", href: "/reports", icon: BarChart2 },
-    ],
+    items: [{ label: "Reports", href: "/reports", icon: BarChart2 }],
   },
 ];
 
@@ -188,33 +176,37 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
   const nav = isOwner ? OWNER_NAV : EMPLOYEE_NAV;
 
   return (
-    <aside className="relative h-full w-full bg-sidebar text-sidebar-text flex flex-col overflow-hidden">
-      {/* Decoration only — see .chrome-motif / .chrome-veil in globals.css. */}
+    // min-h-0 lets flex-1 nav actually shrink instead of forcing its full
+    // intrinsic height and bubbling overflow up. Without it, the whole aside
+    // grew past the viewport and the nav container's own scrollbar rendered.
+    <aside className="relative h-full w-full bg-sidebar text-sidebar-text flex flex-col overflow-hidden min-h-0">
       <div aria-hidden className="pointer-events-none absolute inset-0 chrome-motif" />
       <div aria-hidden className="pointer-events-none absolute inset-0 chrome-veil" />
-      {/* Brand — mobile drawer only; desktop brand lives in GlobalTopbar */}
-      <div className="relative z-10 md:hidden flex items-center gap-3 px-5 pt-5 pb-4 border-b border-sidebar-dim/20">
-        <MandovaraLeafIcon size={32} />
+
+      {/* Brand — mobile drawer only; desktop brand lives in GlobalTopbar. */}
+      <div className="relative z-10 md:hidden flex items-center gap-3 px-6 pt-7 pb-5 border-b border-sidebar-dim/20">
+        <MandovaraLeafIcon size={40} />
         <div>
-          <div className="font-display text-[17px] tracking-[0.06em] font-semibold leading-none text-sidebar-text">
+          <div className="font-display text-[19px] tracking-[0.04em] font-semibold leading-none text-sidebar-text">
             Mandovara
           </div>
-          <div className="mt-1 text-[8.5px] tracking-[0.22em] text-sidebar-dim uppercase">
+          <div className="mt-1.5 text-[9.5px] tracking-[0.24em] text-sidebar-dim uppercase">
             Studio Console
           </div>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="relative z-10 flex-1 overflow-y-auto px-3 pb-3">
+      {/* Nav — min-h-0 is essential (see comment on aside). rail-scroll gives
+          a hair-thin scrollbar only when short viewports force it. */}
+      <nav className="relative z-10 flex-1 min-h-0 overflow-y-auto rail-scroll px-3 py-2">
         {nav.map((section) => {
           const visible = isOwner
             ? section.items
             : section.items.filter((item) => !item.perm || permissions.includes(item.perm));
           if (visible.length === 0) return null;
           return (
-            <div key={section.section} className="mb-4">
-              <div className="px-3 mb-1.5 mt-2 text-[10.5px] uppercase tracking-[0.22em] text-sidebar-dim">
+            <div key={section.section} className="mb-3 first:mt-1">
+              <div className="px-3 mb-1 text-[10px] uppercase tracking-[0.24em] text-sidebar-dim/80">
                 {section.section}
               </div>
               {visible.map((item) => (
@@ -231,17 +223,17 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
         })}
       </nav>
 
-      {/* Profile + sign-out */}
-      <div className="relative z-10 border-t border-white/[0.08] px-4 py-3.5">
+      {/* Profile + sign-out — mobile drawer only. On desktop the topbar
+          already shows the user chip and sign-out, so this block would just
+          duplicate and steal ~70px that made the nav scroll. */}
+      <div className="relative z-10 md:hidden border-t border-sidebar-dim/15 px-4 py-3.5">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-semibold tracking-wider shrink-0">
             {initials(userName)}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13.5px] font-medium truncate text-sidebar-text">
-              {userName}
-            </div>
-            <div className="text-[11px] text-sidebar-dim truncate">
+            <div className="text-[14px] font-medium truncate text-sidebar-text">{userName}</div>
+            <div className="text-[11.5px] text-sidebar-dim truncate">
               {ROLE_LABEL[userRole] ?? userRole}
             </div>
           </div>
@@ -250,7 +242,7 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
             onClick={handleSignOut}
             disabled={signing}
             title="Sign out"
-            className="h-8 w-8 rounded-[7px] flex items-center justify-center text-sidebar-dim hover:text-sidebar-text hover:bg-sidebar-hover transition-colors shrink-0 disabled:opacity-40"
+            className="h-9 w-9 rounded-[8px] flex items-center justify-center text-sidebar-dim hover:text-sidebar-text hover:bg-sidebar-hover transition-colors shrink-0 disabled:opacity-40"
           >
             <LogOut size={15} strokeWidth={1.7} />
           </button>
@@ -264,19 +256,21 @@ function NavRow({ href, label, Icon, active }: { href: string; label: string; Ic
   return (
     <Link
       href={href as Route}
+      aria-current={active ? "page" : undefined}
       className={[
-        "relative flex items-center gap-3 h-[38px] px-3 rounded-[7px]",
-        "text-[13.5px] transition-colors",
+        "relative flex items-center gap-3 h-[36px] pl-3.5 pr-3 rounded-[8px] mt-[1px]",
+        "text-[13.5px] leading-none transition-colors",
         active
-          ? "bg-sidebar-hover text-sidebar-text"
-          : "text-sidebar-dim hover:bg-sidebar-hover hover:text-sidebar-text",
+          ? "bg-sidebar-hover text-sidebar-text font-medium"
+          : "text-sidebar-dim hover:bg-sidebar-hover/70 hover:text-sidebar-text",
       ].join(" ")}
     >
+      {/* Left indicator — a 3px accent bar on the active row. */}
       <span
         aria-hidden
-        className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
+        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-accent transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
       />
-      <Icon size={17} strokeWidth={1.6} className="shrink-0" />
+      <Icon size={17} strokeWidth={active ? 1.9 : 1.6} className="shrink-0" />
       <span className="truncate">{label}</span>
     </Link>
   );
