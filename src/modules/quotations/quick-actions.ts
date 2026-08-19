@@ -22,7 +22,7 @@ import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kern
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import { computeCalcResult } from "@/modules/measurement/engine";
-import type { ProductFamily } from "@prisma/client";
+import type { ProductFamily, SellUnit } from "@prisma/client";
 import { findMeasurementGateViolation } from "./lib";
 import type { ActionResult } from "./actions";
 import { quickQuoteSchema } from "./quick-schemas";
@@ -63,22 +63,20 @@ export async function createQuickQuote(
     if (!client) return { ok: false, error: "Client not found" };
   }
 
-  // ── Resolve colourways for GST rate + family ───────────────────
-  const cwIds = d.lines.map((l) => l.colourwayId);
-  const colourways = await db.colourway.findMany({
-    where: { id: { in: cwIds } },
-    select: {
-      id: true, colourName: true, sellUnit: true,
-      design: {
+  // ── Resolve colourways for GST rate + family (only for catalog lines) ─
+  const cwIds = d.lines.map((l) => l.colourwayId).filter((id): id is string => !!id);
+  const colourways = cwIds.length > 0
+    ? await db.colourway.findMany({
+        where: { id: { in: cwIds } },
         select: {
-          id: true, name: true, family: true, gstRate: true, hsn: true,
+          id: true, colourName: true, sellUnit: true,
+          design: { select: { id: true, name: true, family: true, gstRate: true, hsn: true } },
         },
-      },
-    },
-  });
+      })
+    : [];
   const cwMap = new Map(colourways.map((c) => [c.id, c] as const));
   for (const l of d.lines) {
-    if (!cwMap.has(l.colourwayId)) {
+    if (l.colourwayId && !cwMap.has(l.colourwayId)) {
       return { ok: false, error: `Colourway ${l.colourwayId.slice(0, 8)}… not found or inactive.` };
     }
   }
@@ -90,6 +88,8 @@ export async function createQuickQuote(
   // made-to-measure line with measurementItemId = null (exactly what §15.1
   // forbids, with no exception), refuse it and name the next action.
   if (isLeadScoped) {
+    // Gate only applies to catalog lines — free-text lines (no colourwayId) have
+    // no known family and are treated as service / accessory items.
     const violation = findMeasurementGateViolation(
       d.lines,
       (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,
@@ -109,8 +109,8 @@ export async function createQuickQuote(
   const supplierStateCode = branch.stateCode;
   const placeOfSupplyCode = supplierStateCode; // quick quote defaults to same state
   const computed = d.lines.map((line, i) => {
-    const cw = cwMap.get(line.colourwayId)!;
-    const gstRate = Number(cw.design.gstRate);
+    const cw = line.colourwayId ? cwMap.get(line.colourwayId) : undefined;
+    const gstRate = cw ? Number(cw.design.gstRate) : (line.gstRate ?? 18);
     const ratePaise = parseINR(line.ratePaise);
     const qtyFixed  = BigInt(Math.round(line.quantity * 10_000));
     const gross     = (ratePaise * qtyFixed) / 10_000n;
@@ -119,7 +119,7 @@ export async function createQuickQuote(
     return {
       input:    line,
       lineNo:   i + 1,
-      cw,
+      cw:       cw ?? null,
       ratePaise,
       taxable,
       gstRate,
@@ -207,6 +207,7 @@ export async function createQuickQuote(
 
       for (let i = 0; i < d.lines.length; i++) {
         const line = d.lines[i]!;
+        if (!line.colourwayId) continue;   // free-text lines need no measurement item
         const cw   = cwMap.get(line.colourwayId)!;
         const family = cw.design.family;
         const roomId = roomIdByName.get(line.roomName.trim())!;
@@ -298,10 +299,11 @@ export async function createQuickQuote(
           lineNo:            l.lineNo,
           measurementItemId: itemId,
           roomLabel:         line.roomName.trim(),
-          colourwayId:       line.colourwayId,
-          description:       line.description?.trim() || `${l.cw.design.name} — ${l.cw.colourName}`,
+          colourwayId:       line.colourwayId ?? null,
+          description:       line.description?.trim() ||
+            (l.cw ? `${l.cw.design.name} — ${l.cw.colourName}` : line.label.trim()),
           quantity:          new Decimal(line.quantity),
-          unit:              l.cw.sellUnit,
+          unit:              (l.cw?.sellUnit ?? line.unit) as SellUnit,
           rate:              l.ratePaise,
           discountPct:       new Decimal(line.discountPct),
           taxable:           l.taxable,

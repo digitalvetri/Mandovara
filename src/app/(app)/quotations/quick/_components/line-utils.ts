@@ -32,11 +32,13 @@ export function emptyLine(): LineDraft {
     heightMm:    "",
     quantity:    "1",
     discountPct: "0",
+    gstRate:     18,
+    sellUnit:    "PIECE",
   };
 }
 
 export function lineAmount(l: LineDraft): bigint {
-  if (!l.colourwayId || !l.rateEditable) return 0n;
+  if (!l.rateEditable) return 0n;
   try {
     const rate  = parseINR(l.rateEditable);
     const qty   = parseFloat(l.quantity) || 0;
@@ -53,7 +55,7 @@ export function lineAmount(l: LineDraft): bigint {
 export function runningTotals(lines: LineDraft[]): { taxable: bigint; gst: bigint; total: bigint } {
   let taxable = 0n, gst = 0n;
   for (const l of lines) {
-    if (!l.colourwayId || !l.rateEditable) continue;
+    if (!l.rateEditable) continue;
     try {
       const rate  = parseINR(l.rateEditable);
       const qty   = parseFloat(l.quantity) || 0;

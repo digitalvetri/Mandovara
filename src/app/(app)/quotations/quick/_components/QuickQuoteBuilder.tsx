@@ -43,11 +43,11 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
     (isLeadScoped || (usingNewProject ? newProjectName.trim().length > 0 : projectId.length > 0)) &&
     lines.length > 0 &&
     lines.every((l) =>
-      l.colourwayId &&
-      l.roomName.trim() &&
       l.label.trim() &&
+      l.roomName.trim() &&
       parseFloat(l.widthMm) > 0 &&
-      parseFloat(l.heightMm) > 0,
+      parseFloat(l.heightMm) > 0 &&
+      l.rateEditable && parseFloat(l.rateEditable) > 0,
     );
 
   const totals = useMemo(() => runningTotals(lines), [lines]);
@@ -74,7 +74,8 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
           widthMm:     parseFloat(l.widthMm),
           heightMm:    parseFloat(l.heightMm),
           quantity:    parseFloat(l.quantity) || 1,
-          colourwayId: l.colourwayId!,
+          gstRate:     l.gstRate ?? 18,
+          unit:        (l.sellUnit ?? "PIECE") as "METRE"|"ROLL"|"SQFT"|"SQM"|"PIECE"|"SET"|"BOX"|"RUNNING_FT",
           ratePaise:   parseINR(l.rateEditable ?? "0").toString(),
           discountPct: parseFloat(l.discountPct) || 0,
         })),
@@ -157,7 +158,7 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
           <dl className="mt-4 space-y-2 text-[12px]">
             <Row k="Sub-total" v={formatINR(totals.taxable)} />
             <Row k="GST" v={formatINR(totals.gst)} />
-            <Row k="Lines" v={String(lines.filter((l) => l.colourwayId).length)} />
+            <Row k="Lines" v={String(lines.length)} />
           </dl>
           <label className="mt-4 block">
             <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">Valid for (days)</div>

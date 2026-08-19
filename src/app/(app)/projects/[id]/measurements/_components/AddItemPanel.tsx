@@ -5,12 +5,10 @@
 // screen flow next session. Rooms are pre-loaded from the parent.
 // A new-room quick-add sits inline.
 
-import { useState, useTransition, useMemo, useEffect } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { createRoom } from "@/modules/measurement/actions";
-import { searchColourwaysByFamily } from "@/modules/measurement/actions-catalog";
-import type { ColourwayOption } from "@/modules/measurement/actions-shared";
-import { addMeasurementItem, pickProductForMeasurementItem } from "@/modules/measurement/actions-item";
+import { addMeasurementItem } from "@/modules/measurement/actions-item";
 import {
   PRODUCT_FAMILIES, SURFACE_TYPES, HEADING_TYPES, LAY_PATTERNS, MOUNT_TYPES,
 } from "@/modules/measurement/schema";
@@ -41,16 +39,8 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
   const [layPattern,  setLayPattern]  = useState<(typeof LAY_PATTERNS)[number]>("STRAIGHT");
   const [mountType,   setMountType]   = useState<(typeof MOUNT_TYPES)[number]>("INSIDE");
   const [notes, setNotes] = useState("");
-  const [colourwayId, setColourwayId] = useState("");
-  const [colourways,  setColourways]  = useState<ColourwayOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start]  = useTransition();
-
-  useEffect(() => {
-    setColourwayId("");
-    setColourways([]);
-    searchColourwaysByFamily(family).then(setColourways).catch(() => setColourways([]));
-  }, [family]);
 
   const [newRoomOpen, setNewRoomOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
@@ -62,7 +52,7 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
   const showDeducts = useMemo(() => WALLPAPER_LIKE.has(family), [family]);
 
   function reset(): void {
-    setLabel(""); setWidthMm(""); setHeightMm(""); setQuantity("1"); setNotes(""); setColourwayId("");
+    setLabel(""); setWidthMm(""); setHeightMm(""); setQuantity("1"); setNotes("");
   }
 
   async function addRoom(): Promise<void> {
@@ -107,9 +97,6 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
       };
       const r = await addMeasurementItem(payload);
       if (!r.ok) { setError(r.error ?? "Could not add item"); return; }
-      if (colourwayId && r.data?.id) {
-        await pickProductForMeasurementItem({ measurementItemId: r.data.id, colourwayId });
-      }
       reset();
     });
   }
@@ -174,25 +161,6 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
         <FieldSelect label="Surface" value={surface} onChange={(v) => setSurface(v as typeof surface)} options={SURFACE_TYPES} />
         <FieldSelect label="Family"  value={family}  onChange={(v) => setFamily(v as Family)}          options={PRODUCT_FAMILIES} />
         <FieldInput label="Quantity" value={quantity} onChange={setQuantity} inputMode="numeric" width="w-full" />
-
-        {/* Product picker — select before saving so calc uses actual product properties */}
-        <div className="col-span-2 flex flex-col gap-1 lg:col-span-4">
-          <span className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim">
-            Product <span className="normal-case text-text-subtle">(optional — select to link catalogue item)</span>
-          </span>
-          <select
-            value={colourwayId}
-            onChange={(e) => setColourwayId(e.target.value)}
-            className="h-[36px] rounded-[6px] border border-rule bg-transparent px-2 text-[12.5px] text-text"
-          >
-            <option value="">— no product selected (pick from catalogue later) —</option>
-            {colourways.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.brandName} · {c.designName} · {c.colourName} ({c.code})
-              </option>
-            ))}
-          </select>
-        </div>
 
         <FieldInput label="Width (mm)"  value={widthMm}  onChange={setWidthMm}  inputMode="decimal" />
         <FieldInput label="Height (mm)" value={heightMm} onChange={setHeightMm} inputMode="decimal" />

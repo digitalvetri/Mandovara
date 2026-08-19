@@ -6,16 +6,13 @@
 // English underneath, written for a client to read.
 
 import { useTransition } from "react";
-import Link from "next/link";
-import type { Route } from "next";
-import { Camera, Trash2, PencilLine, Package } from "lucide-react";
+import { Camera, Trash2, PencilLine } from "lucide-react";
 import type { ItemDetail } from "@/modules/measurement/queries";
 import { deleteMeasurementItem } from "@/modules/measurement/actions-item";
 
 interface ItemCardProps {
   item:      ItemDetail;
   editable:  boolean;
-  /** Needed to build the "Pick from catalog" link with the right context. */
   projectId: string;
 }
 
@@ -114,29 +111,9 @@ export function ItemCard({ item, editable, projectId }: ItemCardProps) {
         </div>
       )}
 
-      {/* Actions row — Pick / Change is always available (designers routinely
-          swap colours after a round is approved). Edit/Delete only render on
-          DRAFT rounds. */}
-      <div className="col-span-2 border-t border-rule px-4 py-2 flex justify-between items-center gap-3">
-        <div className="min-w-0 flex-1 text-[11px] text-text-dim truncate">
-          {item.calc?.colourwayCode ? (
-            <>
-              <span className="text-[10px] uppercase tracking-[0.06em] text-text-faint mr-2">Picked</span>
-              <span className="tabular text-text">{item.calc.colourwayCode}</span>
-              {item.calc.colourName && <span className="ml-1 text-text-dim">· {item.calc.colourName}</span>}
-            </>
-          ) : (
-            <span className="text-text-faint italic">No product picked yet</span>
-          )}
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Link
-            href={`/products?forProject=${encodeURIComponent(projectId)}&itemId=${encodeURIComponent(item.id)}` as Route}
-            className="inline-flex items-center gap-1 text-[10.5px] text-text-dim hover:text-gold"
-          >
-            <Package size={10} /> {item.calc?.colourwayId ? "Change product" : "Pick from catalog"}
-          </Link>
-          {editable && (
+      {/* Actions row — Edit/Delete only render on DRAFT rounds. */}
+      <div className="col-span-2 border-t border-rule px-4 py-2 flex justify-end items-center gap-3">
+        {editable && (
             <>
               <button
                 type="button"
@@ -157,7 +134,6 @@ export function ItemCard({ item, editable, projectId }: ItemCardProps) {
             </>
           )}
         </div>
-      </div>
     </article>
   );
 }
