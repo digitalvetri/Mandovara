@@ -8,7 +8,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { DashboardData } from "@/app/(app)/_dashboard/types";
 import { ACTIVE_PROJECT_STAGES, OPEN_LEAD_STAGES } from "./queries";
-import { Db, addDays, endOfMonth, loadProjectStages, loadRecentActivity, loadRevenueByMonth, loadSiteVisits, percentChange, startOfMonth, sumInvoices } from "./queries-part2-loaders";
+import { addDays, endOfMonth, loadProjectStages, loadRecentActivity, loadRevenueByMonth, loadSiteVisits, percentChange, startOfMonth, sumInvoices } from "./queries-part2-loaders";
 
 export async function loadDashboard(ctx: RequestContext): Promise<DashboardData> {
   requirePermission(ctx, "report.view.dashboard");
