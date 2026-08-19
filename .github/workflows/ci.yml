@@ -78,8 +78,36 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Browser binaries only — deliberately NOT `--with-deps`.
+      #
+      # `--with-deps` shells out to apt-get, and on 2026-08-19 that hung for
+      # 23 minutes on two consecutive runs (1392s, killed by the job timeout)
+      # having taken 21s an hour earlier — an apt lock or mirror stall on the
+      # hosted runner, nothing to do with the code. The ubuntu-latest image
+      # already ships the shared libraries chromium needs, so the apt step was
+      # buying almost nothing and could take the whole pipeline down at any
+      # time. If a library ever genuinely goes missing, the E2E step fails
+      # immediately with the missing .so named — a far better signal than a
+      # silent 23-minute stall.
+      #
+      # The cache makes the common case a no-op. Keyed on the resolved
+      # Playwright version so a dependency bump re-downloads rather than
+      # launching a browser against mismatched drivers.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "v=$(pnpm exec playwright --version | tr -cd '0-9.')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pw.outputs.v }}
+
       - name: Install Playwright browsers
-        run: pnpm playwright install --with-deps chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
+        run: pnpm playwright install chromium
 
       # E2E specs (lead-list card assertions, project detail, the §12.2
       # scenarios) expect a baseline of realistic data. Without SEED_DEMO_DATA
