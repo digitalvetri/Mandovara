@@ -6,7 +6,7 @@
 // A new-room quick-add sits inline.
 
 import { useState, useTransition, useMemo } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Save } from "lucide-react";
 import { createRoom } from "@/modules/measurement/actions";
 import { addMeasurementItem } from "@/modules/measurement/actions-item";
 import {
@@ -166,10 +166,7 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
         <FieldInput label="Height (mm)" value={heightMm} onChange={setHeightMm} inputMode="decimal" />
 
         {showHeading && (
-          <>
-            <FieldSelect label="Heading" value={headingType} onChange={(v) => setHeadingType(v as typeof headingType)} options={HEADING_TYPES} />
-            <FieldInput  label="Fullness" value={fullness} onChange={setFullness} inputMode="decimal" />
-          </>
+          <FieldSelect label="Heading" value={headingType} onChange={(v) => setHeadingType(v as typeof headingType)} options={HEADING_TYPES} />
         )}
         {showLay && (
           <FieldSelect label="Lay pattern" value={layPattern} onChange={(v) => setLayPattern(v as typeof layPattern)} options={LAY_PATTERNS} />
@@ -193,10 +190,10 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
           type="button"
           onClick={save}
           disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-[6px] bg-gold px-3 py-1.5 text-[11.5px] font-medium text-ink hover:bg-gold-strong disabled:opacity-60 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-[6px] bg-accent px-4 py-1.5 text-[11.5px] font-medium text-white hover:opacity-90 disabled:opacity-60 transition-colors"
         >
-          {pending ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-          Add item
+          {pending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+          Save
         </button>
       </div>
     </div>
