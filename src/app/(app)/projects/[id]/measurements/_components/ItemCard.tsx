@@ -11,8 +11,8 @@ import type { ItemDetail } from "@/modules/measurement/queries";
 import { deleteMeasurementItem } from "@/modules/measurement/actions-item";
 
 interface ItemCardProps {
-  item:      ItemDetail;
-  editable:  boolean;
+  item:     ItemDetail;
+  editable: boolean;
 }
 
 export function ItemCard({ item, editable }: ItemCardProps) {
