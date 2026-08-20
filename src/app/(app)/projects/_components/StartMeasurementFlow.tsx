@@ -13,13 +13,14 @@
 //     mount. ConvertLeadModal redirects here so users don't have to
 //     hunt for "what's next" after converting a lead.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { Route } from "next";
 import { NextActionCard } from "./NextActionCard";
 import { RoomSetupSheet } from "./RoomSetupSheet";
 import { ScheduleVisitSheet } from "./ScheduleVisitSheet";
 import type { NextAction } from "@/modules/projects/next-action";
+import { startMeasurementAndRedirect } from "@/modules/measurement/start-and-redirect";
 
 interface Props {
   projectId: string;
@@ -33,6 +34,7 @@ export function StartMeasurementFlow({ projectId, action, currentUserId }: Props
   const params     = useSearchParams();
   const [needsRoomsOpen, setNeedsRoomsOpen] = useState(false);
   const [scheduleVisitOpen, setScheduleVisitOpen] = useState(false);
+  const [, startNav] = useTransition();
 
   // Post-conversion wizard entry: land here from ConvertLeadModal with
   // ?wizard=schedule-visit and we pop the sheet automatically. Clear
@@ -65,11 +67,18 @@ export function StartMeasurementFlow({ projectId, action, currentUserId }: Props
         onClose={() => setNeedsRoomsOpen(false)}
         onDone={() => {
           setNeedsRoomsOpen(false);
-          // Rooms exist now — kick the button again from the same flow so
-          // the redirect fires. A page reload also does the trick but is
-          // heavier; window.location.reload keeps this component self-
-          // contained without router imports.
-          if (typeof window !== "undefined") window.location.reload();
+          // Rooms now exist — re-fire the measurement action. This time it
+          // creates the measurement round and redirects directly to it, so
+          // the user never has to click "Start measurement" a second time.
+          startNav(async () => {
+            try {
+              await startMeasurementAndRedirect({ projectId });
+            } catch (e: unknown) {
+              const err = e as { digest?: string };
+              if (err?.digest?.startsWith("NEXT_REDIRECT")) throw e;
+              if (typeof window !== "undefined") window.location.reload();
+            }
+          });
         }}
       />
 
