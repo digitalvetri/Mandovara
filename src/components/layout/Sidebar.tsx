@@ -121,7 +121,7 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   },
   {
     section: "Admin",
-    items: [{ label: "Reports", href: "/reports", icon: BarChart2 }],
+    items: [{ label: "Reports", href: "/reports", icon: BarChart2, perm: "report.view.sales" as const }],
   },
 ];
 
