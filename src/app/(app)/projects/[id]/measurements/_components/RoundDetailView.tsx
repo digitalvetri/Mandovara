@@ -112,7 +112,7 @@ export function RoundDetailView({ round, rooms }: RoundDetailViewProps) {
               </div>
               <div className="space-y-3 p-4">
                 {room.items.map((it) => (
-                  <ItemCard key={it.id} item={it} editable={status === "DRAFT"} projectId={round.project.id} />
+                  <ItemCard key={it.id} item={it} editable={status === "DRAFT"} />
                 ))}
               </div>
             </div>

@@ -13,10 +13,9 @@ import { deleteMeasurementItem } from "@/modules/measurement/actions-item";
 interface ItemCardProps {
   item:      ItemDetail;
   editable:  boolean;
-  projectId: string;
 }
 
-export function ItemCard({ item, editable, projectId }: ItemCardProps) {
+export function ItemCard({ item, editable }: ItemCardProps) {
   const [pending, start] = useTransition();
 
   function onDelete() {
