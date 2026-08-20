@@ -8,7 +8,7 @@ import { devContext } from "@/lib/dev-context";
 import { getInvoice } from "@/modules/invoices/queries";
 import { StatusPill } from "../_components/StatusPill";
 import { CancelInvoiceButton } from "../_components/CancelInvoiceButton";
-import { PrintButton } from "../_components/PrintButton";
+import { InvoicePDFPreviewButton } from "./_components/InvoicePDFPreviewButton";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +39,50 @@ export default async function InvoiceDetailPage({
   const waDigits = inv.clientMobile.replace(/\D/g, "");
   const waHref = `https://wa.me/${waDigits.startsWith("91") ? waDigits : "91" + waDigits}?text=${waText}`;
 
+  const serialized = {
+    id:               inv.id,
+    number:           inv.number,
+    type:             inv.type,
+    status:           inv.status,
+    clientName:       inv.clientName,
+    clientMobile:     inv.clientMobile,
+    clientGstin:      inv.clientGstin,
+    branchName:       inv.branchName,
+    supplierStateCode: inv.supplierStateCode,
+    placeOfSupplyCode: inv.placeOfSupplyCode,
+    date:             formatDate(inv.date),
+    dueDate:          formatDate(inv.dueDate),
+    orderNumber:      inv.orderNumber,
+    isIntra,
+    taxableAmount:    formatINR(inv.taxableAmount),
+    cgst:             formatINR(inv.cgst),
+    sgst:             formatINR(inv.sgst),
+    igst:             formatINR(inv.igst),
+    roundOff:         formatINR(inv.roundOff),
+    roundOffNonZero:  inv.roundOff !== 0n,
+    total:            formatINR(inv.total),
+    advanceAdjusted:  formatINR(inv.advanceAdjusted),
+    paidTotal:        formatINR(inv.paidTotal),
+    outstanding:      formatINR(inv.outstanding),
+    hasAdv:           inv.advanceAdjusted > 0n,
+    hasPaid:          inv.paidTotal > 0n,
+    lines: inv.lines.map((l) => ({
+      id:          l.id,
+      lineNo:      l.lineNo,
+      description: l.description,
+      hsn:         l.hsn,
+      quantity:    l.quantity,
+      unit:        l.unit,
+      rate:        formatINR(l.rate),
+      taxable:     formatINR(l.taxable),
+      gstRate:     l.gstRate,
+      cgst:        formatINR(l.cgst),
+      sgst:        formatINR(l.sgst),
+      igst:        formatINR(l.igst),
+      amount:      formatINR(l.amount),
+    })),
+  };
+
   return (
     <>
       <Topbar
@@ -46,13 +90,7 @@ export default async function InvoiceDetailPage({
         eyebrow={`${inv.clientName} · ${formatDate(inv.date)} → due ${formatDate(inv.dueDate)}${inv.orderNumber ? ` · from ${inv.orderNumber}` : ""}`}
         actions={
           <div className="flex items-center gap-2" data-no-print>
-            <a
-              href={`/api/invoicing/${inv.id}/pdf`}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-rule bg-surface-2 text-text-dim text-[12px] hover:bg-surface hover:text-text transition-colors"
-            >
-              Download PDF
-            </a>
-            <PrintButton />
+            <InvoicePDFPreviewButton invoice={serialized} />
             {inv.clientMobile && (
               <a
                 href={waHref}
