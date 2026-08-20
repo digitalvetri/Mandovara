@@ -42,7 +42,8 @@ interface SuccessState {
 export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose }: Props) {
   const router = useRouter();
   const [purpose, setPurpose]         = useState("INITIAL_SURVEY");
-  const [scheduledAt, setScheduledAt] = useState(defaultDatetime());
+  const [dateVal, setDateVal]         = useState(defaultDate());
+  const [timeVal, setTimeVal]         = useState("10:00");
   const [assigneeId, setAssigneeId]   = useState(defaultAssigneeId);
   const [notes, setNotes]             = useState("");
   const [error, setError]             = useState<string | null>(null);
@@ -62,7 +63,7 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
       const res = await createSiteVisit({
         projectId,
         purpose,
-        scheduledAt:  new Date(scheduledAt).toISOString(),
+        scheduledAt:  new Date(`${dateVal}T${timeVal}`).toISOString(),
         assignedToId: assigneeId,
         observations: notes.trim() || undefined,
       });
@@ -81,6 +82,8 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
     setSuccess(null);
     setError(null);
     setNotes("");
+    setDateVal(defaultDate());
+    setTimeVal("10:00");
     onClose();
   }
 
@@ -172,15 +175,25 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
             </select>
           </Field>
 
-          <Field label="Scheduled at">
-            <input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              className={inputCls}
-              required
-            />
-          </Field>
+          <div>
+            <label className="mb-1 block text-[10.5px] uppercase tracking-[0.12em] text-text-dim">Scheduled at</label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={dateVal}
+                onChange={(e) => setDateVal(e.target.value)}
+                className={inputCls + " flex-1"}
+                required
+              />
+              <input
+                type="time"
+                value={timeVal}
+                onChange={(e) => setTimeVal(e.target.value)}
+                className={inputCls + " w-[110px]"}
+                required
+              />
+            </div>
+          </div>
 
           <Field label="Assign to">
             <select
@@ -229,7 +242,7 @@ export function ScheduleVisitSheet({ projectId, defaultAssigneeId, open, onClose
           <button
             type="button"
             onClick={submit}
-            disabled={pending || !scheduledAt || !assigneeId}
+            disabled={pending || !dateVal || !timeVal || !assigneeId}
             className="inline-flex items-center gap-2 rounded-[8px] bg-gold px-5 py-2 text-[12.5px] font-semibold text-ink hover:bg-gold-strong disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pending ? <Loader2 size={12} className="animate-spin" /> : "Schedule"}
@@ -251,11 +264,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function defaultDatetime(): string {
-  // Default to tomorrow 10 AM local.
+function defaultDate(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  d.setHours(10, 0, 0, 0);
   const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
