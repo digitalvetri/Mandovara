@@ -11,17 +11,15 @@ import type { ProjectDetail, ProjectMoney } from "@/modules/projects/queries";
 interface Props {
   project: ProjectDetail;
   money: ProjectMoney | null;
-  clientArchitectName?: string | null;
 }
 
-export function RightRail({ project, money, clientArchitectName }: Props) {
+export function RightRail({ project, money }: Props) {
   return (
     <aside className="space-y-4 lg:sticky lg:top-4 lg:h-fit">
       <ClientCard
         clientId={project.clientId}
         name={project.clientName}
         mobile={project.clientMobile}
-        architect={clientArchitectName ?? null}
       />
       <SiteCard
         address={project.siteAddress}
@@ -42,8 +40,8 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function ClientCard({ clientId, name, mobile, architect }: {
-  clientId: string; name: string; mobile: string; architect: string | null;
+function ClientCard({ clientId, name, mobile }: {
+  clientId: string; name: string; mobile: string;
 }) {
   return (
     <Card title="Client">
@@ -81,9 +79,6 @@ function ClientCard({ clientId, name, mobile, architect }: {
         </div>
       )}
 
-      <div className="mt-3 border-t border-rule pt-3 text-[11.5px] text-text-dim">
-        Architect: <span className="text-text">{architect ?? "—"}</span>
-      </div>
     </Card>
   );
 }
