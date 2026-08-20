@@ -6,11 +6,12 @@ import { formatINRShort } from "@/kernel/money/format";
 import { HardHat, Ruler, AlarmClock, IndianRupee } from "lucide-react";
 import type { ProjectKpis } from "@/modules/projects/queries";
 
-interface Props { kpis: ProjectKpis }
+interface Props { kpis: ProjectKpis; showFinancials?: boolean }
 
-export function ProjectKpiCards({ kpis }: Props) {
+export function ProjectKpiCards({ kpis, showFinancials = false }: Props) {
+  const cols = showFinancials ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2";
   return (
-    <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className={`mb-4 grid gap-3 ${cols}`}>
       <Card
         label="Active"
         value={String(kpis.activeCount)}
@@ -25,20 +26,24 @@ export function ProjectKpiCards({ kpis }: Props) {
         Icon={Ruler}
         tone={kpis.awaitingMeasurement > 0 ? "heat" : "solid"}
       />
-      <Card
-        label="Payments overdue"
-        value={String(kpis.paymentsOverdueCount)}
-        sub={kpis.paymentsOverdueCount === 0 ? "all clear" : "projects with late invoices"}
-        Icon={AlarmClock}
-        tone={kpis.paymentsOverdueCount > 0 ? "fault" : "solid"}
-      />
-      <Card
-        label="Receivables"
-        value={formatINRShort(kpis.receivablesTotal)}
-        sub={kpis.receivablesTotal > 0n ? "outstanding across projects" : "nothing due"}
-        Icon={IndianRupee}
-        tone={kpis.receivablesTotal > 0n ? "heat" : "solid"}
-      />
+      {showFinancials && (
+        <Card
+          label="Payments overdue"
+          value={String(kpis.paymentsOverdueCount)}
+          sub={kpis.paymentsOverdueCount === 0 ? "all clear" : "projects with late invoices"}
+          Icon={AlarmClock}
+          tone={kpis.paymentsOverdueCount > 0 ? "fault" : "solid"}
+        />
+      )}
+      {showFinancials && (
+        <Card
+          label="Receivables"
+          value={formatINRShort(kpis.receivablesTotal)}
+          sub={kpis.receivablesTotal > 0n ? "outstanding across projects" : "nothing due"}
+          Icon={IndianRupee}
+          tone={kpis.receivablesTotal > 0n ? "heat" : "solid"}
+        />
+      )}
     </div>
   );
 }

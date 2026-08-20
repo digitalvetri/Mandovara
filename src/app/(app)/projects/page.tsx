@@ -31,6 +31,9 @@ export default async function ProjectsPage({
   const stage = normaliseStatus(params.stage ?? params.status);
   const page = parsePositiveInt(params.page) ?? 1;
 
+  const role = ctx.roles[0] ?? "OWNER";
+  const showFinancials = role === "OWNER" || role === "ACCOUNTS";
+
   const [{ rows, total, pageSize }, kpis] = await Promise.all([
     listProjects(ctx, { ...(q != null && { search: q }), stage, page }),
     getProjectKpis(ctx),
@@ -57,7 +60,7 @@ export default async function ProjectsPage({
         </Link>
       </div>
 
-      <ProjectKpiCards kpis={kpis} />
+      <ProjectKpiCards kpis={kpis} showFinancials={showFinancials} />
       <ProjectsToolbar />
       <ProjectCards rows={rows} canEditStage={ctx.permissions.has("project.update")} />
       <Pager page={page} pageSize={pageSize} total={total} />
