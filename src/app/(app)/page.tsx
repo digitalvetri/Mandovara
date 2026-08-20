@@ -7,8 +7,8 @@ import type { DashboardData } from "./_dashboard/types";
 import type { RequestContext } from "@/kernel/auth/context";
 
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
-import { GreetingHero } from "./_dashboard/GreetingHero";
 import { DaySummary } from "./_dashboard/DaySummary";
+import { IST_TIMEZONE } from "@/kernel/datetime";
 import { KpiCard } from "./_dashboard/KpiCard";
 import { RevenueChart } from "./_dashboard/RevenueChart";
 import { ProjectStages } from "./_dashboard/ProjectStages";
@@ -62,12 +62,30 @@ export default async function DashboardPage() {
     safeLoadDaySummary(ctx),
   ]);
 
-  // Shared greeting block — shown at the top for every role.
+  // The dashboard hero. This used to be a dark slab carrying a greeting and a
+  // live clock, with the day's work in a smaller card beneath it. The clock is
+  // gone and the two are now one band: §1.3 wants "what's stuck and what money
+  // is due, in 30 seconds" in this space, not the time.
+  //
+  // Hour and date are resolved on the server in IST so the copy does not
+  // flicker from a client-locale render on hydrate.
+  const istNow = new Date();
+  const istHour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: IST_TIMEZONE, hour: "2-digit", hour12: false,
+    }).format(istNow),
+  );
+  const istDate = new Intl.DateTimeFormat("en-IN", {
+    timeZone: IST_TIMEZONE, weekday: "long", day: "numeric", month: "long", year: "numeric",
+  }).format(istNow);
+
   const greeting = (
-    <div className="space-y-3">
-      <GreetingHero userName={userName} />
-      <DaySummary items={daySummary} />
-    </div>
+    <DaySummary
+      items={daySummary}
+      userName={userName}
+      hour={istHour}
+      dateLabel={istDate}
+    />
   );
 
   if (role === "DESIGNER") {

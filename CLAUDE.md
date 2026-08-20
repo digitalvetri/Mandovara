@@ -1350,11 +1350,13 @@ which derives from the sidebar tokens; using `bg-surface` there renders a white
 pill with white text in the light theme. Dropdown *panels* still use
 `bg-surface` — they float over the canvas, not the chrome.
 
-The same applies to colour: **`--color-accent` is solved against white and
-measures only 3.53:1 on the rail.** Accent-coloured elements on chrome take
-`--color-accent-chrome` (the dark-theme accent, declared in both themes,
-7.79:1 on the rail). Active nav bar, topbar avatar, hero accents, featured
-cards.
+The same applies to colour. **Every canvas token in this system was solved
+against white, so none of them is valid on chrome** — `--color-accent` measures
+3.53:1 on the rail, and `solid` / `heat` / `fault` all measure 3.52:1. Chrome
+elements take the `*-chrome` variants (`--color-accent-chrome`,
+`--color-solid-chrome`, `--color-heat-chrome`, `--color-fault-chrome`): the
+dark-theme values, declared in both themes, 5.8–9.6:1 on the rail. Active nav
+bar, topbar avatar, hero band, featured cards, chips on chrome.
 
 **One accent per screen.** Colour encodes *state*, never *category*. A row of
 KPI cards gets one accent and red only where something is genuinely wrong;
@@ -1397,7 +1399,7 @@ reduced-motion path still lands them visible. Both halves are pinned by
 
 ### 6.4 Key screens (route → content; build exactly these)
 
-- `/dashboard` — greeting; 4 KPI cards (live projects, awaiting measurement, ready to install, outstanding); project board by stage with swatch chips; today's install route; overdue sample books; money strip (OWNER/ACCOUNTS only).
+- `/dashboard` — hero band carrying the day's work (§1.3's 30-second read: what is stuck, what is due — not a clock); 4 KPI cards (live projects, awaiting measurement, ready to install, outstanding); project board by stage with swatch chips; today's install route; overdue sample books; money strip (OWNER/ACCOUNTS only).
 - `/catalog` — brand rail → collection grid → design list with swatch thumbnails; filters by family, brand, pattern match, price band, in-stock. Search across design code, name, brand, colour name. **Sub-200ms.**
 - `/catalog/design/[id]` — hero swatch, colourway strip, physical properties (roll width, repeat, match), price tiers, live stock **by dye lot**, which projects used it, sample-book location, brand PDF.
 - `/projects/[id]` — the hub. Tabs: Rooms & Measurements · Quotation · Order · Procurement · Make · Install · Money · Documents · Snags. Header shows stage stepper, client, architect, order value, margin (OWNER only).

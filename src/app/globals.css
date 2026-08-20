@@ -62,6 +62,13 @@
      .on-chrome; this is its colour half. */
   --color-accent-chrome: oklch(0.720 0.115 182);
 
+  /* Status on chrome, same reasoning. Solved against white these measure
+     3.52:1 on the rail; the dark-theme values give 5.8–9.6:1. Declared in
+     both themes because the chrome is dark in both. */
+  --color-solid-chrome:  oklch(0.760 0.150 158);
+  --color-heat-chrome:   oklch(0.800 0.135 72);
+  --color-fault-chrome:  oklch(0.680 0.190 22);
+
   /* ── Gold — demoted from co-star to a rare hairline and the avatar chip.
      Kept as a token because :focus-visible, .hairline and /styleguide read it. */
   --color-gold:          oklch(0.534 0.105 85);    /* #89670E  4.5:1 */
@@ -156,6 +163,9 @@
   --color-accent-dim:    oklch(0.520 0.095 182);
   --color-accent-tint:   oklch(0.720 0.115 182 / 0.14);
   --color-accent-chrome: oklch(0.720 0.115 182);
+  --color-solid-chrome:  oklch(0.760 0.150 158);
+  --color-heat-chrome:   oklch(0.800 0.135 72);
+  --color-fault-chrome:  oklch(0.680 0.190 22);
 
   --color-gold:          oklch(0.780 0.095 85);
   --color-gold-strong:   oklch(0.860 0.085 85);

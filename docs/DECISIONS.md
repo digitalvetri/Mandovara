@@ -652,3 +652,36 @@ mechanism on a catalogue card, so both survive future rewrites.
 nearly empty — ₹0 last month, one bar on an eight-month chart. No design
 survives that, and it is the single biggest reason the deployed instance reads
 as unfinished.
+
+---
+
+## The greeting slab is gone; the space carries the day's work
+
+*2026-08-20 — owner instruction*
+
+The largest, heaviest object above the fold was a dark slab holding a name and
+a live clock, with the day's actual work in a smaller card beneath it. §1.3
+states what an owner wants from this space — *"every live project's stage,
+what's stuck, and what money is due, in 30 seconds"* — and the time of day is
+not it. A clock is a desktop widget.
+
+`GreetingHero` is deleted. `DaySummary` takes the band: same dark chrome and
+prisms, but the greeting is now one small line and the day's narrative gets the
+display size the clock used to have — *"52 leads to contact, 5 site
+measurements today, and 2 installs today."* — with every clause repeated
+underneath as a chip that links to the work. Two stacked banner-ish cards
+became one, so the KPI row moves up roughly 90px.
+
+The clock also cost more than space: it was a client component re-rendering
+every second for the whole band. The hour and date are now resolved once on the
+server in IST, which also removes a hydration flicker where the client's locale
+rendered before the IST value settled.
+
+**Third instance of the same bug, found by looking this time.** Putting status
+chips on the dark band meant `fault` and `heat` on chrome, and like
+`--color-accent` before them those are solved against white: **3.52:1 on the
+rail** for all three status colours. `--color-solid-chrome`, `--color-heat-chrome`
+and `--color-fault-chrome` join `--color-accent-chrome`, all declared in both
+themes because the chrome is dark in both — 5.8:1 to 9.6:1. The rule is now
+general and belongs in review: **any token used on chrome needs its chrome
+variant, because every canvas token in this system was solved against white.**
