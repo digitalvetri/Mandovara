@@ -9,6 +9,8 @@ import { devContext } from "@/lib/dev-context";
 import { listOrgRounds } from "@/modules/measurement/org-queries";
 import type { MeasurementStatusStr } from "@/modules/measurement/queries-types";
 import { StatusPill } from "../projects/[id]/measurements/_components/StatusPill";
+import { listProjectsForSelect } from "@/modules/projects/queries";
+import { NewMeasurementSheet } from "./_components/NewMeasurementSheet";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +27,14 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
   const page   = sp.page ? Math.max(1, parseInt(sp.page, 10) || 1) : 1;
 
   const ctx = await devContext();
-  const { rows, hasNext, totalCounts } = await listOrgRounds(ctx, {
-    ...(status && { status }),
-    ...(search && { search }),
-    page,
-  });
+  const [{ rows, hasNext, totalCounts }, projects] = await Promise.all([
+    listOrgRounds(ctx, {
+      ...(status && { status }),
+      ...(search && { search }),
+      page,
+    }),
+    listProjectsForSelect(ctx),
+  ]);
 
   const totalActive = totalCounts.DRAFT + totalCounts.SUBMITTED + totalCounts.APPROVED;
 
@@ -38,6 +43,7 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
       <Topbar
         title="Measurements"
         eyebrow={`${totalActive.toLocaleString("en-IN")} active rounds across the studio`}
+        actions={<NewMeasurementSheet projects={projects} />}
       />
 
       <div className="flex flex-wrap items-center gap-2 pb-4">
