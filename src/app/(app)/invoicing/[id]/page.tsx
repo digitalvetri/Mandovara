@@ -6,7 +6,7 @@ import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { getInvoice } from "@/modules/invoices/queries";
-import { IrnPill, StatusPill } from "../_components/StatusPill";
+import { StatusPill } from "../_components/StatusPill";
 import { CancelInvoiceButton } from "../_components/CancelInvoiceButton";
 import { PrintButton } from "../_components/PrintButton";
 
@@ -81,7 +81,6 @@ export default async function InvoiceDetailPage({
             <div className="flex items-center gap-3">
               <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim">Status</div>
               <StatusPill status={inv.status} />
-              <IrnPill status={inv.irnStatus} />
               {isOverdue && (
                 <span className="text-[11px] text-bad tabular">{overdueDays}d overdue</span>
               )}
@@ -200,17 +199,6 @@ export default async function InvoiceDetailPage({
             </dl>
           </div>
 
-          <div className="rounded-[14px] bg-surface border border-rule p-5">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">E-invoice / IRN</div>
-            <dl className="space-y-3 text-[12.5px]">
-              <Row k="IRN" v={inv.irn ?? "—"} mono />
-              <Row k="Ack no." v={inv.ackNo ?? "—"} mono />
-              <Row k="Ack date" v={inv.ackDate ? formatDate(inv.ackDate) : "—"} />
-            </dl>
-            <p className="mt-3 text-[10.5px] text-text-faint">
-              IRN generation via GSP lands in the backend pass. Currently marked NOT_REQUIRED for demo.
-            </p>
-          </div>
         </aside>
       </div>
     </>
