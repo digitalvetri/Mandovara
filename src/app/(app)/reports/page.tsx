@@ -6,9 +6,9 @@ import { devContext } from "@/lib/dev-context";
 import { shortNumber } from "@/lib/short-number";
 import { getReportKpis } from "@/modules/reports/kpi";
 import { leadsBySource, invoiceAgeing, topClientsByRevenue, projectMarginTop } from "@/modules/reports/queries";
-import { ExportButtons } from "./ExportButtons";
 import { DateRangeFilter } from "./_components/DateRangeFilter";
 import { CardDownloadButton } from "./_components/CardDownloadButton";
+import { ReportsExportBar } from "./_components/ReportsExportBar";
 
 export const dynamic = "force-dynamic";
 
@@ -43,47 +43,77 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     ? `${p.from ?? "start"} → ${p.to ?? "today"}`
     : "All time";
 
-  // ── CSV row shapes for per-card download ──────────────────────────────
-  const leadsRows = leads.map((r) => ({
-    Source:     SOURCE_LABEL[r.source] ?? r.source,
-    Total:      String(r.total),
-    Won:        String(r.won),
-    "Conv %":   `${(r.conversion * 100).toFixed(1)}%`,
+  // ── CSV rows for per-card download ────────────────────────────────────
+  const leadsCSV = leads.map((r) => ({
+    Source: SOURCE_LABEL[r.source] ?? r.source,
+    Total: String(r.total), Won: String(r.won),
+    "Conv %": `${(r.conversion * 100).toFixed(1)}%`,
   }));
-
-  const ageingRows = ageing.map((b) => ({
-    Bucket:      b.label,
-    Amount:      formatINR(b.amount),
-    Invoices:    String(b.count),
+  const ageingCSV = ageing.map((b) => ({
+    Bucket: b.label, Amount: formatINR(b.amount), Invoices: String(b.count),
   }));
-
-  const topClientsRows = topClients.map((c) => ({
-    Client:   c.name,
-    Invoices: String(c.invoiceCount),
-    Revenue:  formatINR(c.revenue),
+  const topClientsCSV = topClients.map((c) => ({
+    Client: c.name, Invoices: String(c.invoiceCount), Revenue: formatINR(c.revenue),
   }));
-
-  const marginsRows = margins.map((prj) => ({
-    Number:      prj.number,
-    Project:     prj.name,
+  const marginsCSV = margins.map((prj) => ({
+    Number: prj.number, Project: prj.name,
     "Order Value": formatINR(prj.orderValue),
-    Margin:      formatINR(prj.margin),
-    "Margin %":  `${(prj.marginPct * 100).toFixed(1)}%`,
+    Margin: formatINR(prj.margin),
+    "Margin %": `${(prj.marginPct * 100).toFixed(1)}%`,
   }));
+
+  // ── Serialised data for PDF export bar ───────────────────────────────
+  const exportBarProps = {
+    periodLabel,
+    kpi: {
+      revenue:        formatINRShort(kpi.revenue),
+      collections:    formatINRShort(kpi.collections),
+      outstanding:    formatINRShort(kpi.outstanding),
+      activeProjects: kpi.activeProjects,
+      newLeads:       kpi.newLeads,
+      readyToInstall: kpi.readyToInstall,
+    },
+    leads: leads.map((r) => ({
+      source:  r.source,
+      label:   SOURCE_LABEL[r.source] ?? r.source,
+      total:   r.total,
+      won:     r.won,
+      convPct: `${(r.conversion * 100).toFixed(0)}%`,
+    })),
+    ageing: ageing.map((b) => ({
+      label:    b.label,
+      amount:   formatINR(b.amount),
+      count:    b.count,
+      fromDays: b.fromDays,
+    })),
+    topClients: topClients.map((c) => ({
+      name:         c.name,
+      invoiceCount: c.invoiceCount,
+      revenue:      formatINR(c.revenue),
+    })),
+    margins: margins.map((prj) => ({
+      number:     prj.number,
+      name:       prj.name,
+      orderValue: formatINR(prj.orderValue),
+      margin:     formatINR(prj.margin),
+      marginPct:  `${(prj.marginPct * 100).toFixed(0)}%`,
+      positive:   prj.margin > 0n,
+    })),
+  };
 
   return (
     <>
-      <Topbar title="Reports" eyebrow={periodLabel} actions={<ExportButtons />} />
+      <Topbar title="Reports" eyebrow={periodLabel} actions={<ReportsExportBar {...exportBarProps} />} />
 
       <DateRangeFilter />
 
-      {/* ── KPI cards ─────────────────────────────────────────────────────────── */}
+      {/* ── KPI cards ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <KpiCard label="Revenue"         value={formatINRShort(kpi.revenue)}        href="/invoicing"                                note="ex-GST" />
+        <KpiCard label="Revenue"         value={formatINRShort(kpi.revenue)}        href="/invoicing"                                 note="ex-GST" />
         <KpiCard label="Collections"     value={formatINRShort(kpi.collections)}    href="/accounts" />
-        <KpiCard label="Outstanding"     value={formatINRShort(kpi.outstanding)}    href={"/invoicing?status=ISSUED" as Route}       warn={kpi.outstanding > 0n} />
+        <KpiCard label="Outstanding"     value={formatINRShort(kpi.outstanding)}    href={"/invoicing?status=ISSUED" as Route}        warn={kpi.outstanding > 0n} />
         <KpiCard label="Active Projects" value={String(kpi.activeProjects)}         href="/projects" />
-        <KpiCard label="New Leads"       value={String(kpi.newLeads)}               href="/leads"                                    note={periodLabel} />
+        <KpiCard label="New Leads"       value={String(kpi.newLeads)}               href="/leads"                                     note={periodLabel} />
         <KpiCard label="Overview"        value={String(kpi.readyToInstall)}         href={"/orders?status=READY_TO_INSTALL" as Route} />
       </div>
 
@@ -92,7 +122,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <Card
           title="Leads by source"
           eyebrow={`Overall ${overallConvPct} conversion`}
-          download={<CardDownloadButton filename="leads-by-source" rows={leadsRows} />}
+          download={<CardDownloadButton filename="leads-by-source" rows={leadsCSV} />}
         >
           {leads.length === 0 ? <Empty text="No leads yet." /> : (
             <ul className="divide-y divide-rule/60">
@@ -125,7 +155,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <Card
           title="Outstanding invoice ageing"
           eyebrow={`Total open · ${formatINR(totalOutstanding)}`}
-          download={<CardDownloadButton filename="invoice-ageing" rows={ageingRows} />}
+          download={<CardDownloadButton filename="invoice-ageing" rows={ageingCSV} />}
         >
           {totalOutstanding === 0n ? <Empty text="Every issued invoice is settled." /> : (
             <ul className="divide-y divide-rule/60">
@@ -152,7 +182,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <Card
           title="Top clients by revenue"
           eyebrow="Top 10 · all time · non-cancelled"
-          download={<CardDownloadButton filename="top-clients-revenue" rows={topClientsRows} />}
+          download={<CardDownloadButton filename="top-clients-revenue" rows={topClientsCSV} />}
         >
           {topClients.length === 0 ? <Empty text="No invoices yet." /> : (
             <ul className="divide-y divide-rule/60">
@@ -173,7 +203,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <Card
           title="Project margin snapshot"
           eyebrow="Top 10 by order value · order value − approved expenses"
-          download={<CardDownloadButton filename="project-margins" rows={marginsRows} />}
+          download={<CardDownloadButton filename="project-margins" rows={marginsCSV} />}
         >
           {margins.length === 0 ? <Empty text="No projects yet." /> : (
             <ul className="divide-y divide-rule/60">
@@ -220,10 +250,7 @@ function KpiCard({ label, value, href, note, warn }: {
 function Card({
   title, eyebrow, download, children,
 }: {
-  title: string;
-  eyebrow?: string;
-  download?: React.ReactNode;
-  children: React.ReactNode;
+  title: string; eyebrow?: string; download?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
     <div className="rounded-[14px] bg-surface border border-rule p-5 mb-4">
