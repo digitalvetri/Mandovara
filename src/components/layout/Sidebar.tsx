@@ -81,7 +81,7 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   {
     section: "Overview",
     items: [
-      { label: "My Dashboard", href: "/employee", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/employee", icon: LayoutDashboard },
       { label: "Projects",     href: "/projects", icon: Briefcase,       perm: "project.view" },
     ],
   },
