@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Ruler, Calendar, User, Hash } from "lucide-react";
+import { Ruler } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { listOrgRounds } from "@/modules/measurement/org-queries";
@@ -12,7 +12,6 @@ import { NewMeasurementSheet } from "./_components/NewMeasurementSheet";
 
 export const dynamic = "force-dynamic";
 
-// Superseded is an internal archival state — not useful for field staff.
 const FILTER_STATUSES: readonly MeasurementStatusStr[] = ["DRAFT", "SUBMITTED", "APPROVED"];
 
 const STATUS_STRIP: Record<string, string> = {
@@ -81,76 +80,100 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
         </form>
       </div>
 
-      {/* Content */}
+      {/* Table */}
       {rows.length === 0 ? (
         <EmptyRounds status={status ?? null} search={search ?? null} />
       ) : (
-        <ul className="space-y-2">
-          {rows.map((r) => (
-            <li key={r.id}>
-              <Link
-                href={`/projects/${r.project.id}/measurements/${r.id}` as Route}
-                className="group flex overflow-hidden rounded-[12px] border border-rule bg-surface hover:border-accent/50 hover:shadow-sm transition-all duration-150"
-              >
-                {/* Status accent strip */}
-                <div className={`w-[5px] shrink-0 ${STATUS_STRIP[r.status] ?? "bg-border"}`} />
+        <div className="overflow-hidden rounded-[12px] border border-rule bg-surface">
+          <table className="w-full border-collapse">
+            {/* Column headers */}
+            <thead>
+              <tr className="bg-surface-2 border-b border-rule">
+                <th className="w-[5px] p-0" aria-hidden />
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Round</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Project</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">Client</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Visited</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">By</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Status</th>
+                <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Items</th>
+                <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Rooms</th>
+                <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Rev</th>
+              </tr>
+            </thead>
 
-                {/* Main content */}
-                <div className="flex flex-1 items-center gap-4 px-5 py-4 min-w-0">
+            <tbody>
+              {rows.map((r, i) => (
+                <tr
+                  key={r.id}
+                  className={[
+                    "group relative transition-colors hover:bg-surface-2/60",
+                    i > 0 ? "border-t border-rule" : "",
+                  ].join(" ")}
+                >
+                  {/* Coloured accent strip */}
+                  <td className="p-0 w-[5px]">
+                    <div className={`h-full w-[5px] min-h-[60px] ${STATUS_STRIP[r.status] ?? "bg-border"}`} />
+                  </td>
 
                   {/* Round number */}
-                  <div className="shrink-0 w-[110px]">
-                    <div className="tabular text-[13px] font-semibold text-accent group-hover:text-accent">
+                  <td className="px-4 py-4">
+                    <Link
+                      href={`/projects/${r.project.id}/measurements/${r.id}` as Route}
+                      className="block tabular text-[13.5px] font-semibold text-accent hover:underline"
+                    >
                       {shortNumber(r.number)}
-                    </div>
-                    <div className="text-[10.5px] text-text-faint tabular mt-0.5">v{r.revision}</div>
-                  </div>
+                    </Link>
+                    <div className="tabular text-[10.5px] text-text-faint mt-0.5">v{r.revision}</div>
+                  </td>
 
-                  {/* Project + client */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13.5px] font-medium text-text truncate group-hover:text-accent transition-colors">
-                      {r.project.name}
-                    </div>
-                    <div className="text-[11.5px] text-text-dim truncate mt-0.5">
-                      {r.project.clientName}
-                    </div>
-                  </div>
+                  {/* Project */}
+                  <td className="px-4 py-4 max-w-[200px]">
+                    <div className="text-[13px] font-medium text-text truncate">{r.project.name}</div>
+                    <div className="text-[11px] text-text-dim mt-0.5 truncate md:hidden">{r.project.clientName}</div>
+                  </td>
 
-                  {/* Meta: date + measurer */}
-                  <div className="shrink-0 hidden md:flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-1.5 text-[11.5px] text-text-dim">
-                      <Calendar size={11} strokeWidth={1.75} />
-                      <span className="tabular">{formatDate(r.visitedAt)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11.5px] text-text-dim">
-                      <User size={11} strokeWidth={1.75} />
-                      <span>{r.measuredByName}</span>
-                    </div>
-                  </div>
+                  {/* Client */}
+                  <td className="px-4 py-4 text-[12.5px] text-text-dim hidden md:table-cell max-w-[160px]">
+                    <span className="truncate block">{r.project.clientName}</span>
+                  </td>
 
-                  {/* Counts */}
-                  <div className="shrink-0 hidden sm:flex flex-col items-center gap-1 w-[56px]">
-                    <div className="flex items-center gap-1 text-[11px] text-text-dim">
-                      <Ruler size={10} strokeWidth={1.75} />
-                      <span className="tabular font-medium text-text">{r.itemCount}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[10.5px] text-text-faint">
-                      <Hash size={9} strokeWidth={1.75} />
-                      <span className="tabular">{r.roomCount} rooms</span>
-                    </div>
-                  </div>
+                  {/* Visited */}
+                  <td className="px-4 py-4 tabular text-[12.5px] text-text-dim hidden lg:table-cell whitespace-nowrap">
+                    {formatDate(r.visitedAt)}
+                  </td>
 
-                  {/* Status pill */}
-                  <div className="shrink-0">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium ${STATUS_CHIP[r.status] ?? "bg-surface-2 text-text-dim"}`}>
+                  {/* By */}
+                  <td className="px-4 py-4 text-[12.5px] text-text-dim hidden lg:table-cell max-w-[140px]">
+                    <span className="truncate block">{r.measuredByName}</span>
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-4">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap ${STATUS_CHIP[r.status] ?? "bg-surface-2 text-text-dim"}`}>
                       {r.status.charAt(0) + r.status.slice(1).toLowerCase()}
                     </span>
-                  </div>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  </td>
+
+                  {/* Items */}
+                  <td className="px-4 py-4 text-right tabular text-[13px] font-medium text-text hidden sm:table-cell">
+                    {r.itemCount}
+                  </td>
+
+                  {/* Rooms */}
+                  <td className="px-4 py-4 text-right tabular text-[13px] text-text-dim hidden sm:table-cell">
+                    {r.roomCount}
+                  </td>
+
+                  {/* Rev */}
+                  <td className="px-4 py-4 text-right tabular text-[12px] text-text-faint">
+                    v{r.revision}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Pagination */}
