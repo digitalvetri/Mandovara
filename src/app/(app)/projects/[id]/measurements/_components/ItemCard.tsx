@@ -1,28 +1,147 @@
 "use client";
 
-// One MeasurementItem, rendered in the shape spec §5.2 mocked. The
-// left rule + swatch and the material block on the right are the two
-// signature elements the spec calls for. Warnings render in plain
-// English underneath, written for a client to read.
-
-import { useTransition } from "react";
-import { Camera, Trash2, PencilLine } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Camera, Trash2, PencilLine, Save, X } from "lucide-react";
 import type { ItemDetail } from "@/modules/measurement/queries";
-import { deleteMeasurementItem } from "@/modules/measurement/actions-item";
+import { deleteMeasurementItem, updateMeasurementItem } from "@/modules/measurement/actions-item";
+import {
+  SURFACE_TYPES, HEADING_TYPES, LAY_PATTERNS, MOUNT_TYPES, PRODUCT_FAMILIES,
+} from "@/modules/measurement/schema";
 
 interface ItemCardProps {
-  item:     ItemDetail;
-  editable: boolean;
+  item:          ItemDetail;
+  measurementId: string;
+  editable:      boolean;
 }
 
-export function ItemCard({ item, editable }: ItemCardProps) {
+type Family = (typeof PRODUCT_FAMILIES)[number];
+const CURTAIN_LIKE = new Set<Family>(["CURTAIN_FABRIC", "SHEER"]);
+const FLOORING_LIKE = new Set<Family>(["FLOORING"]);
+const BLIND_LIKE = new Set<Family>(["BLIND"]);
+
+export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
   const [pending, start] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Edit-form state — initialised from item on each open
+  const [label,       setLabel]       = useState(item.label);
+  const [surface,     setSurface]     = useState<(typeof SURFACE_TYPES)[number]>(item.surface as (typeof SURFACE_TYPES)[number]);
+  const [family,      setFamily]      = useState<Family>(item.family as Family);
+  const [widthMm,     setWidthMm]     = useState(String(item.widthMm));
+  const [heightMm,    setHeightMm]    = useState(String(item.heightMm));
+  const [quantity,    setQuantity]    = useState(String(item.quantity));
+  const [headingType, setHeadingType] = useState<(typeof HEADING_TYPES)[number]>(
+    (item.headingType ?? "EYELET") as (typeof HEADING_TYPES)[number],
+  );
+  const [layPattern,  setLayPattern]  = useState<(typeof LAY_PATTERNS)[number]>(
+    (item.layPattern ?? "STRAIGHT") as (typeof LAY_PATTERNS)[number],
+  );
+  const [mountType,   setMountType]   = useState<(typeof MOUNT_TYPES)[number]>(
+    (item.mountType ?? "INSIDE") as (typeof MOUNT_TYPES)[number],
+  );
+  const [notes, setNotes] = useState(item.notes ?? "");
+
+  const showHeading = CURTAIN_LIKE.has(family);
+  const showLay     = FLOORING_LIKE.has(family);
+  const showMount   = BLIND_LIKE.has(family);
+
+  function openEdit() {
+    setLabel(item.label);
+    setSurface(item.surface as (typeof SURFACE_TYPES)[number]);
+    setFamily(item.family as Family);
+    setWidthMm(String(item.widthMm));
+    setHeightMm(String(item.heightMm));
+    setQuantity(String(item.quantity));
+    setHeadingType((item.headingType ?? "EYELET") as (typeof HEADING_TYPES)[number]);
+    setLayPattern((item.layPattern ?? "STRAIGHT") as (typeof LAY_PATTERNS)[number]);
+    setMountType((item.mountType ?? "INSIDE") as (typeof MOUNT_TYPES)[number]);
+    setNotes(item.notes ?? "");
+    setError(null);
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    setError(null);
+    const w = parseFloat(widthMm);
+    const h = parseFloat(heightMm);
+    const q = parseInt(quantity, 10);
+    if (!label.trim())                    { setError("Label required"); return; }
+    if (!Number.isFinite(w) || w <= 0)   { setError("Width required"); return; }
+    if (!Number.isFinite(h) || h <= 0)   { setError("Height required"); return; }
+    start(async () => {
+      const r = await updateMeasurementItem({
+        id:            item.id,
+        measurementId,
+        roomId:        item.roomId,
+        label:         label.trim(),
+        surface,
+        family,
+        widthMm:  w,
+        heightMm: h,
+        quantity:  Number.isFinite(q) && q > 0 ? q : 1,
+        notes:     notes.trim() || undefined,
+        ...(showHeading && { headingType, fullness: 2.5 }),
+        ...(showLay     && { layPattern }),
+        ...(showMount   && { mountType }),
+      });
+      if (!r.ok) { setError(r.error ?? "Could not save"); return; }
+      setEditing(false);
+    });
+  }
 
   function onDelete() {
     if (!confirm(`Delete "${item.label}"?`)) return;
-    start(async () => {
-      await deleteMeasurementItem({ id: item.id });
-    });
+    start(async () => { await deleteMeasurementItem({ id: item.id }); });
+  }
+
+  if (editing) {
+    return (
+      <article className="rounded-[8px] border border-accent/40 bg-surface overflow-hidden">
+        <div className="border-b border-rule px-4 py-2.5 text-[11.5px] uppercase tracking-[0.06em] text-text-dim flex items-center justify-between">
+          <span>Editing — {item.label}</span>
+          <button type="button" onClick={() => setEditing(false)} className="text-text-dim hover:text-text">
+            <X size={13} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4">
+          <EField label="Label"       value={label}    onChange={setLabel}    placeholder="Window 1 — East" width="col-span-2" />
+          <ESelect label="Surface"    value={surface}   onChange={(v) => setSurface(v as typeof surface)}   options={SURFACE_TYPES} />
+          <ESelect label="Family"     value={family}    onChange={(v) => setFamily(v as Family)}            options={PRODUCT_FAMILIES} />
+          <EField label="Quantity"    value={quantity}  onChange={setQuantity}  inputMode="numeric" />
+          <EField label="Width (mm)"  value={widthMm}   onChange={setWidthMm}   inputMode="decimal" />
+          <EField label="Height (mm)" value={heightMm}  onChange={setHeightMm}  inputMode="decimal" />
+          {showHeading && (
+            <ESelect label="Heading"  value={headingType} onChange={(v) => setHeadingType(v as typeof headingType)} options={HEADING_TYPES} />
+          )}
+          {showLay && (
+            <ESelect label="Lay pattern" value={layPattern} onChange={(v) => setLayPattern(v as typeof layPattern)} options={LAY_PATTERNS} />
+          )}
+          {showMount && (
+            <ESelect label="Mount"    value={mountType} onChange={(v) => setMountType(v as typeof mountType)} options={MOUNT_TYPES} />
+          )}
+          <EField label="Notes"       value={notes}     onChange={setNotes}   width="col-span-2 lg:col-span-4" />
+        </div>
+        <div className="flex items-center justify-between border-t border-rule px-4 py-2.5">
+          {error ? (
+            <span className="text-[11px] text-fault">{error}</span>
+          ) : (
+            <span className="text-[11px] text-text-dim">Dimensions in millimetres.</span>
+          )}
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setEditing(false)}
+              className="inline-flex items-center gap-1.5 rounded-[6px] border border-rule px-3 py-1.5 text-[11.5px] text-text-dim hover:text-text transition-colors">
+              Cancel
+            </button>
+            <button type="button" onClick={saveEdit} disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-[6px] bg-accent px-4 py-1.5 text-[11.5px] font-medium text-white hover:opacity-90 disabled:opacity-60 transition-colors">
+              {pending ? <span className="animate-spin">⟳</span> : <Save size={12} />}
+              Save
+            </button>
+          </div>
+        </div>
+      </article>
+    );
   }
 
   return (
@@ -97,43 +216,73 @@ export function ItemCard({ item, editable }: ItemCardProps) {
         </div>
       </div>
 
-      {/* Warnings — full width, plain English */}
-      {item.calc && item.calc.warnings.length > 0 && (
-        <div className="col-span-2 border-t border-rule bg-surface-2/50 px-4 py-2">
-          <ul className="space-y-1">
-            {item.calc.warnings.map((w, i) => (
-              <li key={i} className="text-[11px] text-heat before:mr-1.5 before:content-['⚠']">
-                {w}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Actions row — Edit/Delete only render on DRAFT rounds. */}
+      {/* Actions row */}
       <div className="col-span-2 border-t border-rule px-4 py-2 flex justify-end items-center gap-3">
         {editable && (
-            <>
-              <button
-                type="button"
-                disabled
-                className="inline-flex items-center gap-1 text-[10.5px] text-text-faint opacity-50 cursor-not-allowed"
-                title="Inline editing lands in the field PWA (next session)"
-              >
-                <PencilLine size={10} /> Edit
-              </button>
-              <button
-                type="button"
-                onClick={onDelete}
-                disabled={pending}
-                className="inline-flex items-center gap-1 text-[10.5px] text-fault hover:text-fault-strong disabled:opacity-60"
-              >
-                <Trash2 size={10} /> Delete
-              </button>
-            </>
-          )}
-        </div>
+          <>
+            <button
+              type="button"
+              onClick={openEdit}
+              disabled={pending}
+              className="inline-flex items-center gap-1 text-[10.5px] text-text-dim hover:text-accent transition-colors disabled:opacity-60"
+            >
+              <PencilLine size={10} /> Edit
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={pending}
+              className="inline-flex items-center gap-1 text-[10.5px] text-fault hover:text-fault-strong disabled:opacity-60"
+            >
+              <Trash2 size={10} /> Delete
+            </button>
+          </>
+        )}
+      </div>
     </article>
+  );
+}
+
+// ── Inline edit field primitives ──────────────────────────────────────
+function EField({
+  label, value, onChange, placeholder, inputMode, width,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder?: string; inputMode?: "decimal" | "numeric"; width?: string;
+}) {
+  return (
+    <label className={`flex flex-col gap-1 ${width ?? ""}`}>
+      <span className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim">{label}</span>
+      <input
+        type="text"
+        inputMode={inputMode}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-[36px] rounded-[6px] border border-rule bg-transparent px-2 text-[12.5px] text-text tabular"
+      />
+    </label>
+  );
+}
+
+function ESelect({
+  label, value, onChange, options,
+}: {
+  label: string; value: string; onChange: (v: string) => void; options: readonly string[];
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[36px] rounded-[6px] border border-rule bg-transparent px-2 pr-8 text-[12.5px] text-text"
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>{o.replace(/_/g, " ")}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

@@ -111,7 +111,7 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
           <select
             value={roomId}
             onChange={(e) => setRoomId(e.target.value)}
-            className="h-[36px] rounded-[6px] border border-rule bg-transparent px-2 text-[12px] text-text"
+            className="h-[36px] min-w-0 max-w-[200px] rounded-[6px] border border-rule bg-transparent px-2 pr-7 text-[12px] text-text"
           >
             {rooms.length === 0 && <option value="">No rooms yet</option>}
             {rooms.map((r) => (
@@ -186,15 +186,26 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
             Dimensions in millimetres. Live calc runs on save.
           </span>
         )}
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-[6px] bg-accent px-4 py-1.5 text-[11.5px] font-medium text-white hover:opacity-90 disabled:opacity-60 transition-colors"
-        >
-          {pending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-          Save
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={save}
+            disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-[6px] border border-rule px-3 py-1.5 text-[11.5px] text-text-dim hover:text-text hover:border-text-dim disabled:opacity-60 transition-colors"
+          >
+            {pending ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+            Add item
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-[6px] bg-accent px-4 py-1.5 text-[11.5px] font-medium text-white hover:opacity-90 disabled:opacity-60 transition-colors"
+          >
+            {pending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            Save
+          </button>
+        </div>
       </div>
     </div>
   );
