@@ -18,8 +18,10 @@ export interface SiteVisit {
   day: string;
   month: string;
   name: string;
-  meta: string; // "Measurement · 10:30 AM"
-  owner: string;
+  meta: string;       // "Measurement · 10:30 AM"
+  assignee: string;   // team member's name
+  status: string;
+  isOverdue: boolean; // past scheduledAt, still SCHEDULED
 }
 
 export type ActivityKind = "quote" | "payment" | "lead";

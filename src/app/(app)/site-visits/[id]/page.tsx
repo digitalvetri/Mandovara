@@ -6,6 +6,7 @@ import { devContext } from "@/lib/dev-context";
 import { getSiteVisit } from "@/modules/site-visits/queries";
 import { formatDate } from "@/kernel/datetime";
 import { Calendar, MapPin, User, FileText, Camera, ArrowLeft } from "lucide-react";
+import { VisitStatusActions } from "./_components/VisitStatusActions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ const STATUS_CHIP: Record<string, string> = {
   COMPLETED:   "bg-solid/12 text-solid",
   CANCELLED:   "bg-surface-2 text-text-dim",
   RESCHEDULED: "bg-heat/12 text-heat",
+  NO_SHOW:     "bg-fault/12 text-fault",
 };
 
 export default async function SiteVisitDetailPage({
@@ -97,6 +99,8 @@ export default async function SiteVisitDetailPage({
             )}
           </div>
         </section>
+
+        <VisitStatusActions visitId={visit.id} status={visit.status} />
 
         {/* Notes */}
         {(hasObserved || hasCustomer) && (

@@ -18,7 +18,7 @@ const VISIT_PURPOSES = [
   "INITIAL_SURVEY", "MEASUREMENT", "SAMPLE_SHOWING", "SUPERVISION", "SNAG_FIX", "HANDOVER",
 ] as const;
 
-const VISIT_STATUSES = ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "RESCHEDULED"] as const;
+const VISIT_STATUSES = ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "RESCHEDULED", "NO_SHOW"] as const;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}T/);
 

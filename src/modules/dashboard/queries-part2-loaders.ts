@@ -53,37 +53,63 @@ export async function loadProjectStages(db: Db): Promise<ProjectStage[]> {
 }
 
 export async function loadSiteVisits(db: Db, now: Date): Promise<SiteVisit[]> {
-  // Upcoming install visits scheduled within the next 30 days
-  const visits = await db.installVisit.findMany({
-    where: {
-      status: "SCHEDULED",
-      scheduledAt: { gte: now, lte: addDays(now, 30) },
-    },
-    orderBy: { scheduledAt: "asc" },
-    take: SITE_VISITS_LIMIT,
-    include: {
-      project: {
-        select: {
-          name: true,
-          siteAddress: true,
-          client: { select: { name: true } },
-        },
+  const SELECT = {
+    id: true, scheduledAt: true, purpose: true, status: true, assignedToId: true,
+    project: { select: { name: true } },
+  } as const;
+
+  const [overdue, upcoming] = await Promise.all([
+    // Past scheduledAt and still SCHEDULED → missed / no update yet
+    db.siteVisit.findMany({
+      where: { status: "SCHEDULED", scheduledAt: { lt: now } },
+      orderBy: { scheduledAt: "desc" },
+      take: 5,
+      select: SELECT,
+    }),
+    // Coming up in the next 14 days
+    db.siteVisit.findMany({
+      where: {
+        status: { in: ["SCHEDULED", "IN_PROGRESS"] },
+        scheduledAt: { gte: now, lte: addDays(now, 14) },
       },
-    },
-  });
-  return visits.map((v, i) => {
+      orderBy: { scheduledAt: "asc" },
+      take: SITE_VISITS_LIMIT,
+      select: SELECT,
+    }),
+  ]);
+
+  const all = [...overdue, ...upcoming];
+  const userIds = [...new Set(all.map((v) => v.assignedToId))];
+  const users = userIds.length
+    ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
+    : [];
+  const nameById = new Map(users.map((u) => [u.id, u.name]));
+
+  const PURPOSE_SHORT: Record<string, string> = {
+    INITIAL_SURVEY: "Initial Survey", MEASUREMENT: "Measurement",
+    SAMPLE_SHOWING: "Sample Showing", SUPERVISION: "Supervision",
+    SNAG_FIX: "Snag Fix", HANDOVER: "Handover",
+  };
+
+  function toRow(v: (typeof all)[number], isOverdue: boolean): SiteVisit {
     const d = v.scheduledAt;
-    const kinds = ["Installation", "Site survey", "Measurement"] as const;
-    const addr = v.project.siteAddress as { city?: string } | null;
+    const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
     return {
-      id: v.id,
-      day: String(d.getDate()).padStart(2, "0"),
-      month: d.toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" }).toUpperCase(),
-      name: v.project.name,
-      meta: `${kinds[i % kinds.length]} · ${["10:30 AM", "2:00 PM", "11:00 AM"][i % 3]}`,
-      owner: addr?.city ?? "Coimbatore",
+      id:        v.id,
+      day:       String(d.getDate()).padStart(2, "0"),
+      month:     d.toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" }).toUpperCase(),
+      name:      v.project?.name ?? "Site visit",
+      meta:      `${PURPOSE_SHORT[v.purpose] ?? v.purpose} · ${time}`,
+      assignee:  nameById.get(v.assignedToId) ?? "—",
+      status:    v.status,
+      isOverdue,
     };
-  });
+  }
+
+  return [
+    ...overdue.map((v) => toRow(v, true)),
+    ...upcoming.map((v) => toRow(v, false)),
+  ];
 }
 
 export async function loadRecentActivity(db: Db): Promise<ActivityItem[]> {
