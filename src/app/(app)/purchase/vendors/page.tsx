@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
+import { Plus, Star } from "lucide-react";
+import { Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
 import { listVendors } from "@/modules/vendors/queries";
@@ -23,52 +24,103 @@ export default async function VendorsPage({
   return (
     <>
       <Topbar
-        title="Vendors"
+        title="Purchase & Vendors"
         eyebrow={`${total} vendor${total === 1 ? "" : "s"}${q ? ` · matching "${q}"` : ""}`}
         actions={
-          <div className="flex items-center gap-2">
-            <Link href={"/purchase" as Route}
-                  className="h-[38px] px-3 grid place-items-center rounded-[8px] bg-surface border border-rule text-[12.5px] text-text-dim hover:text-text hover:bg-surface-hover transition-colors">
-              POs
-            </Link>
-            <PrimaryButton href="/purchase/vendors/new">New Vendor</PrimaryButton>
-          </div>
+          <Link
+            href={"/purchase/vendors/new" as Route}
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[8px] bg-accent text-[12.5px] font-medium text-white hover:opacity-90 transition-colors"
+          >
+            <Plus size={14} strokeWidth={2} />
+            New vendor
+          </Link>
         }
       />
+
+      {/* Tabs */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="flex gap-1 rounded-[10px] border border-rule bg-surface-2 p-1">
+          <TabLink href="/purchase" label="Purchase Orders" active={false} />
+          <TabLink href="/purchase/vendors" label="Vendors" active />
+        </div>
+
+        {/* Search */}
+        <form action="/purchase/vendors" method="GET" className="ml-auto">
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="Search vendors…"
+            className="h-[34px] w-[220px] rounded-[8px] border border-rule bg-transparent px-3 text-[12.5px] text-text placeholder:text-text-faint focus:border-accent focus:outline-none transition-colors"
+          />
+        </form>
+      </div>
+
       {rows.length === 0 ? (
-        <div className="rounded-[14px] bg-surface border border-rule py-16 text-center">
-          <div className="text-[14px] text-text mb-2">No vendors yet.</div>
+        <div className="rounded-[12px] bg-surface border border-rule py-16 text-center">
+          <div className="text-[14px] font-medium text-text mb-1.5">No vendors yet.</div>
           <p className="text-[12px] text-text-dim">
-            Add your first vendor to start issuing POs. →{" "}
-            <Link href={"/purchase/vendors/new" as Route} className="text-accent hover:underline">New vendor</Link>
+            Add your first vendor to start issuing POs.{" "}
+            <Link href={"/purchase/vendors/new" as Route} className="text-accent hover:underline">New vendor →</Link>
           </p>
         </div>
       ) : (
-        <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-          <table className="w-full text-[12.5px]">
+        <div className="overflow-hidden rounded-[12px] border border-rule bg-surface">
+          <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
-                <th className="px-4 h-[34px] text-left font-medium">Code</th>
-                <th className="px-4 h-[34px] text-left font-medium">Name</th>
-                <th className="px-4 h-[34px] text-left font-medium">Mobile</th>
-                <th className="px-4 h-[34px] text-left font-medium">GSTIN</th>
-                <th className="px-4 h-[34px] text-right font-medium">Terms</th>
-                <th className="px-4 h-[34px] text-right font-medium">Lead time</th>
+              <tr className="bg-surface-2 border-b border-rule">
+                <th className="w-[5px] p-0" aria-hidden />
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Vendor</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">Mobile</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">GSTIN</th>
+                <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Terms</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Lead time</th>
+                <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Rating</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((v) => (
-                <tr key={v.id} className="border-b border-rule/70 last:border-0 hover:bg-surface-hover transition-colors">
-                  <td className="px-4 py-2 tabular text-text-dim text-[11.5px]">{v.code}</td>
-                  <td className="px-4 py-2">
-                    <Link href={`/purchase/vendors/${v.id}` as Route} className="text-text hover:text-accent">
+              {rows.map((v, i) => (
+                <tr
+                  key={v.id}
+                  className={[
+                    "group transition-colors hover:bg-surface-2/60",
+                    i > 0 ? "border-t border-rule" : "",
+                  ].join(" ")}
+                >
+                  {/* Accent strip keyed to lead time */}
+                  <td className="p-0 w-[5px]">
+                    <div className={`h-full w-[5px] min-h-[60px] ${leadStrip(v.leadTimeDays)}`} />
+                  </td>
+
+                  <td className="px-4 py-4">
+                    <Link
+                      href={`/purchase/vendors/${v.id}` as Route}
+                      className="block text-[13px] font-semibold text-accent hover:underline"
+                    >
                       {v.name}
                     </Link>
+                    <div className="text-[11px] text-text-faint mt-0.5 tabular">{v.code}</div>
                   </td>
-                  <td className="px-4 py-2 tabular">{v.mobile}</td>
-                  <td className="px-4 py-2 tabular text-text-dim">{v.gstin ?? "—"}</td>
-                  <td className="px-4 py-2 text-right tabular text-text-dim">{v.paymentTermsDays}d</td>
-                  <td className="px-4 py-2 text-right tabular text-text-dim">{v.leadTimeDays}d</td>
+
+                  <td className="px-4 py-4 tabular text-[12.5px] text-text-dim hidden md:table-cell">
+                    {v.mobile}
+                  </td>
+
+                  <td className="px-4 py-4 tabular text-[12px] text-text-dim hidden lg:table-cell">
+                    {v.gstin ?? <span className="text-text-faint">—</span>}
+                  </td>
+
+                  <td className="px-4 py-4 text-right tabular text-[12.5px] text-text-dim hidden sm:table-cell">
+                    {v.paymentTermsDays}d
+                  </td>
+
+                  <td className="px-4 py-4">
+                    <LeadTimeBadge days={v.leadTimeDays} />
+                  </td>
+
+                  <td className="px-4 py-4 hidden sm:table-cell">
+                    <RatingDots rating={v.rating} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -77,6 +129,55 @@ export default async function VendorsPage({
       )}
       <Pager page={page} pageSize={pageSize} total={total} />
     </>
+  );
+}
+
+function TabLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href as Route}
+      className={[
+        "rounded-[7px] px-4 py-1.5 text-[12.5px] font-medium transition-colors",
+        active ? "bg-surface shadow-sm text-text" : "text-text-dim hover:text-text",
+      ].join(" ")}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function leadStrip(days: number): string {
+  if (days <= 7)  return "bg-solid";
+  if (days <= 14) return "bg-heat";
+  return "bg-fault";
+}
+
+function LeadTimeBadge({ days }: { days: number }) {
+  const [bg, text] = days <= 7
+    ? ["bg-solid/12", "text-solid"]
+    : days <= 14
+      ? ["bg-heat/12", "text-heat"]
+      : ["bg-fault/12", "text-fault"];
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 tabular text-[11px] font-medium ${bg} ${text}`}>
+      {days}d
+    </span>
+  );
+}
+
+function RatingDots({ rating }: { rating: number | null }) {
+  if (rating == null) return <span className="text-[12px] text-text-faint">—</span>;
+  return (
+    <div className="flex items-center gap-0.5" title={`Rating: ${rating}/5`}>
+      {Array.from({ length: 5 }).map((_, idx) => (
+        <Star
+          key={idx}
+          size={11}
+          className={idx < rating ? "text-gold" : "text-rule fill-none"}
+          fill={idx < rating ? "currentColor" : "none"}
+        />
+      ))}
+    </div>
   );
 }
 

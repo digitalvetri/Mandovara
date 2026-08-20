@@ -212,6 +212,37 @@ export async function listColourwaysForPO(ctx: RequestContext) {
 
 export type ColourwayPickerRow = Awaited<ReturnType<typeof listColourwaysForPO>>[0];
 
+// ── PO KPIs ───────────────────────────────────────────────────────────────────
+
+export interface POKPIs {
+  openCount: number;
+  outstandingValue: bigint;
+  overdueCount: number;
+}
+
+export async function getPOKPIs(ctx: RequestContext): Promise<POKPIs> {
+  requirePermission(ctx, "po.view");
+  const db = scoped(ctx);
+
+  const now = new Date();
+
+  const [openRows, overdueCount] = await Promise.all([
+    db.purchaseOrder.findMany({
+      where: { status: { in: ["DRAFT", "SENT", "PARTIAL"] as POStatus[] } },
+      select: { totalValue: true },
+    }),
+    db.purchaseOrder.count({
+      where: {
+        status: { in: ["SENT", "PARTIAL"] as POStatus[] },
+        expectedAt: { lt: now },
+      },
+    }),
+  ]);
+
+  const outstandingValue = openRows.reduce((s, r) => s + r.totalValue, 0n);
+  return { openCount: openRows.length, outstandingValue, overdueCount };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function subDec(a: string, b: string): string {
