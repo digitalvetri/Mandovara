@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { redirect } from "next/navigation";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR, formatINRShort } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { shortNumber } from "@/lib/short-number";
+import { can } from "@/kernel/rbac/guard";
 import { getReportKpis } from "@/modules/reports/kpi";
 import { leadsBySource, invoiceAgeing, topClientsByRevenue, projectMarginTop } from "@/modules/reports/queries";
 import { DateRangeFilter } from "./_components/DateRangeFilter";
@@ -23,6 +25,11 @@ interface SP { from?: string; to?: string }
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const p   = await searchParams;
   const ctx = await devContext();
+
+  if (!can(ctx, "report.view.sales")) {
+    redirect(ctx.roles[0] === "OWNER" ? "/" : "/employee");
+  }
+
   const from = p.from ? new Date(p.from) : undefined;
   const to   = p.to   ? new Date(`${p.to}T23:59:59`) : undefined;
 
