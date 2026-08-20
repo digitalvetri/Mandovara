@@ -125,7 +125,7 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
         <div className="hidden sm:flex items-center gap-2.5 h-[38px] px-3 rounded-[10px] shrink-0 cursor-default border on-chrome">
           {/* Avatar with gold accent to distinguish from teal CTA */}
           <div
-            className="h-[26px] w-[26px] rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-accent text-white"
+            className="h-[26px] w-[26px] rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-accent-chrome text-ink"
           >
             {ini}
           </div>

@@ -167,6 +167,7 @@ export default async function DashboardPage() {
 
       <section className="stagger mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <KpiCard
+          featured
           label="Revenue (MTD)"
           value={formatLakhs(d.revenueMtd)}
           subtitle={`vs ${formatLakhs(d.revenueMtdPrev)} last month`}

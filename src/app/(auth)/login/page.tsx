@@ -60,9 +60,9 @@ export default async function LoginPage() {
                 border: "1px solid color-mix(in oklab, var(--color-accent) 30%, transparent)",
               }}
             >
-              <span className="w-[6px] h-[6px] rounded-full bg-accent" />
+              <span className="w-[6px] h-[6px] rounded-full bg-accent-chrome" />
               <span
-                className="text-[10px] font-semibold tracking-[0.18em] uppercase text-accent"
+                className="text-[10px] font-semibold tracking-[0.18em] uppercase text-accent-chrome"
               >
                 Studio Console
               </span>
@@ -72,7 +72,7 @@ export default async function LoginPage() {
           {/* Centre: headline + tagline */}
           <div className="rise" style={{ "--d": "90ms" } as React.CSSProperties}>
             <div
-              className="text-[10px] font-semibold tracking-[0.26em] uppercase mb-5 text-accent"
+              className="text-[10px] font-semibold tracking-[0.26em] uppercase mb-5 text-accent-chrome"
             >
               Measure · Quote · Install
             </div>

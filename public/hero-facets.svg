@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280" viewBox="0 0 1200 280" fill="none" preserveAspectRatio="xMaxYMid slice">
+  <!--
+    Hero prisms — light broken through glass, weighted to the right so the
+    greeting and the clock keep the left two-thirds clear.
+
+    Built from flat polygons and linear gradients rather than a raster: it
+    scales to any band height, weighs ~2KB, and re-tints with the theme because
+    every fill is the same hue as the accent rather than a baked screenshot.
+  -->
+  <defs>
+    <linearGradient id="pane-a" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#7FE8DA" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#7FE8DA" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="pane-b" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#39C9B6" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#39C9B6" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="pane-c" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#B8FFF3" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#B8FFF3" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#CFFFF6" stop-opacity="0.55"/>
+      <stop offset="60%"  stop-color="#CFFFF6" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#CFFFF6" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wash" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#0C2B29" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#39C9B6" stop-opacity="0.10"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ambient wash so the shards sit in light rather than on a flat ground. -->
+  <rect x="560" y="0" width="640" height="280" fill="url(#wash)"/>
+
+  <!-- Broad background panes, low contrast. -->
+  <polygon points="742,280 900,-20 1010,-20 830,280"   fill="url(#pane-a)"/>
+  <polygon points="880,280 1052,-20 1200,-20 1200,120 1010,280" fill="url(#pane-b)"/>
+  <polygon points="632,280 760,60 812,120 700,280"     fill="url(#pane-c)"/>
+
+  <!-- Foreground shards, brighter and narrower. -->
+  <polygon points="948,280 1078,20 1122,74 1016,280"   fill="url(#pane-a)"/>
+  <polygon points="1096,214 1200,52 1200,168 1150,280 1074,280" fill="url(#pane-c)"/>
+
+  <!-- Lit edges. These are what read as glass rather than as flat shapes. -->
+  <path d="M900,-20 L742,280"   stroke="url(#edge)" stroke-width="1.25"/>
+  <path d="M1052,-20 L880,280"  stroke="url(#edge)" stroke-width="1.25"/>
+  <path d="M1078,20 L948,280"   stroke="url(#edge)" stroke-width="1"/>
+  <path d="M760,60 L632,280"    stroke="url(#edge)" stroke-width="0.9"/>
+  <path d="M1200,52 L1096,214"  stroke="url(#edge)" stroke-width="0.9"/>
+</svg>

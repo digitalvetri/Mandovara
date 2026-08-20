@@ -1344,11 +1344,22 @@ class over a dark default.)
 unlayered `input { background: … }` silently defeats `bg-transparent` on every
 input in the app.
 
-**Chrome vs canvas.** The topbar and rail are dark in *both* themes. Controls
-mounted on them use the `.on-chrome` utility, which derives from the sidebar
-tokens; using `bg-surface` there renders a white pill with white text in the
-light theme. Dropdown *panels* still use `bg-surface` — they float over the
-canvas, not the chrome.
+**Chrome vs canvas.** The topbar, rail, hero band and any featured card are
+dark in *both* themes. Controls mounted on them use the `.on-chrome` utility,
+which derives from the sidebar tokens; using `bg-surface` there renders a white
+pill with white text in the light theme. Dropdown *panels* still use
+`bg-surface` — they float over the canvas, not the chrome.
+
+The same applies to colour: **`--color-accent` is solved against white and
+measures only 3.53:1 on the rail.** Accent-coloured elements on chrome take
+`--color-accent-chrome` (the dark-theme accent, declared in both themes,
+7.79:1 on the rail). Active nav bar, topbar avatar, hero accents, featured
+cards.
+
+**One accent per screen.** Colour encodes *state*, never *category*. A row of
+KPI cards gets one accent and red only where something is genuinely wrong;
+cards are told apart by icon and label. Gold is not usable on light grounds —
+darkened to clear 4.5:1 on white it becomes brown.
 
 **Type:** Fraunces (display, weight 560, tracking −0.015em, `font-optical-sizing:auto`) · Inter (UI body, 13px base) · **Geist Mono with `tabular-nums` for every numeral** — ₹, mm, metres, sqft, roll counts, dates · Noto Sans Tamil on field surfaces.
 Scale: display 32/38 · h1 26/32 · h2 20/28 · h3 16/24 · body 13/20 · caption 12/16 · eyebrow 11 caps +0.08em.

@@ -54,6 +54,14 @@
   --color-accent-dim:    oklch(0.400 0.090 182);
   --color-accent-tint:   oklch(0.516 0.105 182 / 0.10);
 
+  /* The accent AS USED ON THE DARK CHROME. --color-accent is solved against
+     white, so on the rail it measures 3.53:1 — under the floor — and the
+     active-nav bar, the topbar avatar and the hero dot were all quietly
+     failing it in the light theme. The chrome is dark in BOTH themes, so this
+     is the dark-theme accent in both: 7.79:1 on the rail. Same reasoning as
+     .on-chrome; this is its colour half. */
+  --color-accent-chrome: oklch(0.720 0.115 182);
+
   /* ── Gold — demoted from co-star to a rare hairline and the avatar chip.
      Kept as a token because :focus-visible, .hairline and /styleguide read it. */
   --color-gold:          oklch(0.534 0.105 85);    /* #89670E  4.5:1 */
@@ -147,6 +155,7 @@
   --color-accent-hover:  oklch(0.790 0.105 182);
   --color-accent-dim:    oklch(0.520 0.095 182);
   --color-accent-tint:   oklch(0.720 0.115 182 / 0.14);
+  --color-accent-chrome: oklch(0.720 0.115 182);
 
   --color-gold:          oklch(0.780 0.095 85);
   --color-gold-strong:   oklch(0.860 0.085 85);
@@ -303,22 +312,58 @@ html, body {
 .on-chrome-rule  { background-color: color-mix(in oklab, var(--color-sidebar-text) 18%, transparent); }
 
 /* ── Sidebar rail decoration ────────────────────────────────────────
-   Line art of the trade's own instruments, at a whisper. The opacity lives
-   here rather than in the SVG so the asset stays a drawing and the two themes
-   can carry it at different strengths — Malachite's ground is darker, so the
-   same art reads louder there and is pulled back.
+   Crystalline facets, matching the hero band — the two surfaces should read as
+   one piece of glass catching light, not as two separate decorations. This
+   replaced line art of wallpaper rolls and swatch fans: recognisable at full
+   size, fog at 264px on a laptop, which is not a texture but a smudge.
+
+   The opacity lives here rather than in the SVG so the asset stays artwork and
+   the two themes can carry it at different strengths — Malachite's ground is
+   darker, so the same graphic reads louder there and is pulled back.
 
    Both layers are inert: pointer-events none, aria-hidden on the element, and
    the nav sits above them on z-index. Nothing here may touch legibility —
    sidebar text stays at 16.9:1 over the rail with the motif applied. */
 .chrome-motif {
-  background-image: url("/sidebar-motif.svg");
+  background-image: url("/chrome-facets.svg");
   background-repeat: repeat-y;
   background-position: top left;
   background-size: var(--sidebar-w) auto;
   opacity: 0.075;
 }
 :root.dark .chrome-motif { opacity: 0.055; }
+
+/* Hero prisms — right-weighted so the greeting and clock keep the left of the
+   band clear. `cover` on a wide short band would crop the shards to mush, so
+   the SVG carries its own preserveAspectRatio and this only positions it. */
+.hero-facets {
+  background-image: url("/hero-facets.svg");
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: auto 100%;
+}
+
+/* The same prisms at card scale. `auto 100%` on a 300px-wide card crops the
+   shards into broad bands that swamp the numeral — this holds the whole
+   graphic and drops it back so it stays a texture behind the figure. */
+.card-facets {
+  background-image: url("/hero-facets.svg");
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: 150% 150%;
+  opacity: 0.45;
+}
+
+/* Page ground. Flat porcelain was the honest read of "premium restraint" and
+   it came back as "unfinished" — two soft washes give the canvas somewhere to
+   recede to without introducing a second hue. Fixed attachment so the light
+   stays put while content scrolls under it. */
+.page-wash {
+  background:
+    radial-gradient(90rem 40rem at 88% -10%, color-mix(in oklab, var(--color-accent) 9%, transparent) 0%, transparent 60%),
+    radial-gradient(70rem 34rem at -8% 4%, color-mix(in oklab, var(--color-accent) 5%, transparent) 0%, transparent 55%);
+  background-attachment: fixed;
+}
 
 /* Depth: lit from the top, settling into shadow at the foot — the vignette a
    real panel has. Sits over the motif so the art recedes as it descends. */

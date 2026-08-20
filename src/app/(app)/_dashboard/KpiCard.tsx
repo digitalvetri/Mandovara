@@ -1,70 +1,122 @@
+import type { LucideIcon } from "lucide-react";
+import { IndianRupee, Package, Users, FileText } from "lucide-react";
+
 interface KpiCardProps {
   label: string;
   value: string;
   subtitle: string;
   trend: string;
   trendTone: "good" | "warn" | "bad";
-  // Colour of the vertical swatch strip on the card's left edge — a specimen
-  // label from a fabric book. Defaults chosen by KPI label below.
-  swatch?: "teal" | "gold" | "steel" | "fault";
+  /** The lead card of a row — dark ground, larger numeral. One per row. */
+  featured?: boolean;
+  icon?: LucideIcon;
 }
 
-// Trend pill tones. Kept as semantic token names so a theme flip does not
-// strand these colours.
+// Trend pill tones. Semantic token names so a theme flip does not strand them.
 const toneClass: Record<KpiCardProps["trendTone"], string> = {
   good: "text-solid bg-solid/10",
   warn: "text-heat  bg-heat/10",
   bad:  "text-fault bg-fault/10",
 };
 
-// Signature — the left-edge swatch. Each KPI family gets its own strip so a
-// glance down the row reads like a bolt sample: money → teal, projects →
-// gold, pipeline → steel, overdue → vermilion.
-const swatchClass: Record<NonNullable<KpiCardProps["swatch"]>, string> = {
-  teal:  "bg-accent",
-  gold:  "bg-gold",
-  steel: "bg-[color:var(--color-info)]",
-  fault: "bg-fault",
+// Identity comes from an icon, not a colour.
+//
+// This row used to carry four differently coloured left strips — teal, ochre,
+// blue, red — one per KPI. Nothing explained why Active Projects was gold and
+// Open Leads blue, because nothing could: the colour encoded category, which a
+// reader has no use for. Four saturated hues competing on one row is also what
+// buried the only colour that DOES mean something, the red on money overdue.
+//
+// So: one accent for the whole row, red kept for genuine alarm, and the cards
+// told apart by an icon and their own words.
+const defaultIcon: Record<string, LucideIcon> = {
+  "Revenue (MTD)":    IndianRupee,
+  "Active Projects":  Package,
+  "Open Leads":       Users,
+  "Overdue Invoices": FileText,
 };
 
-const defaultSwatch: Record<string, NonNullable<KpiCardProps["swatch"]>> = {
-  "Revenue (MTD)":     "teal",
-  "Active Projects":   "gold",
-  "Open Leads":        "steel",
-  "Overdue Invoices":  "fault",
-};
-
-export function KpiCard({ label, value, subtitle, trend, trendTone, swatch }: KpiCardProps) {
-  const tone       = toneClass[trendTone];
-  const strip      = swatchClass[swatch ?? defaultSwatch[label] ?? "teal"];
+export function KpiCard({
+  label, value, subtitle, trend, trendTone, featured = false, icon,
+}: KpiCardProps) {
+  const tone  = toneClass[trendTone];
+  const Icon  = icon ?? defaultIcon[label] ?? Package;
+  // "bad" is the row's alarm state — currently only overdue money reaches it.
+  const alarm = trendTone === "bad";
 
   return (
-    <div className="group relative rounded-[14px] bg-surface border border-rule overflow-hidden shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]">
-      {/* Swatch strip — the signature. Full-height band on the left edge,
-          coloured per KPI family. A row of these reads like specimen labels
-          from a fabric book. 6px is the smallest width that still reads as
-          "a strip" rather than "a hairline". */}
-      <div aria-hidden className={`absolute inset-y-0 left-0 w-[6px] ${strip}`} />
+    <div
+      className={[
+        "lift group relative overflow-hidden rounded-[14px] border p-5",
+        featured
+          ? "bg-sidebar border-transparent text-sidebar-text"
+          : "bg-surface border-rule shadow-sm",
+      ].join(" ")}
+    >
+      {featured && (
+        <div aria-hidden className="pointer-events-none absolute inset-0 card-facets" />
+      )}
 
-      <div className="pl-7 pr-5 py-4">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-dim leading-none">
+      <div className="relative z-10">
+        <div className="flex items-start justify-between gap-3">
+          <div
+            className={[
+              "grid h-9 w-9 shrink-0 place-items-center rounded-[10px]",
+              featured
+                ? "bg-white/10 text-accent-chrome"
+                : alarm
+                  ? "bg-fault/10 text-fault"
+                  : "bg-accent/10 text-accent",
+            ].join(" ")}
+          >
+            <Icon size={17} strokeWidth={1.8} aria-hidden />
+          </div>
+
+          <span
+            className={[
+              "shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold tabular",
+              // The tinted tones are mixed against a light card; on the dark
+              // featured ground they sink into it.
+              featured ? "bg-white/12 text-accent-chrome" : tone,
+            ].join(" ")}
+          >
+            {trend}
+          </span>
+        </div>
+
+        <div
+          className={[
+            "mt-4 text-[10.5px] font-semibold uppercase tracking-[0.14em] leading-none",
+            featured ? "text-sidebar-dim" : "text-text-dim",
+          ].join(" ")}
+        >
           {label}
         </div>
 
-        {/* Numeral — mono, generous scale, gold hairline underline that
-            draws in once on load. Signature per §6.1. */}
-        <div className="mt-3 inline-block">
-          <div className="font-data text-[30px] leading-none font-medium text-text tabular-nums tracking-[-0.01em]">
+        {/* Numeral — mono and tabular so a row of them lines up, with the §6.1
+            hairline drawing in beneath it once on load. Accent, not the old
+            ochre: that gold was drawn for a dark ground and turns brown when
+            darkened enough to be legible on white. */}
+        <div className="mt-2 inline-block">
+          <div
+            className={[
+              "font-data tabular-nums font-medium leading-none tracking-[-0.01em]",
+              featured ? "text-[34px] text-sidebar-text" : "text-[30px] text-text",
+            ].join(" ")}
+          >
             {value}
           </div>
-          <div className="kpi-underline mt-2 h-[1.5px] w-full bg-gold origin-left" aria-hidden />
+          <div
+            aria-hidden
+            className={[
+              "kpi-underline mt-2 h-[1.5px] w-full",
+              alarm ? "bg-fault/50" : "bg-accent/45",
+            ].join(" ")}
+          />
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <div className="text-[11px] text-text-dim truncate flex-1">{subtitle}</div>
-          <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full tabular shrink-0 ${tone}`}>
-            {trend}
-          </span>
+        <div className={`mt-3 truncate text-[11px] ${featured ? "text-sidebar-dim" : "text-text-dim"}`}>
+          {subtitle}
         </div>
       </div>
     </div>

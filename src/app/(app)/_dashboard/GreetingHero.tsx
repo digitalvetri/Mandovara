@@ -56,13 +56,13 @@ export function GreetingHero({ userName }: Props) {
 
   return (
     <div className="relative overflow-hidden rounded-[16px] bg-sidebar text-sidebar-text">
-      <div aria-hidden className="pointer-events-none absolute inset-0 chrome-motif opacity-25" />
       <div aria-hidden className="pointer-events-none absolute inset-0 chrome-veil" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 hero-facets" />
 
       <div className="relative z-10 px-6 py-5 sm:px-8 sm:py-6">
         {/* Live date chip */}
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3.5 py-1.5 text-[11px] font-medium text-sidebar-dim tracking-[0.04em]">
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-chrome" />
           {parts ? parts.dateStr : "          "}
         </div>
 
@@ -76,7 +76,7 @@ export function GreetingHero({ userName }: Props) {
 
             <h2 className="mt-1.5 font-display text-[28px] sm:text-[34px] font-[560] leading-none tracking-[-0.015em] text-sidebar-text">
               {firstName}
-              <span className="text-accent">.</span>
+              <span className="text-accent-chrome">.</span>
             </h2>
 
             <p className="mt-2 text-[12.5px] text-sidebar-dim leading-snug">
@@ -95,7 +95,7 @@ export function GreetingHero({ userName }: Props) {
               </span>
             </div>
             <div className="mt-2 flex items-center justify-end gap-2">
-              <span className="rounded-sm bg-accent/20 px-1.5 py-[3px] text-[10px] font-semibold text-accent tracking-[0.06em]">
+              <span className="rounded-sm bg-accent-chrome/20 px-1.5 py-[3px] text-[10px] font-semibold text-accent-chrome tracking-[0.06em]">
                 {parts ? parts.ampm : "AM"}
               </span>
               <span className="text-[10.5px] text-sidebar-dim/70 tracking-[0.14em]">IST</span>

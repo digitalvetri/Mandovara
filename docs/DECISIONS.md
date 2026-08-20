@@ -592,3 +592,63 @@ animation on `transform` cannot touch. Testing the KPI cards alone would have
 gone green while `.lift` — which does animate `transform` — stayed broken. The
 guard in `tests/e2e/motion-a11y.spec.ts` covers both mechanisms and the
 reduced-motion contract, because none of this is visible in review.
+
+---
+
+## One accent, crystalline geometry, and a chrome-safe accent token
+
+*2026-08-20 — owner direction*
+
+The owner reported the dashboard read as "a low level application" and supplied
+a mock: cyan-teal throughout, crystalline glass geometry instead of the rail's
+line art, icon tiles on the KPI row, no coloured category strips. Explicit
+instruction not to touch the logo.
+
+**The palette was not the problem; the hue count was.** Six accent hues were
+live on one dashboard — accent, gold, info, fault, solid, heat — four of them
+side by side on the KPI row encoding *category*. Nothing could explain why
+Active Projects was gold and Open Leads blue, because category is not something
+a reader uses. Worse, it buried the only colour on the page that means
+something: red on money overdue. The four-colour strips arrived in `092f97e`,
+after the palette commit; before that the row had one accent.
+
+Now: one accent for the row, red kept for genuine alarm, and cards told apart
+by an icon and their own words. The KPI hairline moved off gold too — that gold
+was drawn for a dark ground, and darkened far enough to clear 4.5:1 on white it
+becomes `#89670E`, which is brown.
+
+Geometry replaced the line art. `sidebar-motif.svg` (wallpaper rolls, swatch
+fans, a paint roller) is gone in favour of `chrome-facets.svg` and
+`hero-facets.svg` — flat polygons and gradients in the accent hue. The motifs
+were recognisable at full size and fog at 264px on a laptop, which is a smudge
+rather than a texture. The facets also re-tint with the theme, because every
+fill is the hue rather than a baked screenshot.
+
+### The finding: --color-accent is not safe on the chrome
+
+`--color-accent` is solved against white. On the dark rail it measures
+**3.53:1** — under the floor — and that is what the sidebar's active-nav bar,
+the topbar avatar, the hero's date dot and the login badge had all been using
+in the light theme. The featured KPI card made it obvious (a dark-teal icon on
+a near-black card, effectively invisible), but the bug was already shipped
+across the chrome and nobody had noticed, because it is a contrast failure
+rather than a missing element.
+
+`--color-accent-chrome` is the dark-theme accent, declared in **both** themes,
+because the chrome is dark in both: **7.79:1** on the rail. This is the colour
+half of the same lesson `.on-chrome` records — *chrome is not canvas, and a
+token solved for one ground is not valid on the other.* Any new accent-coloured
+element on the rail, topbar, hero or a featured card takes this token.
+
+### Also
+
+`motion-a11y.spec.ts` failed the moment the KPI card was rebuilt onto `.lift`,
+because that test asserted on the `translate` property Tailwind's
+`-translate-y-*` writes, and `.lift` animates `transform`. That is the guard
+working, not a flake. It now covers `.lift` on the leads list and the Tailwind
+mechanism on a catalogue card, so both survive future rewrites.
+
+**Still outstanding, and larger than any of this:** the production database is
+nearly empty — ₹0 last month, one bar on an eight-month chart. No design
+survives that, and it is the single biggest reason the deployed instance reads
+as unfinished.

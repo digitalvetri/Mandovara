@@ -226,7 +226,7 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
           duplicate and steal ~70px that made the nav scroll. */}
       <div className="relative z-10 md:hidden border-t border-sidebar-dim/15 px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-semibold tracking-wider shrink-0">
+          <div className="h-9 w-9 rounded-full bg-accent-chrome text-ink flex items-center justify-center text-[12px] font-semibold tracking-wider shrink-0">
             {initials(userName)}
           </div>
           <div className="flex-1 min-w-0">
@@ -266,7 +266,7 @@ function NavRow({ href, label, Icon, active }: { href: string; label: string; Ic
       {/* Left indicator — a 3px accent bar on the active row. */}
       <span
         aria-hidden
-        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-accent transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
+        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-accent-chrome transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
       />
       <Icon size={17} strokeWidth={active ? 1.9 : 1.6} className="shrink-0" />
       <span className="truncate">{label}</span>
