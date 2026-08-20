@@ -11,10 +11,7 @@
 // user's permissions don't cover margin/outstanding, so the row IDs and
 // paisa values never leave the DB for those roles.
 
-import Link from "next/link";
-import type { Route } from "next";
 import { notFound } from "next/navigation";
-import { Package } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
@@ -77,15 +74,6 @@ export default async function ProjectDetailPage({
       <Topbar
         title=""
         eyebrow=""
-        actions={
-          <Link
-            href={`/products?forProject=${encodeURIComponent(p.id)}` as Route}
-            className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[8px] border border-rule bg-surface text-[12px] text-text-dim hover:text-text hover:border-gold/40 transition-colors"
-          >
-            <Package size={13} strokeWidth={2} />
-            Browse catalog
-          </Link>
-        }
       />
 
       {/* ── Header ────────────────────────────────────────────────── */}
