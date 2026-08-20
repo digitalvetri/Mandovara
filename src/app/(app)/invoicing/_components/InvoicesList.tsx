@@ -8,7 +8,6 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Eye } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import type { InvoiceRow } from "@/modules/invoices/queries";
@@ -40,9 +39,12 @@ function Row({ r }: { r: InvoiceRow }) {
   const isOverdue   = !isCancelled && !isPaid && r.overdueBy > 0;
 
   return (
-    <li className="flex items-center gap-4 px-5 py-3 hover:bg-surface-2/40">
+    <li className="relative flex items-center gap-4 px-5 py-3 hover:bg-surface-2/40 cursor-pointer">
+      {/* full-row link */}
+      <Link href={`/invoicing/${r.id}` as Route} className="absolute inset-0" aria-label={`View invoice ${r.number}`} />
+
       {/* left: client + number + status */}
-      <div className="min-w-0 flex-1">
+      <div className="relative min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className={`text-[13.5px] font-semibold ${isCancelled ? "text-text-dim line-through" : "text-text"}`}>
             {r.clientName}
@@ -68,25 +70,16 @@ function Row({ r }: { r: InvoiceRow }) {
         </div>
       </div>
 
-      {/* right: amount + view */}
-      <div className="flex items-baseline gap-4 shrink-0">
-        <div className="text-right">
-          <div className={`tabular-nums text-[13.5px] font-medium ${isCancelled ? "text-text-dim" : "text-text"}`}>
-            {formatINR(r.total)}
-          </div>
-          {r.outstanding > 0n && !isCancelled && (
-            <div className="text-[10.5px] tabular-nums text-fault">
-              {formatINR(r.outstanding)} due
-            </div>
-          )}
+      {/* right: amount */}
+      <div className="relative text-right shrink-0">
+        <div className={`tabular-nums text-[13.5px] font-medium ${isCancelled ? "text-text-dim" : "text-text"}`}>
+          {formatINR(r.total)}
         </div>
-        <Link
-          href={`/invoicing/${r.id}` as Route}
-          className="inline-flex items-center gap-1 text-[11.5px] text-text-dim hover:text-gold"
-        >
-          <Eye size={12} />
-          View
-        </Link>
+        {r.outstanding > 0n && !isCancelled && (
+          <div className="text-[10.5px] tabular-nums text-fault">
+            {formatINR(r.outstanding)} due
+          </div>
+        )}
       </div>
     </li>
   );
