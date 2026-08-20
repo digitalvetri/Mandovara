@@ -14,15 +14,17 @@ export default async function PayrollPage() {
     <>
       <Topbar title="Payroll" eyebrow="Salary computed from locked attendance" />
 
-      <div className="rounded-[14px] bg-sidebar text-sidebar-text p-6 mb-4 flex items-center justify-between">
-        <div>
-          <div className="font-display text-[22px] font-semibold">{p.runLabel}</div>
-          <div className="mt-1 text-[12px] text-sidebar-dim">{p.runStatus}</div>
+      {(p.runLabel || p.awaitingApproval) && (
+        <div className="rounded-[12px] bg-surface border border-rule px-5 py-4 mb-4 flex items-center justify-between">
+          <div>
+            <div className="text-[14px] font-semibold text-text">{p.runLabel}</div>
+            {p.runStatus && <div className="mt-0.5 text-[12px] text-text-dim">{p.runStatus}</div>}
+          </div>
+          {p.awaitingApproval && p.runId && (
+            <ApproveButton runId={p.runId} netFormatted={formatINR(p.net)} />
+          )}
         </div>
-        {p.awaitingApproval && p.runId && (
-          <ApproveButton runId={p.runId} netFormatted={formatINR(p.net)} />
-        )}
-      </div>
+      )}
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
         <BandCard label="Gross payroll" value={formatINR(p.gross)} tone="good" />
