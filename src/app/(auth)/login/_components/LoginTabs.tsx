@@ -61,7 +61,7 @@ export function LoginCard() {
     // Mobile: the whole thing sits inside a soft white card that floats on
     // the brand wash. Desktop keeps it flush to the right panel (no card
     // ring, no shadow — the panel itself is the container there).
-    <div className="w-full max-w-[420px] mx-auto lg:max-w-[400px] lg:bg-transparent lg:shadow-none lg:border-0 lg:p-0 lg:rounded-none bg-white rounded-[20px] p-6 sm:p-8 shadow-[0_20px_60px_-20px_rgba(43,168,154,0.20),0_2px_8px_rgba(15,42,40,0.06)] border border-[#E7F1EF]">
+    <div className="rise w-full max-w-[420px] mx-auto lg:max-w-[400px] lg:bg-transparent lg:shadow-none lg:border-0 lg:p-0 lg:rounded-none bg-white rounded-[20px] p-6 sm:p-8 shadow-[0_20px_60px_-20px_rgba(43,168,154,0.20),0_2px_8px_rgba(15,42,40,0.06)] border border-[#E7F1EF]">
 
       {/* Logo — bigger and more generous on mobile */}
       <div className="mb-8 lg:mb-10">
@@ -210,26 +210,36 @@ export function LoginCard() {
           </div>
         )}
 
-        {/* Sign In — 56px, generous touch target */}
+        {/* Sign In — 56px, generous touch target.
+            The disabled fill used to be a pale mint (#A8D5CF) that read as a
+            broken primary button on arrival, since an empty form is the state
+            everybody sees first. It is now plainly a disabled control: muted
+            surface, muted label, no glow. The enabled state keeps the accent
+            gradient and its lift, and the arrow steps forward on hover. */}
         <button
           type="submit"
           disabled={pending || !canSubmit}
-          className="w-full flex items-center justify-center gap-2.5 font-semibold text-white transition-all duration-200 active:scale-[0.99]"
-          style={{
-            height: 56,
-            borderRadius: 14,
-            fontSize: 15.5,
-            marginTop: 6,
-            background: pending || !canSubmit
-              ? "#A8D5CF"
-              : "linear-gradient(135deg, #2BA89A 0%, #1A8A7E 100%)",
-            boxShadow: pending || !canSubmit ? "none" : "0 8px 26px rgba(43,168,154,0.32)",
-            cursor:    pending || !canSubmit ? "not-allowed" : "pointer",
-          }}
+          className={[
+            "group/cta w-full h-[56px] mt-1.5 rounded-[14px]",
+            "flex items-center justify-center gap-2.5 font-semibold text-[15.5px]",
+            "transition-all duration-200 press",
+            pending || !canSubmit
+              ? "bg-surface-hover text-text-subtle border border-rule cursor-not-allowed"
+              : "bg-accent text-white border border-transparent hover:bg-accent-hover shadow-md hover:shadow-lg",
+          ].join(" ")}
         >
           {pending
             ? <Loader2 size={18} className="animate-spin" />
-            : <><span>Sign In</span><ArrowRight size={17} strokeWidth={2.2} /></>}
+            : (
+              <>
+                <span>Sign In</span>
+                <ArrowRight
+                  size={17}
+                  strokeWidth={2.2}
+                  className="transition-transform duration-200 group-hover/cta:translate-x-[3px]"
+                />
+              </>
+            )}
         </button>
       </form>
 

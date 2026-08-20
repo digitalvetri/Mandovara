@@ -37,7 +37,7 @@ export function ProductCard({
             src={row.imageKey}
             alt={row.name}
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-[450ms] ease-[cubic-bezier(.2,0,0,1)] group-hover:scale-[1.045]"
           />
         ) : (
           <SwatchFallback name={row.name} code={row.code} hex={row.hex} />

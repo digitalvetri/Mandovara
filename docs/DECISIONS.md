@@ -542,3 +542,53 @@ where nothing need be in stock. Both were the same error as the seed fixture in
 the CI commit above: **asserting on something that has to be found, without
 guaranteeing it is in the window the user is looking at.** The spec now uses
 `?inStock=1`, and that parameter is load-bearing, not incidental.
+
+---
+
+## Motion system, and the fill mode that silently breaks hover
+
+*2026-08-20*
+
+Asked for a more attractive UI with animations and effects, against a reference
+screenshot of DigitalVetri's Manufacturing OS login — split editorial layout,
+serif headline, mono stat strip.
+
+Mandovara's login was already the same family, so this was execution rather
+than redesign: it moved onto tokens (it was the last screen still hardcoding a
+frozen teal-on-dark palette and so the only one that ignored the theme
+toggle), gained the reference's mono proof strip using §1.1's real trading
+figures, and picked up the sidebar rail's motif so signing in reads as the
+front door of the same building.
+
+One real defect fixed on the way: the primary button's disabled fill was a pale
+mint `#A8D5CF` that read as a *broken primary button*, and an empty form is the
+state every visitor sees first. It is now plainly a disabled control — muted
+surface, muted label, no glow — with the accent gradient reserved for when the
+form can actually be submitted.
+
+### The finding worth keeping
+
+Entrance animations went in as `.rise` / `.fade-in` / `.stagger`, all with
+`animation-fill-mode: both`. Every hover lift in the product stopped working.
+
+A filled-forwards animation keeps asserting its final keyframe for the life of
+the element, and an animated declaration outranks a normal one in the cascade.
+So `rise` finishing on `transform: none` beat every
+`:hover { transform: translateY(…) }` underneath it. Nothing errors, nothing
+logs, the page looks perfect in a screenshot — the cards just quietly stop
+responding to the pointer.
+
+`backwards` is the correct fill here: it applies the from-state during the
+stagger delay, then hands the element back to its own styles once the animation
+ends. Elements are naturally opaque, so the reduced-motion path (duration
+collapsed to 0.01ms) still lands them visible.
+
+**Two traps inside the one bug.** First, the reduced-motion path is why `both`
+looked necessary at all — without a forwards fill it seems like an element
+starting at `opacity: 0` would finish invisible. It does not, because opacity 0
+only ever exists inside the keyframe. Second, the obvious test passes: Tailwind
+v4's `-translate-y-*` writes the standalone `translate` property, which an
+animation on `transform` cannot touch. Testing the KPI cards alone would have
+gone green while `.lift` — which does animate `transform` — stayed broken. The
+guard in `tests/e2e/motion-a11y.spec.ts` covers both mechanisms and the
+reduced-motion contract, because none of this is visible in review.

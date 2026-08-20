@@ -118,7 +118,7 @@ export function LeadsTable({
           <div
             key={r.id}
             onClick={() => router.push(`/leads/${r.id}` as Route)}
-            className="flex items-center gap-5 px-5 py-[18px] bg-surface border border-rule rounded-[14px] hover:bg-surface-hover transition-colors cursor-pointer"
+            className="lift flex items-center gap-5 px-5 py-[18px] bg-surface border border-rule rounded-[14px] hover:bg-surface-hover cursor-pointer"
           >
             {/* ── Identity + meta ──────────────────────────────── */}
             <div className="flex-1 min-w-0">

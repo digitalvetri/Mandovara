@@ -1352,7 +1352,22 @@ canvas, not the chrome.
 
 **Type:** Fraunces (display, weight 560, tracking −0.015em, `font-optical-sizing:auto`) · Inter (UI body, 13px base) · **Geist Mono with `tabular-nums` for every numeral** — ₹, mm, metres, sqft, roll counts, dates · Noto Sans Tamil on field surfaces.
 Scale: display 32/38 · h1 26/32 · h2 20/28 · h3 16/24 · body 13/20 · caption 12/16 · eyebrow 11 caps +0.08em.
-Motion: 140/200/260ms `cubic-bezier(.2,0,0,1)`; respect `prefers-reduced-motion`. Shadows only in the light theme; dark uses border + surface-2 lift.
+Motion: 140/200/260ms `cubic-bezier(.2,0,0,1)`, exposed as `--t-fast` /
+`--t-base` / `--t-slow` and `--ease`; respect `prefers-reduced-motion`. Shadows
+only in the light theme; dark uses border + surface-2 lift.
+
+**Entrance animation is CSS-only** — `.rise`, `.fade-in`, and `.stagger` on a
+container so children deal themselves out by `nth-child` rather than every call
+site gaining a delay prop. Interactive surfaces use `.lift`, buttons `.press`.
+
+Fill mode is **`backwards`, never `both`**. A filled-forwards animation keeps
+asserting its final keyframe, and an animated declaration outranks a normal
+one — so `rise` ending on `transform: none` silently beats every
+`:hover { transform: … }` beneath it and kills the lift on every card it
+touches. `backwards` applies the from-state during the delay and then hands the
+element back to its own styles. Elements are naturally opaque, so the
+reduced-motion path still lands them visible. Both halves are pinned by
+`tests/e2e/motion-a11y.spec.ts`; the failure is invisible in code review.
 
 ### 6.3 UX doctrine (what "best in this era" means, concretely)
 

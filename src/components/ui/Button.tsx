@@ -60,7 +60,7 @@ export function Button({
       aria-busy={loading || undefined}
       className={[
         "inline-flex items-center justify-center font-medium whitespace-nowrap",
-        "transition-[background-color,border-color,color,opacity] duration-140",
+        "transition-[background-color,border-color,color,opacity] duration-140 press",
         "disabled:opacity-45 disabled:pointer-events-none",
         VARIANT[variant],
         SIZE[size],

@@ -93,6 +93,13 @@
   --radius-md: 10px;
   --radius-lg: 16px;
 
+  /* §6.2 motion: 140 / 200 / 260ms on a single easing curve. One curve for
+     the whole product is what keeps motion feeling like one hand made it. */
+  --ease: cubic-bezier(.2, 0, 0, 1);
+  --t-fast: 140ms;
+  --t-base: 200ms;
+  --t-slow: 260ms;
+
   /* Sidebar width — one source of truth for the rail, topbar brand block,
      and <main> left-padding. Grows on wider viewports so the sidebar feels
      spacious on desktop without cramping the workspace on 1366-class laptops. */
@@ -207,6 +214,70 @@ html, body {
 .elev-sm { box-shadow: var(--shadow-sm); }
 .elev-md { box-shadow: var(--shadow-md); }
 .elev-lg { box-shadow: var(--shadow-lg); }
+
+/* ── Motion ─────────────────────────────────────────────────────────
+   Entrance animations are CSS-only and run on first paint — no JS, no
+   layout thrash, nothing to hydrate. Stagger is a custom property so a
+   list can deal itself out without a class per position:
+
+       <div className="rise" style={{ "--d": "60ms" }}>
+
+   Fill mode is `backwards`, not `both`, and the difference is not cosmetic.
+   A filled-forwards animation keeps asserting its final keyframe forever, and
+   an animated declaration outranks a normal one — so `transform: none` at the
+   end of `rise` silently beat every `:hover { transform: translateY(...) }`
+   underneath it and killed the lift on every card it touched. `backwards`
+   applies the from-state during the delay, then hands the element back to its
+   own styles once the animation ends. Elements are naturally opaque, so the
+   reduced-motion path below (duration collapsed to 0.01ms) still lands them
+   visible. There is an e2e for both halves of this: motion-a11y.spec.ts. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes draw-x {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.rise    { animation: rise var(--t-slow) var(--ease) backwards; animation-delay: var(--d, 0ms); }
+.fade-in { animation: fade-in var(--t-base) var(--ease) backwards; animation-delay: var(--d, 0ms); }
+
+/* Stagger — put this on a grid or row and its children deal themselves out.
+   Done with nth-child rather than a delay prop so no component needs to know
+   its own position, and a call site does not gain four `style={{"--d":...}}`
+   attributes just to animate. Past the eighth child everything shares the
+   last delay: a long catalogue grid should not take two seconds to arrive. */
+.stagger > * { animation: rise var(--t-slow) var(--ease) backwards; }
+.stagger > *:nth-child(1) { animation-delay:   0ms; }
+.stagger > *:nth-child(2) { animation-delay:  55ms; }
+.stagger > *:nth-child(3) { animation-delay: 110ms; }
+.stagger > *:nth-child(4) { animation-delay: 165ms; }
+.stagger > *:nth-child(5) { animation-delay: 220ms; }
+.stagger > *:nth-child(6) { animation-delay: 275ms; }
+.stagger > *:nth-child(7) { animation-delay: 330ms; }
+.stagger > *:nth-child(n+8) { animation-delay: 385ms; }
+
+/* Interactive surfaces. The lift is 2px — enough to read as "this responds",
+   small enough that a grid of them does not shimmer as the pointer crosses. */
+.lift {
+  transition: transform var(--t-base) var(--ease),
+              box-shadow var(--t-base) var(--ease),
+              border-color var(--t-base) var(--ease);
+  will-change: transform;
+}
+.lift:hover      { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.lift:active     { transform: translateY(0); transition-duration: var(--t-fast); }
+/* Dark has no shadow tokens (§6.2), so it lifts on border instead. */
+:root.dark .lift:hover { border-color: var(--color-rule-strong); }
+
+/* Buttons acknowledge the press itself, not just the hover. */
+.press { transition: transform var(--t-fast) var(--ease); }
+.press:active:not(:disabled) { transform: scale(0.97); }
 
 /* ── Chrome controls ────────────────────────────────────────────────
    The topbar and rail are dark in BOTH themes — that L-shaped chrome is the
@@ -376,16 +447,13 @@ textarea:read-only {
 @media (min-width: 1280px) { :root { --sidebar-w: 288px; } }
 @media (min-width: 1536px) { :root { --sidebar-w: 300px; } }
 
-/* §6.1 signature — the hairline gold underline that draws in once beneath
-   every KPI numeral on load. 240ms per spec, 140ms delay so the hero row
-   animates in after the shell paints. */
+/* §6.1 signature — the hairline that draws in once beneath every KPI numeral
+   on load. Shares the draw-x keyframes so there is a single draw animation in
+   the product rather than two near-identical ones; the 140ms delay stays so
+   the hero row animates after the shell paints. */
 .kpi-underline {
-  transform: scaleX(0);
-  animation: kpi-underline-draw 240ms cubic-bezier(0.2, 0, 0, 1) 140ms both;
-}
-@keyframes kpi-underline-draw {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
+  transform-origin: left center;
+  animation: draw-x 240ms var(--ease) 140ms backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

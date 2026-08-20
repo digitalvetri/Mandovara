@@ -165,7 +165,7 @@ export default async function DashboardPage() {
 
       {greeting}
 
-      <section className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <section className="stagger mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <KpiCard
           label="Revenue (MTD)"
           value={formatLakhs(d.revenueMtd)}
@@ -196,14 +196,14 @@ export default async function DashboardPage() {
         />
       </section>
 
-      <section className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <section className="rise mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ "--d": "150ms" } as React.CSSProperties}>
         <div className="lg:col-span-2">
           <RevenueChart months={d.revenueByMonth} />
         </div>
         <ProjectStages stages={d.projectStages} />
       </section>
 
-      <section className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section className="rise mt-4 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ "--d": "210ms" } as React.CSSProperties}>
         <SiteVisits visits={d.siteVisits} />
         <RecentActivity items={d.activity} />
       </section>
