@@ -35,7 +35,7 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
   const [heightMm, setHeightMm] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [headingType, setHeadingType] = useState<(typeof HEADING_TYPES)[number]>("EYELET");
-  const [fullness,    setFullness]    = useState("2.5");
+  const fullness = "2.5";
   const [layPattern,  setLayPattern]  = useState<(typeof LAY_PATTERNS)[number]>("STRAIGHT");
   const [mountType,   setMountType]   = useState<(typeof MOUNT_TYPES)[number]>("INSIDE");
   const [notes, setNotes] = useState("");
