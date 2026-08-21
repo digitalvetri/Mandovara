@@ -71,15 +71,25 @@ test.describe("hover survives the entrance animation", () => {
   // anchor even when the inventory is empty.
   test("a Tailwind translate hover still moves", async ({ page }) => {
     await page.goto("/inventory", { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(2000);
     // The "Add item (to catalog)" link in InventoryToolbar always renders.
     // Tailwind's `-translate-y-*` compiles into `transform: translate(...)`,
     // NOT the standalone `translate` CSS property. Reading `.translate` would
     // return "none" both before and after hover; read `.transform` instead.
     const card = page.locator("a[href='/products']").first();
+    await card.waitFor({ state: "visible" });
+    await card.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(2000); // entrance animations settle
+    // Use explicit mouse coordinates — more reliable than .hover() for
+    // triggering CSS :hover in headless Chromium.
+    const box = (await card.boundingBox())!;
+    await page.mouse.move(0, 0); // neutral start
     const before = await card.evaluate((e) => getComputedStyle(e).transform);
-    await card.hover();
-    await page.waitForTimeout(350);
+    await page.mouse.move(
+      box.x + box.width / 2,
+      box.y + box.height / 2,
+      { steps: 5 },
+    );
+    await page.waitForTimeout(400);
     const after = await card.evaluate((e) => getComputedStyle(e).transform);
     expect(after).not.toBe(before);
   });
