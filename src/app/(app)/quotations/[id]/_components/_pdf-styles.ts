@@ -27,11 +27,12 @@ export const pdfStyles = StyleSheet.create({
     paddingHorizontal: 32, paddingTop: 20, paddingBottom: 16,
     borderBottomWidth: 0.75, borderBottomColor: RULE,
   },
-  headerLeft: { flexDirection: "column" },
-  docTitle:   { fontSize: 28, fontWeight: "bold", color: BRAND, letterSpacing: 1 },
-  docMeta:    { fontSize: 8, color: MUTED, marginTop: 4 },
-  docNum:     { fontSize: 9.5, fontWeight: "bold", color: INK, marginTop: 2 },
-  logoImg:    { width: 180, height: 60, objectFit: "contain", objectPosition: "right center" },
+  headerLeft:  { flexDirection: "column" },
+  headerRight: { flexDirection: "column", alignItems: "flex-end" },
+  docTitle:    { fontSize: 28, fontWeight: "bold", color: BRAND, letterSpacing: 1 },
+  docMeta:     { fontSize: 8, color: MUTED, marginTop: 4 },
+  docNum:      { fontSize: 9.5, fontWeight: "bold", color: INK, marginTop: 2 },
+  logoImg:     { width: 240, height: 80, objectFit: "contain", objectPosition: "left center" },
 
   // ── meta strip (date + valid) ────────────────────────────────────
   metaStrip: {

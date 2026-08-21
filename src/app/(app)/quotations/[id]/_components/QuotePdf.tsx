@@ -144,9 +144,20 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
         {/* ── Top accent stripe ────────────────────────────────────── */}
         <View style={s.stripe} />
 
-        {/* ── Header: title left · logo right ─────────────────────── */}
+        {/* ── Header: logo left · title right ─────────────────────── */}
         <View style={s.headerWrap}>
-          <View style={s.headerLeft}>
+          {logoSrc
+            ? <Image src={logoSrc} style={s.logoImg} />
+            : (
+              <View style={s.headerLeft}>
+                <Text style={{ fontSize: 16, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
+                <Text style={{ fontSize: 6.5, color: MUTED, letterSpacing: 1.5, marginTop: 2 }}>
+                  INTERIORS · COIMBATORE
+                </Text>
+              </View>
+            )
+          }
+          <View style={s.headerRight}>
             <Text style={s.docTitle}>{docTitle}</Text>
             {q.revision > 0 && (
               <Text style={[s.docMeta, { color: BRAND }]}>Revision {q.revision}</Text>
@@ -155,17 +166,6 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
               <Text style={s.docNum}>{q.number}</Text>
             </Text>
           </View>
-          {logoSrc
-            ? <Image src={logoSrc} style={s.logoImg} />
-            : (
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={{ fontSize: 16, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
-                <Text style={{ fontSize: 6.5, color: MUTED, letterSpacing: 1.5, marginTop: 2 }}>
-                  INTERIORS · COIMBATORE
-                </Text>
-              </View>
-            )
-          }
         </View>
 
         {/* ── Meta strip: date, valid, branch ──────────────────────── */}
