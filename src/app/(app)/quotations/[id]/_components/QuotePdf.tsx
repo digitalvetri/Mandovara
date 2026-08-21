@@ -19,7 +19,7 @@ Font.register({
 });
 
 // ── helpers ────────────────────────────────────────────────────────────────
-const U: Record<string, string> = {
+const UNIT: Record<string, string> = {
   METRE: "m", ROLL: "roll", SQFT: "sqft", SQM: "sqm",
   PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft",
 };
@@ -33,19 +33,16 @@ function fd(d: Date): string {
 function fm(p: bigint): string {
   const neg = p < 0n;
   const a   = neg ? -p : p;
-  const r   = a / 100n;
-  const raw = r.toString();
+  const raw = (a / 100n).toString();
   const grp = raw.length <= 3 ? raw
     : raw.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + raw.slice(-3);
-  return neg ? `(${grp})` : grp;
+  return neg ? `(₹${grp})` : `₹${grp}`;
 }
 
-function fmr(p: bigint): string { return `₹${fm(p)}`; }
-
-function gstRateLabel(cgst: bigint, taxable: bigint): string {
+function gstHalf(cgst: bigint, taxable: bigint): string {
   if (taxable === 0n) return "";
-  const rate = Math.round(Number(cgst * 10000n / taxable)) / 100;
-  return `(${Number.isInteger(rate) ? rate : rate.toFixed(1)}%)`;
+  const r = Math.round(Number(cgst * 10000n / taxable)) / 100;
+  return `(${Number.isInteger(r) ? r : r.toFixed(1)}%)`;
 }
 
 // ── constants ──────────────────────────────────────────────────────────────
@@ -61,75 +58,66 @@ const FROM = {
 const ESTIMATE_TERMS = [
   ESTIMATE_CAVEAT,
   "This estimate is indicative — a firm quotation follows site measurement.",
-  "Estimate is valid until the date mentioned above.",
+  "Estimate is valid until the date shown above.",
 ];
-
 const DEFAULT_TERMS = [
-  "Quotation is valid until the date mentioned above.",
+  "Quotation is valid until the date shown above.",
   "50% advance required to confirm the order.",
   "Balance payable before or on delivery / installation.",
   "Goods once delivered cannot be returned.",
-  "Installation timeline is as per the agreed schedule.",
+  "Delivery timeline is as per the agreed schedule.",
 ];
 
-// ── sub-components ─────────────────────────────────────────────────────────
+// ── table header (fixed on every page) ────────────────────────────────────
 function TH({ fixed: fx }: { fixed?: boolean }) {
   return (
     <View style={s.thead} fixed={fx}>
-      <View style={s.cNo}  ><Text style={[s.th, { textAlign: "center"  }]}>#</Text></View>
+      <View style={s.cNo}  ><Text style={[s.th, { textAlign: "center" }]}>#</Text></View>
       <View style={s.cDesc}><Text style={s.th}>DESCRIPTION / ROOM</Text></View>
-      <View style={s.cQty} ><Text style={[s.th, { textAlign: "right"   }]}>QTY</Text></View>
+      <View style={s.cQty} ><Text style={[s.th, { textAlign: "right"  }]}>QTY</Text></View>
       <View style={s.cUnit}><Text style={s.th}>UNIT</Text></View>
-      <View style={s.cRate}><Text style={[s.th, { textAlign: "right"   }]}>RATE (₹)</Text></View>
-      <View style={s.cGst} ><Text style={[s.th, { textAlign: "right"   }]}>GST</Text></View>
-      <View style={s.cAmt} ><Text style={[s.th, { textAlign: "right"   }]}>AMOUNT (₹)</Text></View>
+      <View style={s.cRate}><Text style={[s.th, { textAlign: "right"  }]}>RATE (₹)</Text></View>
+      <View style={s.cGst} ><Text style={[s.th, { textAlign: "right"  }]}>GST</Text></View>
+      <View style={s.cAmt} ><Text style={[s.th, { textAlign: "right"  }]}>AMOUNT (₹)</Text></View>
     </View>
   );
 }
 
+// ── table row ─────────────────────────────────────────────────────────────
 function TR({ line: l, idx }: { line: QuotationLine; idx: number }) {
   return (
     <View style={[s.tr, { backgroundColor: idx % 2 === 1 ? STRIP : WHITE }]} wrap={false}>
       <View style={s.cNo}  ><Text style={[s.tdMain, { textAlign: "center", color: MUTED }]}>{idx + 1}</Text></View>
       <View style={s.cDesc}>
         <Text style={s.tdMain}>{l.description || "—"}</Text>
-        {l.roomLabel   ? <Text style={s.tdSub}>{l.roomLabel}</Text>  : null}
-        {l.isOptional  ? <Text style={s.tdOpt}>Optional</Text>       : null}
+        {l.roomLabel   ? <Text style={s.tdSub}>{l.roomLabel}</Text> : null}
+        {l.isOptional  ? <Text style={s.tdOpt}>Optional</Text>     : null}
       </View>
-      <View style={s.cQty} ><Text style={[s.tdRight, { color: INK   }]}>{parseFloat(l.quantity)}</Text></View>
-      <View style={s.cUnit}><Text style={[s.tdMain,  { color: MUTED }]}>{U[l.unit] ?? l.unit.toLowerCase()}</Text></View>
-      <View style={s.cRate}><Text style={[s.tdRight, { fontWeight: "bold" }]}>{fmr(l.rate)}</Text></View>
+      <View style={s.cQty} ><Text style={[s.tdRight, { color: INK }]}>{parseFloat(l.quantity)}</Text></View>
+      <View style={s.cUnit}><Text style={[s.tdMain,  { color: MUTED }]}>{UNIT[l.unit] ?? l.unit.toLowerCase()}</Text></View>
+      <View style={s.cRate}><Text style={[s.tdRight, { fontWeight: "bold" }]}>{fm(l.rate)}</Text></View>
       <View style={s.cGst} ><Text style={[s.tdRight, { color: MUTED }]}>{l.gstRate}%</Text></View>
-      <View style={s.cAmt} ><Text style={[s.tdRight, { fontWeight: "bold", color: BRAND }]}>{fmr(l.amount)}</Text></View>
+      <View style={s.cAmt} ><Text style={[s.tdRight, { fontWeight: "bold", color: BRAND }]}>{fm(l.amount)}</Text></View>
     </View>
   );
 }
 
-// ── main component ─────────────────────────────────────────────────────────
+// ── main ───────────────────────────────────────────────────────────────────
 interface Props { quotation: QuotationDetail; logoSrc?: string }
 
 export function QuotePdf({ quotation: q, logoSrc }: Props) {
-  const estimate  = isEstimate(q.lines);
-  const isIntra   = q.cgst > 0n;
-  const rateLabel = isIntra ? gstRateLabel(q.cgst, q.taxableAmount) : "";
-  const docTitle  = estimate ? "ESTIMATE" : "QUOTATION";
+  const estimate   = isEstimate(q.lines);
+  const isIntra    = q.cgst > 0n;
+  const half       = isIntra ? gstHalf(q.cgst, q.taxableAmount) : "";
   const stateLabel = q.supplierStateCode === "33" ? "Tamil Nadu (33)" : q.supplierStateCode;
+  const docLabel   = estimate ? "ESTIMATE" : "QUOTATION";
 
-  const taxRows: { label: string; v: bigint }[] = [
-    { label: "Taxable Amount",           v: q.taxableAmount },
-    ...(isIntra
-      ? [{ label: `CGST ${rateLabel}`, v: q.cgst },
-         { label: `SGST ${rateLabel}`, v: q.sgst }]
-      : [{ label: "IGST",               v: q.igst }]),
-    ...(q.roundOff !== 0n ? [{ label: "Round-off", v: q.roundOff }] : []),
-  ];
-
-  const baseTerms = q.termsText
-    ? q.termsText.split("\n").filter(Boolean)
-    : (estimate ? ESTIMATE_TERMS : DEFAULT_TERMS);
-  const terms = estimate && !baseTerms.includes(ESTIMATE_CAVEAT)
-    ? [ESTIMATE_CAVEAT, ...baseTerms]
-    : baseTerms;
+  const terms = (() => {
+    const base = q.termsText
+      ? q.termsText.split("\n").filter(Boolean)
+      : (estimate ? ESTIMATE_TERMS : DEFAULT_TERMS);
+    return estimate && !base.includes(ESTIMATE_CAVEAT) ? [ESTIMATE_CAVEAT, ...base] : base;
+  })();
 
   const clientLines = [
     q.clientMobile,
@@ -138,55 +126,53 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
   ].filter(Boolean) as string[];
 
   return (
-    <Document title={`${docTitle} ${q.number}`} author="Mandovara" creator="Mandovara Interior OS">
+    <Document title={`${docLabel} ${q.number}`} author="Mandovara" creator="Mandovara Interior OS">
       <Page size="A4" style={s.page}>
 
-        {/* ── Top accent stripe ────────────────────────────────────── */}
+        {/* ── Accent stripe ────────────────────────────────────────── */}
         <View style={s.stripe} />
 
-        {/* ── Header: logo left · title right ─────────────────────── */}
-        <View style={s.headerWrap}>
+        {/* ── Header: logo LEFT · doc info RIGHT ───────────────────── */}
+        <View style={s.header}>
           {logoSrc
             ? <Image src={logoSrc} style={s.logoImg} />
             : (
-              <View style={s.headerLeft}>
-                <Text style={{ fontSize: 16, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
+              <View>
+                <Text style={{ fontSize: 17, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
                 <Text style={{ fontSize: 6.5, color: MUTED, letterSpacing: 1.5, marginTop: 2 }}>
                   INTERIORS · COIMBATORE
                 </Text>
               </View>
             )
           }
-          <View style={s.headerRight}>
-            <Text style={s.docTitle}>{docTitle}</Text>
+          <View style={s.headerMeta}>
+            <Text style={s.docBadge}>{docLabel}</Text>
+            <Text style={s.docNumber}>{q.number}</Text>
             {q.revision > 0 && (
-              <Text style={[s.docMeta, { color: BRAND }]}>Revision {q.revision}</Text>
+              <View style={s.docMetaRow}>
+                <Text style={s.docMetaLbl}>REVISION</Text>
+                <Text style={s.docMetaVal}>{q.revision}</Text>
+              </View>
             )}
-            <Text style={s.docMeta}>No.{" "}
-              <Text style={s.docNum}>{q.number}</Text>
-            </Text>
+            <View style={s.docMetaRow}>
+              <Text style={s.docMetaLbl}>DATE</Text>
+              <Text style={s.docMetaVal}>{fd(q.date)}</Text>
+            </View>
+            <View style={s.docMetaRow}>
+              <Text style={s.docMetaLbl}>VALID UNTIL</Text>
+              <Text style={s.docMetaVal}>{fd(q.validUntil)}</Text>
+            </View>
+            <View style={s.docMetaRow}>
+              <Text style={s.docMetaLbl}>BRANCH</Text>
+              <Text style={s.docMetaVal}>{q.branchName}</Text>
+            </View>
           </View>
         </View>
 
-        {/* ── Meta strip: date, valid, branch ──────────────────────── */}
-        <View style={s.metaStrip}>
-          {[
-            { label: "DATE",        value: fd(q.date)       },
-            { label: "VALID UNTIL", value: fd(q.validUntil) },
-            { label: "BRANCH",      value: q.branchName     },
-          ].map(({ label, value }) => (
-            <View key={label}>
-              <Text style={s.metaLbl}>{label}</Text>
-              <Text style={s.metaVal}>{value}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* ── Party boxes: Quotation By | Quotation To ─────────────── */}
+        {/* ── Party boxes ──────────────────────────────────────────── */}
         <View style={s.partyRow}>
-          {/* FROM */}
           <View style={s.partyBox}>
-            <Text style={s.partyTitle}>Quotation By</Text>
+            <Text style={s.partyLabel}>QUOTATION BY</Text>
             <Text style={s.partyName}>{FROM.name}</Text>
             <Text style={s.partyLine}>{FROM.addr1}</Text>
             <Text style={s.partyLine}>{FROM.addr2}</Text>
@@ -194,10 +180,8 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
             <Text style={s.partyLine}>{FROM.phone}</Text>
             <Text style={s.partyAccent}>{FROM.email}</Text>
           </View>
-
-          {/* TO */}
           <View style={s.partyBox}>
-            <Text style={s.partyTitle}>Quotation To</Text>
+            <Text style={s.partyLabel}>QUOTATION TO</Text>
             <Text style={s.partyName}>{q.clientName}</Text>
             {clientLines.map((l) => (
               <Text key={l} style={s.partyLine}>{l}</Text>
@@ -219,7 +203,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
             <Text style={s.supplyVal}>{isIntra ? "CGST + SGST" : "IGST"}</Text>
           </View>
           <View style={s.supplyItem}>
-            <Text style={s.supplyLbl}>COUNTRY OF SUPPLY:</Text>
+            <Text style={s.supplyLbl}>COUNTRY:</Text>
             <Text style={s.supplyVal}>India</Text>
           </View>
         </View>
@@ -230,7 +214,10 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
           {q.lines.map((l, i) => <TR key={l.id} line={l} idx={i} />)}
         </View>
 
-        {/* ── Terms | Totals ───────────────────────────────────────── */}
+        {/* ── Divider ──────────────────────────────────────────────── */}
+        <View style={s.divider} />
+
+        {/* ── Terms (left) | Totals (right) ────────────────────────── */}
         <View style={s.bottomRow} wrap={false}>
           <View style={s.termsCol}>
             <Text style={s.termsSec}>TERMS &amp; CONDITIONS</Text>
@@ -238,24 +225,46 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
               <Text key={i} style={s.termsBullet}>{i + 1}.{"  "}{t}</Text>
             ))}
           </View>
+
           <View style={s.totalsCol}>
-            {taxRows.map(({ label, v }) => (
-              <View key={label} style={s.totRow}>
-                <Text style={s.totLbl}>{label}</Text>
-                <Text style={s.totVal}>{fmr(v)}</Text>
+            {/* Tax breakdown rows */}
+            <View style={s.totRow}>
+              <Text style={s.totLbl}>Sub Total</Text>
+              <Text style={s.totVal}>{fm(q.taxableAmount)}</Text>
+            </View>
+            {isIntra ? (
+              <>
+                <View style={s.totRow}>
+                  <Text style={s.totLbl}>CGST {half}</Text>
+                  <Text style={s.totVal}>{fm(q.cgst)}</Text>
+                </View>
+                <View style={s.totRow}>
+                  <Text style={s.totLbl}>SGST {half}</Text>
+                  <Text style={s.totVal}>{fm(q.sgst)}</Text>
+                </View>
+              </>
+            ) : (
+              <View style={s.totRow}>
+                <Text style={s.totLbl}>IGST</Text>
+                <Text style={s.totVal}>{fm(q.igst)}</Text>
               </View>
-            ))}
-            <View style={s.grandRow}>
-              <Text style={s.grandLbl}>GRAND TOTAL</Text>
-              <Text style={s.grandVal}>{fmr(q.total)}</Text>
+            )}
+            {q.roundOff !== 0n && (
+              <View style={s.totRow}>
+                <Text style={s.totLbl}>Round-off</Text>
+                <Text style={s.totVal}>{fm(q.roundOff)}</Text>
+              </View>
+            )}
+
+            {/* Grand total + amount in words — all in the teal box */}
+            <View style={s.grandBox}>
+              <View style={s.grandRow}>
+                <Text style={s.grandLbl}>GRAND TOTAL</Text>
+                <Text style={s.grandAmt}>{fm(q.total)}</Text>
+              </View>
+              <Text style={s.wordsText}>{rupeesToWords(q.total)}</Text>
             </View>
           </View>
-        </View>
-
-        {/* ── Amount in words ──────────────────────────────────────── */}
-        <View style={s.wordsWrap} wrap={false}>
-          <Text style={s.wordsLbl}>AMOUNT IN WORDS</Text>
-          <Text style={s.wordsText}>{rupeesToWords(q.total)}</Text>
         </View>
 
         {/* ── Footer ───────────────────────────────────────────────── */}
