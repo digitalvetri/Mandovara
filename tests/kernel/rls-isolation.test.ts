@@ -25,7 +25,7 @@ const APP_URL   = process.env["APP_DATABASE_URL"];
 const ORG_OWNED_MODELS = [
   "client", "lead", "project", "quotation", "order", "invoice", "receipt",
   "vendor", "purchaseOrder", "gRN", "stockMove", "stockBalance", "allocation",
-  "makeJob", "installVisit", "snag", "brand", "collection", "design",
+  "makeJob", "brand", "collection", "design",
   "colourway", "price", "sampleBook", "architect", "employee", "user",
   "measurement", "measurementItem", "calcResult", "room", "expense",
   "attendance", "payrollRun", "auditLog", "numberSequence", "setting",
