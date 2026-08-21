@@ -8,10 +8,10 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("free-text estimate", () => {
-  test("is reachable from the quotations list", async ({ page }) => {
-    await page.goto("/quotations");
-    await expect(page.getByRole("link", { name: /quick estimate/i })).toBeVisible();
-  });
+  // The "Quick estimate" list-header button was removed at the owner's
+  // request. The route itself still works, so a direct visit still creates
+  // an estimate — the "reachable from list" test that used to sit here is
+  // no longer meaningful.
 
   test("creates a formal estimate from words alone, and marks it as an estimate", async ({ page }) => {
     await page.goto("/quotations/estimate");

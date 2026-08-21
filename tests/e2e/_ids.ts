@@ -33,7 +33,10 @@ export async function projectId(page: Page): Promise<string | null> {
   return process.env["E2E_PROJECT_ID"] ?? firstIdFrom(page, "/projects", "/projects");
 }
 export async function leadId(page: Page): Promise<string | null> {
-  return process.env["E2E_LEAD_ID"] ?? firstIdFrom(page, "/leads", "/leads");
+  // Pin to NEW leads so callers get one that is still convertible.
+  // The default /leads list can surface a WON / LOST lead first, which
+  // hides the "Convert to Client" button and breaks the conversion smoke.
+  return process.env["E2E_LEAD_ID"] ?? firstIdFrom(page, "/leads?status=NEW", "/leads");
 }
 export async function clientId(page: Page): Promise<string | null> {
   return process.env["E2E_CLIENT_ID"] ?? firstIdFrom(page, "/clients", "/clients");
