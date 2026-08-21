@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import {
-  Download, Mail, MessageCircle, Copy, Check,
+  Mail, MessageCircle, Copy, Check,
   ExternalLink, ArrowLeft, CalendarDays, Clock4,
 } from "lucide-react";
 import { StatusPill } from "../../_components/StatusPill";
@@ -13,6 +13,7 @@ import { ReissueButton } from "./ReissueButton";
 import type { SerializedQuotation } from "../_types";
 import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 import { pToINR, fmtDate, digitsOnly, shortNum, effectiveGstRate } from "./quote-header-utils";
+import { PdfPreviewModal } from "./PdfPreviewModal";
 
 // ── avatar ─────────────────────────────────────────────────────────────────
 
@@ -129,14 +130,10 @@ export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }:
           {isEstimate(quotation.lines) && quotation.status !== "REVISED" && (
             <ReissueButton quotationId={quotation.id} blockedReason={reissueBlockedReason} />
           )}
-          <a
-            href={`/api/quotations/${quotation.id}/pdf`}
-            download
-            className="inline-flex items-center gap-1.5 h-[30px] px-4 rounded-[7px] text-[12px] font-semibold bg-accent text-ink hover:bg-accent/85 transition-colors shrink-0"
-          >
-            <Download size={13} strokeWidth={2.2} />
-            Download PDF
-          </a>
+          <PdfPreviewModal
+            quotationId={quotation.id}
+            label={quotation.number}
+          />
         </div>
       </div>
 

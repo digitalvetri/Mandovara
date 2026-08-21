@@ -43,7 +43,7 @@ export async function GET(
   return new NextResponse(bytes, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Quotation-${safe}.pdf"`,
+      "Content-Disposition": `inline; filename="Quotation-${safe}.pdf"`,
       "Cache-Control": "no-store",
     },
   });
