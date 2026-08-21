@@ -60,7 +60,7 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         setServerError(result.error ?? "Something went wrong. Please try again.");
         return;
       }
-      router.push(`/leads/${result.data.id}`);
+      router.push(result.data?.id ? `/leads/${result.data.id}` : "/leads");
       router.refresh();
     });
   }
