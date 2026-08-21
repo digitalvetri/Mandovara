@@ -1,13 +1,12 @@
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import {
-  listLeads, listSalesUsers, getLeadSummaryCounts, getLeadCities,
+  listLeads, listSalesUsers, getLeadCities,
 } from "@/modules/leads/queries";
 import { LEAD_STATUSES } from "@/modules/leads/schema";
 import { Pager } from "@/components/data/Pager";
 import { LeadFilters } from "./_components/LeadFilters";
 import { LeadsTable } from "./_components/LeadsTable";
-import { LeadSummaryCards } from "./_components/LeadSummaryCards";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +41,12 @@ export default async function LeadsPage({
   const dateFrom = params.dateFrom?.trim() || undefined;
   const dateTo   = params.dateTo?.trim() || undefined;
 
-  const [{ rows, total, pageSize }, counts, salesUsers, cities] = await Promise.all([
+  const [{ rows, total, pageSize }, salesUsers, cities] = await Promise.all([
     listLeads(ctx, {
       ...(q != null && { search: q }),
       stage, page, sort,
       priority, source, ownerId, city, dateFrom, dateTo,
     }),
-    getLeadSummaryCounts(ctx),
     listSalesUsers(ctx),
     getLeadCities(ctx),
   ]);
@@ -60,7 +58,6 @@ export default async function LeadsPage({
         eyebrow={`${total} lead${total === 1 ? "" : "s"} · ${filterEyebrow(stage, q)}`}
         actions={<PrimaryButton href="/leads/new">New Lead</PrimaryButton>}
       />
-      <LeadSummaryCards counts={counts} />
       <LeadFilters salesUsers={salesUsers} cities={cities} />
       <LeadsTable
         rows={rows}

@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2 } from "lucide-react";
 import {
   createLeadSchema,
   LEAD_SOURCE_OPTIONS,
@@ -27,7 +26,6 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
 
   const {
     register,
@@ -37,17 +35,15 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
   } = useForm<CreateLeadInput>({
     resolver: zodResolver(createLeadSchema),
     defaultValues: {
-      name:      "",
-      mobile:    "",
-      altMobile: "",
-      email:     "",
-      city:      "",
-      pincode:   "",
+      name:        "",
+      mobile:      "",
+      email:       "",
+      city:        "",
       requirement: "",
-      source:    undefined,
-      priority:  "WARM",
-      ownerId:   "",
-      branchId:  branches[0]?.id ?? "",
+      source:      undefined,
+      priority:    "WARM",
+      ownerId:     "",
+      branchId:    branches[0]?.id ?? "",
     },
   });
 
@@ -64,32 +60,12 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         setServerError(result.error ?? "Something went wrong. Please try again.");
         return;
       }
-      setIsSuccess(true);
-      setTimeout(() => {
-        router.push("/leads");
-        router.refresh();
-      }, 1400);
+      router.push(`/leads/${result.data.id}`);
+      router.refresh();
     });
   }
 
   const fc = EntityForm.fieldCls;
-
-  if (isSuccess) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div
-          className="w-14 h-14 rounded-full flex items-center justify-center"
-          style={{ background: "oklch(0.78 0.145 165 / 0.15)", border: "2px solid oklch(0.78 0.145 165 / 0.4)" }}
-        >
-          <CheckCircle2 size={28} style={{ color: "var(--color-solid, oklch(0.78 0.145 165))" }} />
-        </div>
-        <div className="text-center">
-          <p className="text-[16px] font-semibold text-text">Lead created successfully</p>
-          <p className="text-[13px] text-text-muted mt-1">Returning to leads list…</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <EntityForm
@@ -99,7 +75,7 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
       submitLabel="Create Lead"
       onCancel={() => router.back()}
     >
-      {/* ── Customer Information ────────────────────────────────── */}
+      {/* Row 1 — Name (full width) */}
       <EntityForm.Field label="Customer Name" error={errors.name?.message} required span={2}>
         <input
           {...register("name")}
@@ -110,6 +86,7 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         />
       </EntityForm.Field>
 
+      {/* Row 2 — Mobile | Email */}
       <EntityForm.Field label="Mobile Number" error={errors.mobile?.message} required
         hint="10 digits or +91-prefixed">
         <input
@@ -121,26 +98,17 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         />
       </EntityForm.Field>
 
-      <EntityForm.Field label="Alternate Mobile" error={errors.altMobile?.message}
-        hint="10 digits or +91-prefixed">
-        <input
-          {...register("altMobile")}
-          className={`${fc} tabular-nums`}
-          inputMode="tel"
-          placeholder="Optional"
-        />
-      </EntityForm.Field>
-
       <EntityForm.Field label="Email" error={errors.email?.message}>
         <input
           {...register("email")}
           className={fc}
           type="email"
-          placeholder="Optional"
+          placeholder="Optional — for quotation emails"
           autoComplete="email"
         />
       </EntityForm.Field>
 
+      {/* Row 3 — City | Source */}
       <EntityForm.Field label="City" error={errors.city?.message}>
         <input
           {...register("city")}
@@ -150,49 +118,6 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         />
       </EntityForm.Field>
 
-      <EntityForm.Field label="Pincode" error={errors.pincode?.message} hint="6-digit">
-        <input
-          {...register("pincode")}
-          className={`${fc} tabular-nums`}
-          inputMode="numeric"
-          maxLength={6}
-          placeholder="Optional"
-        />
-      </EntityForm.Field>
-
-      {/* Hidden branch */}
-      {branches.length > 1 ? (
-        <EntityForm.Field label="Branch" error={errors.branchId?.message} required>
-          <select {...register("branchId")} className={fc}>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </EntityForm.Field>
-      ) : (
-        <input type="hidden" {...register("branchId")} />
-      )}
-
-      <EntityForm.Field label="Site Address" error={errors.address?.message} span={2}>
-        <textarea
-          {...register("address")}
-          rows={2}
-          className={`${fc} h-auto py-2 resize-y`}
-          placeholder="Flat/House no., Street, Area, Landmark… (optional)"
-        />
-      </EntityForm.Field>
-
-      {/* ── Enquiry Details ─────────────────────────────────────── */}
-      <EntityForm.Field label="Basic Requirement" error={errors.requirement?.message} span={2}>
-        <textarea
-          {...register("requirement")}
-          rows={3}
-          className={`${fc} h-auto py-2 resize-y`}
-          placeholder="Briefly describe what the customer is looking for (curtains, flooring, wallpaper…)"
-        />
-      </EntityForm.Field>
-
-      {/* ── Lead Assignment ─────────────────────────────────────── */}
       <EntityForm.Field label="Lead Source" error={errors.source?.message} required>
         <select {...register("source")} className={fc} defaultValue="">
           <option value="" disabled>Select source</option>
@@ -202,8 +127,8 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         </select>
       </EntityForm.Field>
 
-      <EntityForm.Field label="Lead Priority" error={errors.priority?.message}
-        hint="Default: Warm">
+      {/* Row 4 — Priority | Budget */}
+      <EntityForm.Field label="Lead Priority" error={errors.priority?.message}>
         <select {...register("priority")} className={fc}>
           {LEAD_PRIORITY_OPTIONS.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
@@ -212,19 +137,21 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
       </EntityForm.Field>
 
       <EntityForm.Field label="Estimated Budget" error={errors.estimatedBudget?.message}
-        hint="Enter exact amount in ₹ (optional)">
-        <div className="flex items-center h-[38px] border border-rule rounded-[8px] bg-surface focus-within:border-accent transition-colors overflow-hidden">
+        hint="Optional, in ₹">
+        <div className="flex items-center h-[34px] border border-rule rounded-[6px] bg-surface-2 focus-within:border-accent transition-colors overflow-hidden">
           <span className="px-3 text-[13px] text-text-dim shrink-0 border-r border-rule h-full flex items-center">₹</span>
           <input
             {...register("estimatedBudget")}
-            className="flex-1 h-full px-3 bg-transparent text-[13px] text-text tabular-nums outline-none"
+            className="flex-1 h-full px-3 bg-transparent text-[12.5px] text-text tabular-nums outline-none"
             inputMode="numeric"
             placeholder="e.g. 2,50,000"
           />
         </div>
       </EntityForm.Field>
 
-      <EntityForm.Field label="Assigned Sales Executive" error={errors.ownerId?.message} hint="Leave blank to assign to yourself" span={2}>
+      {/* Row 5 — Assigned To | Site Address */}
+      <EntityForm.Field label="Assigned To" error={errors.ownerId?.message}
+        hint="Leave blank to assign to yourself">
         <select {...register("ownerId")} className={fc} defaultValue="">
           <option value="">Unassigned (defaults to you)</option>
           {salesUsers.map((u) => (
@@ -232,6 +159,38 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
           ))}
         </select>
       </EntityForm.Field>
+
+      <EntityForm.Field label="Site Address" error={errors.address?.message}>
+        <input
+          {...register("address")}
+          className={fc}
+          placeholder="Area, landmark… (optional)"
+          autoComplete="street-address"
+        />
+      </EntityForm.Field>
+
+      {/* Row 6 — Requirement (full width) */}
+      <EntityForm.Field label="Basic Requirement" error={errors.requirement?.message} span={2}>
+        <textarea
+          {...register("requirement")}
+          rows={2}
+          className={`${fc} h-auto py-2 resize-none`}
+          placeholder="Briefly describe what the customer is looking for (curtains, flooring, wallpaper…)"
+        />
+      </EntityForm.Field>
+
+      {/* Hidden fields */}
+      {branches.length > 1 ? (
+        <EntityForm.Field label="Branch" error={errors.branchId?.message} required span={2}>
+          <select {...register("branchId")} className={fc}>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </EntityForm.Field>
+      ) : (
+        <input type="hidden" {...register("branchId")} />
+      )}
     </EntityForm>
   );
 }

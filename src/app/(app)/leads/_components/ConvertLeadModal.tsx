@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { X, UserCheck, Building2, MapPin, IndianRupee, CalendarDays, ClipboardList, Home, Landmark } from "lucide-react";
+import { X, UserCheck, Building2, MapPin, IndianRupee, CalendarDays, ClipboardList, Home, Landmark, ChevronDown } from "lucide-react";
 import { convertLead } from "@/modules/leads/actions-part2";
 
 const PROJECT_TYPES = ["Residential", "Commercial", "Office", "Retail", "Hospitality", "Other"] as const;
@@ -25,6 +25,7 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [bizOpen, setBizOpen] = useState(false);
   const [form, setForm] = useState({
     // billing address
     billingLine1:      "",
@@ -152,55 +153,70 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
 
           <div className="border-t border-rule" />
 
-          {/* Business Details */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-3">
-              <Landmark size={11} className="text-text-dim" strokeWidth={1.75} />
-              <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">Business Details</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={lbl}>GSTIN</label>
-                <input
-                  value={form.gstin} onChange={set("gstin")}
-                  className={inp} placeholder="27AABCU9603R1ZX"
-                  maxLength={15}
-                />
+          {/* Business Details — collapsible */}
+          <div className="rounded-[8px] border border-rule overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setBizOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-surface-2 transition-colors"
+            >
+              <div className="flex items-center gap-1.5">
+                <Landmark size={11} className="text-text-dim" strokeWidth={1.75} />
+                <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">Business Details</span>
+                <span className="text-[10px] text-text-faint ml-1">(optional — GST / PAN)</span>
               </div>
-              <div>
-                <label className={lbl}>PAN</label>
-                <input
-                  value={form.pan}
-                  onChange={(e) => setForm((f) => ({ ...f, pan: e.target.value.toUpperCase() }))}
-                  className={inp} placeholder="AABCU9603R"
-                  maxLength={10}
-                  style={{ textTransform: "uppercase" }}
-                />
+              <ChevronDown
+                size={13}
+                strokeWidth={2}
+                className={`text-text-dim transition-transform duration-200 ${bizOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {bizOpen && (
+              <div className="px-3 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-rule">
+                <div>
+                  <label className={lbl}>GSTIN</label>
+                  <input
+                    value={form.gstin} onChange={set("gstin")}
+                    className={inp} placeholder="27AABCU9603R1ZX"
+                    maxLength={15}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>PAN</label>
+                  <input
+                    value={form.pan}
+                    onChange={(e) => setForm((f) => ({ ...f, pan: e.target.value.toUpperCase() }))}
+                    className={inp} placeholder="AABCU9603R"
+                    maxLength={10}
+                    style={{ textTransform: "uppercase" }}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>State Code</label>
+                  <input
+                    value={form.stateCode} onChange={set("stateCode")}
+                    className={inp} placeholder="33"
+                    maxLength={2} inputMode="numeric"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Payment Terms (Days)</label>
+                  <input
+                    type="number" min={0} max={365}
+                    value={form.paymentTermsDays} onChange={set("paymentTermsDays")}
+                    className={inp} placeholder="30"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={lbl}><IndianRupee size={10} className="inline mr-1" />Credit Limit (₹)</label>
+                  <input
+                    value={form.creditLimit} onChange={set("creditLimit")}
+                    className={inp} placeholder="0 (no credit)" inputMode="numeric"
+                  />
+                </div>
               </div>
-              <div>
-                <label className={lbl}>State Code</label>
-                <input
-                  value={form.stateCode} onChange={set("stateCode")}
-                  className={inp} placeholder="33"
-                  maxLength={2} inputMode="numeric"
-                />
-              </div>
-              <div>
-                <label className={lbl}>Payment Terms (Days)</label>
-                <input
-                  type="number" min={0} max={365}
-                  value={form.paymentTermsDays} onChange={set("paymentTermsDays")}
-                  className={inp} placeholder="30"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={lbl}><IndianRupee size={10} className="inline mr-1" />Credit Limit (₹)</label>
-                <input
-                  value={form.creditLimit} onChange={set("creditLimit")}
-                  className={inp} placeholder="0 (no credit)" inputMode="numeric"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="border-t border-rule" />

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import {
   Phone, MessageCircle, ArrowUpRight,
-  PencilLine, RefreshCw, BellPlus, UserCheck, Trash2,
+  PencilLine, RefreshCw, BellPlus, UserCheck, Trash2, Users,
 } from "lucide-react";
 import type { LeadRow } from "@/modules/leads/queries";
 import { SOURCE_LABEL } from "@/modules/leads/schema";
@@ -13,14 +13,26 @@ import { deleteLead } from "@/modules/leads/actions-part2";
 import { MoreMenu, type MenuItem } from "@/components/data/MoreMenu";
 import { StatusPill } from "./StatusPill";
 
-// ── constants ────────────────────────────────────────────────────
+// ── accent strip colour per stage ────────────────────────────────
+const STAGE_STRIP: Record<string, string> = {
+  NEW:           "bg-info",
+  CONTACTED:     "bg-heat",
+  QUALIFIED:     "bg-accent",
+  SITE_VISIT:    "bg-heat",
+  QUOTED:        "bg-gold",
+  NEGOTIATION:   "bg-gold",
+  WON:           "bg-solid",
+  LOST:          "bg-fault",
+};
 
+// ── priority chip ────────────────────────────────────────────────
 const PRIORITY: Record<string, { cls: string; label: string }> = {
   HOT:  { cls: "bg-fault/12 text-fault border border-fault/25",  label: "Hot"  },
-  WARM: { cls: "bg-warn/12 text-warn border border-warn/25",     label: "Warm" },
+  WARM: { cls: "bg-heat/12 text-heat border border-heat/25",     label: "Warm" },
   COLD: { cls: "bg-surface-2 text-text-dim border border-rule",  label: "Cold" },
 };
 
+// ── source dot colours ───────────────────────────────────────────
 const SOURCE_DOT: Record<string, string> = {
   INSTAGRAM:          "bg-[#C13584]",
   FACEBOOK:           "bg-[#1877F2]",
@@ -37,7 +49,6 @@ const SOURCE_DOT: Record<string, string> = {
 };
 
 // ── helpers ──────────────────────────────────────────────────────
-
 function fmtMobile(m: string): string {
   const d = m.replace(/^\+91/, "").replace(/\D/g, "");
   return d.length === 10 ? `${d.slice(0, 5)} ${d.slice(5)}` : m.replace("+91", "");
@@ -49,27 +60,34 @@ function waHref(mobile: string): string {
   return `https://wa.me/${num}`;
 }
 
+function fmtDate(d: Date): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit", month: "short", year: "2-digit",
+  }).format(d);
+}
+
 function leadMenuItems(r: LeadRow): MenuItem[] {
   const isTerminal = r.stage === "WON" || r.stage === "LOST";
   return [
-    { key: "edit",      label: "Edit",            icon: PencilLine, href: `/leads/${r.id}/edit` },
-    { key: "status",    label: "Change Status",    icon: RefreshCw,  href: `/leads/${r.id}` },
-    { key: "followup",  label: "Add Follow-up",    icon: BellPlus,   href: `/leads/${r.id}` },
-    ...(!isTerminal ? [{ key: "convert", label: "Convert to Client", icon: UserCheck, href: `/leads/${r.id}` } as MenuItem] : []),
+    { key: "edit",     label: "Edit",             icon: PencilLine, href: `/leads/${r.id}/edit` },
+    { key: "status",   label: "Change Status",     icon: RefreshCw,  href: `/leads/${r.id}` },
+    { key: "followup", label: "Add Follow-up",     icon: BellPlus,   href: `/leads/${r.id}` },
+    ...(!isTerminal
+      ? [{ key: "convert", label: "Convert to Client", icon: UserCheck, href: `/leads/${r.id}` } as MenuItem]
+      : []),
     {
-      key:          "delete",
-      label:        "Delete Lead",
-      icon:         Trash2,
-      danger:       true,
-      separator:    true,
-      confirm:      "Permanently delete this lead? This cannot be undone.",
-      onClick:      () => void deleteLead(r.id),
+      key:       "delete",
+      label:     "Delete Lead",
+      icon:      Trash2,
+      danger:    true,
+      separator: true,
+      confirm:   "Permanently delete this lead? This cannot be undone.",
+      onClick:   () => void deleteLead(r.id),
     },
   ];
 }
 
 // ── component ────────────────────────────────────────────────────
-
 export function LeadsTable({
   rows,
   hasActiveFilters,
@@ -81,126 +99,166 @@ export function LeadsTable({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-[14px] bg-surface border border-rule py-20 text-center">
-        <p className="text-[14px] text-text mb-1.5">
+      <div className="overflow-hidden rounded-[12px] border border-rule bg-surface px-6 py-14 text-center">
+        <div className="mx-auto mb-3 w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center">
+          <Users size={18} strokeWidth={1.5} className="text-text-dim" />
+        </div>
+        <div className="text-[14px] font-medium text-text mb-1">
           {hasActiveFilters ? "No leads match your filters." : "No leads yet."}
-        </p>
-        <p className="text-[12.5px] text-text-dim">
+        </div>
+        <div className="text-[12px] text-text-dim">
           {hasActiveFilters ? (
             <>
-              <Link href={"/leads" as Route} className="text-accent hover:underline">
-                Clear filters
-              </Link>{" "}
+              <Link href={"/leads" as Route} className="text-accent hover:underline">Clear filters</Link>{" "}
               to see all leads.
             </>
           ) : (
             <>
-              <Link href={"/leads/new" as Route} className="text-accent hover:underline">
-                + New Lead
-              </Link>{" "}
+              <Link href={"/leads/new" as Route} className="text-accent hover:underline">+ New Lead</Link>{" "}
               to get started.
             </>
           )}
-        </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {rows.map((r) => {
-        const priority  = r.priority ? PRIORITY[r.priority] : null;
-        const sourceDot = SOURCE_DOT[r.source];
-        const hasOwner  = r.ownerName && r.ownerName !== "—";
-        const initial   = hasOwner ? r.ownerName!.charAt(0).toUpperCase() : null;
+    <div className="overflow-hidden rounded-[12px] border border-rule bg-surface">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-surface-2 border-b border-rule">
+            <th className="w-[5px] p-0" aria-hidden />
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Lead</th>
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Mobile</th>
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">City</th>
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Source</th>
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Stage</th>
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">Priority</th>
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Assigned To</th>
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Added</th>
+            <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const priority  = r.priority ? PRIORITY[r.priority] : null;
+            const sourceDot = SOURCE_DOT[r.source];
+            const strip     = STAGE_STRIP[r.stage] ?? "bg-border";
+            const initial   = r.ownerName?.charAt(0).toUpperCase() ?? null;
 
-        return (
-          <div
-            key={r.id}
-            onClick={() => router.push(`/leads/${r.id}` as Route)}
-            className="lift flex items-center gap-5 px-5 py-[18px] bg-surface border border-rule rounded-[14px] hover:bg-surface-hover cursor-pointer"
-          >
-            {/* ── Identity + meta ──────────────────────────────── */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[14px] font-semibold text-text leading-snug">
-                  {r.name}
-                </span>
-                <StatusPill status={r.stage} />
-                {priority && (
-                  <span className={`text-[10px] font-semibold uppercase tracking-[0.07em] px-[7px] py-0.5 rounded-[4px] ${priority.cls}`}>
-                    {priority.label}
+            return (
+              <tr
+                key={r.id}
+                onClick={() => router.push(`/leads/${r.id}` as Route)}
+                className={[
+                  "group relative cursor-pointer transition-colors hover:bg-surface-2/60",
+                  i > 0 ? "border-t border-rule" : "",
+                ].join(" ")}
+              >
+                {/* Accent strip */}
+                <td className="p-0 w-[5px]">
+                  <div className={`h-full w-[5px] min-h-[56px] ${strip}`} />
+                </td>
+
+                {/* Lead name + number */}
+                <td className="px-4 py-3.5 max-w-[200px]">
+                  <div className="text-[13px] font-semibold text-text truncate">{r.name}</div>
+                  <div className="text-[10.5px] text-text-faint mt-0.5 tabular">{r.number}</div>
+                </td>
+
+                {/* Mobile */}
+                <td className="px-4 py-3.5 hidden sm:table-cell">
+                  <span className="tabular text-[12.5px] text-text-dim">{fmtMobile(r.mobile)}</span>
+                </td>
+
+                {/* City */}
+                <td className="px-4 py-3.5 text-[12.5px] text-text-dim hidden md:table-cell">
+                  {r.city ?? <span className="text-text-faint">—</span>}
+                </td>
+
+                {/* Source */}
+                <td className="px-4 py-3.5 hidden lg:table-cell">
+                  <span className="inline-flex items-center gap-1.5 text-[12.5px] text-text-dim">
+                    {sourceDot && (
+                      <span className={`w-[6px] h-[6px] rounded-full shrink-0 ${sourceDot}`} aria-hidden />
+                    )}
+                    {SOURCE_LABEL[r.source] ?? r.source}
                   </span>
-                )}
-              </div>
+                </td>
 
-              <div className="flex items-center gap-2 mt-1 text-[12px] text-text-dim leading-tight flex-wrap">
-                <span className="font-data tabular tracking-tight">{fmtMobile(r.mobile)}</span>
-                {r.city && (
-                  <>
-                    <Sep />
-                    <span>{r.city}</span>
-                  </>
-                )}
-                <Sep />
-                <span className="inline-flex items-center gap-1.5">
-                  {sourceDot && (
-                    <span className={`w-[6px] h-[6px] rounded-full shrink-0 ${sourceDot}`} aria-hidden />
+                {/* Stage */}
+                <td className="px-4 py-3.5">
+                  <StatusPill status={r.stage} />
+                </td>
+
+                {/* Priority */}
+                <td className="px-4 py-3.5 hidden md:table-cell">
+                  {priority ? (
+                    <span className={`text-[10px] font-semibold uppercase tracking-[0.07em] px-[7px] py-0.5 rounded-[4px] ${priority.cls}`}>
+                      {priority.label}
+                    </span>
+                  ) : (
+                    <span className="text-text-faint text-[12px]">—</span>
                   )}
-                  {SOURCE_LABEL[r.source] ?? r.source}
-                </span>
-              </div>
-            </div>
+                </td>
 
-            {/* ── Assigned sales exec ──────────────────────────── */}
-            {initial && (
-              <div className="hidden sm:flex items-center gap-2 shrink-0">
-                <span className="w-[26px] h-[26px] rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center uppercase select-none">
-                  {initial}
-                </span>
-                <span className="text-[12px] text-text-dim hidden lg:block whitespace-nowrap max-w-[110px] truncate">
-                  {r.ownerName}
-                </span>
-              </div>
-            )}
+                {/* Assigned To */}
+                <td className="px-4 py-3.5 hidden lg:table-cell">
+                  {initial ? (
+                    <div className="flex items-center gap-2">
+                      <span className="w-[24px] h-[24px] rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center uppercase select-none shrink-0">
+                        {initial}
+                      </span>
+                      <span className="text-[12px] text-text-dim truncate max-w-[110px]">{r.ownerName}</span>
+                    </div>
+                  ) : (
+                    <span className="text-text-faint text-[12px]">—</span>
+                  )}
+                </td>
 
-            {/* ── Actions ──────────────────────────────────────── */}
-            <div
-              className="flex items-center gap-1 shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <a
-                href={`tel:${r.mobile}`}
-                title={`Call ${r.name}`}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-text-dim hover:text-text hover:bg-surface-2 transition-colors"
-              >
-                <Phone size={13} strokeWidth={1.75} />
-              </a>
-              <a
-                href={waHref(r.mobile)}
-                target="_blank"
-                rel="noreferrer noopener"
-                title={`WhatsApp ${r.name}`}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-text-dim hover:text-[#25D366] hover:bg-surface-2 transition-colors"
-              >
-                <MessageCircle size={13} strokeWidth={1.75} />
-              </a>
-              <Link
-                href={`/leads/${r.id}` as Route}
-                className="ml-1 h-7 px-2.5 rounded-[7px] text-[12px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
-              >
-                Details
-                <ArrowUpRight size={12} strokeWidth={2} />
-              </Link>
-              <MoreMenu items={leadMenuItems(r)} />
-            </div>
-          </div>
-        );
-      })}
+                {/* Added date */}
+                <td className="px-4 py-3.5 tabular text-[12px] text-text-dim hidden lg:table-cell whitespace-nowrap">
+                  {fmtDate(r.createdAt)}
+                </td>
+
+                {/* Actions */}
+                <td
+                  className="px-4 py-3.5 text-right"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="inline-flex items-center gap-1 justify-end">
+                    <a
+                      href={`tel:${r.mobile}`}
+                      title={`Call ${r.name}`}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-text-dim hover:text-text hover:bg-surface-2 transition-colors"
+                    >
+                      <Phone size={12} strokeWidth={1.75} />
+                    </a>
+                    <a
+                      href={waHref(r.mobile)}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`WhatsApp ${r.name}`}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-text-dim hover:text-[#25D366] hover:bg-surface-2 transition-colors"
+                    >
+                      <MessageCircle size={12} strokeWidth={1.75} />
+                    </a>
+                    <Link
+                      href={`/leads/${r.id}` as Route}
+                      className="ml-1 h-7 px-2.5 rounded-[7px] text-[11.5px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
+                    >
+                      Details
+                      <ArrowUpRight size={11} strokeWidth={2} />
+                    </Link>
+                    <MoreMenu items={leadMenuItems(r)} />
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
-}
-
-function Sep() {
-  return <span className="text-text-faint/60 select-none">·</span>;
 }

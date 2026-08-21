@@ -159,12 +159,12 @@ export function buildWhere(q: ListLeadsQuery): WhereInput {
   return { AND: conditions };
 }
 
-export function orderFor(sort: ListLeadsQuery["sort"]): { [k: string]: "asc" | "desc" } {
+export function orderFor(sort: ListLeadsQuery["sort"]): { [k: string]: "asc" | "desc" }[] {
   switch (sort) {
-    case "oldest": return { createdAt: "asc" };
-    case "name":   return { name: "asc" };
-    case "value":  return { budgetMax: "desc" };
+    case "oldest": return [{ createdAt: "asc" },  { id: "asc" }];
+    case "name":   return [{ name: "asc" },        { createdAt: "desc" }, { id: "desc" }];
+    case "value":  return [{ budgetMax: "desc" },  { createdAt: "desc" }, { id: "desc" }];
     case "recent":
-    default:       return { createdAt: "desc" };
+    default:       return [{ createdAt: "desc" },  { id: "desc" }];
   }
 }
