@@ -1,0 +1,292 @@
+{
+  "lastUpdated": "2026-08-21",
+  "sections": [
+    {
+      "key": "mandovara-named",
+      "label": "Named — no catalogue match",
+      "source": "MANDOVARA STOCK",
+      "description": "Catalogue name was written in the Excel sheet but no matching collection exists in the Product Catalogue under any brand or spelling variant.",
+      "items": [
+        {
+          "id": "A-FAITH-F7047",
+          "catalogueName": "FAITH",
+          "code": "F7047",
+          "qty": 6,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No FAITH collection found in catalogue under any brand",
+          "confirmNeeded": "Brand name on selvedge · full collection name · roll width · pattern repeat"
+        },
+        {
+          "id": "A-FAITH-F7016",
+          "catalogueName": "FAITH",
+          "code": "F7016",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No FAITH collection found in catalogue under any brand",
+          "confirmNeeded": "Brand name on selvedge · full collection name"
+        },
+        {
+          "id": "A-FAITH-F7057",
+          "catalogueName": "FAITH",
+          "code": "F7057",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No FAITH collection found in catalogue under any brand",
+          "confirmNeeded": "Brand name on selvedge · full collection name"
+        },
+        {
+          "id": "A-MODELICA-AMDL211122",
+          "catalogueName": "MODELICA",
+          "code": "AMDL211122",
+          "qty": 3,
+          "unit": "ROLL",
+          "proposedMapping": "Possibly Arham-distributed (code prefix AMDL)",
+          "pendingReason": "No MODELICA collection in catalogue; AMDL prefix may be an Arham design-line code",
+          "confirmNeeded": "Brand name on selvedge · whether AMDL is the brand code or a design-line prefix"
+        },
+        {
+          "id": "A-MODELICA-AMDL211125",
+          "catalogueName": "MODELICA",
+          "code": "AMDL211125",
+          "qty": 3,
+          "unit": "ROLL",
+          "proposedMapping": "Possibly Arham-distributed (code prefix AMDL)",
+          "pendingReason": "No MODELICA collection in catalogue",
+          "confirmNeeded": "Brand name on selvedge"
+        },
+        {
+          "id": "A-FF-HOR809",
+          "catalogueName": "F&F",
+          "code": "HOR809",
+          "qty": 2,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No F&F brand or collection found; unclear what F&F stands for",
+          "confirmNeeded": "Full brand name · whether HOR809 and DE214102 are from the same collection"
+        },
+        {
+          "id": "A-FF-DE214102",
+          "catalogueName": "F&F",
+          "code": "DE214102",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No F&F brand or collection found; code prefix DE differs from HOR — may be a different sub-line",
+          "confirmNeeded": "Full brand name · collection name"
+        },
+        {
+          "id": "A-OKHILLA-RD3137",
+          "catalogueName": "OKHILLA",
+          "code": "RD3137",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No OKHILLA collection found; code prefix RD is unrecognised",
+          "confirmNeeded": "Brand name on selvedge · full collection name · roll width"
+        },
+        {
+          "id": "A-PASSENGER-TP21202",
+          "catalogueName": "PASSENGER",
+          "code": "TP21202",
+          "qty": 3,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No PASSENGER collection found; code prefix TP does not match any existing collection",
+          "confirmNeeded": "Brand name on selvedge · full collection name"
+        },
+        {
+          "id": "A-BEYOND-72008-4",
+          "catalogueName": "BEYOND",
+          "code": "72008-4",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No BEYOND collection found; numerical code format does not match any existing brand",
+          "confirmNeeded": "Brand name on selvedge · whether this is a Latest Wallpaper / Arham product"
+        }
+      ]
+    },
+    {
+      "key": "mandovara-unknown",
+      "label": "Unknown catalogue",
+      "source": "MANDOVARA STOCK",
+      "description": "No catalogue name was recorded in the Excel sheet. The roll is physically in the showroom but its brand and collection are unidentified.",
+      "items": [
+        {
+          "id": "B-TN83405",
+          "catalogueName": null,
+          "code": "TN83405",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No catalogue name in Excel; TN prefix unrecognised",
+          "confirmNeeded": "Brand name · collection name · roll width · pattern repeat from roll label"
+        },
+        {
+          "id": "B-NO0044",
+          "catalogueName": null,
+          "code": "NO:0044",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No catalogue name in Excel; unusual colon separator in code may indicate a European or Korean brand format",
+          "confirmNeeded": "Brand name · collection name from roll label"
+        },
+        {
+          "id": "B-EAR301",
+          "catalogueName": null,
+          "code": "EAR301",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No catalogue name in Excel; EAR prefix unrecognised",
+          "confirmNeeded": "Brand name · collection name from roll label"
+        },
+        {
+          "id": "B-AD138303",
+          "catalogueName": null,
+          "code": "AD138303",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No catalogue name in Excel; AD prefix unrecognised",
+          "confirmNeeded": "Brand name · collection name from roll label"
+        },
+        {
+          "id": "B-386508",
+          "catalogueName": null,
+          "code": "386-508-47823",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "No catalogue name in Excel; long numerical format may be a barcode rather than a design code",
+          "confirmNeeded": "Check if this is a barcode or design code; scan roll label for brand name and design code"
+        },
+        {
+          "id": "B-8603-2",
+          "catalogueName": null,
+          "code": "8603-2",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": "Possibly Latest Wallpaper / BRAHMOS (NNNN-N format matches BRAHMOS codes)",
+          "pendingReason": "No catalogue name in Excel; do NOT map to BRAHMOS until physical roll label confirms Latest Wallpaper branding",
+          "confirmNeeded": "Check selvedge for 'Latest Wallpaper' or 'Brahmos' brand print; note the exact design code"
+        },
+        {
+          "id": "B-7252-1",
+          "catalogueName": null,
+          "code": "7252-1",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": "Possibly Latest Wallpaper / BRAHMOS (NNNN-N format matches BRAHMOS codes)",
+          "pendingReason": "No catalogue name in Excel; do NOT map to BRAHMOS until physical roll label confirms Latest Wallpaper branding",
+          "confirmNeeded": "Check selvedge for 'Latest Wallpaper' or 'Brahmos' brand print; note the exact design code"
+        }
+      ]
+    },
+    {
+      "key": "mandovara-bespoke",
+      "label": "Project / bespoke stock",
+      "source": "MANDOVARA STOCK",
+      "description": "Section B has no design code (colour-only rolls). Section C is customised/bespoke stock made for a specific project. Neither belongs in general stock — they require a different workflow.",
+      "items": [
+        {
+          "id": "SB-GREY-DARK",
+          "catalogueName": null,
+          "code": "— (no code)",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "Section B: colour-only roll with no design code — cannot be created as a catalogue SKU",
+          "confirmNeeded": "Check if this matches an existing catalogue colourway (e.g. a plain grey wallpaper); if not, write off or assign to a project"
+        },
+        {
+          "id": "SB-SANDEL",
+          "catalogueName": null,
+          "code": "— (no code)",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "Section B: colour-only roll (SANDEL COLOUR) with no design code",
+          "confirmNeeded": "Check if this matches an existing catalogue colourway; assign to project or write off"
+        },
+        {
+          "id": "SB-GREY-LIGHT",
+          "catalogueName": null,
+          "code": "— (no code)",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "Section B: colour-only roll with no design code",
+          "confirmNeeded": "Check if this matches an existing catalogue colourway; assign to project or write off"
+        },
+        {
+          "id": "SC-AL259719-A",
+          "catalogueName": "AL259719-A",
+          "code": "AL259719-A",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "Section C: customised / bespoke roll (LEAF DESIGN) — the code is a project reference, not a catalogue design. Must not enter general stock.",
+          "confirmNeeded": "Identify which client project this was made for; add as an Install Line or project material, not a stock SKU"
+        },
+        {
+          "id": "SC-AL276246-A",
+          "catalogueName": "AL276246-A",
+          "code": "AL276246-A",
+          "qty": 1,
+          "unit": "ROLL",
+          "proposedMapping": null,
+          "pendingReason": "Section C: customised / bespoke roll (TEMPLE DESIGN) — project reference, not a catalogue design.",
+          "confirmNeeded": "Identify which client project this was made for; add as an Install Line or project material, not a stock SKU"
+        }
+      ]
+    },
+    {
+      "key": "track-hardware",
+      "label": "Hardware — family unconfirmed",
+      "source": "TRACK STOCK",
+      "description": "All other TRACK STOCK items (28 SKUs, 43 pieces) were imported as GRN MDV/GRN-2608-0004. These two item types were excluded because their product family or stock treatment is unclear.",
+      "items": [
+        {
+          "id": "T-PLYWOOD",
+          "catalogueName": "PLYWOOD",
+          "code": "PLYWOOD",
+          "qty": 2,
+          "unit": "PIECE",
+          "lengthInches": null,
+          "proposedMapping": "HARDWARE_TRACK (Curtain Tracks) — if tracked as stock",
+          "pendingReason": "Raw material (plywood board for Roman blind headers). Unclear whether to track as a stock item or expense on installation.",
+          "confirmNeeded": "Confirm: are these boards tracked as stock or expensed during installation? If stock → assign to HARDWARE_TRACK. If expensed → log as ProjectExpense, no stock import."
+        },
+        {
+          "id": "T-ANTICRAFF-32",
+          "catalogueName": "ANTICRAFF",
+          "code": "ANTICRAFF-32IN",
+          "qty": 1,
+          "unit": "PIECE",
+          "lengthInches": 32,
+          "lengthMm": 812.8,
+          "proposedMapping": "HARDWARE_TRACK or HARDWARE_ROD — unclear",
+          "pendingReason": "Spelling unclear — may be 'Anticraft' (brand), 'anti-corrosion' (finish), or a decorative rod. Cannot determine if it is a channel rail (track) or a pole (rod).",
+          "confirmNeeded": "Check the physical item: if it is a channel/rail → HARDWARE_TRACK (Curtain Tracks). If it is a pole/rod → HARDWARE_ROD (Curtain Rods). Note the brand name if printed."
+        },
+        {
+          "id": "T-ANTICRAFF-33",
+          "catalogueName": "ANTICRAFF",
+          "code": "ANTICRAFF-33IN",
+          "qty": 1,
+          "unit": "PIECE",
+          "lengthInches": 33,
+          "lengthMm": 838.2,
+          "proposedMapping": "HARDWARE_TRACK or HARDWARE_ROD — unclear",
+          "pendingReason": "Same as ANTICRAFF-32IN above",
+          "confirmNeeded": "Same as ANTICRAFF-32IN above"
+        }
+      ]
+    }
+  ]
+}

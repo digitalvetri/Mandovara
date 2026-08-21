@@ -65,7 +65,7 @@ export function InventoryToolbar({ families }: Props) {
       <div>
         <Link
           href={"/products" as Route}
-          className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-surface px-4 py-2 text-[12.5px] font-medium text-text-dim transition-colors hover:border-gold hover:text-gold"
+          className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-surface px-4 py-2 text-[12.5px] font-medium text-text-dim transition-all duration-200 hover:border-gold hover:text-gold hover:-translate-y-0.5"
         >
           <Plus size={12} strokeWidth={2.2} />
           Add item (to catalog)

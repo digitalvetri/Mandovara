@@ -65,16 +65,15 @@ test.describe("hover survives the entrance animation", () => {
     expect(after, "entrance animation is clobbering the hover transform").not.toBe(before);
   });
 
-  // The inventory item name link uses Tailwind's `-translate-y-*`, keeping
-  // the second mechanism covered. /inventory always has rows from the seed,
-  // making it a stable anchor. It moved here from /products when that page
-  // became a brand/PDF catalog that is empty in CI (no PDFs seeded) — and
-  // this test failing at that moment is the guard doing its job.
+  // The "Add item (to catalog)" toolbar link on /inventory uses Tailwind's
+  // `-translate-y-*`, keeping the second mechanism covered. The toolbar always
+  // renders regardless of whether the stock list has rows — making it a stable
+  // anchor even when the inventory is empty.
   test("a Tailwind translate hover still moves", async ({ page }) => {
     await page.goto("/inventory", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2000);
-    // The inventory row name link points to /products/[colourwayId].
-    const card = page.locator("a[href^='/products/']:not([href$='/new'])").first();
+    // The "Add item (to catalog)" link in InventoryToolbar always renders.
+    const card = page.locator("a[href='/products']").first();
     const before = await card.evaluate((e) => getComputedStyle(e).translate);
     await card.hover();
     await page.waitForTimeout(350);

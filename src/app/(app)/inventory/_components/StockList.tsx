@@ -80,86 +80,148 @@ export function StockList({ rows }: Props) {
 }
 
 function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
-  const inclGst = grossFromCost(r.lastCostPaise, r.gstRate);
+  const inclGst  = grossFromCost(r.lastCostPaise, r.gstRate);
+  const swatchBg = r.hex ?? "var(--color-surface-2)";
+  const statusBadge = r.isOut ? (
+    <span className="rounded-full bg-fault/15 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-fault">
+      Out
+    </span>
+  ) : r.isLow ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-heat/15 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-heat">
+      <AlertTriangle size={9} /> Low
+    </span>
+  ) : null;
+
   return (
-    <li className="md:grid md:grid-cols-[minmax(0,2fr)_84px_84px_84px_100px_100px_60px] flex flex-col gap-2 md:gap-3 items-start md:items-center px-5 py-3 hover:bg-surface-2/40">
-      {/* Item */}
-      <div className="flex min-w-0 items-center gap-3">
+    <li className="hover:bg-surface-2/40 transition-colors">
+      {/* ── Mobile card (below md) ─────────────────────────────────────── */}
+      <div className="flex items-start gap-3 px-4 py-3.5 md:hidden">
         <span
           aria-hidden
-          className="h-8 w-8 shrink-0 rounded-[6px] border border-rule"
-          style={{ background: r.hex ?? "var(--color-surface-2, #1a2340)" }}
+          className="mt-0.5 h-10 w-10 shrink-0 rounded-[8px] border border-rule"
+          style={{ background: swatchBg }}
         />
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-2">
+        <div className="min-w-0 flex-1">
+          {/* Name + badge */}
+          <div className="flex min-w-0 items-start justify-between gap-2">
             <Link
               href={`/products/${r.colourwayId}` as Route}
               onClick={(e) => e.stopPropagation()}
-              className="truncate text-[13.5px] font-semibold text-text hover:text-accent hover:-translate-y-0.5 transition-all duration-200"
+              className="line-clamp-2 text-[13px] font-semibold leading-snug text-text hover:text-accent"
             >
               {r.designName} — {r.colourName}
             </Link>
-            {r.isOut ? (
-              <span className="rounded-full bg-fault/15 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-fault">
-                Out
-              </span>
-            ) : r.isLow ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-heat/15 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-heat">
-                <AlertTriangle size={9} />
-                Low
-              </span>
-            ) : null}
+            {statusBadge && <span className="mt-0.5 shrink-0">{statusBadge}</span>}
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-text-dim">
+
+          {/* Code + brand */}
+          <div className="mt-0.5 text-[11px] text-text-dim">
             <span className="tabular-nums">{r.code}</span>
-            <span className="mx-1.5 text-text-subtle">·</span>
-            <span>{r.brandName}</span>
+            <span className="mx-1 text-text-faint">·</span>
+            {r.brandName}
+          </div>
+
+          {/* Qty + family + Edit — all on one row */}
+          <div className="mt-2 flex items-center gap-3">
+            <div className="flex items-baseline gap-1">
+              <span className={`tabular-nums text-[15px] font-semibold ${r.isOut ? "text-fault" : r.isLow ? "text-heat" : "text-text"}`}>
+                {formatQty(r.onHand)}
+              </span>
+              <span className="text-[11px] text-text-dim">{unitLabel(r.sellUnit)}</span>
+            </div>
+
+            <span aria-hidden className="text-[10px] text-text-faint">·</span>
+
+            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10.5px] text-text-dim">
+              {FAMILY_LABEL[r.family] ?? r.family}
+            </span>
+
+            <button
+              type="button"
+              onClick={onEdit}
+              className="ml-auto inline-flex items-center gap-1 rounded-[6px] border border-rule px-2.5 py-1 text-[11px] text-text-dim hover:border-gold hover:text-gold"
+              aria-label={`Edit ${r.code}`}
+            >
+              <Pencil size={11} /> Edit
+            </button>
+          </div>
+
+          {/* Reorder level — only shown when set */}
+          {r.reorderLevel != null && (
+            <div className="mt-1 text-[10.5px] text-text-dim">
+              reorder at <span className="tabular-nums">{formatQty(r.reorderLevel)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Desktop grid (md+) ─────────────────────────────────────────── */}
+      <div className="hidden md:grid md:grid-cols-[minmax(0,2fr)_84px_84px_84px_100px_100px_60px] items-center gap-3 px-5 py-3">
+        {/* Item */}
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden
+            className="h-8 w-8 shrink-0 rounded-[6px] border border-rule"
+            style={{ background: swatchBg }}
+          />
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <Link
+                href={`/products/${r.colourwayId}` as Route}
+                onClick={(e) => e.stopPropagation()}
+                className="truncate text-[13.5px] font-semibold text-text hover:text-accent hover:-translate-y-0.5 transition-all duration-200"
+              >
+                {r.designName} — {r.colourName}
+              </Link>
+              {statusBadge}
+            </div>
+            <div className="mt-0.5 truncate text-[11px] text-text-dim">
+              <span className="tabular-nums">{r.code}</span>
+              <span className="mx-1.5 text-text-subtle">·</span>
+              {r.brandName}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* On hand */}
-      <div className="text-right md:text-right">
-        <div className={`tabular-nums text-[13.5px] font-medium ${r.isOut ? "text-fault" : r.isLow ? "text-heat" : "text-text"}`}>
-          {formatQty(r.onHand)}
+        {/* On hand */}
+        <div className="text-right">
+          <div className={`tabular-nums text-[13.5px] font-medium ${r.isOut ? "text-fault" : r.isLow ? "text-heat" : "text-text"}`}>
+            {formatQty(r.onHand)}
+          </div>
+          <div className="text-[10px] text-text-dim">{unitLabel(r.sellUnit)}</div>
         </div>
-        <div className="text-[10.5px] text-text-dim md:hidden">on hand · {unitLabel(r.sellUnit)}</div>
-      </div>
 
-      {/* Reorder */}
-      <div className="text-right">
-        <div className="tabular-nums text-[12.5px] text-text-dim">
+        {/* Reorder */}
+        <div className="tabular-nums text-right text-[12.5px] text-text-dim">
           {r.reorderLevel == null ? "—" : formatQty(r.reorderLevel)}
         </div>
-        <div className="text-[10.5px] text-text-dim md:hidden">reorder at</div>
-      </div>
 
-      {/* Family */}
-      <div className="text-[11px] text-text-dim">
-        {FAMILY_LABEL[r.family] ?? r.family}
-      </div>
+        {/* Family */}
+        <div className="text-[11px] text-text-dim">
+          {FAMILY_LABEL[r.family] ?? r.family}
+        </div>
 
-      {/* Cost */}
-      <div className="tabular-nums text-right text-[12.5px] text-text-dim">
-        {r.lastCostPaise > 0n ? formatINR(r.lastCostPaise) : "—"}
-      </div>
+        {/* Cost */}
+        <div className="tabular-nums text-right text-[12.5px] text-text-dim">
+          {r.lastCostPaise > 0n ? formatINR(r.lastCostPaise) : "—"}
+        </div>
 
-      {/* Incl. GST */}
-      <div className="tabular-nums text-right text-[12.5px] text-text">
-        {r.lastCostPaise > 0n ? formatINR(inclGst) : "—"}
-      </div>
+        {/* Incl. GST */}
+        <div className="tabular-nums text-right text-[12.5px] text-text">
+          {r.lastCostPaise > 0n ? formatINR(inclGst) : "—"}
+        </div>
 
-      {/* Edit */}
-      <div className="md:justify-self-end">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="inline-flex items-center gap-1 rounded-[6px] border border-rule px-2 py-1 text-[11px] text-text-dim hover:border-gold hover:text-gold"
-          aria-label={`Edit ${r.code}`}
-        >
-          <Pencil size={11} />
-          Edit
-        </button>
+        {/* Edit */}
+        <div className="justify-self-end">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1 rounded-[6px] border border-rule px-2 py-1 text-[11px] text-text-dim hover:border-gold hover:text-gold"
+            aria-label={`Edit ${r.code}`}
+          >
+            <Pencil size={11} /> Edit
+          </button>
+        </div>
       </div>
     </li>
   );

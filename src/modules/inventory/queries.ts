@@ -48,9 +48,9 @@ export async function getInventoryKpis(ctx: RequestContext): Promise<InventoryKp
   requirePermission(ctx, "inventory.view");
   const db = scoped(ctx);
 
-  const [items, balances, openPos] = await Promise.all([
+  const [colourways, balances, openPos] = await Promise.all([
     db.colourway.findMany({
-      where:  { isActive: true },
+      where:  { isActive: true, stock: { some: {} } },
       select: { id: true, reorderLevel: true },
     }),
     db.stockBalance.findMany({
@@ -71,14 +71,14 @@ export async function getInventoryKpis(ctx: RequestContext): Promise<InventoryKp
   }
 
   let low = 0;
-  for (const it of items) {
+  for (const it of colourways) {
     if (it.reorderLevel == null) continue;
     const on = onHandByCw.get(it.id) ?? 0;
     if (on <= Number(it.reorderLevel)) low += 1;
   }
 
   return {
-    itemCount:       items.length,
+    itemCount:       colourways.length,
     lowStockCount:   low,
     openPoCount:     openPos,
     stockValuePaise: stockValue,
@@ -103,6 +103,9 @@ export async function listStockItems(
   if (q.hasLot) {
     // Only colourways that have at least one StockBalance row with a dye lot recorded.
     where["stock"] = { some: { dyeLot: { not: null } } };
+  } else {
+    // Default: only show colourways that have been received into stock.
+    where["stock"] = { some: {} };
   }
   if (q.search && q.search.trim()) {
     const s = q.search.trim();
@@ -130,8 +133,15 @@ export async function listStockItems(
       },
     }),
     db.colourway.count({ where }),
+    // Only families that have at least one colourway with actual stock on hand.
+    // Catalogue families with zero stock (Blinds, Curtains, Carpet, etc.) are
+    // excluded here — they have no StockBalance rows and must not appear as
+    // filter pills on the Stocks page.
     db.design.findMany({
-      where:    { isActive: true },
+      where: {
+        isActive: true,
+        colourways: { some: { isActive: true, stock: { some: {} } } },
+      },
       select:   { family: true },
       distinct: ["family"],
     }),
