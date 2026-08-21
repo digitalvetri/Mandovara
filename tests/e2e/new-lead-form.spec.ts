@@ -3,17 +3,17 @@ import { test, expect } from "@playwright/test";
 // Helper selectors — EntityForm.Field uses <div> labels, not <label htmlFor>
 // so we match by the input's `name` attribute (set by react-hook-form's register())
 const sel = {
-  name:      'input[name="name"]',
-  mobile:    'input[name="mobile"]',
-  altMobile: 'input[name="altMobile"]',
-  email:     'input[name="email"]',
-  city:      'input[name="city"]',
-  pincode:   'input[name="pincode"]',
-  source:    'select[name="source"]',
-  priority:  'select[name="priority"]',
-  ownerId:   'select[name="ownerId"]',
-  requirement: 'textarea[name="requirement"]',
-  submit:    'button[type="submit"]',
+  name:            'input[name="name"]',
+  mobile:          'input[name="mobile"]',
+  email:           'input[name="email"]',
+  city:            'input[name="city"]',
+  address:         'input[name="address"]',
+  source:          'select[name="source"]',
+  priority:        'select[name="priority"]',
+  estimatedBudget: 'input[name="estimatedBudget"]',
+  ownerId:         'select[name="ownerId"]',
+  requirement:     'textarea[name="requirement"]',
+  submit:          'button[type="submit"]',
 };
 
 test.describe("New Lead Form — PDF spec", () => {
@@ -24,17 +24,18 @@ test.describe("New Lead Form — PDF spec", () => {
     // ── Fields that MUST be present ──────────────────────────────────
     await expect(page.locator(sel.name)).toBeVisible();
     await expect(page.locator(sel.mobile)).toBeVisible();
-    await expect(page.locator(sel.altMobile)).toBeVisible();
     await expect(page.locator(sel.email)).toBeVisible();
     await expect(page.locator(sel.city)).toBeVisible();
-    await expect(page.locator(sel.pincode)).toBeVisible();
+    await expect(page.locator(sel.address)).toBeVisible();
     await expect(page.locator(sel.requirement)).toBeVisible();
     await expect(page.locator(sel.source)).toBeVisible();
     await expect(page.locator(sel.priority)).toBeVisible();
     await expect(page.locator(sel.ownerId)).toBeVisible();
+    await expect(page.locator(sel.estimatedBudget)).toBeVisible();
 
     // ── Fields that must NOT be present ──────────────────────────────
-    await expect(page.locator('input[name="siteAddress"], textarea[name="siteAddress"]')).not.toBeAttached();
+    await expect(page.locator('input[name="altMobile"]')).not.toBeAttached();
+    await expect(page.locator('input[name="pincode"]')).not.toBeAttached();
     await expect(page.locator('input[name="projectName"]')).not.toBeAttached();
     await expect(page.locator('select[name="projectType"]')).not.toBeAttached();
   });
@@ -62,7 +63,7 @@ test.describe("New Lead Form — PDF spec", () => {
     await expect(page.getByText(/customer name is required/i)).toBeVisible();
   });
 
-  test("creates a lead and shows success state then redirects to /leads", async ({ page }) => {
+  test("creates a lead and navigates to the lead detail page", async ({ page }) => {
     await page.goto("/leads/new");
     await page.waitForLoadState("load");
 
@@ -78,10 +79,8 @@ test.describe("New Lead Form — PDF spec", () => {
 
     await page.locator(sel.submit).click();
 
-    // Should show the success panel
-    await expect(page.getByText(/lead created successfully/i)).toBeVisible({ timeout: 8000 });
-
-    // Then redirect to the leads list
-    await expect(page).toHaveURL("/leads", { timeout: 6000 });
+    // Should navigate directly to the lead detail page (no success animation)
+    await expect(page).toHaveURL(/\/leads\/[a-z0-9]+$/, { timeout: 8000 });
+    await expect(page.getByText("Playwright Test Lead")).toBeVisible({ timeout: 4000 });
   });
 });

@@ -54,7 +54,8 @@ test.describe("hover survives the entrance animation", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test(".lift still lifts once the entrance has finished", async ({ page }) => {
-    await page.goto("/leads", { waitUntil: "domcontentloaded" });
+    // Dashboard KPI cards use .lift — leads was changed to a table layout
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2000);
     const row = page.locator(".lift").first();
     const before = await row.evaluate((e) => getComputedStyle(e).transform);
