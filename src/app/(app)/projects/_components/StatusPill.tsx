@@ -8,15 +8,13 @@ const TONE: Record<ProjectStage, string> = {
   ORDERED:       "bg-warn/15 text-warn",
   PROCUREMENT:   "bg-warn/15 text-warn",
   MAKE:          "bg-warn/15 text-warn",
-  INSTALLATION:  "bg-warn/15 text-warn",
-  SNAGGING:      "bg-heat/15 text-heat",
   COMPLETED:     "bg-good/12 text-good",
   CANCELLED:     "bg-bad/12 text-bad line-through",
 };
 const LABEL: Record<ProjectStage, string> = {
   ENQUIRY: "Enquiry", SITE_VISIT: "Site Visit", MEASUREMENT: "Measurement",
   QUOTATION: "Quotation", ORDERED: "Ordered", PROCUREMENT: "Procurement",
-  MAKE: "Make", INSTALLATION: "Installation", SNAGGING: "Snagging",
+  MAKE: "Make",
   COMPLETED: "Completed", CANCELLED: "Cancelled",
 };
 

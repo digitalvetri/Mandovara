@@ -12,8 +12,6 @@ const CARDS: CardDef[] = [
   { key: "CONFIRMED",        label: "Confirmed",    borderColor: "border-l-heat",  numColor: "text-heat"  },
   { key: "PROCUREMENT",      label: "Procurement",  borderColor: "border-l-heat",  numColor: "text-heat"  },
   { key: "MAKE",             label: "Make",         borderColor: "border-l-info",  numColor: "text-info"  },
-  { key: "READY_TO_INSTALL", label: "Ready",        borderColor: "border-l-info",  numColor: "text-info"  },
-  { key: "INSTALLING",       label: "Installing",   borderColor: "border-l-solid", numColor: "text-solid" },
   { key: "COMPLETED",        label: "Completed",    borderColor: "border-l-solid", numColor: "text-solid" },
   { key: "CANCELLED",        label: "Cancelled",    borderColor: "border-l-fault", numColor: "text-fault" },
   { key: "open",             label: "Total Open",   borderColor: "border-l-accent",numColor: "text-accent"},

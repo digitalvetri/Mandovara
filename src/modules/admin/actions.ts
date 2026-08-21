@@ -18,7 +18,7 @@ const mobileRegex = /^(\+91)?\d{10}$/;
 // roleId carries the AppRole enum value (e.g. "OWNER", "DESIGNER") — no Role model exists.
 const APP_ROLE_VALUES = [
   "OWNER", "DESIGNER", "SALES", "MEASURE_EXEC", "STORE",
-  "MAKE_SUPERVISOR", "INSTALLER", "ACCOUNTS", "HR",
+  "MAKE_SUPERVISOR", "ACCOUNTS", "HR",
 ] as const;
 
 const createUserSchema = z.object({
@@ -51,7 +51,7 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
   const ROLE_NAME_MAP: Record<string, string> = {
     OWNER: "Owner", DESIGNER: "Designer", SALES: "Sales",
     MEASURE_EXEC: "Measure Executive", STORE: "Store",
-    MAKE_SUPERVISOR: "Make Supervisor", INSTALLER: "Installer",
+    MAKE_SUPERVISOR: "Make Supervisor",
     ACCOUNTS: "Accounts", HR: "HR",
   };
   const dynamicRole = await db.role.findFirst({

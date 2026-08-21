@@ -12,7 +12,7 @@ export const OPEN_LEAD_STAGES = [
 
 // Active ProjectStage values — post-order, real work underway
 export const ACTIVE_PROJECT_STAGES = [
-  "ORDERED", "PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING",
+  "ORDERED", "PROCUREMENT", "MAKE",
 ] as const;
 
 export const MONTHS_LOOKBACK = 8;
@@ -23,7 +23,7 @@ export const TEAM_PROJECTS_PREVIEW = 4;         // projects shown inline per mem
 // as "in flight" for owner-load purposes. COMPLETED / CANCELLED drop off.
 export const LIVE_STAGES = [
   "ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION",
-  "ORDERED", "PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING",
+  "ORDERED", "PROCUREMENT", "MAKE",
 ] as const;
 
 export * from "./queries-part2";

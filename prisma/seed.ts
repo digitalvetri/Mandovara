@@ -112,7 +112,6 @@ async function bumpNumberSequences(db: PrismaClient, orgId: string): Promise<voi
     { series: "RCT",  table: "Receipt",         numberField: "number", prefix: "MDV" },
     { series: "PO",   table: "PurchaseOrder",   numberField: "number", prefix: "MDV" },
     { series: "GRN",  table: "GRN",             numberField: "number", prefix: "MDV" },
-    { series: "INS",  table: "InstallVisit",    numberField: "number", prefix: "MDV" },
     { series: "MJ",   table: "MakeJob",         numberField: "number", prefix: "MDV" },
     { series: "ENQ",  table: "Lead",            numberField: "number", prefix: "MDV" },
     { series: "CLI",  table: "Client",          numberField: "code",   prefix: "MDV" },

@@ -19,7 +19,6 @@ import { SalesView } from "./_dashboard/SalesView";
 import { MeasureExecView } from "./_dashboard/MeasureExecView";
 import { StoreView } from "./_dashboard/StoreView";
 import { MakeSupervisorView } from "./_dashboard/MakeSupervisorView";
-import { InstallerView } from "./_dashboard/InstallerView";
 import { AccountsView } from "./_dashboard/AccountsView";
 import { HrView } from "./_dashboard/HrView";
 
@@ -130,15 +129,6 @@ export default async function DashboardPage() {
         <Topbar title="Dashboard" eyebrow="production" />
         {greeting}
         <div className="mt-4"><MakeSupervisorView ctx={ctx} /></div>
-      </>
-    );
-  }
-  if (role === "INSTALLER") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="installation" />
-        {greeting}
-        <div className="mt-4"><InstallerView ctx={ctx} /></div>
       </>
     );
   }

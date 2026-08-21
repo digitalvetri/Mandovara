@@ -25,7 +25,6 @@ const USER_SPECS = [
   { role: "MEASURE_EXEC",   name: "Bala Kumar",       mobile: "+91 9843012348", email: "bala@mandovara.com"      },
   { role: "STORE",          name: "Senthil Murugan",  mobile: "+91 9843012349", email: "senthil@mandovara.com"   },
   { role: "MAKE_SUPERVISOR",name: "Manoj Krishnan",   mobile: "+91 9843012350", email: "manoj@mandovara.com"     },
-  { role: "INSTALLER",      name: "Vignesh Prasad",   mobile: "+91 9843012351", email: "vignesh@mandovara.com"   },
   { role: "ACCOUNTS",       name: "Deepa Iyer",       mobile: "+91 9843012352", email: "deepa@mandovara.com"     },
   { role: "HR",             name: "Priya Natarajan",  mobile: "+91 9843012353", email: "priya@mandovara.com"     },
 ] as const;
@@ -39,7 +38,6 @@ const DEPT_BY_ROLE: Record<string, string> = {
   MEASURE_EXEC:    "MEASURE",
   STORE:           "STORE",
   MAKE_SUPERVISOR: "MAKE",
-  INSTALLER:       "INSTALL",
   ACCOUNTS:        "ACCOUNTS",
   HR:              "HR",
 };
@@ -51,7 +49,6 @@ const DESIGNATION_BY_ROLE: Record<string, string> = {
   MEASURE_EXEC:    "Measurement Executive",
   STORE:           "Store Keeper",
   MAKE_SUPERVISOR: "Make Supervisor",
-  INSTALLER:       "Installation Technician",
   ACCOUNTS:        "Accounts Manager",
   HR:              "HR Executive",
 };

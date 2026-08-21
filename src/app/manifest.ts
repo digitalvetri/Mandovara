@@ -15,7 +15,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Mandovara Interior OS",
     short_name: "Mandovara",
     description:
-      "Measure-to-install operating system for Mandovara — measurements, quotations, dye-lot stock, make, install and money.",
+      "Operating system for Mandovara — measurements, quotations, dye-lot stock, make and money.",
     start_url: "/",
     scope: "/",
     display: "standalone",
@@ -33,7 +33,6 @@ export default function manifest(): MetadataRoute.Manifest {
     // Long-press the installed icon to jump straight to the field surfaces.
     shortcuts: [
       { name: "Measure a site", short_name: "Measure", url: "/measure" },
-      { name: "Today's installs", short_name: "Install", url: "/install" },
       { name: "Mark attendance", short_name: "Attendance", url: "/m/attendance" },
     ],
   };

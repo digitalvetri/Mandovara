@@ -18,7 +18,6 @@ import type {
   AdvanceReceivedEvent,
   AllocationCompleteEvent,
   GrnReceivedEvent,
-  InstallVisitCompletedEvent,
   MakeJobQcPassedEvent,
   MeasurementApprovedEvent,
   QuotationAcceptedEvent,
@@ -130,10 +129,6 @@ async function onMakeJobQcPassed(e: MakeJobQcPassedEvent): Promise<void> {
   await completeMilestonesByEvent(e.orgId, e.projectId, "makeJob.qcPassed");
 }
 
-async function onInstallVisitCompleted(e: InstallVisitCompletedEvent): Promise<void> {
-  await completeMilestonesByEvent(e.orgId, e.projectId, "installVisit.completed");
-}
-
 // ── Registration ───────────────────────────────────────────
 let registered = false;
 
@@ -148,5 +143,4 @@ export function registerMilestoneListeners(): void {
   bus.subscribe("grn.received",            onGrnReceived);
   bus.subscribe("allocation.complete",     onAllocationComplete);
   bus.subscribe("makeJob.qcPassed",        onMakeJobQcPassed);
-  bus.subscribe("installVisit.completed",  onInstallVisitCompleted);
 }

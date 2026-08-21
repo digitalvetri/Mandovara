@@ -41,9 +41,6 @@ export async function clientId(page: Page): Promise<string | null> {
 export async function makeJobId(page: Page): Promise<string | null> {
   return process.env["E2E_MAKE_JOB_ID"] ?? firstIdFrom(page, "/make", "/make");
 }
-export async function installVisitId(page: Page): Promise<string | null> {
-  return process.env["E2E_INSTALL_VISIT_ID"] ?? firstIdFrom(page, "/install", "/install");
-}
 export async function colourwayId(page: Page): Promise<string | null> {
   // ?hasLot=1 filters the inventory to colourways that have at least one
   // StockBalance row with a non-null dyeLot. The seed creates exactly these

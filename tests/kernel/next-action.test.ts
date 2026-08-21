@@ -53,7 +53,7 @@ describe("resolveNextAction — measurement stages", () => {
 
 describe("resolveNextAction — stage → CTA mapping", () => {
   const perms = new Set(["project.update", "quotation.create", "po.create",
-    "allocation.create", "install.create", "install.raiseSnag"]);
+    "allocation.create"]);
   const ctx = ctxWith([...perms]);
 
   it.each([
@@ -63,17 +63,11 @@ describe("resolveNextAction — stage → CTA mapping", () => {
     // Label changed when the dye-lot allocation console was removed — the
     // stage still exists, but there is nothing to allocate to any more.
     ["PROCUREMENT",  "ALLOCATE_MATERIAL",  "Material in procurement"],
-    ["INSTALLATION", "SCHEDULE_INSTALL",   "Schedule installation"],
     ["CANCELLED",    "PROJECT_CANCELLED",  "This project was cancelled"],
   ])("stage=%s → kind=%s / label=%s", (stage, kind, label) => {
     const a = resolveNextAction(ctx, { id: "p1", stage });
     expect(a.kind).toBe(kind);
     expect(a.label).toContain(label);
-  });
-
-  it("stage=SNAGGING with openSnags count reflects the number", () => {
-    const a = resolveNextAction(ctx, { id: "p1", stage: "SNAGGING", openSnags: 3 });
-    expect(a.label).toBe("3 open snags");
   });
 
   it("stage=MAKE reflects make progress in subLine", () => {

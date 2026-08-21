@@ -75,7 +75,8 @@ export async function submitQC(
         });
       }
 
-      // Advance order to READY_TO_INSTALL when all jobs for this order are done
+      // Advance order to COMPLETED when all jobs for this order are done.
+      // (Was READY_TO_INSTALL before installation was removed as a stage.)
       const allJobsForOrder = await tx.makeJob.findMany({
         where: { orderId: job.orderId, organizationId: ctx.orgId },
         select: { id: true, status: true },
@@ -90,7 +91,7 @@ export async function submitQC(
             organizationId: ctx.orgId,
             status: { in: ["CONFIRMED", "PROCUREMENT", "MAKE"] },
           },
-          data: { status: "READY_TO_INSTALL" },
+          data: { status: "COMPLETED" },
         });
       }
     }

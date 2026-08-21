@@ -4,7 +4,7 @@ import { z } from "zod";
 
 export const PROJECT_STAGES = [
   "ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION", "ORDERED", "PROCUREMENT",
-  "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED", "CANCELLED",
+  "MAKE", "COMPLETED", "CANCELLED",
 ] as const;
 
 export type ProjectStage = (typeof PROJECT_STAGES)[number];
@@ -71,20 +71,6 @@ export const addSiteLogSchema = z.object({
   loggedAt:      isoDate,
 });
 
-export const SNAG_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED"] as const;
-export type SnagStatus = (typeof SNAG_STATUSES)[number];
-
-export const addSnagSchema = z.object({
-  projectId:   z.string().min(1),
-  location:    z.string().trim().min(1, "Where is it?").max(120),
-  description: z.string().trim().min(1, "What's wrong?").max(1000),
-});
-
-export const setSnagStatusSchema = z.object({
-  id:     z.string().min(1),
-  status: z.enum(SNAG_STATUSES),
-});
-
 export const EXPENSE_STATUSES = ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"] as const;
 export type ExpenseStatus = (typeof EXPENSE_STATUSES)[number];
 
@@ -139,7 +125,6 @@ export type CreateProjectInput      = z.infer<typeof createProjectSchema>;
 export type AddMilestoneInput       = z.infer<typeof addMilestoneSchema>;
 export type AddTaskInput            = z.infer<typeof addTaskSchema>;
 export type AddSiteLogInput         = z.infer<typeof addSiteLogSchema>;
-export type AddSnagInput            = z.infer<typeof addSnagSchema>;
 export type AddProjectExpenseInput  = z.infer<typeof addProjectExpenseSchema>;
 export type SaveHandoverInput       = z.infer<typeof saveHandoverSchema>;
 export type HandoverChecklistItem   = z.infer<typeof checklistItemSchema>;

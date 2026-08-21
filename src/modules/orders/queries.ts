@@ -37,14 +37,6 @@ export interface OrderStatusCounts {
   total:    number;
 }
 
-export interface InstallVisitSummary {
-  id:          string;
-  number:      string;
-  scheduledAt: Date;
-  status:      string;
-  completedAt: Date | null;
-}
-
 export interface OrderLineRow {
   id: string;
   lineNo: number;
@@ -58,8 +50,6 @@ export interface OrderLineRow {
   amount: bigint;
   procuredQty: string;
   madeQty: string;
-  installedQty: string;
-  dispatchedQty: string;
   remainingQty: string;
 }
 
@@ -77,7 +67,6 @@ export interface OrderDetail {
   projectName: string;
   salesExecName: string | null;
   date: Date;
-  promisedInstallAt: Date | null;
   totalValue: bigint;
   advanceRequired: bigint;
   advanceReceived: bigint;
@@ -85,7 +74,6 @@ export interface OrderDetail {
   quotationNumber: string | null;
   makeJobId: string | null;
   makeJobStatus: string | null;
-  installVisits: InstallVisitSummary[];
   invoicedTotal: bigint;
   paidTotal: bigint;
   lines: OrderLineRow[];

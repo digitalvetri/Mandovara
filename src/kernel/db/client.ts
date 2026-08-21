@@ -49,7 +49,7 @@ if (process.env["NODE_ENV"] !== "production") {
 }
 
 export type {
-  AppRole, InstallStatus, MakeJobStatus, HeadingType, RequestStatus,
+  AppRole, MakeJobStatus, HeadingType, RequestStatus,
 } from "@prisma/client";
 
 // ── Auth bootstrap ──────────────────────────────────────────────────────────

@@ -50,12 +50,6 @@ export interface OrderConfirmedEvent extends EventBase {
   clientId: string;
   total: Paise;
 }
-export interface DispatchPostedEvent extends EventBase {
-  type: "dispatch.posted";
-  dispatchId: string;
-  orderId: string;
-}
-
 // ── Invoicing / accounts ────────────────────────────────────
 export interface InvoiceCreatedEvent extends EventBase {
   type: "invoice.created";
@@ -224,16 +218,10 @@ export interface MakeJobQcPassedEvent extends EventBase {
   makeJobId: string;
   projectId: string;
 }
-export interface InstallVisitCompletedEvent extends EventBase {
-  type: "installVisit.completed";
-  installVisitId: string;
-  projectId: string;
-}
-
 // ── The union ───────────────────────────────────────────────
 export type DomainEvent =
   | QuotationCreatedEvent | QuotationSentEvent | QuotationAcceptedEvent | QuotationExpiredEvent
-  | OrderConfirmedEvent   | DispatchPostedEvent
+  | OrderConfirmedEvent
   | InvoiceCreatedEvent   | InvoiceCancelledEvent | PaymentOverdueEvent | ReceiptRecordedEvent
   | StockBelowReorderEvent | StockAdjustmentPostedEvent | GrnPostedEvent
   | PurchaseOrderIssuedEvent
@@ -243,7 +231,7 @@ export type DomainEvent =
   | ClientCreatedEvent | ClientStatusChangedEvent
   | SiteVisitCompletedEvent | MeasurementSubmittedEvent | MeasurementApprovedEvent
   | AdvanceReceivedEvent | GrnReceivedEvent | AllocationCompleteEvent
-  | MakeJobQcPassedEvent | InstallVisitCompletedEvent;
+  | MakeJobQcPassedEvent;
 
 export type DomainEventType = DomainEvent["type"];
 

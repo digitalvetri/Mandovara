@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
-  Boxes, MapPin, Briefcase, Wrench, Receipt, Wallet,
+  Boxes, MapPin, Briefcase, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
   Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
   type LucideIcon,
@@ -51,7 +51,6 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
     items: [
       { label: "Site Visit Management", href: "/site-visits",  icon: MapPin  },
       { label: "Measurements",          href: "/measurements", icon: Ruler   },
-      { label: "Installation",          href: "/install",      icon: Wrench  },
     ],
   },
   {
@@ -104,7 +103,6 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
     items: [
       { label: "Site Visit Management", href: "/site-visits",  icon: MapPin, perm: "sitelog.view"     },
       { label: "Measurements",          href: "/measurements", icon: Ruler,  perm: "measurement.view" },
-      { label: "Installation",          href: "/install",      icon: Wrench, perm: "install.view"     },
     ],
   },
   {
@@ -132,7 +130,6 @@ const ROLE_LABEL: Record<string, string> = {
   MEASURE_EXEC:    "Measurement Exec",
   STORE:           "Store Keeper",
   MAKE_SUPERVISOR: "Make Supervisor",
-  INSTALLER:       "Site Installer",
   ACCOUNTS:        "Accounts",
   HR:              "HR Manager",
 };

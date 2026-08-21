@@ -59,7 +59,7 @@ const MAX_PAGE_SIZE = 100;
 
 // Active stages — post-enquiry, real work underway
 const ACTIVE_STAGES = [
-  "ORDERED", "PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING",
+  "ORDERED", "PROCUREMENT", "MAKE",
 ] as const;
 
 // ── Landing-page KPI tiles ──────────────────────────────────────

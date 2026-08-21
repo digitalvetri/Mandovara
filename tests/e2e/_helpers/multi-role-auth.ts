@@ -33,7 +33,7 @@ loadEnvOnce();
 
 export type SeedRole =
   | "OWNER" | "DESIGNER" | "SALES" | "MEASURE_EXEC"
-  | "STORE" | "MAKE_SUPERVISOR" | "INSTALLER" | "ACCOUNTS" | "HR";
+  | "STORE" | "MAKE_SUPERVISOR" | "ACCOUNTS" | "HR";
 
 const TEMP_PWD = "Mandovara@2026";
 const SESSION_COOKIE = "mv_sess";
@@ -45,7 +45,6 @@ export const ROLE_USERS: Record<SeedRole, { email: string }> = {
   MEASURE_EXEC:   { email: "bala@mandovara.com"      },
   STORE:          { email: "senthil@mandovara.com"   },
   MAKE_SUPERVISOR:{ email: "manoj@mandovara.com"     },
-  INSTALLER:      { email: "vignesh@mandovara.com"   },
   ACCOUNTS:       { email: "deepa@mandovara.com"     },
   HR:             { email: "priya@mandovara.com"     },
 };

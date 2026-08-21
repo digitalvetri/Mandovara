@@ -8,7 +8,6 @@ import { devContext } from "@/lib/dev-context";
 import { getOrder } from "@/modules/orders/queries";
 import { StatusPill } from "../_components/StatusPill";
 import { CreateInvoiceButton } from "../_components/CreateInvoiceButton";
-import { DispatchSection } from "../_components/DispatchSection";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +16,6 @@ const TIMELINE = [
   { key: "CONFIRMED",        label: "Confirmed"   },
   { key: "PROCUREMENT",      label: "Procurement" },
   { key: "MAKE",             label: "Make"        },
-  { key: "READY_TO_INSTALL", label: "Ready"       },
-  { key: "INSTALLING",       label: "Installing"  },
   { key: "COMPLETED",        label: "Completed"   },
 ] as const;
 
@@ -42,7 +39,7 @@ export default async function OrderDetailPage({
   const canEdit     = !isDone && !isCancelled;
 
   const balance     = o.totalValue - o.paidTotal;
-  const installDate = o.promisedInstallAt ? ` · install by ${formatDate(o.promisedInstallAt)}` : "";
+  const installDate = "";
 
   return (
     <>
@@ -121,7 +118,6 @@ export default async function OrderDetailPage({
                   <Th align="right">Qty</Th>
                   <Th align="right">Procured</Th>
                   <Th align="right">Made</Th>
-                  <Th align="right">Installed</Th>
                   <Th align="right">Rate</Th>
                   <Th align="right">Amount</Th>
                 </tr>
@@ -129,8 +125,8 @@ export default async function OrderDetailPage({
               <tbody>
                 {o.lines.map((l) => {
                   const qty  = parseFloat(l.quantity);
-                  const inst = parseFloat(l.installedQty);
-                  const pct  = qty === 0 ? 0 : Math.min(100, (inst / qty) * 100);
+                  const made = parseFloat(l.madeQty);
+                  const pct  = qty === 0 ? 0 : Math.min(100, (made / qty) * 100);
                   return (
                     <tr key={l.id} className="border-b border-rule/70 last:border-0 align-top">
                       <Td align="right"><span className="tabular text-text-muted">{l.lineNo}</span></Td>
@@ -146,9 +142,6 @@ export default async function OrderDetailPage({
                       </Td>
                       <Td align="right"><span className="tabular text-text-muted">{l.procuredQty}</span></Td>
                       <Td align="right"><span className="tabular text-text-muted">{l.madeQty}</span></Td>
-                      <Td align="right">
-                        <span className={`tabular ${inst > 0 ? "text-solid" : "text-text-muted"}`}>{l.installedQty}</span>
-                      </Td>
                       <Td align="right"><span className="tabular text-text-muted">{formatINR(l.rate)}</span></Td>
                       <Td align="right"><span className="tabular text-text font-medium">{formatINR(l.amount)}</span></Td>
                     </tr>
@@ -157,15 +150,6 @@ export default async function OrderDetailPage({
               </tbody>
             </table>
           </div>
-
-          {/* Dispatch section */}
-          <DispatchSection
-            orderId={o.id}
-            projectId={o.projectId}
-            visits={o.installVisits}
-            lines={o.lines}
-            canEdit={canEdit}
-          />
         </div>
 
         {/* ── Sidebar ─────────────────────────────────────────────────── */}
@@ -199,7 +183,6 @@ export default async function OrderDetailPage({
               <Row k="Project"   v={`${o.projectNumber} · ${o.projectName}`} />
               <Row k="Branch"    v={o.branchName} />
               {o.salesExecName && <Row k="Sales exec" v={o.salesExecName} />}
-              {o.promisedInstallAt && <Row k="Install by" v={formatDate(o.promisedInstallAt)} />}
               {o.makeJobStatus && (
                 <Row k="Make job" v={o.makeJobStatus.replace(/_/g, " ")} />
               )}

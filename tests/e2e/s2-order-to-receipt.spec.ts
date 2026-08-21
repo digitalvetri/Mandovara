@@ -1,16 +1,15 @@
 // §12.2 Scenario 2 — Order → PO → GRN with dye lot → allocate → make job →
-//   cut list printed → install visit → client signature → invoice → receipt.
+//   cut list printed → invoice → receipt.
 //
 // This spec verifies every operations-side page loads and renders its core UI.
 // DB-level behavior (dye-lot enforcement, append-only StockMove, GST computation)
 // is covered in the unit and kernel tests.
 //
-// E2E_ORDER_ID  — a confirmed order.
-// E2E_MAKE_JOB_ID — a make job (any status).
-// E2E_INSTALL_VISIT_ID — a scheduled install visit.
+// The install-visit portion of this scenario was removed when the whole
+// installation module was nuked. Order fulfillment now stops at MAKE / QC.
 
 import { test, expect, type Page } from "@playwright/test";
-import { makeJobId, installVisitId, colourwayId } from "./_ids";
+import { makeJobId, colourwayId } from "./_ids";
 
 const _ORDER_ID        = process.env["E2E_ORDER_ID"];
 
@@ -52,23 +51,6 @@ test("make job detail renders cut list", async ({ page }) => {
   await expectNoRuntimeError(page);
   // Cut list should show panel count or cut length
   await expect(page.getByText(/cut list|panel|cut length/i).first()).toBeVisible();
-});
-
-// ── Install ───────────────────────────────────────────────────────────────────
-
-test("install schedule page loads", async ({ page }) => {
-  await page.goto("/install");
-  await expect(page).not.toHaveTitle(/404|500/);
-  await expectNoRuntimeError(page);
-  await expect(page.getByText(/install|visit|crew/i).first()).toBeVisible();
-});
-
-test("install visit detail renders room lines", async ({ page }) => {
-  const id = await installVisitId(page);
-  test.skip(!id, "no install visit in the database — run the seed with SEED_DEMO_DATA=true");
-  await page.goto(`/install/${id}`);
-  await expect(page).not.toHaveTitle(/404|500/);
-  await expectNoRuntimeError(page);
 });
 
 // ── Invoicing ─────────────────────────────────────────────────────────────────
@@ -117,31 +99,20 @@ test("inventory page loads with balance list", async ({ page }) => {
 // lot went where?", and removing the allocation console did not remove it: the
 // reservation step is gone, the record is not.
 
-test("a dye lot is recorded at both ends of the chain — stocked, then fitted", async ({ page }) => {
+test("a dye lot is recorded at the stocked end of the chain", async ({ page }) => {
   // Stocked end: the product detail page carries a dye-lot pin whenever the
   // colourway has stock recorded under a specific lot ("MIX" when multiple
   // lots are held). Asserted on the pin's title attribute.
   //
-  // We filter the inventory page to WALLPAPER family because dye lot is
-  // mandatory for roll-based families at GRN (§0.6), so any wallpaper
-  // colourway that has reached stock will have a dye lot in its balance.
-  // The inventory rows link to the product detail page (/products/[id]) where
-  // the pin renders if dyeLotHint is non-null.
+  // (The "fitted end" of this scenario was covered by the install visit sheet,
+  // which was removed with the installation module. Traceability at goods
+  // receipt through to stock balances is what remains.)
   const cwId = await colourwayId(page);
   test.skip(!cwId, "no wallpaper colourways in inventory — run the seed with SEED_DEMO_DATA=true");
   await page.goto(`/products/${cwId}`);
   await expectNoRuntimeError(page);
   const stockedLot = page.locator('[title^="Dye lot:"]').first();
   await expect(stockedLot, "no dye-lot pin on product detail for wallpaper SKU").toBeVisible({ timeout: 15_000 });
-
-  // Fitted end: the install sheet records the lot that physically went up.
-  // Without both halves, "which lot went on which wall" is unanswerable —
-  // which is the single most expensive recurring failure in this trade (§1.2).
-  const visit = await installVisitId(page);
-  test.skip(!visit, "no install visit — seed with SEED_DEMO_DATA=true");
-  await page.goto(`/install/${visit}`);
-  await expectNoRuntimeError(page);
-  await expect(page.getByText(/LOT-|dye lot/i).first()).toBeVisible({ timeout: 15_000 });
 });
 
 test("the make queue shows a cut list derived from the measurement", async ({ page }) => {
@@ -154,16 +125,6 @@ test("the make queue shows a cut list derived from the measurement", async ({ pa
   // so panels and cut length must both be present on the job card.
   await expect(page.getByText(/cut list|panel|cut length/i).first()).toBeVisible();
   await expect(page.getByText(/MDV\/MJ-/).first()).toBeVisible();
-});
-
-test("an install visit records the dye lot that was actually fitted", async ({ page }) => {
-  const id = await installVisitId(page);
-  test.skip(!id, "no install visit — seed with SEED_DEMO_DATA=true");
-  await page.goto(`/install/${id}`);
-  await expectNoRuntimeError(page);
-  await expect(page.getByText(/MDV\/INS-/).first()).toBeVisible();
-  // The visit sheet is room-by-room; each line names the lot used.
-  await expect(page.getByText(/LOT-|dye lot/i).first()).toBeVisible();
 });
 
 test("an invoice shows GST split and a rupee total", async ({ page }) => {

@@ -40,12 +40,11 @@ export async function loadDaySummary(ctx: RequestContext): Promise<DaySummaryIte
   if (role === "OWNER") {
     const [
       leadsOpen, followupsDue, measurementsToday,
-      installsToday, overdueInvoices, makeJobsReady,
+      overdueInvoices, makeJobsReady,
     ] = await Promise.all([
       db.lead.count({ where: { stage: { in: ["NEW", "CONTACTED"] } } }),
       db.followUp.count({ where: { dueAt: { lte: end }, completedAt: null } }),
       db.measurement.count({ where: { visitedAt: { gte: start, lte: end } } }),
-      db.installVisit.count({ where: { scheduledAt: { gte: start, lte: end } } }),
       db.invoice.count({ where: { status: { in: ["ISSUED", "PARTIALLY_PAID"] }, dueDate: { lt: now } } }),
       db.makeJob.count({ where: { status: "READY" } }),
     ]);
@@ -53,8 +52,7 @@ export async function loadDaySummary(ctx: RequestContext): Promise<DaySummaryIte
     if (leadsOpen > 0)        push(items, { id: "leads",     icon: "Users",        count: leadsOpen,        singular: "lead to contact",       plural: "leads to contact",        href: "/leads",        urgency: "normal" });
     if (followupsDue > 0)     push(items, { id: "followups", icon: "CalendarCheck", count: followupsDue,     singular: "follow-up due today",    plural: "follow-ups due today",     href: "/leads",        urgency: followupsDue > 5 ? "warn" : "normal" });
     if (measurementsToday > 0)push(items, { id: "measure",   icon: "Ruler",         count: measurementsToday,singular: "site measurement today",  plural: "site measurements today",  href: "/measurements", urgency: "normal" });
-    if (installsToday > 0)    push(items, { id: "installs",  icon: "Wrench",        count: installsToday,    singular: "install today",          plural: "installs today",           href: "/install",      urgency: "normal" });
-    if (makeJobsReady > 0)    push(items, { id: "makejobs",  icon: "Package",       count: makeJobsReady,    singular: "job ready to dispatch",  plural: "jobs ready to dispatch",   href: "/make",         urgency: "normal" });
+    if (makeJobsReady > 0)    push(items, { id: "makejobs",  icon: "Package",       count: makeJobsReady,    singular: "job ready to finalise",  plural: "jobs ready to finalise",   href: "/make",         urgency: "normal" });
     if (overdueInvoices > 0)  push(items, { id: "invoices",  icon: "AlertCircle",   count: overdueInvoices,  singular: "invoice overdue",        plural: "invoices overdue",         href: "/invoicing",    urgency: overdueInvoices > 5 ? "hot" : "warn" });
 
     return items;
@@ -88,20 +86,12 @@ export async function loadDaySummary(ctx: RequestContext): Promise<DaySummaryIte
     return items;
   }
 
-  if (role === "INSTALLER") {
-    const today = await db.installVisit.count({
-      where: { scheduledAt: { gte: start, lte: end } },
-    });
-    if (today > 0) push(items, { id: "installs", icon: "Wrench", count: today, singular: "install today", plural: "installs today", href: "/install", urgency: "normal" });
-    return items;
-  }
-
   if (role === "MAKE_SUPERVISOR") {
     const [ready, inQc] = await Promise.all([
       db.makeJob.count({ where: { status: "READY" } }),
       db.makeJob.count({ where: { status: "QC"    } }),
     ]);
-    if (ready > 0) push(items, { id: "ready", icon: "Package",       count: ready, singular: "job ready to dispatch", plural: "jobs ready to dispatch", href: "/make", urgency: "normal" });
+    if (ready > 0) push(items, { id: "ready", icon: "Package",       count: ready, singular: "job ready", plural: "jobs ready", href: "/make", urgency: "normal" });
     if (inQc > 0)  push(items, { id: "qc",    icon: "ClipboardList", count: inQc,  singular: "job awaiting QC",       plural: "jobs awaiting QC",       href: "/make", urgency: "normal" });
     return items;
   }

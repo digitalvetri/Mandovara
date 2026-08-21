@@ -13,7 +13,6 @@ const MODELS = [
   "vendor","purchaseOrder","pOLine","gRN","gRNLine",
   "stockBalance","stockMove","allocation",
   "makeJob","makeJobLine",
-  "installCrew","installVisit","installLine","snag",
   "invoice","invoiceLine","advance","receipt","receiptAllocation",
   "projectExpense","expense",
   "attendance","leave","statutorySlab","payrollRun","payslip",

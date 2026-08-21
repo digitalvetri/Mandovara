@@ -4,16 +4,15 @@
 
 import { PrismaClient } from "@prisma/client";
 
-type RoleKey = "OWNER" | "DESIGNER" | "SALES" | "MEASURE_EXEC" | "STORE" | "MAKE_SUPERVISOR" | "INSTALLER" | "ACCOUNTS" | "HR";
+type RoleKey = "OWNER" | "DESIGNER" | "SALES" | "MEASURE_EXEC" | "STORE" | "MAKE_SUPERVISOR" | "ACCOUNTS" | "HR";
 
 const ROLE_META: Record<RoleKey, { name: string; description: string; isOwnerRole?: boolean }> = {
   OWNER:           { name: "Owner",             description: "Full access — Managing Director", isOwnerRole: true },
   DESIGNER:        { name: "Designer",           description: "Catalog, projects, measurements and quotations" },
   SALES:           { name: "Sales",              description: "Leads, clients and quotations" },
   MEASURE_EXEC:    { name: "Measure Executive",  description: "Site measurements and site visits" },
-  STORE:           { name: "Store",              description: "Stock, dye-lot allocation and GRN" },
+  STORE:           { name: "Store",              description: "Stock and GRN" },
   MAKE_SUPERVISOR: { name: "Make Supervisor",    description: "Make jobs and cut lists" },
-  INSTALLER:       { name: "Installer",          description: "Install visits and site logs" },
   ACCOUNTS:        { name: "Accounts",           description: "Invoicing, receipts and payroll view" },
   HR:              { name: "HR",                 description: "Employees, attendance, leave and payroll" },
 };
@@ -50,7 +49,6 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "measurement.view.any", "measurement.create.any", "measurement.edit.own", "measurement.submit.any",
     "sitelog.view", "sitelog.create",
     "make.view", "make.printCutList",
-    "install.view",
     "invoice.view",
     "receipt.view",
     "report.view.dashboard", "report.view.projects",
@@ -81,7 +79,6 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "measurement.view.any", "measurement.create.any", "measurement.edit.own", "measurement.submit.any",
     "sitelog.view", "sitelog.create",
     "make.view",
-    "install.view",
     "report.view.dashboard",
   ],
 
@@ -110,17 +107,6 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "stock.view",
     "batch.view",
     "make.view", "make.create", "make.update", "make.printCutList",
-    "report.view.dashboard",
-  ],
-
-  INSTALLER: [
-    "catalog.view",
-    "project.view",
-    "order.view",
-    // Measurement: VIEW only (installer sees dimensions but never types them)
-    "measurement.view", "measurement.view.any",
-    "install.view", "install.create", "install.update", "install.complete", "install.raiseSnag",
-    "sitelog.view", "sitelog.create",
     "report.view.dashboard",
   ],
 

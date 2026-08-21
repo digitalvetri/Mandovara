@@ -11,7 +11,7 @@ export interface ReportKpis {
   outstanding:    bigint;   // invoices ISSUED + PARTIALLY_PAID (always current)
   activeProjects: number;   // not COMPLETED / CANCELLED (always current)
   newLeads:       number;   // leads created in period
-  readyToInstall: number;   // orders with status READY_TO_INSTALL (always current)
+  readyToInstall: number;   // orders currently in MAKE status
 }
 
 export async function getReportKpis(
@@ -43,7 +43,7 @@ export async function getReportKpis(
       where: { stage: { notIn: ["COMPLETED", "CANCELLED"] } },
     }),
     db.lead.count({ where: { ...(hasDf && { createdAt: df }) } }),
-    db.order.count({ where: { status: "READY_TO_INSTALL" } }),
+    db.order.count({ where: { status: "MAKE" } }),
   ]);
 
   return {

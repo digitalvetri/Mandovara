@@ -36,19 +36,17 @@ export async function loadRevenueByMonth(db: Db, now: Date): Promise<RevenueMont
 }
 
 export async function loadProjectStages(db: Db): Promise<ProjectStage[]> {
-  const [enquiry, measurement, quotation, production, installation] = await Promise.all([
+  const [enquiry, measurement, quotation, production] = await Promise.all([
     db.project.count({ where: { stage: "ENQUIRY" } }),
     db.project.count({ where: { stage: "MEASUREMENT" } }),
     db.project.count({ where: { stage: "QUOTATION" } }),
     db.project.count({ where: { stage: { in: ["ORDERED", "PROCUREMENT", "MAKE"] } } }),
-    db.project.count({ where: { stage: { in: ["INSTALLATION", "SNAGGING"] } } }),
   ]);
   return [
     { name: "Enquiry",      count: enquiry },
     { name: "Measurement",  count: measurement },
     { name: "Quotation",    count: quotation },
     { name: "Production",   count: production },
-    { name: "Installation", count: installation },
   ];
 }
 

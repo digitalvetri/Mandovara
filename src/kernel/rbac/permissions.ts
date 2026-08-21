@@ -25,7 +25,6 @@ export const PERMISSIONS = {
   // ── Sales ──────────────────────────────────────────────────
   quotation: ["view", "create", "update", "delete", "viewOthers", "send", "approve", "cancel", "revise"],
   order:     ["view", "create", "cancel", "amend", "viewMargin"],
-  dispatch:  ["view", "create", "approve"],
 
   // ── Procurement ────────────────────────────────────────────
   vendor:      ["view", "create", "update", "block", "viewRates"],
@@ -42,7 +41,7 @@ export const PERMISSIONS = {
   serial:     ["view", "assign"],
 
   // ── Projects ───────────────────────────────────────────────
-  project:    ["view", "create", "update", "materialIssue", "milestoneBill", "closeSnag", "handover"],
+  project:    ["view", "create", "update", "materialIssue", "milestoneBill", "handover"],
   sitelog:    ["view", "create"],
   // Site measurements + persisted CalcResult (§7, Phase 2 gate).
   //
@@ -79,9 +78,8 @@ export const PERMISSIONS = {
   leave:      ["view", "apply", "approve", "cancel"],
   payroll:    ["view", "run", "viewOthers", "review", "finalize", "bankFile"],
 
-  // ── Make & Install ─────────────────────────────────────────
+  // ── Make ───────────────────────────────────────────────────
   make:    ["view", "create", "update", "printCutList"],
-  install: ["view", "create", "update", "complete", "raiseSnag"],
 
   // ── Automation & Comms ─────────────────────────────────────
   whatsapp: [

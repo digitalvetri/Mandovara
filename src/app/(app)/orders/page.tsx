@@ -2,14 +2,10 @@ import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
 import { listOrders, getOrderSummaryCounts } from "@/modules/orders/queries";
-import { listDispatches, getDispatchStatusCounts } from "@/modules/orders/dispatch-queries";
 import { ORDER_STATUSES, type OrderStatus } from "@/modules/orders/schema";
 import { OrderFilters } from "./_components/OrderFilters";
 import { OrdersTable } from "./_components/OrdersTable";
 import { OrderSummaryCards } from "./_components/OrderSummaryCards";
-import { OrderTabNav } from "./_components/OrderTabNav";
-import { DispatchHistoryTable } from "./_components/DispatchHistoryTable";
-import { DispatchSummaryCards } from "./_components/DispatchSummaryCards";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +14,6 @@ interface SearchParams {
   status?: string;
   page?: string;
   sort?: string;
-  tab?: string;
 }
 
 export default async function OrdersPage({
@@ -26,50 +21,24 @@ export default async function OrdersPage({
 }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
   const ctx    = await devContext();
-  const tab    = params.tab === "dispatch" ? "dispatch" : "orders";
   const page   = parsePositiveInt(params.page) ?? 1;
 
-  // ── Dispatch tab ────────────────────────────────────────────────────────────
-  if (tab === "dispatch") {
-    const [dispatches, dispatchCounts, orderCounts] = await Promise.all([
-      listDispatches(ctx, { page, status: params.status }),
-      getDispatchStatusCounts(ctx),
-      getOrderSummaryCounts(ctx),
-    ]);
-    return (
-      <>
-        <Topbar
-          title="Sales Orders & Dispatch"
-          eyebrow={`${dispatchCounts.total} dispatch ${dispatchCounts.total === 1 ? "record" : "records"}`}
-          actions={<PrimaryButton href="/orders/dispatch/new">New Dispatch</PrimaryButton>}
-        />
-        <OrderTabNav active="dispatch" orderCount={orderCounts.open} dispatchCount={dispatchCounts.total} />
-        <DispatchSummaryCards counts={dispatchCounts} />
-        <DispatchHistoryTable rows={dispatches.rows} />
-        <Pager page={dispatches.page} pageSize={dispatches.pageSize} total={dispatches.total} />
-      </>
-    );
-  }
-
-  // ── Orders tab (default) ─────────────────────────────────────────────────────
   const q      = params.q?.trim();
   const status = normaliseStatus(params.status);
   const sort   = (params.sort as "recent" | "oldest" | "total" | undefined) ?? "recent";
 
-  const [{ rows, total, pageSize }, counts, dispatchCounts] = await Promise.all([
+  const [{ rows, total, pageSize }, counts] = await Promise.all([
     listOrders(ctx, { ...(q != null && { search: q }), status, page, sort }),
     getOrderSummaryCounts(ctx),
-    getDispatchStatusCounts(ctx),
   ]);
 
   return (
     <>
       <Topbar
-        title="Sales Orders & Dispatch"
+        title="Sales Orders"
         eyebrow={`${total} order${total === 1 ? "" : "s"} · ${eyebrowFor(status, q)}`}
         actions={<PrimaryButton href="/quotations">From Quotation</PrimaryButton>}
       />
-      <OrderTabNav active="orders" orderCount={counts.open} dispatchCount={dispatchCounts.total} />
       <OrderSummaryCards counts={counts} />
       <OrderFilters />
       <OrdersTable rows={rows} />

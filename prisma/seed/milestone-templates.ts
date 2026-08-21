@@ -24,8 +24,7 @@ const TEMPLATES: readonly TemplateSpec[] = [
   { family: null, sequence: 30, code: "QUOTATION",     name: "Quotation",      billingWeightPct: 0,  autoCompleteOn: "quotation.accepted" },
   { family: null, sequence: 40, code: "ADVANCE",       name: "Advance",        billingWeightPct: 40, autoCompleteOn: "advance.received" },
   { family: null, sequence: 50, code: "PROCUREMENT",   name: "Procurement",    billingWeightPct: 0,  autoCompleteOn: "allocation.complete" },
-  { family: null, sequence: 80, code: "INSTALLATION",  name: "Installation",   billingWeightPct: 30, autoCompleteOn: "installVisit.completed" },
-  { family: null, sequence: 90, code: "HANDOVER",      name: "Handover",       billingWeightPct: 10, autoCompleteOn: null },
+  { family: null, sequence: 90, code: "HANDOVER",      name: "Handover",       billingWeightPct: 40, autoCompleteOn: null },
 
   // ── Curtains & sheer share the make cycle ──────────────────────────────
   { family: "CURTAIN_FABRIC", sequence: 60, code: "FABRIC_INWARD",  name: "Fabric inward",  billingWeightPct: 0,  autoCompleteOn: "grn.received" },

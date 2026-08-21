@@ -33,7 +33,7 @@ export async function loadDashboard(ctx: RequestContext): Promise<DashboardData>
       where: { stage: { in: [...ACTIVE_PROJECT_STAGES] }, createdAt: { gte: monthStart } },
     }),
     db.project.count({
-      where: { stage: "INSTALLATION", expectedInstallAt: { gte: now, lte: addDays(now, 30) } },
+      where: { stage: "MAKE", expectedInstallAt: { gte: now, lte: addDays(now, 30) } },
     }),
 
     db.lead.count({ where: { stage: { in: [...OPEN_LEAD_STAGES] } } }),

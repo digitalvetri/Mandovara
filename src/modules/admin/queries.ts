@@ -41,14 +41,13 @@ const APP_ROLES: { id: string; name: string }[] = [
   { id: "MEASURE_EXEC",    name: "Measure Executive" },
   { id: "STORE",           name: "Store" },
   { id: "MAKE_SUPERVISOR", name: "Make Supervisor" },
-  { id: "INSTALLER",       name: "Installer" },
   { id: "ACCOUNTS",        name: "Accounts" },
   { id: "HR",              name: "HR" },
 ];
 
 const MATRIX_ROWS = [
   { module: "Leads & Quotes" },
-  { module: "Orders & Dispatch" },
+  { module: "Orders" },
   { module: "Invoices" },
   { module: "Stock & GRN" },
   { module: "Payroll (finance)" },
@@ -147,7 +146,6 @@ function formatRole(role: string): string {
     MEASURE_EXEC:    "Measure Exec",
     STORE:           "Store",
     MAKE_SUPERVISOR: "Make Supervisor",
-    INSTALLER:       "Installer",
     ACCOUNTS:        "Accounts",
     HR:              "HR",
   };

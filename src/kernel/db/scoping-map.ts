@@ -30,9 +30,7 @@ export const TENANT_SCOPED = new Set<string>([
   "Vendor", "PurchaseOrder", "GRN", "StockBalance", "StockMove", "Allocation",
   "PurchaseRequest", "PurchaseRequestLine",
   // make
-  "MakeJob", "InstallCrew",
-  // install
-  "InstallVisit", "Snag",
+  "MakeJob",
   // money
   "Invoice", "Advance", "Receipt", "ProjectExpense", "Expense",
   // HR

@@ -21,7 +21,7 @@ import { loginAs, resetAllRoleUsersToSeed, type SeedRole } from "./_helpers/mult
 
 const ROLES: SeedRole[] = [
   "OWNER", "DESIGNER", "SALES", "MEASURE_EXEC",
-  "STORE", "MAKE_SUPERVISOR", "INSTALLER", "ACCOUNTS", "HR",
+  "STORE", "MAKE_SUPERVISOR", "ACCOUNTS", "HR",
 ];
 
 // Every top-level app surface. Not detail pages — those need per-record IDs
@@ -41,8 +41,6 @@ const ROUTES = [
   "/measurements",
   "/measure",
   "/make",
-  "/install",
-  "/installations",
   "/site-visits",
   "/invoicing",
   "/accounts",

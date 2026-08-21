@@ -18,7 +18,7 @@ export async function getOrder(
     select: {
       id: true, number: true, status: true, branchId: true, projectId: true,
       clientId: true, quotationId: true,
-      date: true, promisedInstallAt: true,
+      date: true,
       totalValue: true, advanceRequired: true, advanceReceived: true,
       project: {
         select: {
@@ -32,14 +32,14 @@ export async function getOrder(
           id: true, lineNo: true, description: true,
           colourwayId: true, serviceRateId: true, measurementItemId: true,
           quantity: true, unit: true, rate: true, amount: true,
-          procuredQty: true, madeQty: true, installedQty: true,
+          procuredQty: true, madeQty: true,
         },
       },
     },
   });
   if (!row) return null;
 
-  const [branch, quotationNumber, ownerUser, makeJob, installVisits, invoices, dispatchedLines] = await Promise.all([
+  const [branch, quotationNumber, ownerUser, makeJob, invoices] = await Promise.all([
     db.branch.findUniqueOrThrow({ where: { id: row.branchId }, select: { name: true } }),
     row.quotationId
       ? db.quotation.findUnique({ where: { id: row.quotationId }, select: { number: true } }).then((r) => r?.number ?? null)
@@ -50,25 +50,8 @@ export async function getOrder(
       orderBy: { number: "desc" },
       select: { id: true, status: true },
     }),
-    db.installVisit.findMany({
-      where: { orderId: id },
-      orderBy: { scheduledAt: "asc" },
-      select: { id: true, number: true, scheduledAt: true, status: true, completedAt: true },
-    }),
     db.invoice.findMany({ where: { orderId: id }, select: { id: true, total: true } }),
-    db.installLine.findMany({
-      where: { visit: { orderId: id, status: { not: "CANCELLED" } } },
-      select: { orderLineId: true, plannedQty: true },
-    }),
   ]);
-
-  const dispatchedByLine = new Map<string, number>();
-  for (const dl of dispatchedLines) {
-    dispatchedByLine.set(
-      dl.orderLineId,
-      (dispatchedByLine.get(dl.orderLineId) ?? 0) + Number(dl.plannedQty),
-    );
-  }
 
   const invoicedTotal = invoices.reduce((s, i) => s + i.total, 0n);
 
@@ -96,7 +79,6 @@ export async function getOrder(
     projectName: row.project.name,
     salesExecName: ownerUser?.name ?? null,
     date: row.date,
-    promisedInstallAt: row.promisedInstallAt,
     totalValue: row.totalValue,
     advanceRequired: row.advanceRequired,
     advanceReceived: row.advanceReceived,
@@ -104,12 +86,10 @@ export async function getOrder(
     quotationNumber,
     makeJobId: makeJob?.id ?? null,
     makeJobStatus: makeJob?.status ?? null,
-    installVisits,
     invoicedTotal,
     paidTotal,
     lines: row.lines.map((l) => {
-      const dispatched = dispatchedByLine.get(l.id) ?? 0;
-      const remaining  = Math.max(0, Number(l.quantity) - dispatched);
+      const remaining = Math.max(0, Number(l.quantity) - Number(l.madeQty));
       return {
         id: l.id,
         lineNo: l.lineNo,
@@ -123,8 +103,6 @@ export async function getOrder(
         amount: l.amount,
         procuredQty: l.procuredQty.toString(),
         madeQty: l.madeQty.toString(),
-        installedQty: l.installedQty.toString(),
-        dispatchedQty: dispatched.toFixed(2),
         remainingQty:  remaining.toFixed(2),
       };
     }),

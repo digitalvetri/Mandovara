@@ -51,8 +51,6 @@ const PERM_START_MEASUREMENT = [
 const PERM_BUILD_QUOTATION = ["quotation.create"] as const;
 const PERM_SEND_QUOTATION  = ["quotation.send"]   as const;
 const PERM_STOCK           = ["stock.view"] as const;   // what /inventory gates on
-const PERM_SCHEDULE_INSTALL = ["install.create"]  as const;
-
 function hasAny(ctx: RequestContext, keys: readonly string[]): boolean {
   for (const k of keys) if (ctx.permissions.has(k as never)) return true;
   return false;
@@ -145,31 +143,6 @@ export function resolveNextAction(
           : undefined,
       };
 
-    case "INSTALLATION": {
-      const enabled = hasAny(ctx, PERM_SCHEDULE_INSTALL);
-      return {
-        kind:  "SCHEDULE_INSTALL",
-        label: "Schedule installation",
-        cta:   "Open install calendar",
-        enabled,
-        disabledReason: enabled ? null :
-          "Installation scheduling is handled by the install team.",
-        href: `/install`,
-      };
-    }
-
-    case "SNAGGING":
-      return {
-        kind:  "RESOLVE_SNAGS",
-        label: project.openSnags && project.openSnags > 0
-          ? `${project.openSnags} open snag${project.openSnags === 1 ? "" : "s"}`
-          : "Resolve snags",
-        cta:   "Open snag register",
-        enabled: hasAny(ctx, ["install.raiseSnag", "install.view"]),
-        disabledReason: null,
-        href: `/install`,
-      };
-
     case "COMPLETED":
       return {
         kind:  "REQUEST_REVIEW",
@@ -204,7 +177,7 @@ export function resolveNextAction(
 
 export const PROJECT_STAGES: readonly string[] = [
   "ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION", "ORDERED",
-  "PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED",
+  "PROCUREMENT", "MAKE", "COMPLETED",
 ];
 
 export const STAGE_SHORT_LABEL: Record<string, string> = {
@@ -215,26 +188,23 @@ export const STAGE_SHORT_LABEL: Record<string, string> = {
   ORDERED:      "Order",
   PROCUREMENT:  "Procure",
   MAKE:         "Make",
-  INSTALLATION: "Install",
-  SNAGGING:     "Snag",
   COMPLETED:    "Done",
   CANCELLED:    "Cancelled",
 };
 
-// Customer-facing 4-phase view of the 10-stage internal workflow. Owners
-// think in "site visit → measurement → installation → completed"; the
-// internal ENQUIRY/QUOTATION/ORDERED/PROCUREMENT/MAKE/SNAGGING states are
-// substeps within those phases and don't need their own visual tokens.
-export type ProjectPhase = "SITE_VISIT" | "MEASUREMENT" | "INSTALLATION" | "COMPLETED";
+// Customer-facing 4-phase view of the internal workflow. Owners think in
+// "site visit → measurement → make → completed"; the internal
+// ENQUIRY/QUOTATION/ORDERED/PROCUREMENT states are substeps within those.
+export type ProjectPhase = "SITE_VISIT" | "MEASUREMENT" | "MAKE" | "COMPLETED";
 
 export const PROJECT_PHASES: readonly ProjectPhase[] = [
-  "SITE_VISIT", "MEASUREMENT", "INSTALLATION", "COMPLETED",
+  "SITE_VISIT", "MEASUREMENT", "MAKE", "COMPLETED",
 ];
 
 export const PHASE_LABEL: Record<ProjectPhase, string> = {
   SITE_VISIT:   "Site Visit",
   MEASUREMENT:  "Measurement",
-  INSTALLATION: "Installation",
+  MAKE:         "Make",
   COMPLETED:    "Completed",
 };
 
@@ -243,7 +213,7 @@ export const PHASE_LABEL: Record<ProjectPhase, string> = {
 export const PHASE_TARGET_STAGE: Record<ProjectPhase, string> = {
   SITE_VISIT:   "SITE_VISIT",
   MEASUREMENT:  "MEASUREMENT",
-  INSTALLATION: "INSTALLATION",
+  MAKE:         "MAKE",
   COMPLETED:    "COMPLETED",
 };
 
@@ -258,9 +228,7 @@ export function phaseForStage(stage: string): ProjectPhase | "CANCELLED" {
     case "ORDERED":
     case "PROCUREMENT":
     case "MAKE":
-    case "INSTALLATION":
-    case "SNAGGING":
-      return "INSTALLATION";
+      return "MAKE";
     case "COMPLETED":
       return "COMPLETED";
     case "CANCELLED":

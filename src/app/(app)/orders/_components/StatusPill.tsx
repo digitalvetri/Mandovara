@@ -5,8 +5,6 @@ const ORDER_TONE: Record<OrderStatus, string> = {
   CONFIRMED:        "bg-heat/15 text-heat",
   PROCUREMENT:      "bg-heat/15 text-heat",
   MAKE:             "bg-info/15 text-info",
-  READY_TO_INSTALL: "bg-info/15 text-info",
-  INSTALLING:       "bg-solid/12 text-solid",
   COMPLETED:        "bg-solid/12 text-solid",
   CANCELLED:        "bg-fault/12 text-fault",
 };
@@ -15,8 +13,6 @@ const ORDER_LABEL: Record<OrderStatus, string> = {
   CONFIRMED:        "Confirmed",
   PROCUREMENT:      "Procurement",
   MAKE:             "Make",
-  READY_TO_INSTALL: "Ready",
-  INSTALLING:       "Installing",
   COMPLETED:        "Completed",
   CANCELLED:        "Cancelled",
 };

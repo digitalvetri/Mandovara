@@ -121,7 +121,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <KpiCard label="Outstanding"     value={formatINRShort(kpi.outstanding)}    href={"/invoicing?status=ISSUED" as Route}        warn={kpi.outstanding > 0n} />
         <KpiCard label="Active Projects" value={String(kpi.activeProjects)}         href="/projects" />
         <KpiCard label="New Leads"       value={String(kpi.newLeads)}               href="/leads"                                     note={periodLabel} />
-        <KpiCard label="Overview"        value={String(kpi.readyToInstall)}         href={"/orders?status=READY_TO_INSTALL" as Route} />
+        <KpiCard label="Orders in Make"  value={String(kpi.readyToInstall)}         href={"/orders?status=MAKE" as Route} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">

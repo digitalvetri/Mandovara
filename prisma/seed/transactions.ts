@@ -64,9 +64,7 @@ const STAGES = [
   ["QUOTATION",    180],
   ["ORDERED",      200],
   ["PROCUREMENT",  150],
-  ["MAKE",         120],
-  ["INSTALLATION", 100],
-  ["SNAGGING",      80],
+  ["MAKE",         300],
   ["COMPLETED",    150],
   ["CANCELLED",     40],
 ] as const;
@@ -232,15 +230,14 @@ export async function seedTransactions(
 
   const NEEDS_MEASUREMENT = new Set<ProjectStage>([
     "MEASUREMENT", "QUOTATION", "ORDERED", "PROCUREMENT",
-    "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED", "CANCELLED",
+    "MAKE", "COMPLETED", "CANCELLED",
   ]);
   const NEEDS_QUOTATION = new Set<ProjectStage>([
     "QUOTATION", "ORDERED", "PROCUREMENT", "MAKE",
-    "INSTALLATION", "SNAGGING", "COMPLETED", "CANCELLED",
+    "COMPLETED", "CANCELLED",
   ]);
   const NEEDS_ORDER = new Set<ProjectStage>([
-    "ORDERED", "PROCUREMENT", "MAKE",
-    "INSTALLATION", "SNAGGING", "COMPLETED",
+    "ORDERED", "PROCUREMENT", "MAKE", "COMPLETED",
   ]);
 
   let meaCount = 0;
@@ -300,7 +297,7 @@ export async function seedTransactions(
     meaCount++;
     const measurementId = randomUUID();
     const measStatus: Prisma.MeasurementCreateManyInput["status"] =
-      stage === "COMPLETED" || stage === "SNAGGING" || stage === "INSTALLATION" ? "APPROVED"
+      stage === "COMPLETED" ? "APPROVED"
       : stage === "ORDERED" || stage === "PROCUREMENT" || stage === "MAKE" ? "SUBMITTED"
       : "DRAFT";
 
@@ -429,8 +426,6 @@ export async function seedTransactions(
       stage === "ORDERED" ? "CONFIRMED"
       : stage === "PROCUREMENT" ? "PROCUREMENT"
       : stage === "MAKE" ? "MAKE"
-      : stage === "INSTALLATION" ? "INSTALLING"
-      : stage === "SNAGGING" ? "READY_TO_INSTALL"
       : "COMPLETED";
 
     orderValueMap.set(projectId, qTotal);
@@ -447,7 +442,6 @@ export async function seedTransactions(
       totalValue: qTotal,
       advanceRequired: qTotal / 2n,
       advanceReceived: qTotal / 2n,
-      promisedInstallAt: new Date(quotedAt.getTime() + 30 * 86400_000),
     });
   }
 
@@ -647,31 +641,9 @@ async function seedEdgeCases(
     });
   }
 
-  // 5. Snag reopened twice
-  const snagProject = await db.project.create({
-    data: {
-      organizationId: orgId, branchId: input.branchId,
-      number: "MDV/PRJ-EDGE-SNAG",
-      name: "Snag Reopened Demo — Saibaba Colony",
-      clientId, stage: "SNAGGING",
-      siteAddress: { city: "Coimbatore" } as Prisma.InputJsonValue,
-      ownerId, orderValue: 3000000n,
-    },
-  });
-  await db.snag.create({
-    data: {
-      organizationId: orgId,
-      projectId: snagProject.id,
-      roomLabel: "Master Bedroom",
-      raisedById: ownerId,
-      raisedAt: new Date(Date.now() - 20 * 86400_000),
-      description: "Wallpaper seam visible at corner — reopened twice (first resolution inadequate, second resolution paste bleed)",
-      photoKeys: [],
-      status: "OPEN",
-      assignedToId: input.userByRole["INSTALLER"] ?? null,
-      resolutionNote: "Reopened: first fix left seam visible; second fix caused paste bleed. Awaiting replacement strip.",
-    },
-  });
+  // (Removed) 5. Snag reopened twice — the Snag model went away with the
+  // installation module. Its fixture is gone; the edge-case narrative
+  // continues below.
 
   // 6. Motorized blind awaiting power point
   const { projectId: motorProjectId } = await makeChain(

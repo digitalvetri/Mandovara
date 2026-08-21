@@ -19,13 +19,11 @@ import { ClientLedgerPanel, type InvoiceLedgerRow, type ReceiptLedgerRow } from 
 const STAGE_LABEL: Record<string, string> = {
   ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
   ORDERED: "Ordered", PROCUREMENT: "Procurement", MAKE: "Make",
-  INSTALLATION: "Installation", SNAGGING: "Snagging",
   COMPLETED: "Completed", CANCELLED: "Cancelled",
 };
 const STAGE_CLS: Record<string, string> = {
   ENQUIRY: "text-text-dim", MEASUREMENT: "text-info", QUOTATION: "text-accent",
   ORDERED: "text-gold", PROCUREMENT: "text-heat", MAKE: "text-heat",
-  INSTALLATION: "text-gold", SNAGGING: "text-fault",
   COMPLETED: "text-good", CANCELLED: "text-text-dim",
 };
 

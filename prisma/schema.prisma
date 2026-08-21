@@ -17,7 +17,6 @@ enum AppRole {
   MEASURE_EXEC
   STORE
   MAKE_SUPERVISOR
-  INSTALLER
   ACCOUNTS
   HR
 }
@@ -165,8 +164,6 @@ enum ProjectStage {
   ORDERED
   PROCUREMENT
   MAKE
-  INSTALLATION
-  SNAGGING
   COMPLETED
   CANCELLED
 }
@@ -194,8 +191,6 @@ enum OrderStatus {
   CONFIRMED
   PROCUREMENT
   MAKE
-  READY_TO_INSTALL
-  INSTALLING
   COMPLETED
   CANCELLED
 }
@@ -242,31 +237,6 @@ enum MakeJobStatus {
   REWORK
   READY
   DELIVERED
-}
-
-enum VisitKind {
-  DISPATCH
-  INSTALL
-}
-
-enum InstallStatus {
-  SCHEDULED
-  ASSIGNED
-  IN_PROGRESS
-  COMPLETED
-  PARTIAL
-  RESCHEDULED
-  CANCELLED
-  CUSTOMER_CONFIRMED
-  SNAGGING
-  CLOSED
-}
-
-enum SnagStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
 }
 
 enum InvoiceType {
@@ -395,7 +365,6 @@ enum NotifyChannel {
 
 enum EventKind {
   SITE_VISIT
-  INSTALLATION
   FOLLOW_UP
   MEETING
   DEADLINE
@@ -883,9 +852,7 @@ model Project {
   measurements Measurement[]
   quotations   Quotation[]
   orders       Order[]
-  installVisits InstallVisit[]
   expenses     ProjectExpense[]
-  snags        Snag[]
   documents    ProjectDocument[]
   architectCommissions ArchitectCommission[]
 
@@ -1190,7 +1157,6 @@ model Order {
   totalValue        BigInt
   advanceRequired   BigInt      @default(0)
   advanceReceived   BigInt      @default(0)
-  promisedInstallAt DateTime?
 
   project Project     @relation(fields: [projectId], references: [id])
   lines   OrderLine[]
@@ -1214,7 +1180,6 @@ model OrderLine {
   amount            BigInt
   procuredQty       Decimal  @db.Decimal(12, 3) @default(0)
   madeQty           Decimal  @db.Decimal(12, 3) @default(0)
-  installedQty      Decimal  @db.Decimal(12, 3) @default(0)
 
   order     Order        @relation(fields: [orderId], references: [id])
   colourway Colourway?   @relation("OrderLineColourway", fields: [colourwayId], references: [id])
@@ -1452,106 +1417,6 @@ model MakeJobLine {
   job MakeJob @relation(fields: [makeJobId], references: [id])
 
   @@index([makeJobId])
-}
-
-// ─── INSTALLATION ─────────────────────────────────────────────────────────────
-
-model InstallCrew {
-  id                String        @id @default(cuid())
-  organizationId    String
-  name              String
-  leadEmployeeId    String
-  memberEmployeeIds String[]
-  skills            ProductFamily[]
-  isActive          Boolean       @default(true)
-}
-
-model InstallVisit {
-  id                   String        @id @default(cuid())
-  organizationId       String
-  number               String
-  projectId            String
-  orderId              String
-  kind                 VisitKind     @default(DISPATCH)
-  crewId               String?
-  assignedToId         String?
-  assignedAt           DateTime?
-  scheduledAt          DateTime
-  status               InstallStatus @default(SCHEDULED)
-  startedAt            DateTime?
-  completedAt          DateTime?
-  customerConfirmedAt  DateTime?
-  checklist            Json?
-  clientSignatureKey   String?
-  clientFeedbackRating Int?
-  photoKeys            String[]
-  rescheduleReason     String?
-  notes                String?
-
-  project Project             @relation(fields: [projectId], references: [id])
-  lines   InstallLine[]
-  events  InstallVisitEvent[]
-  snags   Snag[]
-
-  @@unique([organizationId, number])
-  @@index([organizationId, scheduledAt, status])
-  @@index([organizationId, kind, status])
-}
-
-model InstallLine {
-  id             String       @id @default(cuid())
-  organizationId String
-  installVisitId String
-  orderLineId    String
-  roomLabel      String
-  plannedQty     Decimal      @db.Decimal(12, 3)
-  installedQty   Decimal      @db.Decimal(12, 3) @default(0)
-  dyeLotUsed     String?
-  remoteSerials  String[]
-  photoKeys      String[]
-  issue          String?
-
-  visit InstallVisit @relation(fields: [installVisitId], references: [id])
-
-  @@index([installVisitId])
-}
-
-model InstallVisitEvent {
-  id             String   @id @default(cuid())
-  organizationId String
-  visitId        String
-  actorId        String
-  type           String   // STATUS_CHANGE | SNAG_RAISED | SNAG_RESOLVED | NOTE
-  fromStatus     String?
-  toStatus       String?
-  payload        Json     @default("{}")
-  createdAt      DateTime @default(now())
-
-  visit InstallVisit @relation(fields: [visitId], references: [id])
-
-  @@index([visitId, createdAt])
-}
-
-model Snag {
-  id             String     @id @default(cuid())
-  organizationId String
-  projectId      String
-  installVisitId String?
-  roomLabel      String?
-  raisedById     String
-  raisedAt       DateTime   @default(now())
-  description    String
-  photoKeys      String[]
-  status         SnagStatus @default(OPEN)
-  assignedToId   String?
-  resolvedAt     DateTime?
-  resolutionNote String?
-
-  project      Project       @relation(fields: [projectId], references: [id])
-  installVisit InstallVisit? @relation(fields: [installVisitId], references: [id])
-
-  @@index([organizationId, status])
-  @@index([installVisitId])
 }
 
 // ─── MONEY ───────────────────────────────────────────────────────────────────

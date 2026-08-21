@@ -47,7 +47,6 @@ export function AddRuleForm() {
         <select value={eventType} onChange={(e) => setEventType(e.target.value)} className={fieldCls}>
           <option value="lead.created">lead.created</option>
           <option value="quotation.sent">quotation.sent</option>
-          <option value="dispatch.posted">dispatch.posted</option>
           <option value="invoice.created">invoice.created</option>
           <option value="payment.overdue">payment.overdue</option>
         </select>

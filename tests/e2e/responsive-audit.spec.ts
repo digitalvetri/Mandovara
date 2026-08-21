@@ -11,12 +11,12 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const ROUTES = [
-  "/", "/accounts", "/accounts/new", "/admin", "/admin/roles", "/ai",
+  "/", "/accounts", "/accounts/new", "/admin", "/admin/roles",
   "/architects", "/architects/new", "/attendance", "/calendar", "/clients",
-  "/clients/new", "/documents", "/employee", "/install", "/install/new",
-  "/installations", "/inventory", "/invoicing", "/invoicing/new", "/leads",
+  "/clients/new", "/documents", "/employee", "/inventory",
+  "/invoicing", "/invoicing/new", "/leads",
   "/leads/new", "/make", "/measure", "/measurements", "/notifications",
-  "/orders", "/orders/dispatch/new", "/payroll", "/products", "/products/new",
+  "/orders", "/payroll", "/products", "/products/new",
   "/profile", "/projects", "/projects/new", "/purchase",
   "/purchase/new", "/purchase/requests", "/purchase/vendors",
   "/purchase/vendors/new", "/quotations", "/quotations/new", "/quotations/quick",

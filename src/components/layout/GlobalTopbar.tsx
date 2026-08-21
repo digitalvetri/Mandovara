@@ -23,7 +23,6 @@ const ROLE_LABEL: Record<string, string> = {
   MEASURE_EXEC:    "Measurement Exec",
   STORE:           "Store Keeper",
   MAKE_SUPERVISOR: "Make Supervisor",
-  INSTALLER:       "Site Installer",
   ACCOUNTS:        "Accounts",
   HR:              "HR Manager",
 };

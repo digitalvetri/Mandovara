@@ -35,17 +35,14 @@ function makeCtx(perms: string[]): RequestContext {
   };
 }
 
-// INSTALLER permissions per §3.1: install module access, project view, catalog view — no financials.
-const INSTALLER_PERMS = [
+// STORE permissions per §3.1: stock + catalog view, no financials.
+// (Was INSTALLER before the installation module was removed; the RBAC
+// invariant — non-finance roles can't see cost/margin — is unchanged.)
+const NON_FINANCE_PERMS = [
   "project.view",
   "catalog.view",
-  "install.view",
-  "install.create",
-  "install.update",
-  "install.complete",
-  "install.raiseSnag",
+  "stock.view",
   "sitelog.view",
-  "sitelog.create",
 ];
 
 // OWNER has everything; ACCOUNTS has cost/margin visibility per §3.1.
@@ -59,8 +56,8 @@ const COST_MARGIN_KEYS = [
 
 describe("§12.2 S6 — cost & margin gate (OWNER / ACCOUNTS only)", () => {
 
-  describe("INSTALLER context blocks cost and margin permissions", () => {
-    const installerCtx = makeCtx(INSTALLER_PERMS);
+  describe("non-finance role blocks cost and margin permissions", () => {
+    const installerCtx = makeCtx(NON_FINANCE_PERMS);
 
     for (const key of COST_MARGIN_KEYS) {
       it(`cannot ${key}`, () => {
@@ -93,12 +90,8 @@ describe("§12.2 S6 — cost & margin gate (OWNER / ACCOUNTS only)", () => {
     }
   });
 
-  describe("INSTALLER can access installation permissions", () => {
-    const installerCtx = makeCtx(INSTALLER_PERMS);
-
-    it("can install.view", () => expect(can(installerCtx, "install.view")).toBe(true));
-    it("can install.complete", () => expect(can(installerCtx, "install.complete")).toBe(true));
-    it("can install.raiseSnag", () => expect(can(installerCtx, "install.raiseSnag")).toBe(true));
+  describe("non-finance role can still browse catalog (without cost)", () => {
+    const installerCtx = makeCtx(NON_FINANCE_PERMS);
     it("can catalog.view (browse, but not cost)", () => expect(can(installerCtx, "catalog.view")).toBe(true));
   });
 

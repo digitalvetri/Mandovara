@@ -10,8 +10,6 @@ const STATUS_LABELS: Record<string, string> = {
   CONFIRMED:        "Confirmed",
   PROCUREMENT:      "Procurement",
   MAKE:             "Make",
-  READY_TO_INSTALL: "Ready",
-  INSTALLING:       "Installing",
   COMPLETED:        "Completed",
   CANCELLED:        "Cancelled",
 };

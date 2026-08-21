@@ -26,10 +26,9 @@ const MAKE_FAMILIES = new Set<string>([
   "CURTAIN_FABRIC", "SHEER", "UPHOLSTERY_FABRIC",
 ]);
 
-const PROCURING_STAGES = ["PROCUREMENT", "MAKE", "INSTALLATION", "SNAGGING", "COMPLETED"];
-const MAKING_STAGES    = ["MAKE", "INSTALLATION", "SNAGGING", "COMPLETED"];
-const INSTALLED_STAGES = ["INSTALLATION", "SNAGGING", "COMPLETED"];
-const BILLED_STAGES    = ["SNAGGING", "COMPLETED"];
+const PROCURING_STAGES = ["PROCUREMENT", "MAKE", "COMPLETED"];
+const MAKING_STAGES    = ["MAKE", "COMPLETED"];
+const BILLED_STAGES    = ["COMPLETED"];
 
 const pad = (n: number, w = 4) => String(n).padStart(w, "0");
 
@@ -64,13 +63,7 @@ export async function seedDownstream(
   ];
   await batch(db.serviceRate, serviceRates);
 
-  // ── Install crews ─────────────────────────────────────────────────────────
-  const crewIds = [randomUUID(), randomUUID(), randomUUID()];
-  await batch(db.installCrew, [
-    { id: crewIds[0]!, organizationId: orgId, name: "Crew A — Curtains & Blinds", leadEmployeeId: input.employeeIds[0] ?? "", memberEmployeeIds: input.employeeIds.slice(1, 3), skills: ["CURTAIN_FABRIC", "SHEER", "BLIND"] },
-    { id: crewIds[1]!, organizationId: orgId, name: "Crew B — Wallpaper & Films", leadEmployeeId: input.employeeIds[3] ?? "", memberEmployeeIds: input.employeeIds.slice(4, 6), skills: ["WALLPAPER", "INTERIOR_FILM"] },
-    { id: crewIds[2]!, organizationId: orgId, name: "Crew C — Flooring & Carpet", leadEmployeeId: input.employeeIds[6] ?? "", memberEmployeeIds: input.employeeIds.slice(7, 9), skills: ["FLOORING", "CARPET_ROLL", "CARPET_TILE"] },
-  ] as Prisma.InstallCrewCreateManyInput[]);
+  // (Removed) Install crews — installation module is gone.
 
   // ── Back-fill OrderLine ───────────────────────────────────────────────────
   // seedTransactions created 800 orders but no order lines at all, so every
@@ -150,8 +143,6 @@ export async function seedDownstream(
   const allocRows:    Prisma.AllocationCreateManyInput[]    = [];
   const makeRows:     Prisma.MakeJobCreateManyInput[]       = [];
   const makeLineRows: Prisma.MakeJobLineCreateManyInput[]   = [];
-  const visitRows:    Prisma.InstallVisitCreateManyInput[]  = [];
-  const instLineRows: Prisma.InstallLineCreateManyInput[]   = [];
   const invRows:      Prisma.InvoiceCreateManyInput[]       = [];
   const invLineRows:  Prisma.InvoiceLineCreateManyInput[]   = [];
   const advanceRows:  Prisma.AdvanceCreateManyInput[]       = [];
@@ -171,7 +162,7 @@ export async function seedDownstream(
   // any more, so nothing should arrive pre-reserved.
   const balances = new Map<string, { colourwayId: string; dyeLot: string | null; qty: number; reserved: number; value: bigint }>();
 
-  let poN = 0, grnN = 0, mjN = 0, insN = 0, invN = 0, rcptN = 0;
+  let poN = 0, grnN = 0, mjN = 0, invN = 0, rcptN = 0;
 
   for (const order of orders) {
     const stage = stageOf.get(order.projectId) ?? "ENQUIRY";
@@ -281,35 +272,7 @@ export async function seedDownstream(
       }
     }
 
-    // ── Install visit ───────────────────────────────────────────────────────
-    if (INSTALLED_STAGES.includes(stage)) {
-      const visitId = randomUUID();
-      const complete = stage !== "INSTALLATION";
-      const scheduledAt = new Date(receivedAt.getTime() + rng.int(8, 20) * 86400_000);
-      visitRows.push({
-        id: visitId, organizationId: orgId, number: `MDV/INS-${yymm}-${pad(++insN)}`,
-        projectId: order.projectId, orderId: order.id, kind: "INSTALL",
-        crewId: crewIds[rng.int(0, 2)]!, scheduledAt,
-        status: complete ? "COMPLETED" : rng.pick(["SCHEDULED", "ASSIGNED", "IN_PROGRESS"] as const),
-        startedAt: complete ? scheduledAt : null,
-        completedAt: complete ? new Date(scheduledAt.getTime() + 6 * 3600_000) : null,
-        clientSignatureKey: complete ? `sign/${visitId}.png` : null,
-        photoKeys: complete ? [`install/${visitId}-1.jpg`, `install/${visitId}-2.jpg`] : [],
-      });
-      for (const l of matLines) {
-        const alloc = allocRows.find((a) => a.orderLineId === l.id);
-        instLineRows.push({
-          organizationId: orgId, installVisitId: visitId, orderLineId: l.id,
-          roomLabel: l.description.slice(0, 40),
-          plannedQty: new Prisma.Decimal(Number(l.quantity)),
-          installedQty: new Prisma.Decimal(complete ? Number(l.quantity) : 0),
-          // The lot that physically went on the wall — this is what makes a
-          // "the wallpaper doesn't match" complaint answerable.
-          dyeLotUsed: (alloc?.dyeLot as string | null) ?? null,
-          remoteSerials: [], photoKeys: [],
-        });
-      }
-    }
+    // (Removed) Install visit seeding — installation module is gone.
 
     // ── Invoice, advance and receipt ────────────────────────────────────────
     if (BILLED_STAGES.includes(stage)) {
@@ -405,8 +368,6 @@ export async function seedDownstream(
   await batch(db.allocation, allocRows);
   await batch(db.makeJob, makeRows);
   await batch(db.makeJobLine, makeLineRows);
-  await batch(db.installVisit, visitRows);
-  await batch(db.installLine, instLineRows);
   await batch(db.invoice, invRows);
   await batch(db.invoiceLine, invLineRows);
   await batch(db.advance, advanceRows);
@@ -424,7 +385,7 @@ export async function seedDownstream(
 
   process.stdout.write(
     `  POs: ${poRows.length}, GRNs: ${grnRows.length}, stockMoves: ${moveRows.length}, ` +
-    `allocations: ${allocRows.length}, makeJobs: ${makeRows.length}, installVisits: ${visitRows.length}, ` +
+    `allocations: ${allocRows.length}, makeJobs: ${makeRows.length}, ` +
     `invoices: ${invRows.length}, receipts: ${receiptRows.length}\n`,
   );
 }

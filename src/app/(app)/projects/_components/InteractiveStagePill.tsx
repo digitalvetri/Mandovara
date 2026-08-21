@@ -20,7 +20,7 @@ import { setProjectStatus } from "@/modules/projects/actions";
 const PHASE_TONE: Record<string, { color: string; bg: string }> = {
   SITE_VISIT:   { color: "text-info",  bg: "bg-info/12"  },
   MEASUREMENT:  { color: "text-heat",  bg: "bg-heat/12"  },
-  INSTALLATION: { color: "text-solid", bg: "bg-solid/12" },
+  MAKE:         { color: "text-solid", bg: "bg-solid/12" },
   COMPLETED:    { color: "text-solid", bg: "bg-solid/12" },
   CANCELLED:    { color: "text-fault", bg: "bg-fault/12" },
 };

@@ -473,32 +473,9 @@ async function seedEdgeCases(
     await db.sampleBook.update({ where: { id: book.id }, data: { status: "OVERDUE" } });
   }
 
-  // 4 ── A motorized blind order still waiting on the electrician's power
-  //      point — the install cannot complete until it exists.
-  const motorVisit = await db.installVisit.findFirst({
-    where: { organizationId: orgId, status: "SCHEDULED" },
-    select: { id: true, projectId: true },
-  });
-  if (motorVisit) {
-    await db.installVisit.update({
-      where: { id: motorVisit.id },
-      data: {
-        status: "RESCHEDULED",
-        rescheduleReason:
-          "Motorized blinds — power point not yet provided by the client's " +
-          "electrician. Remotes held in store until the point is live.",
-      },
-    });
-    await db.snag.create({
-      data: {
-        organizationId: orgId, projectId: motorVisit.projectId,
-        installVisitId: motorVisit.id, roomLabel: "Master Bedroom",
-        raisedById: users.store,
-        description: "Awaiting 5A power point for motorized blind track.",
-        status: "OPEN", photoKeys: [],
-      },
-    });
-  }
+  // (Removed) 4 ── Motorized blind waiting on power point / snag creation —
+  // the installation module is gone. Users track this through order notes
+  // instead.
 
   // 5 ── Dead stock: a lot sitting unallocated for months (drives the
   //      "dead stock by dye lot" report in §6.4).
