@@ -12,9 +12,17 @@ import { QuotePdf } from "@/app/(app)/quotations/[id]/_components/QuotePdf";
 export const dynamic = "force-dynamic";
 
 function readLogoSrc(): string | undefined {
-  const p = path.join(process.cwd(), "public", "mandovara-logo.jpg");
-  if (!fs.existsSync(p)) return undefined;
-  return `data:image/jpeg;base64,${fs.readFileSync(p).toString("base64")}`;
+  const candidates: [string, string][] = [
+    ["mandovara-logo.png", "image/png"],
+    ["mandovara-logo.jpg", "image/jpeg"],
+  ];
+  for (const [file, mime] of candidates) {
+    const p = path.join(process.cwd(), "public", file);
+    if (fs.existsSync(p)) {
+      return `data:${mime};base64,${fs.readFileSync(p).toString("base64")}`;
+    }
+  }
+  return undefined;
 }
 
 export async function GET(
