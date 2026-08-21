@@ -73,11 +73,14 @@ test.describe("hover survives the entrance animation", () => {
     await page.goto("/inventory", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2000);
     // The "Add item (to catalog)" link in InventoryToolbar always renders.
+    // Tailwind's `-translate-y-*` compiles into `transform: translate(...)`,
+    // NOT the standalone `translate` CSS property. Reading `.translate` would
+    // return "none" both before and after hover; read `.transform` instead.
     const card = page.locator("a[href='/products']").first();
-    const before = await card.evaluate((e) => getComputedStyle(e).translate);
+    const before = await card.evaluate((e) => getComputedStyle(e).transform);
     await card.hover();
     await page.waitForTimeout(350);
-    const after = await card.evaluate((e) => getComputedStyle(e).translate);
+    const after = await card.evaluate((e) => getComputedStyle(e).transform);
     expect(after).not.toBe(before);
   });
 });
