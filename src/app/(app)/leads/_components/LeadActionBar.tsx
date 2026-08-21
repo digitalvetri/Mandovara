@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useState } from "react";
 import type { Route } from "next";
 import {
   CalendarPlus, MapPin, FileText,
-  UserCheck, ArrowUpRight, Loader2,
+  UserCheck, ArrowUpRight,
 } from "lucide-react";
-import { changeLeadStage } from "@/modules/leads/actions";
 import { ConvertLeadModal } from "./ConvertLeadModal";
+import { ScheduleVisitModal } from "./ScheduleVisitModal";
 
 interface Props {
   leadId: string;
@@ -23,30 +23,13 @@ interface Props {
 
 export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email }: Props) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
-  const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showVisitModal, setShowVisitModal] = useState(false);
 
   const isConverted = convertedClientId != null;
   const isLost = stage === "LOST";
-  const isSiteVisit = stage === "VISIT_SCHEDULED";
-  const busy = pendingAction !== null;
-
-  function doSiteVisit() {
-    if (isSiteVisit || busy) return;
-    setError(null);
-    setPendingAction("siteVisit");
-    startTransition(async () => {
-      const res = await changeLeadStage({ id: leadId, to: "VISIT_SCHEDULED" });
-      if (!res.ok) setError(res.error ?? "Could not update stage");
-      else router.refresh();
-      setPendingAction(null);
-    });
-  }
 
   function doQuickQuote() {
-    if (busy) return;
     // Already-converted → go straight to the client-scoped builder.
     if (convertedClientId) {
       router.push(`/quotations/quick?client=${convertedClientId}` as Route);
@@ -69,18 +52,15 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
           Follow-up
         </a>
 
-        {/* Site Visit — changes stage to VISIT_SCHEDULED */}
+        {/* Site Visit — opens scheduling modal */}
         {!isConverted && !isLost && (
           <button
             type="button"
-            onClick={doSiteVisit}
-            disabled={busy || isSiteVisit}
-            className={btn(isSiteVisit ? "active-warn" : "neutral")}
+            onClick={() => setShowVisitModal(true)}
+            className={btn("neutral")}
           >
-            {pendingAction === "siteVisit"
-              ? <Loader2 size={14} className="animate-spin" />
-              : <MapPin size={14} strokeWidth={1.75} />}
-            {isSiteVisit ? "Site Visit Set" : "Site Visit"}
+            <MapPin size={14} strokeWidth={1.75} />
+            Site Visit
           </button>
         )}
 
@@ -91,15 +71,12 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
           <button
             type="button"
             onClick={doQuickQuote}
-            disabled={busy}
             className={btn("accent")}
             title={isConverted
               ? "Open the Quick Quote builder for this client"
               : "Draft a preliminary quote against this lead — no client/project created yet"}
           >
-            {pendingAction === "quote"
-              ? <Loader2 size={14} className="animate-spin" />
-              : <FileText size={14} strokeWidth={1.75} />}
+            <FileText size={14} strokeWidth={1.75} />
             Quick Quote
           </button>
         )}
@@ -119,7 +96,6 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
           <button
             type="button"
             onClick={() => setShowConvertModal(true)}
-            disabled={busy}
             className={btn("good")}
           >
             <UserCheck size={14} strokeWidth={1.75} />
@@ -129,10 +105,6 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
 
       </div>
 
-      {error && (
-        <p className="mt-2 text-[12px] text-bad">{error}</p>
-      )}
-
       <ConvertLeadModal
         leadId={leadId}
         leadName={leadName}
@@ -140,6 +112,13 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
         email={email}
         open={showConvertModal}
         onClose={() => setShowConvertModal(false)}
+      />
+
+      <ScheduleVisitModal
+        open={showVisitModal}
+        onClose={() => setShowVisitModal(false)}
+        leadId={leadId}
+        stage={stage}
       />
     </div>
   );

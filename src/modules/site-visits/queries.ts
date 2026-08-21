@@ -89,6 +89,46 @@ export async function listSiteVisits(
   }));
 }
 
+export async function listSiteVisitsForLead(
+  ctx: RequestContext,
+  leadId: string,
+): Promise<SiteVisitRow[]> {
+  requirePermission(ctx, "sitelog.view");
+  const db = scoped(ctx);
+
+  const visits = await db.siteVisit.findMany({
+    where:   { leadId },
+    orderBy: { scheduledAt: "desc" },
+    select: {
+      id: true, number: true, purpose: true,
+      scheduledAt: true, status: true,
+      assignedToId: true, observations: true,
+    },
+  });
+
+  if (visits.length === 0) return [];
+
+  const userIds = [...new Set(visits.map((v) => v.assignedToId))];
+  const userNames = await db.user.findMany({
+    where:  { id: { in: userIds } },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(userNames.map((u) => [u.id, u.name]));
+
+  return visits.map((v) => ({
+    id:          v.id,
+    number:      v.number,
+    purpose:     purposeLabel(v.purpose),
+    scheduledAt: v.scheduledAt,
+    status:      v.status,
+    assignedTo:  nameById.get(v.assignedToId) ?? "—",
+    projectName: null,
+    clientName:  null,
+    leadName:    null,
+    observations: v.observations,
+  }));
+}
+
 export async function getSiteVisit(
   ctx: RequestContext,
   id: string,

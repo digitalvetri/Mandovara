@@ -107,6 +107,7 @@ export async function createSiteVisit(
     revalidatePath("/site-visits");
     revalidatePath("/projects");
     if (d.projectId) revalidatePath(`/projects/${d.projectId}`);
+    if (d.leadId) revalidatePath(`/leads/${d.leadId}`);
     return { ok: true, data: created };
   } catch (e: unknown) {
     // FIXES-01 §8 doctrine — never let a create action throw silently.

@@ -5,6 +5,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
 import { listQuotationsForClient, listLeadScopedQuotations } from "@/modules/quotations/queries";
+import { listSiteVisitsForLead } from "@/modules/site-visits/queries";
 import { LEAD_SOURCES } from "@/modules/leads/schema";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
@@ -14,6 +15,7 @@ import { LeadDetailsCard } from "../_components/LeadDetailsCard";
 import { LeadActionBar } from "../_components/LeadActionBar";
 import { ConversionApprovalCard, type LeadScopedQuote } from "../_components/ConversionApprovalCard";
 import { LeadQuotationsSidebar } from "../_components/LeadQuotationsSidebar";
+import { LeadSiteVisitsSidebar } from "../_components/LeadSiteVisitsSidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +38,10 @@ export default async function LeadDetailPage({
   const ctx = await devContext();
 
   const db = scoped(ctx);
-  const [lead, followUps] = await Promise.all([
+  const [lead, followUps, siteVisits] = await Promise.all([
     getLead(ctx, id),
     listFollowUpsForLead(ctx, id),
+    listSiteVisitsForLead(ctx, id),
   ]);
   if (!lead) notFound();
 
@@ -250,6 +253,8 @@ export default async function LeadDetailPage({
             leadId={lead.id}
             isConverted={isConverted}
           />
+
+          <LeadSiteVisitsSidebar visits={siteVisits} />
         </aside>
       </div>
     </>
