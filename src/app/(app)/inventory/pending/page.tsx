@@ -9,7 +9,7 @@
 
 import { Topbar } from "@/components/layout/Topbar";
 import { InventoryTabs } from "../_components/InventoryTabs";
-import { AlertTriangle, Package, Info } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 import pendingData from "@/data/pending-stock.json";
 
 export const dynamic = "force-dynamic";

@@ -302,7 +302,7 @@ async function main(): Promise<void> {
 async function verify(
   db: PrismaClient,
   orgId: string,
-  rows: BrahmosRow[]
+  _rows: BrahmosRow[]
 ): Promise<void> {
   const balances = await db.stockBalance.findMany({
     where: { organizationId: orgId, dyeLot: DYE_LOT },

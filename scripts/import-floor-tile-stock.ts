@@ -94,8 +94,8 @@ async function main(): Promise<void> {
 
     // Note missing code
     const codes      = rows.map((r) => Number(r.code));
-    const sequential = [1505,1506,1507,1508,1509,1510,1511,1512,1513,1514,1515,1517,1518,1519,1520,1521,1522,1523,1524,1572];
-    const missing    = [1516];
+    const _sequential = [1505,1506,1507,1508,1509,1510,1511,1512,1513,1514,1515,1517,1518,1519,1520,1521,1522,1523,1524,1572];
+    const _missing    = [1516];
     console.log(
       `Codes present: ${codes.join(", ")}`
     );
