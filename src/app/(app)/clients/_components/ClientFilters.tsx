@@ -85,5 +85,5 @@ export function ClientFilters() {
 }
 
 function humanise(s: string): string {
-  return s.charAt(0) + s.slice(1).toLowerCase();
+  return s.split("_").map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ");
 }

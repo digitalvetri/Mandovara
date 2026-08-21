@@ -5,16 +5,20 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import {
   Phone, MessageCircle, ArrowUpRight, Briefcase,
-  PencilLine, BellPlus, FolderPlus, Trash2,
+  PencilLine, BellPlus, FolderPlus, Trash2, Users,
 } from "lucide-react";
 import type { ClientRow } from "@/modules/clients/queries";
 import { deleteClient } from "@/modules/clients/actions";
 import { MoreMenu, type MenuItem } from "@/components/data/MoreMenu";
 
 const TYPE_LABEL: Record<string, string> = {
-  HOMEOWNER: "Homeowner", ARCHITECT: "Architect",
-  INTERIOR_DESIGNER: "Interior Designer", BUILDER: "Builder",
-  COMMERCIAL: "Commercial", GOVERNMENT: "Government", DEALER: "Dealer",
+  HOMEOWNER:         "Homeowner",
+  ARCHITECT:         "Architect",
+  INTERIOR_DESIGNER: "Interior Designer",
+  BUILDER:           "Builder",
+  COMMERCIAL:        "Commercial",
+  GOVERNMENT:        "Government",
+  DEALER:            "Dealer",
 };
 
 const TYPE_STYLE: Record<string, string> = {
@@ -25,6 +29,16 @@ const TYPE_STYLE: Record<string, string> = {
   COMMERCIAL:        "bg-good/12 text-good",
   GOVERNMENT:        "bg-text-dim/12 text-text-dim",
   DEALER:            "bg-warn/12 text-warn",
+};
+
+const TYPE_STRIP: Record<string, string> = {
+  HOMEOWNER:         "bg-accent",
+  ARCHITECT:         "bg-gold",
+  INTERIOR_DESIGNER: "bg-info",
+  BUILDER:           "bg-heat",
+  COMMERCIAL:        "bg-good",
+  GOVERNMENT:        "bg-text-dim",
+  DEALER:            "bg-warn",
 };
 
 function fmtMobile(m: string): string {
@@ -38,27 +52,18 @@ function waHref(mobile: string): string {
   return `https://wa.me/${num}`;
 }
 
-function Sep() {
-  return <span className="text-text-faint/60 select-none">·</span>;
-}
-
 function clientMenuItems(r: ClientRow): MenuItem[] {
   const confirmMsg = r.projectCount > 0
     ? `This client has ${r.projectCount} project${r.projectCount > 1 ? "s" : ""} and cannot be deleted.`
     : "Permanently delete this client? This cannot be undone.";
-
   return [
-    { key: "edit",      label: "Edit",          icon: PencilLine,  href: `/clients/${r.id}/edit` },
-    { key: "followup",  label: "Add Follow-up",  icon: BellPlus,    href: `/clients/${r.id}` },
-    { key: "project",   label: "New Project",    icon: FolderPlus,  href: `/projects/new?clientId=${r.id}` },
+    { key: "edit",     label: "Edit",          icon: PencilLine, href: `/clients/${r.id}/edit` },
+    { key: "followup", label: "Add Follow-up",  icon: BellPlus,   href: `/clients/${r.id}` },
+    { key: "project",  label: "New Project",    icon: FolderPlus, href: `/projects/new?clientId=${r.id}` },
     {
-      key:       "delete",
-      label:     "Delete Client",
-      icon:      Trash2,
-      danger:    true,
-      separator: true,
-      confirm:   confirmMsg,
-      onClick:   r.projectCount > 0 ? undefined : () => void deleteClient(r.id),
+      key: "delete", label: "Delete Client", icon: Trash2,
+      danger: true, separator: true, confirm: confirmMsg,
+      onClick: r.projectCount > 0 ? undefined : () => void deleteClient(r.id),
     },
   ];
 }
@@ -69,106 +74,171 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
   if (rows.length === 0) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-16 text-center">
-        <div className="text-[14px] text-text mb-2">No clients yet.</div>
+        <Users size={28} className="mx-auto mb-3 text-text-faint" />
+        <div className="text-[14px] text-text mb-1">No clients found.</div>
         <p className="text-[12px] text-text-dim">
-          Add your first client to start building the 360° view. →{" "}
           <Link href={"/clients/new" as Route} className="text-accent hover:underline">
-            New client
-          </Link>
+            Add a client
+          </Link>{" "}
+          to start building the 360° view.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {rows.map((r) => {
-        const typeStyle = TYPE_STYLE[r.type] ?? "bg-text-dim/12 text-text-dim";
-        const typeLabel = TYPE_LABEL[r.type] ?? r.type;
-        const proj      = r.latestProject;
-        const initial   = proj?.ownerName && proj.ownerName !== "—"
-          ? proj.ownerName.charAt(0).toUpperCase() : null;
+    <div className="rounded-[14px] border border-rule bg-surface overflow-hidden">
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="border-b border-rule bg-surface-2">
+            <th className="w-[4px] p-0" aria-hidden />
+            <th className="py-2.5 pl-4 pr-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim">
+              Client
+            </th>
+            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden sm:table-cell">
+              Mobile
+            </th>
+            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden lg:table-cell">
+              City
+            </th>
+            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden md:table-cell">
+              Projects
+            </th>
+            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden xl:table-cell">
+              Owner
+            </th>
+            <th className="py-2.5 pl-3 pr-4 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim text-right">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-rule">
+          {rows.map((r) => {
+            const typeStyle = TYPE_STYLE[r.type] ?? "bg-text-dim/12 text-text-dim";
+            const typeLabel = TYPE_LABEL[r.type] ?? r.type;
+            const strip     = TYPE_STRIP[r.type] ?? "bg-text-dim";
+            const proj      = r.latestProject;
+            const initial   = proj?.ownerName && proj.ownerName !== "—"
+              ? proj.ownerName.charAt(0).toUpperCase() : null;
 
-        return (
-          <div
-            key={r.id}
-            onClick={() => router.push(`/clients/${r.id}` as Route)}
-            className="flex items-center gap-5 px-5 py-[18px] bg-surface border border-rule rounded-[14px] hover:bg-surface-hover transition-colors cursor-pointer"
-          >
-            {/* ── Identity ─────────────────────────────────────── */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[14px] font-semibold text-text leading-snug">{r.name}</span>
-                <span className={`text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${typeStyle}`}>
-                  {typeLabel}
-                </span>
-                {r.projectCount > 0 && (
-                  <span className="flex items-center gap-1 text-[10.5px] text-text-dim bg-surface-2 border border-rule px-2 py-0.5 rounded-[3px]">
-                    <Briefcase size={9} strokeWidth={2} />
-                    {r.projectCount} {r.projectCount === 1 ? "project" : "projects"}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 mt-1 text-[12px] text-text-dim leading-tight flex-wrap">
-                <span className="font-data tabular tracking-tight">{fmtMobile(r.mobile)}</span>
-                {r.email && (
-                  <>
-                    <Sep />
-                    <span className="truncate max-w-[180px]">{r.email}</span>
-                  </>
-                )}
-                {r.city && (
-                  <>
-                    <Sep />
-                    <span>{r.city}</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* ── Owner avatar ─────────────────────────────────── */}
-            {initial && (
-              <div className="hidden sm:flex items-center gap-2 shrink-0">
-                <span className="w-[26px] h-[26px] rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center uppercase select-none">
-                  {initial}
-                </span>
-                <span className="text-[12px] text-text-dim hidden lg:block whitespace-nowrap max-w-[110px] truncate">
-                  {proj?.ownerName}
-                </span>
-              </div>
-            )}
-
-            {/* ── Actions ──────────────────────────────────────── */}
-            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-              <a
-                href={`tel:${r.mobile}`}
-                title={`Call ${r.name}`}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-text-dim hover:text-text hover:bg-surface-2 transition-colors"
+            return (
+              <tr
+                key={r.id}
+                onClick={() => router.push(`/clients/${r.id}` as Route)}
+                className="group cursor-pointer transition-colors hover:bg-surface-2/60"
               >
-                <Phone size={13} strokeWidth={1.75} />
-              </a>
-              <a
-                href={waHref(r.mobile)}
-                target="_blank"
-                rel="noreferrer noopener"
-                title={`WhatsApp ${r.name}`}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-text-dim hover:text-[#25D366] hover:bg-surface-2 transition-colors"
-              >
-                <MessageCircle size={13} strokeWidth={1.75} />
-              </a>
-              <Link
-                href={`/clients/${r.id}` as Route}
-                className="ml-1 h-7 px-2.5 rounded-[7px] text-[12px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
-              >
-                View
-                <ArrowUpRight size={12} strokeWidth={2} />
-              </Link>
-              <MoreMenu items={clientMenuItems(r)} />
-            </div>
-          </div>
-        );
-      })}
+                {/* Accent strip — td fills full row height in a table */}
+                <td className={`w-[4px] p-0 ${strip}`} aria-hidden />
+
+                {/* Name + type badge */}
+                <td className="py-3 pl-4 pr-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[13.5px] font-semibold text-text leading-tight">
+                      {r.name}
+                    </span>
+                    <span className={`text-[10px] font-medium tracking-[0.06em] uppercase px-1.5 py-0.5 rounded-[3px] ${typeStyle}`}>
+                      {typeLabel}
+                    </span>
+                  </div>
+                  {/* Compact sub-line on small screens where mobile col is hidden */}
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[11.5px] text-text-dim sm:hidden">
+                    <span className="tabular">{fmtMobile(r.mobile)}</span>
+                    {r.city && (
+                      <>
+                        <span className="text-text-faint">·</span>
+                        <span>{r.city}</span>
+                      </>
+                    )}
+                  </div>
+                </td>
+
+                {/* Mobile + quick-action icons */}
+                <td
+                  className="py-3 px-3 hidden sm:table-cell"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-1">
+                    <a
+                      href={`tel:${r.mobile}`}
+                      title={`Call ${r.name}`}
+                      className="tabular text-[12.5px] text-text-dim hover:text-accent transition-colors"
+                    >
+                      {fmtMobile(r.mobile)}
+                    </a>
+                    <a
+                      href={waHref(r.mobile)}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title="WhatsApp"
+                      className="ml-1.5 w-6 h-6 rounded-full flex items-center justify-center text-text-faint hover:text-[#25D366] hover:bg-surface-2 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <MessageCircle size={11} strokeWidth={1.75} />
+                    </a>
+                    <a
+                      href={`tel:${r.mobile}`}
+                      title="Call"
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-text-faint hover:text-accent hover:bg-surface-2 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Phone size={11} strokeWidth={1.75} />
+                    </a>
+                  </div>
+                </td>
+
+                {/* City */}
+                <td className="py-3 px-3 hidden lg:table-cell">
+                  <span className="text-[12.5px] text-text-dim">{r.city || "—"}</span>
+                </td>
+
+                {/* Project count */}
+                <td className="py-3 px-3 hidden md:table-cell">
+                  {r.projectCount > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-text-dim bg-surface-2 border border-rule px-1.5 py-0.5 rounded-[3px]">
+                      <Briefcase size={9} strokeWidth={2} />
+                      {r.projectCount}
+                    </span>
+                  ) : (
+                    <span className="text-[12px] text-text-faint">—</span>
+                  )}
+                </td>
+
+                {/* Owner */}
+                <td className="py-3 px-3 hidden xl:table-cell">
+                  {initial ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-[22px] h-[22px] rounded-full bg-accent/15 text-accent text-[9px] font-bold flex items-center justify-center uppercase select-none shrink-0">
+                        {initial}
+                      </span>
+                      <span className="text-[12px] text-text-dim truncate max-w-[90px]">
+                        {proj?.ownerName}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[12px] text-text-faint">—</span>
+                  )}
+                </td>
+
+                {/* Actions */}
+                <td
+                  className="py-3 pl-3 pr-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <Link
+                      href={`/clients/${r.id}` as Route}
+                      className="h-7 px-2.5 rounded-[7px] text-[12px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
+                    >
+                      View
+                      <ArrowUpRight size={11} strokeWidth={2} />
+                    </Link>
+                    <MoreMenu items={clientMenuItems(r)} />
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
