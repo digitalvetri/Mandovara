@@ -7,6 +7,8 @@
 // catalog since SKUs are created there, not here.
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { AlertTriangle, Pencil, PackageOpen } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import type { StockItemRow } from "@/modules/inventory/queries";
@@ -90,9 +92,13 @@ function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
         />
         <div className="min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="truncate text-[13.5px] font-semibold text-text">
+            <Link
+              href={`/products/${r.colourwayId}` as Route}
+              onClick={(e) => e.stopPropagation()}
+              className="truncate text-[13.5px] font-semibold text-text hover:text-accent transition-colors"
+            >
               {r.designName} — {r.colourName}
-            </span>
+            </Link>
             {r.isOut ? (
               <span className="rounded-full bg-fault/15 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-fault">
                 Out

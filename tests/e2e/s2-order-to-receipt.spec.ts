@@ -10,7 +10,7 @@
 // E2E_INSTALL_VISIT_ID — a scheduled install visit.
 
 import { test, expect, type Page } from "@playwright/test";
-import { makeJobId, installVisitId } from "./_ids";
+import { makeJobId, installVisitId, colourwayId } from "./_ids";
 
 const _ORDER_ID        = process.env["E2E_ORDER_ID"];
 
@@ -118,22 +118,21 @@ test("inventory page loads with balance list", async ({ page }) => {
 // reservation step is gone, the record is not.
 
 test("a dye lot is recorded at both ends of the chain — stocked, then fitted", async ({ page }) => {
-  // Stocked end: the catalog card carries a dye-lot pin for anything held in
-  // stock under a lot ("MIX" when a SKU spans more than one). Asserted on the
-  // pin's title rather than the visible text, because the label is shortened
-  // to its last six characters to fit the pin.
+  // Stocked end: the product detail page carries a dye-lot pin whenever the
+  // colourway has stock recorded under a specific lot ("MIX" when multiple
+  // lots are held). Asserted on the pin's title attribute.
   //
-  // NOT /inventory: that list is one row per SKU and deliberately aggregates
-  // across lots, so it has no lot column to assert on.
-  //
-  // ?inStock=1 is load-bearing, not incidental: the pin only renders for a SKU
-  // that actually has stock, and unfiltered the catalog opens on page 1 of
-  // 1,229 SKUs sorted A–Z, where nothing need be in stock at all. Asserting
-  // without the filter is asserting that a needle happens to be on page one.
-  await page.goto("/products?inStock=1");
+  // We filter the inventory page to WALLPAPER family because dye lot is
+  // mandatory for roll-based families at GRN (§0.6), so any wallpaper
+  // colourway that has reached stock will have a dye lot in its balance.
+  // The inventory rows link to the product detail page (/products/[id]) where
+  // the pin renders if dyeLotHint is non-null.
+  const cwId = await colourwayId(page);
+  test.skip(!cwId, "no wallpaper colourways in inventory — run the seed with SEED_DEMO_DATA=true");
+  await page.goto(`/products/${cwId}`);
   await expectNoRuntimeError(page);
   const stockedLot = page.locator('[title^="Dye lot:"]').first();
-  await expect(stockedLot, "no dye-lot pin on any in-stock SKU").toBeVisible({ timeout: 15_000 });
+  await expect(stockedLot, "no dye-lot pin on product detail for wallpaper SKU").toBeVisible({ timeout: 15_000 });
 
   // Fitted end: the install sheet records the lot that physically went up.
   // Without both halves, "which lot went on which wall" is unanswerable —

@@ -62,7 +62,7 @@ function BrandCard({ brand: b }: { brand: Brand }) {
   return (
     <Link
       href={`/products/brand/${b.id}` as Route}
-      className="group block rounded-[14px] bg-surface border border-rule shadow-sm hover:border-accent/40 hover:shadow-md transition-all duration-200"
+      className="group block rounded-[14px] bg-surface border border-rule shadow-sm hover:border-accent/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
     >
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
