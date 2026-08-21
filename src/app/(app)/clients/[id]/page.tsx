@@ -7,11 +7,14 @@ import { formatINR } from "@/kernel/money/format";
 import { AgeingBars } from "@/components/data/AgeingBars";
 import { QuotationsInlineTable } from "@/components/data/QuotationsInlineTable";
 import { devContext } from "@/lib/dev-context";
+import { scoped } from "@/kernel/db/scoped";
 import { getClient } from "@/modules/clients/queries";
 import { listQuotationsForClient } from "@/modules/quotations/queries";
+import { listOutstandingInvoicesForClient, listReceipts, type OutstandingInvoice, type ReceiptRow } from "@/modules/receipts/queries";
 import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 import { BillingAddressCard } from "../_components/BillingAddressCard";
 import { StartMeasurementFromClientButton } from "../_components/StartMeasurementFromClientButton";
+import { ClientLedgerPanel, type InvoiceLedgerRow, type ReceiptLedgerRow } from "../_components/ClientLedgerPanel";
 
 const STAGE_LABEL: Record<string, string> = {
   ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
@@ -36,6 +39,38 @@ export default async function ClientDetailPage({
   const client = await getClient(ctx, id);
   if (!client) notFound();
   const quotations = await listQuotationsForClient(ctx, client.id);
+
+  const canCreateReceipt = ctx.permissions.has("receipt.create");
+  const canViewReceipt   = ctx.permissions.has("receipt.view");
+
+  let openInvoicesRaw: OutstandingInvoice[] = [];
+  let receiptsRaw: { rows: ReceiptRow[] }   = { rows: [] };
+  let defaultBranch: { id: string } | null  = null;
+
+  if (canCreateReceipt || canViewReceipt) {
+    [openInvoicesRaw, receiptsRaw, defaultBranch] = await Promise.all([
+      canCreateReceipt
+        ? listOutstandingInvoicesForClient(ctx, client.id).catch((): OutstandingInvoice[] => [])
+        : Promise.resolve<OutstandingInvoice[]>([]),
+      canViewReceipt
+        ? listReceipts(ctx, { clientId: client.id, pageSize: 15 }).catch(() => ({ rows: [] as ReceiptRow[] }))
+        : Promise.resolve({ rows: [] as ReceiptRow[] }),
+      scoped(ctx).branch.findFirst({ where: { organizationId: ctx.orgId }, select: { id: true } }).catch(() => null),
+    ]);
+  }
+
+  const invoiceLedgerRows: InvoiceLedgerRow[] = openInvoicesRaw.map((inv) => ({
+    id: inv.id, number: inv.number,
+    date: inv.date.toISOString(), dueDate: inv.dueDate.toISOString(),
+    total: inv.total.toString(), outstanding: inv.outstanding.toString(),
+  }));
+
+  const receiptLedgerRows: ReceiptLedgerRow[] = receiptsRaw.rows.map((r) => ({
+    id: r.id, number: r.number,
+    date: r.date.toISOString(),
+    mode: r.mode, amount: r.amount.toString(),
+    reference: r.reference, chequeStatus: r.chequeStatus,
+  }));
 
   return (
     <>
@@ -115,6 +150,16 @@ export default async function ClientDetailPage({
             seeAllHref="/quotations"
             newHref="/quotations/new"
           />
+
+          {(canCreateReceipt || canViewReceipt) && (
+            <ClientLedgerPanel
+              clientId={client.id}
+              branchId={defaultBranch?.id ?? ""}
+              openInvoices={invoiceLedgerRows}
+              receipts={receiptLedgerRows}
+              canRecord={canCreateReceipt && !!defaultBranch}
+            />
+          )}
 
           <ClientFollowUpForm clientId={client.id} />
 

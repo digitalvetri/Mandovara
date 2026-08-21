@@ -154,6 +154,7 @@ export async function createReceipt(
 
   revalidatePath("/receipts");
   revalidatePath("/invoicing");
+  revalidatePath(`/clients/${d.clientId}`);
   return { ok: true, data: { ...created, unallocated } };
 }
 

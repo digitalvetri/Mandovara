@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Save } from "lucide-react";
 import { updateQuotationLines } from "@/modules/quotations/actions-status";
@@ -20,16 +20,27 @@ export function QuotationWorkspace({
   canApprove: boolean;
 }) {
   const router = useRouter();
-  const [lines, setLines] = useState<EditLine[]>(() => initLines(quotation.lines));
+  const [lines, setLines]   = useState<EditLine[]>(() => initLines(quotation.lines));
   const [posCode, setPosCode] = useState(quotation.supplierStateCode);
   const [saving, startSave] = useTransition();
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saved, setSaved]     = useState(false);
 
-  const isDraft     = ["DRAFT", "REVISED"].includes(quotation.status);
+  // colourwayId lookup for swatch strip — stripped from EditLine by initLines
+  const colourwayMap = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const sl of quotation.lines) m.set(sl.id, sl.colourwayId);
+    return m;
+  }, [quotation.lines]);
+
+  const isDraft      = ["DRAFT", "REVISED"].includes(quotation.status);
   const isIntraState = posCode === quotation.supplierStateCode;
-  const totals      = computeTotals(lines, isIntraState);
-  const totalRupees = Math.round(totals.total);
+  const totals       = computeTotals(lines, isIntraState);
+  const totalRupees  = Math.round(totals.total);
+
+  // In read-only mode, hide the Disc % column if all lines have 0 discount
+  const anyDiscount  = lines.some((l) => parseFloat(l.discountPct) > 0);
+  const showDiscCol  = isDraft || anyDiscount;
 
   function update(key: string, patch: Partial<EditLine>) {
     setLines((p) => p.map((l) => l._key === key ? { ...l, ...patch } : l));
@@ -39,7 +50,8 @@ export function QuotationWorkspace({
   function addLine() {
     setLines((p) => [
       ...p,
-      { _key: newKey(), description: "", roomLabel: "", quantity: "1", unit: "PIECE", rate: "0", gstRate: "18", discountPct: "0", isOptional: false },
+      { _key: newKey(), description: "", roomLabel: "", quantity: "1", unit: "PIECE",
+        rate: "0", gstRate: "18", discountPct: "0", isOptional: false },
     ]);
     setSaved(false);
   }
@@ -51,7 +63,7 @@ export function QuotationWorkspace({
 
   function handleSave() {
     const valid = lines.filter((l) => l.description.trim());
-    if (!valid.length) { setSaveErr("At least one line with a description is required"); return; }
+    if (!valid.length) { setSaveErr("Add at least one item with a description"); return; }
     setSaveErr(null);
     startSave(async () => {
       const res = await updateQuotationLines({
@@ -59,13 +71,13 @@ export function QuotationWorkspace({
         placeOfSupplyCode: posCode,
         lines: valid.map((l) => ({
           description: l.description.trim(),
-          roomLabel: l.roomLabel.trim() || undefined,
-          quantity: parseFloat(l.quantity) || 1,
-          unit: l.unit as typeof SELL_UNITS[number],
-          rate: l.rate,
-          gstRate: parseFloat(l.gstRate) || 0,
+          roomLabel:   l.roomLabel.trim() || undefined,
+          quantity:    parseFloat(l.quantity) || 1,
+          unit:        l.unit as typeof SELL_UNITS[number],
+          rate:        l.rate,
+          gstRate:     parseFloat(l.gstRate) || 0,
           discountPct: parseFloat(l.discountPct) || 0,
-          isOptional: l.isOptional,
+          isOptional:  l.isOptional,
         })),
       });
       if (!res.ok) { setSaveErr(res.error ?? "Save failed"); return; }
@@ -75,57 +87,85 @@ export function QuotationWorkspace({
   }
 
   return (
-    <div className="rounded-[18px] bg-surface border border-rule overflow-hidden">
+    <div className="rounded-[16px] bg-surface border border-rule overflow-hidden shadow-sm">
 
-      {/* ── Section header ────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 px-7 py-4 border-b border-rule">
-        <div className="text-[14px] font-semibold text-text">Items in this quotation</div>
+      {/* ── Section header ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-rule">
+        <div className="flex items-center gap-2">
+          <div className="text-[9.5px] uppercase tracking-[0.22em] text-text-dim font-semibold">
+            Quotation Items
+          </div>
+          {lines.length > 0 && (
+            <span className="text-[10.5px] tabular text-text-dim bg-ink/40 border border-rule px-1.5 py-0.5 rounded-[4px]">
+              {lines.length}
+            </span>
+          )}
+        </div>
         {isDraft && (
           <button
             type="button"
             onClick={addLine}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[8px] text-[13px] font-medium transition-colors shrink-0"
-            style={{ background: "oklch(0.72 0.115 85)", color: "#0B1020" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "oklch(0.83 0.105 85)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "oklch(0.72 0.115 85)"; }}
+            className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[7px] text-[12px] font-medium text-text-dim border border-rule hover:text-accent hover:border-accent/50 transition-colors shrink-0"
           >
-            <Plus size={14} strokeWidth={2.5} />
+            <Plus size={13} strokeWidth={2.5} />
             Add Item
           </button>
         )}
       </div>
 
-      {/* ── Table ─────────────────────────────────────────────────────── */}
-      <div className="px-7 pt-6 pb-2 overflow-x-auto">
-        <table className="w-full text-[13.5px] border-collapse" style={{ minWidth: "780px" }}>
+      {/* ── Table ───────────────────────────────────────────────────── */}
+      <div className="overflow-x-auto">
+        <table
+          className="w-full text-[13px] border-collapse"
+          style={{ minWidth: isDraft ? "800px" : "560px" }}
+        >
           <thead>
-            <tr className="text-[11px] uppercase tracking-[0.1em] text-text-dim border-b-2 border-rule">
-              <th className="text-left pb-3 pr-3 w-[44px]">#</th>
-              <th className="text-left pb-3 pr-4">Item / Room</th>
-              <th className="text-right pb-3 pr-3 w-[80px]">Quantity</th>
-              <th className="text-left pb-3 pr-3 w-[80px]">Unit</th>
-              <th className="text-right pb-3 pr-3 w-[116px]">Rate (₹)</th>
-              <th className="text-right pb-3 pr-3 w-[64px]">GST %</th>
-              <th className="text-right pb-3 pr-3 w-[84px]">Discount %</th>
-              <th className="text-right pb-3 w-[116px]">Amount (₹)</th>
-              {isDraft && <th className="w-[40px]" />}
+            <tr className="text-[10px] uppercase tracking-[0.12em] text-text-dim bg-ink/20 border-b border-rule">
+              <th className="text-left py-2.5 px-4 w-[36px]">#</th>
+              <th className="text-left py-2.5 px-3">Item</th>
+              {isDraft && <>
+                <th className="text-right py-2.5 px-3 w-[80px]">Qty</th>
+                <th className="text-left py-2.5 px-3 w-[72px]">Unit</th>
+                <th className="text-right py-2.5 px-3 w-[110px]">Rate (₹)</th>
+                <th className="text-right py-2.5 px-3 w-[62px]">GST %</th>
+                {showDiscCol && <th className="text-right py-2.5 px-3 w-[70px]">Disc %</th>}
+              </>}
+              {!isDraft && <>
+                <th className="text-right py-2.5 px-3 w-[70px]">Qty</th>
+                <th className="text-right py-2.5 px-3 w-[120px]">Rate</th>
+                {showDiscCol && <th className="text-right py-2.5 px-3 w-[60px]">Disc</th>}
+              </>}
+              <th className="text-right py-2.5 px-4 w-[120px]">Amount (₹)</th>
+              {isDraft && <th className="w-[36px]" />}
             </tr>
           </thead>
           <tbody>
             {lines.map((l, idx) => {
               const { amount } = lineAmt(l);
+              const hasColourway = !!colourwayMap.get(l._key);
               return (
-                <tr key={l._key} className="border-b border-rule/50 group">
-                  <td className="py-5 pr-3 align-top">
-                    <span className="tabular text-text-dim text-[12.5px] mt-1.5 block">{idx + 1}</span>
+                <tr
+                  key={l._key}
+                  className="border-b border-rule/40 group hover:bg-ink/10 transition-colors"
+                >
+                  {/* # */}
+                  <td className="py-3 px-4 align-top">
+                    <span className="tabular text-text-dim text-[12px]">{idx + 1}</span>
                   </td>
-                  <td className="py-5 pr-4 align-top">
-                    <div className="flex items-start gap-3">
-                      {/* swatch chip — neutral placeholder; colourway hex not in serialized line */}
-                      <span className="flex-shrink-0 mt-0.5 w-8 h-8 rounded-[6px] bg-surface-2 border border-rule" />
+
+                  {/* Item & Room */}
+                  <td className="py-3 px-3 align-top">
+                    <div className="flex items-start gap-2.5">
+                      {/* §6.1 spec: left-edge swatch strip on every quote line */}
+                      <span
+                        className={`flex-shrink-0 self-stretch w-[3px] rounded-full min-h-[18px] mt-0.5 ${
+                          hasColourway ? "bg-accent/60" : "bg-rule"
+                        }`}
+                        aria-hidden
+                      />
                       <div className="flex-1 min-w-0">
                         {isDraft ? (
-                          <div className="space-y-2.5">
+                          <div className="space-y-2">
                             <input
                               type="text"
                               value={l.description}
@@ -136,120 +176,142 @@ export function QuotationWorkspace({
                             <input
                               type="text"
                               value={l.roomLabel}
-                              placeholder="Room (optional)"
+                              placeholder="Room / location (optional)"
                               onChange={(e) => update(l._key, { roomLabel: e.target.value })}
                               className={INPUT_SM}
                             />
                           </div>
                         ) : (
                           <div>
-                            <div className="text-[14.5px] text-text font-medium leading-snug">
+                            <div className="text-[14px] font-medium text-text leading-snug">
                               {l.description}
                             </div>
                             {l.roomLabel && (
-                              <div className="text-[12.5px] text-text-dim mt-1.5">{l.roomLabel}</div>
+                              <div className="text-[11.5px] text-text-dim mt-1">{l.roomLabel}</div>
                             )}
                           </div>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="py-5 pr-3 align-top">
-                    {isDraft ? (
-                      <input type="number" min="0" step="any" value={l.quantity}
-                        onChange={(e) => update(l._key, { quantity: e.target.value })}
-                        className={`${INPUT} text-right`} />
-                    ) : (
-                      <span className="tabular block text-right text-[14px] mt-1">{l.quantity}</span>
-                    )}
-                  </td>
-                  <td className="py-5 pr-3 align-top">
-                    {isDraft ? (
-                      <select value={l.unit} onChange={(e) => update(l._key, { unit: e.target.value })}
-                        className={`${INPUT} px-2`}>
-                        {SELL_UNITS.map((u) => <option key={u} value={u}>{UNIT_SHORT[u]}</option>)}
-                      </select>
-                    ) : (
-                      <span className="text-[13.5px] text-text-dim mt-1 block">
-                        {UNIT_SHORT[l.unit] ?? l.unit}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-5 pr-3 align-top">
-                    {isDraft ? (
-                      <input type="number" min="0" step="any" value={l.rate}
-                        onChange={(e) => update(l._key, { rate: e.target.value })}
-                        className={`${INPUT} text-right`} />
-                    ) : (
-                      <span className="tabular block text-right text-[14px] mt-1">₹{l.rate}</span>
-                    )}
-                  </td>
-                  <td className="py-5 pr-3 align-top">
-                    {isDraft ? (
-                      <input type="number" min="0" max="28" step="0.5" value={l.gstRate}
-                        onChange={(e) => update(l._key, { gstRate: e.target.value })}
-                        className={`${INPUT} text-right`} />
-                    ) : (
-                      <span className="tabular block text-right text-[14px] mt-1">{l.gstRate}%</span>
-                    )}
-                  </td>
-                  <td className="py-5 pr-3 align-top">
-                    {isDraft ? (
-                      <input type="number" min="0" max="100" step="any" value={l.discountPct}
-                        onChange={(e) => update(l._key, { discountPct: e.target.value })}
-                        className={`${INPUT} text-right`} />
-                    ) : (
-                      <span className="tabular block text-right text-[14px] mt-1">{l.discountPct}%</span>
-                    )}
-                  </td>
-                  <td className="py-5 align-top text-right">
-                    <span className="tabular font-semibold text-[15px] text-text mt-1 block">
+
+                  {isDraft ? (
+                    <>
+                      {/* Qty */}
+                      <td className="py-3 px-3 align-top">
+                        <input type="number" min="0" step="any" value={l.quantity}
+                          onChange={(e) => update(l._key, { quantity: e.target.value })}
+                          className={`${INPUT} text-right`} />
+                      </td>
+                      {/* Unit */}
+                      <td className="py-3 px-3 align-top">
+                        <select value={l.unit} onChange={(e) => update(l._key, { unit: e.target.value })}
+                          className={`${INPUT} px-2`}>
+                          {SELL_UNITS.map((u) => <option key={u} value={u}>{UNIT_SHORT[u]}</option>)}
+                        </select>
+                      </td>
+                      {/* Rate */}
+                      <td className="py-3 px-3 align-top">
+                        <input type="number" min="0" step="any" value={l.rate}
+                          onChange={(e) => update(l._key, { rate: e.target.value })}
+                          className={`${INPUT} text-right`} />
+                      </td>
+                      {/* GST % */}
+                      <td className="py-3 px-3 align-top">
+                        <input type="number" min="0" max="28" step="0.5" value={l.gstRate}
+                          onChange={(e) => update(l._key, { gstRate: e.target.value })}
+                          className={`${INPUT} text-right`} />
+                      </td>
+                      {/* Disc % */}
+                      {showDiscCol && (
+                        <td className="py-3 px-3 align-top">
+                          <input type="number" min="0" max="100" step="any" value={l.discountPct}
+                            onChange={(e) => update(l._key, { discountPct: e.target.value })}
+                            className={`${INPUT} text-right`} />
+                        </td>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Qty + Unit combined */}
+                      <td className="py-3 px-3 align-top text-right">
+                        <span className="tabular text-text">{l.quantity}</span>
+                        <span className="text-text-dim text-[11px] ml-1">{UNIT_SHORT[l.unit] ?? l.unit}</span>
+                      </td>
+                      {/* Rate with GST note */}
+                      <td className="py-3 px-3 align-top text-right">
+                        <span className="tabular text-text">{fmtRupee(parseFloat(l.rate) || 0)}</span>
+                        <div className="text-[10.5px] text-text-dim mt-0.5">
+                          {l.gstRate}% GST
+                        </div>
+                      </td>
+                      {/* Disc % (only if any line has it) */}
+                      {showDiscCol && (
+                        <td className="py-3 px-3 align-top text-right">
+                          <span className="tabular text-text-dim text-[12.5px]">
+                            {parseFloat(l.discountPct) > 0 ? `${l.discountPct}%` : "—"}
+                          </span>
+                        </td>
+                      )}
+                    </>
+                  )}
+
+                  {/* Amount */}
+                  <td className="py-3 px-4 align-top text-right">
+                    <span className="tabular font-semibold text-[15px] text-text">
                       {fmtRupee(amount)}
                     </span>
                   </td>
+
+                  {/* Delete (draft only) */}
                   {isDraft && (
-                    <td className="py-5 align-top pl-2">
+                    <td className="py-3 align-top pl-1">
                       <button
                         type="button"
                         onClick={() => removeLine(l._key)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity mt-1 h-8 w-8 flex items-center justify-center rounded-[6px] text-text-dim hover:text-fault hover:bg-fault/10"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 h-8 w-8 flex items-center justify-center rounded-[6px] text-text-dim hover:text-fault hover:bg-fault/10"
                       >
-                        <Trash2 size={14} strokeWidth={2} />
+                        <Trash2 size={13} strokeWidth={2} />
                       </button>
                     </td>
                   )}
                 </tr>
               );
             })}
+
+            {lines.length === 0 && (
+              <tr>
+                <td colSpan={isDraft ? (showDiscCol ? 9 : 8) : (showDiscCol ? 6 : 5)}
+                  className="py-12 text-center text-[13px] text-text-dim">
+                  No items yet.{isDraft && " Click “Add Item” to start."}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* ── Table footer: item count (left) + save (right) ────────────── */}
-      <div className="flex items-center justify-between gap-4 px-7 py-3 border-t border-rule/50">
-        <div className="text-[12.5px] text-text-dim">
-          {lines.length} item{lines.length !== 1 ? "s" : ""}
-        </div>
-        {isDraft && (
+      {/* ── Draft footer: Save ──────────────────────────────────────── */}
+      {isDraft && (
+        <div className="flex items-center justify-between gap-4 px-6 py-3.5 border-t border-rule/60 bg-ink/10">
+          <div className="text-[12px] text-text-dim">
+            {lines.length} item{lines.length !== 1 ? "s" : ""}
+          </div>
           <div className="flex items-center gap-2.5">
-            {saveErr && (
-              <span className="text-[12.5px] text-fault max-w-[220px] truncate">{saveErr}</span>
-            )}
-            {saved && !saving && !saveErr && (
-              <span className="text-[12.5px] text-solid">Saved ✓</span>
-            )}
+            {saveErr && <span className="text-[12px] text-fault max-w-[220px] truncate">{saveErr}</span>}
+            {saved && !saving && !saveErr && <span className="text-[12px] text-solid">Saved ✓</span>}
             <button
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-2 h-9 px-5 rounded-[9px] text-[13px] font-medium transition-colors disabled:opacity-60 border border-rule text-text-dim hover:text-text hover:border-accent"
+              className="inline-flex items-center gap-2 h-8 px-4 rounded-[7px] text-[12.5px] font-semibold bg-accent text-ink hover:bg-accent/85 disabled:opacity-60 transition-colors"
             >
               <Save size={13} strokeWidth={2.2} />
               {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <QuotationSummaryBar
         isDraft={isDraft}

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import {
   Download, Mail, MessageCircle, Copy, Check,
-  ExternalLink, ArrowLeft, Calendar,
+  ExternalLink, ArrowLeft, CalendarDays, Clock4,
 } from "lucide-react";
 import { StatusPill } from "../../_components/StatusPill";
 import { StatusChanger } from "../../_components/StatusChanger";
@@ -21,7 +21,7 @@ function pToINR(paise: string): string {
     const r = n / 100n;
     const s = r.toString();
     if (s.length <= 3) return `₹${s}`;
-    const l3 = s.slice(-3);
+    const l3   = s.slice(-3);
     const rest = s.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",");
     return `₹${rest},${l3}`;
   } catch { return "₹0"; }
@@ -62,7 +62,7 @@ function ClientAvatar({ name }: { name: string }) {
   const bg = AVATAR_BG[letter.charCodeAt(0) % AVATAR_BG.length]!;
   return (
     <span
-      className="flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center text-[22px] font-semibold text-white select-none"
+      className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-bold text-white select-none"
       style={{ backgroundColor: bg }}
       aria-hidden
     >
@@ -75,13 +75,17 @@ function ClientAvatar({ name }: { name: string }) {
 
 interface Props {
   quotation: SerializedQuotation;
-  /** Set when the estimate cannot yet be reissued; explains why. */
   reissueBlockedReason?: string;
   canApprove: boolean;
 }
 
 export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }: Props) {
   const [copied, setCopied] = useState(false);
+  const [link, setLink]     = useState(`/quotations/${quotation.id}`);
+
+  useEffect(() => {
+    setLink(`${window.location.origin}/quotations/${quotation.id}`);
+  }, [quotation.id]);
 
   const isIntraState = BigInt(quotation.igstStr) === 0n;
   const total     = pToINR(quotation.totalStr);
@@ -90,23 +94,20 @@ export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }:
   const sgst      = pToINR(quotation.sgstStr);
   const igst      = pToINR(quotation.igstStr);
   const validDate = fmtDate(quotation.validUntil);
+  const quoteDate = fmtDate(quotation.date);
   const gstRate   = effectiveGstRate(quotation.cgstStr, quotation.taxableAmountStr);
   const num       = shortNum(quotation.number);
-
-  const link = typeof window !== "undefined"
-    ? `${window.location.origin}/quotations/${quotation.id}`
-    : `/quotations/${quotation.id}`;
 
   const msgBody =
     `Namaste ${quotation.clientName},\n\n` +
     `Please find our quotation ${num} at the link below.\n\n` +
     `  Total: ${total}\n` +
     `  Valid until: ${validDate}\n\n` +
-    `Link: ${link}\n\n` +
+    `${link}\n\n` +
     `Reply to accept or request changes.\n\n` +
-    `— Team Mandovara\n+91 89404 30051 · mandovara22@gmail.com`;
+    `— Team Mandovara\n+91 89404 30051 · mandovara.com`;
 
-  const subject  = `Quotation ${num} · Mandovara`;
+  const subject  = `Quotation ${num} from Mandovara`;
   const mailHref = quotation.clientEmail
     ? `mailto:${encodeURIComponent(quotation.clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msgBody)}`
     : null;
@@ -120,58 +121,54 @@ export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }:
     } catch { /* clipboard denied */ }
   }
 
-  const commRow =
-    "flex items-center gap-3 w-full px-4 py-3 text-[13px] text-text-dim " +
-    "hover:text-text hover:bg-surface-2 transition-colors rounded-[8px] group";
+  const shareBtn =
+    "inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[7px] text-[12px] font-medium " +
+    "text-text-dim border border-rule hover:text-text hover:bg-ink/30 hover:border-rule transition-colors";
 
   return (
-    <div className="mb-6">
+    <div className="mb-5">
 
-      {/* ── Top bar: back · number · status pill · actions ──────────── */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
+      {/* ── Nav bar: back · number · status · actions ──────────────── */}
+      <div className="flex items-center gap-2.5 mb-4 flex-wrap">
         <Link
           href={"/quotations" as Route}
-          className="inline-flex items-center gap-1.5 text-[13px] text-text-dim hover:text-text transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 text-[12.5px] text-text-dim hover:text-text transition-colors shrink-0"
         >
-          <ArrowLeft size={14} strokeWidth={1.75} />
-          Back to Quotations
+          <ArrowLeft size={13} strokeWidth={1.75} />
+          Quotations
         </Link>
 
         <div className="w-px h-4 bg-rule shrink-0" />
 
-        <h1 className="font-data text-[20px] font-semibold text-text tabular leading-none">
+        <h1 className="font-data text-[17px] font-semibold text-text tabular leading-none">
           {quotation.number}
         </h1>
+
         <StatusPill status={quotation.status} />
-        {/* Nothing on this document came from a site measurement. Say so where
-            it is read, not just on the PDF. */}
+
         {isEstimate(quotation.lines) && (
           <span
             title={ESTIMATE_CAVEAT}
-            className="inline-flex items-center gap-1 text-[10.5px] uppercase tracking-[0.12em] px-2 py-[3px] rounded-[5px] bg-heat/15 text-heat border border-heat/30"
+            className="text-[10px] uppercase tracking-[0.12em] px-2 py-[3px] rounded-[5px] bg-heat/10 text-heat border border-heat/20"
           >
             Estimate
           </span>
         )}
         {quotation.revision > 0 && (
-          <span className="tabular text-[12px] text-text-dim bg-surface border border-rule px-2.5 py-1 rounded-[5px]">
+          <span className="tabular text-[11px] text-text-dim bg-surface border border-rule px-2 py-0.5 rounded-[5px]">
             Rev {quotation.revision}
           </span>
         )}
 
         <div className="ml-auto flex items-center gap-2 flex-wrap shrink-0">
           <StatusChanger id={quotation.id} current={quotation.status} canApprove={canApprove} />
-          {/* Only an estimate has anything to reissue. */}
           {isEstimate(quotation.lines) && quotation.status !== "REVISED" && (
             <ReissueButton quotationId={quotation.id} blockedReason={reissueBlockedReason} />
           )}
           <a
             href={`/api/quotations/${quotation.id}/pdf`}
             download
-            className="inline-flex items-center gap-1.5 h-[30px] px-4 rounded-[6px] text-[12px] font-semibold transition-colors shrink-0"
-            style={{ background: "oklch(0.72 0.115 85)", color: "#0B1020" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "oklch(0.83 0.105 85)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "oklch(0.72 0.115 85)"; }}
+            className="inline-flex items-center gap-1.5 h-[30px] px-4 rounded-[7px] text-[12px] font-semibold bg-accent text-ink hover:bg-accent/85 transition-colors shrink-0"
           >
             <Download size={13} strokeWidth={2.2} />
             Download PDF
@@ -179,104 +176,135 @@ export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }:
         </div>
       </div>
 
-      {/* ── Three info cards ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr_200px] gap-4">
+      {/* ── Document card ─────────────────────────────────────────── */}
+      <div className="rounded-[16px] bg-surface border border-rule overflow-hidden shadow-sm">
 
-        {/* Card 1 — client ───────────────────────────────────────────── */}
-        <div className="rounded-[16px] bg-surface border border-rule px-5 py-5 flex items-start gap-4">
-          <ClientAvatar name={quotation.clientName} />
-          <div className="min-w-0">
-            <div className="text-[18px] font-semibold text-text leading-snug truncate">
-              {quotation.clientName}
-            </div>
-            <div className="text-[13px] text-text-dim tabular font-data mt-1">
-              {quotation.clientMobile}
-            </div>
-            {quotation.clientEmail && (
-              <div className="text-[12px] text-text-dim mt-0.5 truncate">
-                {quotation.clientEmail}
-              </div>
-            )}
-            {quotation.projectName && (
-              <Link
-                href={`/projects/${quotation.projectId}` as Route}
-                className="inline-flex items-center gap-1.5 text-[12.5px] text-text-dim hover:text-accent transition-colors mt-2"
-              >
-                <span className="truncate">{quotation.projectName}</span>
-                <ExternalLink size={11} strokeWidth={1.75} className="shrink-0" />
-              </Link>
-            )}
-          </div>
-        </div>
+        {/* Brand accent stripe — 5px, drawn in on page load */}
+        <div className="h-[5px] bg-accent" />
 
-        {/* Card 2 — amount breakdown ─────────────────────────────────── */}
-        <div className="rounded-[16px] bg-surface border border-rule px-6 py-5">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-text-dim mb-2">
-            Total Amount (incl. GST)
-          </div>
-          <div className="font-display text-[38px] font-semibold text-text tabular leading-none mb-4">
-            {total}
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[13px]">
-              <span className="text-text-dim">Before GST</span>
-              <span className="tabular text-text">{taxable}</span>
-            </div>
-            {isIntraState ? (
-              <>
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-text-dim">CGST ({gstRate}%)</span>
-                  <span className="tabular text-text">{cgst}</span>
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_292px] gap-6">
+
+            {/* ── LEFT: Billed To ─────────────────────────────────── */}
+            <div className="flex flex-col gap-5">
+
+              {/* Eyebrow + client */}
+              <div>
+                <div className="text-[9.5px] uppercase tracking-[0.22em] text-text-dim font-semibold mb-3">
+                  Billed To
                 </div>
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-text-dim">SGST ({gstRate}%)</span>
-                  <span className="tabular text-text">{sgst}</span>
+                <div className="flex items-start gap-3.5">
+                  <ClientAvatar name={quotation.clientName} />
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="text-[17px] font-semibold text-text leading-tight truncate">
+                      {quotation.clientName}
+                    </div>
+                    <div className="text-[13px] text-text-dim tabular mt-1">
+                      {quotation.clientMobile}
+                    </div>
+                    {quotation.clientEmail && (
+                      <div className="text-[12.5px] text-text-dim mt-0.5 truncate">
+                        {quotation.clientEmail}
+                      </div>
+                    )}
+                    {quotation.projectName && (
+                      <Link
+                        href={`/projects/${quotation.projectId}` as Route}
+                        className="inline-flex items-center gap-1 text-[12px] text-accent hover:text-accent/80 transition-colors mt-2"
+                      >
+                        <span className="truncate">{quotation.projectName}</span>
+                        <ExternalLink size={10} strokeWidth={1.75} className="shrink-0 opacity-70" />
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </>
-            ) : (
-              <div className="flex justify-between text-[13px]">
-                <span className="text-text-dim">IGST</span>
-                <span className="tabular text-text">{igst}</span>
               </div>
-            )}
-            <div className="flex items-center gap-1.5 pt-2 text-[12.5px] text-text-dim">
-              <Calendar size={12} strokeWidth={1.75} />
-              Valid until {validDate}
-            </div>
-          </div>
-        </div>
 
-        {/* Card 3 — communication actions ─────────────────────────────── */}
-        <div className="rounded-[16px] bg-surface border border-rule px-3 py-3 flex flex-col gap-0.5">
-          {mailHref ? (
-            <a href={mailHref} className={commRow}>
-              <Mail size={14} strokeWidth={1.75} />
-              <span>Email</span>
-              <ExternalLink size={11} className="ml-auto opacity-40 group-hover:opacity-70" />
-            </a>
-          ) : (
-            <span
-              className="flex items-center gap-3 w-full px-4 py-3 text-[13px] text-text-dim/40 cursor-not-allowed rounded-[8px]"
-              title="No email address on file"
-            >
-              <Mail size={14} strokeWidth={1.75} />
-              <span>Email</span>
-            </span>
-          )}
-          <a href={waHref} target="_blank" rel="noopener noreferrer" className={commRow}>
-            <MessageCircle size={14} strokeWidth={1.75} />
-            <span>WhatsApp</span>
-            <ExternalLink size={11} className="ml-auto opacity-40 group-hover:opacity-70" />
-          </a>
-          <button type="button" onClick={copyLink} className={commRow}>
-            {copied ? (
-              <><Check size={14} className="text-solid" /><span>Copied!</span></>
-            ) : (
-              <><Copy size={14} strokeWidth={1.75} /><span>Copy Link</span></>
-            )}
-          </button>
+              {/* Quote dates */}
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <CalendarDays size={12} strokeWidth={1.75} className="text-text-dim shrink-0" />
+                  <div>
+                    <div className="text-[9.5px] uppercase tracking-[0.14em] text-text-dim">Date</div>
+                    <div className="text-[12.5px] text-text tabular mt-0.5">{quoteDate}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock4 size={12} strokeWidth={1.75} className="text-text-dim shrink-0" />
+                  <div>
+                    <div className="text-[9.5px] uppercase tracking-[0.14em] text-text-dim">Valid Until</div>
+                    <div className="text-[12.5px] text-text tabular mt-0.5">{validDate}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Share actions */}
+              <div className="flex flex-wrap gap-2 pt-1">
+                {mailHref ? (
+                  <a href={mailHref} className={shareBtn}>
+                    <Mail size={13} strokeWidth={1.75} />
+                    Send Email
+                  </a>
+                ) : (
+                  <span className={`${shareBtn} opacity-35 cursor-not-allowed`} title="No email on file">
+                    <Mail size={13} strokeWidth={1.75} />
+                    Send Email
+                  </span>
+                )}
+                <a href={waHref} target="_blank" rel="noopener noreferrer" className={shareBtn}>
+                  <MessageCircle size={13} strokeWidth={1.75} />
+                  WhatsApp
+                </a>
+                <button type="button" onClick={copyLink} className={shareBtn}>
+                  {copied
+                    ? <><Check size={13} className="text-solid" /> Copied!</>
+                    : <><Copy size={13} strokeWidth={1.75} /> Copy Link</>
+                  }
+                </button>
+              </div>
+            </div>
+
+            {/* ── RIGHT: Amount box ───────────────────────────────── */}
+            <div className="rounded-[12px] bg-accent/6 border border-accent/15 p-5 flex flex-col">
+
+              <div className="text-[9.5px] uppercase tracking-[0.22em] text-accent font-semibold mb-2">
+                Total Amount
+              </div>
+
+              {/* Grand total */}
+              <div className="font-display text-[34px] font-bold text-text tabular leading-none mb-1">
+                {total}
+              </div>
+              <div className="text-[11.5px] text-text-dim mb-4">
+                Inclusive of all taxes
+              </div>
+
+              {/* GST breakdown */}
+              <div className="space-y-2 border-t border-accent/15 pt-4 mt-auto">
+                <AmtRow label="Subtotal" value={taxable} />
+                {isIntraState ? (
+                  <>
+                    <AmtRow label={`CGST ${gstRate}%`} value={cgst} />
+                    <AmtRow label={`SGST ${gstRate}%`} value={sgst} />
+                  </>
+                ) : (
+                  <AmtRow label="IGST" value={igst} />
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AmtRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className="text-[12px] text-text-dim">{label}</span>
+      <span className="text-[13px] tabular text-text font-medium">{value}</span>
     </div>
   );
 }
