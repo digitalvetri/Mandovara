@@ -111,7 +111,7 @@ export const pdfStyles = StyleSheet.create({
   grandRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 7 },
   grandLbl:   { fontSize: 9, fontWeight: "bold", color: WHITE, letterSpacing: 0.6 },
   grandAmt:   { fontSize: 15, fontWeight: "bold", color: WHITE },
-  wordsText:  { fontSize: 7, color: BRANDL, lineHeight: 1.45, fontStyle: "italic" },
+  wordsText:  { fontSize: 7, color: BRANDL, lineHeight: 1.45 },
 
   // ── footer ───────────────────────────────────────────────────────
   footer:      { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: DARK, paddingVertical: 12, paddingHorizontal: 32 },
