@@ -35,6 +35,7 @@ import { UpcomingVisitsCard } from "../_components/UpcomingVisitsCard";
 import { PaymentsPanel } from "../_components/PaymentsPanel";
 import { ChosenItemsPanel } from "../_components/ChosenItemsPanel";
 import { ProfitabilityPanel } from "../_components/ProfitabilityPanel";
+import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
 
 export const dynamic = "force-dynamic";
 
@@ -78,15 +79,28 @@ export default async function ProjectDetailPage({
 
       {/* ── Header ────────────────────────────────────────────────── */}
       <div className="mb-6 rounded-[14px] border border-rule bg-surface p-6">
-        <div className="mb-1 flex items-baseline gap-3 text-[11px] uppercase tracking-[0.14em] text-text-dim">
-          <span className="tabular-nums">{shortNumber(p.number, "P-")}</span>
-          <span aria-hidden>·</span>
-          <span>{formatDate(p.createdAt)}</span>
-        </div>
+        {/* Row 1 — meta + primary action (right-aligned) */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-baseline gap-3 text-[11px] uppercase tracking-[0.14em] text-text-dim">
+              <span className="tabular-nums">{shortNumber(p.number, "P-")}</span>
+              <span aria-hidden>·</span>
+              <span>{formatDate(p.createdAt)}</span>
+            </div>
 
-        <h1 className="font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.015em] text-text">
-          {p.name}
-        </h1>
+            <h1 className="font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.015em] text-text">
+              {p.name}
+            </h1>
+          </div>
+
+          {/* "Create invoice" surfaces here only when both gates hold:
+              user has invoice.create AND the project has a confirmed order.
+              Same server action as the button on PaymentsPanel — this is
+              just a more visible entry point that doesn't require scrolling. */}
+          {ctx.permissions.has("invoice.create") && payments?.latestOrderId && (
+            <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
+          )}
+        </div>
 
         <div className="mt-4">
           <StageStepper
