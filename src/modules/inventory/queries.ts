@@ -87,7 +87,7 @@ export async function getInventoryKpis(ctx: RequestContext): Promise<InventoryKp
 
 export async function listStockItems(
   ctx: RequestContext,
-  q: { search?: string; family?: string | "ALL"; page?: number; pageSize?: number; onlyLow?: boolean },
+  q: { search?: string; family?: string | "ALL"; page?: number; pageSize?: number; onlyLow?: boolean; hasLot?: boolean },
 ): Promise<ListStockItemsResult> {
   requirePermission(ctx, "inventory.view");
   const db = scoped(ctx);
@@ -99,6 +99,10 @@ export async function listStockItems(
   const where: Record<string, unknown> = { isActive: true };
   if (q.family && q.family !== "ALL") {
     where["design"] = { family: q.family };
+  }
+  if (q.hasLot) {
+    // Only colourways that have at least one StockBalance row with a dye lot recorded.
+    where["stock"] = { some: { dyeLot: { not: null } } };
   }
   if (q.search && q.search.trim()) {
     const s = q.search.trim();

@@ -95,7 +95,7 @@ function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
             <Link
               href={`/products/${r.colourwayId}` as Route}
               onClick={(e) => e.stopPropagation()}
-              className="truncate text-[13.5px] font-semibold text-text hover:text-accent transition-colors"
+              className="truncate text-[13.5px] font-semibold text-text hover:text-accent hover:-translate-y-0.5 transition-all duration-200"
             >
               {r.designName} — {r.colourName}
             </Link>

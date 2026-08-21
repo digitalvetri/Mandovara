@@ -45,8 +45,9 @@ export async function installVisitId(page: Page): Promise<string | null> {
   return process.env["E2E_INSTALL_VISIT_ID"] ?? firstIdFrom(page, "/install", "/install");
 }
 export async function colourwayId(page: Page): Promise<string | null> {
-  // Wallpaper family is filtered because dye lot is mandatory for roll-based
-  // families at GRN (§0.6). Any wallpaper colourway that has reached stock
-  // will carry a lot, so the product detail will render the dye-lot pin.
-  return process.env["E2E_COLOURWAY_ID"] ?? firstIdFrom(page, "/inventory?family=WALLPAPER", "/products");
+  // ?hasLot=1 filters the inventory to colourways that have at least one
+  // StockBalance row with a non-null dyeLot. The seed creates exactly these
+  // entries in the dead-stock and mixed-lot-override edge-case fixtures.
+  // Any colourway returned here will render the dye-lot pin on its PDP.
+  return process.env["E2E_COLOURWAY_ID"] ?? firstIdFrom(page, "/inventory?hasLot=1", "/products");
 }

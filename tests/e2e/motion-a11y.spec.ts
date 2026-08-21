@@ -65,15 +65,15 @@ test.describe("hover survives the entrance animation", () => {
     expect(after, "entrance animation is clobbering the hover transform").not.toBe(before);
   });
 
-  // The catalogue card still uses Tailwind's `-translate-y-*`, so this keeps
-  // the second mechanism covered. It moved off the KPI row when that card was
-  // rebuilt onto `.lift` — and this test failed at that moment, which is the
-  // guard doing its job rather than a flake.
+  // The inventory item name link uses Tailwind's `-translate-y-*`, keeping
+  // the second mechanism covered. /inventory always has rows from the seed,
+  // making it a stable anchor. It moved here from /products when that page
+  // became a brand/PDF catalog that is empty in CI (no PDFs seeded) — and
+  // this test failing at that moment is the guard doing its job.
   test("a Tailwind translate hover still moves", async ({ page }) => {
-    await page.goto("/products", { waitUntil: "domcontentloaded" });
+    await page.goto("/inventory", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2000);
-    // Excluding /new: the "New Product" action links into the same path prefix,
-    // sorts first in the DOM, and carries no hover transform.
+    // The inventory row name link points to /products/[colourwayId].
     const card = page.locator("a[href^='/products/']:not([href$='/new'])").first();
     const before = await card.evaluate((e) => getComputedStyle(e).translate);
     await card.hover();

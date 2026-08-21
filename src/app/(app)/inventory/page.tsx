@@ -25,6 +25,7 @@ interface SearchParams {
   page?: string;
   tab?: string;
   onlyLow?: string;
+  hasLot?: string;
 }
 
 export default async function InventoryPage({
@@ -37,9 +38,10 @@ export default async function InventoryPage({
   const family  = params.family?.trim() ?? "ALL";
   const page    = parsePositiveInt(params.page) ?? 1;
   const onlyLow = params.onlyLow === "1";
+  const hasLot  = params.hasLot === "1";
 
   const [{ rows, total, pageSize, families }, kpis] = await Promise.all([
-    listStockItems(ctx, { ...(q && { search: q }), family, page, onlyLow }),
+    listStockItems(ctx, { ...(q && { search: q }), family, page, onlyLow, hasLot }),
     getInventoryKpis(ctx),
   ]);
 
