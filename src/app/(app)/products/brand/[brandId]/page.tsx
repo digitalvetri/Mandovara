@@ -7,6 +7,7 @@ import { can } from "@/kernel/rbac/guard";
 import { getBrandById } from "@/modules/catalog/queries";
 import { scoped } from "@/kernel/db/scoped";
 import { CollectionPdfRow } from "./_components/CollectionPdfRow";
+import { NewCollectionForm } from "./_components/NewCollectionForm";
 
 export const dynamic = "force-dynamic";
 
@@ -16,12 +17,12 @@ interface Props {
 
 export default async function BrandCatalogPage({ params }: Props) {
   const { brandId } = await params;
-  const ctx = await devContext();
+  const ctx      = await devContext();
   const canWrite = can(ctx, "catalog.update");
+  const canAdd   = can(ctx, "catalog.create");
 
   const brand = await getBrandById(ctx, brandId);
 
-  // Get collections with PDF keys — getBrandById doesn't include it
   const collections = await scoped(ctx).collection.findMany({
     where: { brandId, isActive: true },
     orderBy: [{ seasonYear: "desc" }, { name: "asc" }],
@@ -41,7 +42,6 @@ export default async function BrandCatalogPage({ params }: Props) {
         eyebrow={`${totalCount} collection${totalCount !== 1 ? "s" : ""} · ${withPdf} PDF${withPdf !== 1 ? "s" : ""} uploaded`}
       />
 
-      {/* Back link */}
       <div className="mb-5">
         <Link
           href={"/products" as Route}
@@ -82,15 +82,21 @@ export default async function BrandCatalogPage({ params }: Props) {
 
       {/* Collections list */}
       <div className="rounded-[14px] bg-surface border border-rule shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-rule bg-ink/10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-rule bg-ink/10">
           <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim font-semibold">
             Collections
           </div>
+          {canAdd && <NewCollectionForm brandId={brandId} />}
         </div>
 
         {collections.length === 0 ? (
-          <div className="py-12 text-center text-[13px] text-text-dim">
-            No collections found for this brand.
+          <div className="py-12 text-center">
+            <p className="text-[13px] text-text-dim mb-4">No collections yet.</p>
+            {canAdd && (
+              <div className="flex justify-center">
+                <NewCollectionForm brandId={brandId} />
+              </div>
+            )}
           </div>
         ) : (
           <div>

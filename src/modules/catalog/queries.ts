@@ -276,7 +276,10 @@ export async function getOverdueSampleBooks(ctx: RequestContext) {
 export async function listBrandsWithPdf(ctx: RequestContext) {
   const db = scoped(ctx);
   return db.brand.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      collections: { some: { isActive: true, catalogPdfKey: { not: null } } },
+    },
     orderBy: { name: "asc" },
     select: {
       id: true, name: true, country: true, logoKey: true,

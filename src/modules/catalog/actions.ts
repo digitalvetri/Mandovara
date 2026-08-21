@@ -45,6 +45,7 @@ export async function createBrand(input: unknown): Promise<ActionResult<{ id: st
   });
 
   revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 
