@@ -270,3 +270,25 @@ export async function getOverdueSampleBooks(ctx: RequestContext) {
     },
   });
 }
+
+// ── PDF catalog management ────────────────────────────────────────────────────
+
+export async function listBrandsWithPdf(ctx: RequestContext) {
+  const db = scoped(ctx);
+  return db.brand.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+    select: {
+      id: true, name: true, country: true, logoKey: true,
+      collections: {
+        where: { isActive: true },
+        orderBy: [{ seasonYear: "desc" }, { name: "asc" }],
+        select: {
+          id: true, name: true, family: true, seasonYear: true,
+          catalogPdfKey: true,
+          _count: { select: { designs: true } },
+        },
+      },
+    },
+  });
+}

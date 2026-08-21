@@ -1,7 +1,5 @@
-// Shown on /products and /products/[id] when the catalog was opened from
-// inside a project (via ?forProject={id}). Anchors the user's context so
-// browsing feels tied to the project they came from — Back-to-project
-// link on the right; "Add to Quote" is suppressed on the PDP.
+// Shown on /products/[id] when opened from inside a project (via ?forProject={id}).
+// Anchors the user's context — Back-to-project link on the right.
 
 import Link from "next/link";
 import type { Route } from "next";
@@ -10,9 +8,6 @@ import { ArrowLeft } from "lucide-react";
 interface Props {
   projectId:   string;
   projectName: string;
-  /** When the user came here from an ItemCard, the banner shifts from
-   *  browse-mode to "selecting for THIS item" mode — subtly more urgent
-   *  because a click now means an attach. */
   itemLabel?:  string | null;
 }
 
