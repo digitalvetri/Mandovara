@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
+    "postbuild": "prisma migrate deploy",
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
