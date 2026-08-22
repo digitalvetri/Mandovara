@@ -6,7 +6,7 @@
 //
 // Rupee amounts use "Rs." prefix (Helvetica does not include U+20B9).
 
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { InvoiceDetail, InvoiceLineRow } from "@/modules/invoices/queries";
 
 const TEAL   = "#1B8A7E";
@@ -28,8 +28,9 @@ const s = StyleSheet.create({
   },
 
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
-  logoBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-  logoM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
+  logoImg: { width: 140, height: 34, objectFit: "contain", objectPosition: "left center" },
+  logoFallbackBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
+  logoFallbackM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
   brandCol: { marginLeft: 8, justifyContent: "center" },
   brandName: { fontSize: 16, fontFamily: "Helvetica-Bold", color: INK, letterSpacing: 0.3 },
   brandSub: { fontSize: 6.5, color: MUTED, letterSpacing: 2, marginTop: 3 },
@@ -149,7 +150,7 @@ function TableRow({ line, idx, isIntra }: { line: InvoiceLineRow; idx: number; i
   );
 }
 
-export function InvoicePdf({ invoice: i }: { invoice: InvoiceDetail }) {
+export function InvoicePdf({ invoice: i, logoSrc }: { invoice: InvoiceDetail; logoSrc?: string }) {
   const isIntra = i.supplierStateCode === i.placeOfSupplyCode;
   const taxRows: Array<{ label: string; v: bigint }> = [
     { label: "Taxable Amount", v: i.taxableAmount },
@@ -165,11 +166,18 @@ export function InvoicePdf({ invoice: i }: { invoice: InvoiceDetail }) {
 
         <View style={s.header}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={s.logoBox}><Text style={s.logoM}>M</Text></View>
-            <View style={s.brandCol}>
-              <Text style={s.brandName}>Mandovara</Text>
-              <Text style={s.brandSub}>INTERIORS  ·  COIMBATORE</Text>
-            </View>
+            {logoSrc
+              ? <Image src={logoSrc} style={s.logoImg} />
+              : (
+                <>
+                  <View style={s.logoFallbackBox}><Text style={s.logoFallbackM}>M</Text></View>
+                  <View style={s.brandCol}>
+                    <Text style={s.brandName}>Mandovara</Text>
+                    <Text style={s.brandSub}>INTERIORS  ·  COIMBATORE</Text>
+                  </View>
+                </>
+              )
+            }
           </View>
           <View style={s.docLabel}>
             <Text style={s.docTitle}>{i.type === "TAX" ? "TAX INVOICE" : i.type.replace(/_/g, " ")}</Text>
