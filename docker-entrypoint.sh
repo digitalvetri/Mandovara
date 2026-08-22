@@ -10,6 +10,9 @@ if [ $? -ne 0 ]; then
   echo "✗ prisma generate failed — aborting"; exit 1
 fi
 
+echo "→ Cleaning up any failed migration records (checksum-safe re-apply)..."
+node /app/scripts/pre-migrate.mjs
+
 echo "→ Applying pending migrations..."
 "$PRISMA" migrate deploy --schema=/app/prisma/schema.prisma
 if [ $? -ne 0 ]; then

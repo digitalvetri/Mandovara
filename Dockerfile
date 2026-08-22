@@ -92,6 +92,7 @@ COPY --chown=nextjs:nodejs scripts/wipe-demo-data.mjs      /app/scripts/wipe-dem
 #   check-auth-bootstrap refuses to serve if login would be impossible under RLS
 COPY --chown=nextjs:nodejs scripts/setup-app-role.mjs      /app/scripts/setup-app-role.mjs
 COPY --chown=nextjs:nodejs scripts/check-auth-bootstrap.mjs /app/scripts/check-auth-bootstrap.mjs
+COPY --chown=nextjs:nodejs scripts/pre-migrate.mjs          /app/scripts/pre-migrate.mjs
 
 # One-shot catalog reset — wipes brand/collection/design/colourway and
 # reloads Rugway + Fedora with real swatch images copied onto the
