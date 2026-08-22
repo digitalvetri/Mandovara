@@ -17,9 +17,7 @@ const COUNT = 1_000;
 
 let orgId:    string;
 let branchId: string;
-let userId:   string;
 let clientId: string;
-let orderId:  string;
 
 beforeAll(async () => {
   const org = await db.organization.create({
@@ -32,13 +30,12 @@ beforeAll(async () => {
   });
   branchId = branch.id;
 
-  const user = await db.user.create({
+  await db.user.create({
     data: {
       organizationId: orgId, mobile: "+919600000099",
       name: "Gate Tester", role: "OWNER", branchIds: [branchId],
     },
   });
-  userId = user.id;
 
   const client = await db.client.create({
     data: {
@@ -47,23 +44,6 @@ beforeAll(async () => {
     },
   });
   clientId = client.id;
-
-  const project = await db.project.create({
-    data: {
-      organizationId: orgId, branchId, number: "MDV/PRJ-2699-0001",
-      name: "Gate Project", clientId, stage: "ORDERED",
-      siteAddress: {}, ownerId: userId,
-    },
-  });
-
-  const order = await db.order.create({
-    data: {
-      organizationId: orgId, branchId, number: "MDV/SO-2699-0001",
-      projectId: project.id, clientId,
-      date: new Date(), status: "CONFIRMED", totalValue: 100000n,
-    },
-  });
-  orderId = order.id;
 }, 30_000);
 
 afterAll(async () => {
@@ -96,7 +76,6 @@ describe("Phase 6 gate: invoice number allocation", () => {
               number,
               type:              "TAX",
               clientId,
-              orderId,
               date:              new Date(),
               dueDate:           new Date(),
               placeOfSupplyCode: "33",

@@ -167,10 +167,14 @@ export async function createInvoice(
     }, { orgId: ctx.orgId });
   } catch (err) {
     // DB partial unique index fires when a concurrent creation slips past the
-    // pre-check in createInvoiceFromOrder. Emit a friendly error rather than
-    // a 500; the constraint name appears in the Prisma P2002 detail.
-    const code = (err as { code?: string }).code;
-    if (code === "P2002") {
+    // pre-check in createInvoiceFromOrder. Check the constraint name so we
+    // don't swallow an unrelated P2002 (e.g. a number-sequence collision).
+    const code   = (err as { code?: string }).code;
+    const meta   = (err as { meta?: { target?: unknown } }).meta;
+    const target = Array.isArray(meta?.target)
+      ? (meta.target as string[]).join(",")
+      : String(meta?.target ?? "");
+    if (code === "P2002" && target.includes("invoice_order_active_unique")) {
       return { ok: false, error: "An active invoice already exists for this order." };
     }
     throw err;
