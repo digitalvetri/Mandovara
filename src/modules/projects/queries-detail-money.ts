@@ -9,6 +9,7 @@
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { computeOutstanding } from "@/kernel/money/outstanding";
 import type { RequestContext } from "@/kernel/auth/context";
 
 // ── Redesign — money block. Loader-gated on permission so the row IDs
@@ -37,26 +38,43 @@ export async function getProjectMoney(
 ): Promise<ProjectMoney | null> {
   if (!canViewProjectMoney(ctx)) return null;
   const db = scoped(ctx);
-  const [order, advances, invoices, receipts] = await Promise.all([
+
+  // Fetch non-cancelled invoices first — we need IDs for the allocation join,
+  // and we want to exclude cancelled invoices from the totals.
+  const [order, advances, receipts, invRows] = await Promise.all([
     db.order.aggregate({
       where: { projectId },
       _sum:  { totalValue: true, advanceRequired: true, advanceReceived: true },
     }),
     db.advance.aggregate({ where: { projectId }, _sum: { amount: true } }),
-    db.invoice.aggregate({ where: { projectId }, _sum: { total: true } }),
     db.receipt.aggregate({ where: { projectId }, _sum: { amount: true } }),
+    db.invoice.findMany({
+      where:  { projectId, status: { not: "CANCELLED" } },
+      select: { id: true, total: true, advanceAdjusted: true },
+    }),
   ]);
-  const orderValue      = order._sum.totalValue      ?? 0n;
-  const advanceReq      = order._sum.advanceRequired ?? 0n;
-  const advanceRecvOrd  = order._sum.advanceReceived ?? 0n;
-  const advanceRecvOwn  = advances._sum.amount       ?? 0n;
-  const invoiceTotal    = invoices._sum.total        ?? 0n;
-  const receiptTotal    = receipts._sum.amount       ?? 0n;
+
+  const invoiceTotal  = invRows.reduce((s, i) => s + i.total, 0n);
+  const advAdjTotal   = invRows.reduce((s, i) => s + i.advanceAdjusted, 0n);
+  const invIds        = invRows.map((i) => i.id);
+
+  const allocationSum = invIds.length === 0 ? 0n :
+    await db.receiptAllocation.aggregate({
+      where: { invoiceId: { in: invIds } },
+      _sum:  { amount: true },
+    }).then((r) => r._sum.amount ?? 0n);
+
+  const orderValue     = order._sum.totalValue      ?? 0n;
+  const advanceReq     = order._sum.advanceRequired ?? 0n;
+  const advanceRecvOrd = order._sum.advanceReceived ?? 0n;
+  const advanceRecvOwn = advances._sum.amount       ?? 0n;
+  const receiptTotal   = receipts._sum.amount       ?? 0n;
+
   return {
     orderValue,
     advanceReceived: advanceRecvOrd > 0n ? advanceRecvOrd : advanceRecvOwn,
     advanceRequired: advanceReq,
-    outstanding:     invoiceTotal - receiptTotal,
+    outstanding:     computeOutstanding(invoiceTotal, advAdjTotal, allocationSum),
     invoiceTotal,
     receiptTotal,
   };

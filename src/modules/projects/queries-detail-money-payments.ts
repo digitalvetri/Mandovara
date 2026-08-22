@@ -12,20 +12,22 @@
 import { scoped } from "@/kernel/db/scoped";
 import { canViewProjectMoney } from "./queries-detail-money";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { computeOutstanding } from "@/kernel/money/outstanding";
 import type { RequestContext } from "@/kernel/auth/context";
 
 // ── Payments panel data. Everything the "Payments" card needs so we
 // don't have to re-aggregate on the client.
 export type ProjectPaymentInvoice = {
-  id:            string;
-  number:        string;
-  status:        string;   // InvoiceStatus (DRAFT / ISSUED / PARTIALLY_PAID / PAID / CANCELLED)
-  date:          Date;
-  dueDate:       Date;
-  total:         bigint;
-  paid:          bigint;   // sum of ReceiptAllocation.amount for this invoice
-  outstanding:   bigint;   // total − paid
-  isOverdue:     boolean;
+  id:              string;
+  number:          string;
+  status:          string;   // InvoiceStatus (DRAFT / ISSUED / PARTIALLY_PAID / PAID / CANCELLED)
+  date:            Date;
+  dueDate:         Date;
+  total:           bigint;
+  advanceAdjusted: bigint;   // advance portion absorbed at invoice creation
+  paid:            bigint;   // sum of ReceiptAllocation.amount for this invoice
+  outstanding:     bigint;   // total − advanceAdjusted − paid (canonical formula)
+  isOverdue:       boolean;
 };
 
 export type ProjectPayments = {
@@ -53,7 +55,7 @@ export async function getProjectPayments(
       orderBy: { date: "desc" },
       select:  {
         id: true, number: true, status: true, date: true,
-        dueDate: true, total: true,
+        dueDate: true, total: true, advanceAdjusted: true,
       },
     }),
     db.order.findFirst({
@@ -79,15 +81,16 @@ export async function getProjectPayments(
 
   const rows: ProjectPaymentInvoice[] = invoices.map((inv) => {
     const paid        = paidById.get(inv.id) ?? 0n;
-    const outstanding = inv.total - paid;
+    const outstanding = computeOutstanding(inv.total, inv.advanceAdjusted, paid);
     const isOverdue   = outstanding > 0n && inv.dueDate.getTime() < now.getTime();
     return {
-      id:          inv.id,
-      number:      inv.number,
-      status:      inv.status,
-      date:        inv.date,
-      dueDate:     inv.dueDate,
-      total:       inv.total,
+      id:              inv.id,
+      number:          inv.number,
+      status:          inv.status,
+      date:            inv.date,
+      dueDate:         inv.dueDate,
+      total:           inv.total,
+      advanceAdjusted: inv.advanceAdjusted,
       paid,
       outstanding,
       isOverdue,

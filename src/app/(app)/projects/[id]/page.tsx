@@ -93,11 +93,14 @@ export default async function ProjectDetailPage({
             </h1>
           </div>
 
-          {/* "Create invoice" surfaces here only when both gates hold:
-              user has invoice.create AND the project has a confirmed order.
-              Same server action as the button on PaymentsPanel — this is
-              just a more visible entry point that doesn't require scrolling. */}
-          {ctx.permissions.has("invoice.create") && payments?.latestOrderId && (
+          {/* "Create invoice" surfaces here only when all three gates hold:
+              user has invoice.create, project has a confirmed order, AND
+              no active invoice exists yet. Hidden once invoiced to prevent
+              accidental duplicates — the Payments panel below handles
+              further billing actions. */}
+          {ctx.permissions.has("invoice.create") &&
+            payments?.latestOrderId &&
+            (payments.invoices.length === 0) && (
             <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
           )}
         </div>

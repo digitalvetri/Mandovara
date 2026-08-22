@@ -85,6 +85,15 @@ export async function createInvoiceFromOrder(
   if (!order) return { ok: false, error: "Order not found." };
   if (order.status === "CANCELLED") return { ok: false, error: "Cannot invoice a cancelled order." };
 
+  // One active TAX invoice per order — block the common case before the DB
+  // constraint fires (better error message; DB index handles the race).
+  const existingCount = await db.invoice.count({
+    where: { orderId: order.id, status: { not: "CANCELLED" }, type: "TAX" },
+  });
+  if (existingCount > 0) {
+    return { ok: false, error: "An invoice already exists for this order. View it in the Invoicing module." };
+  }
+
   // Determine supply codes for correct CGST/SGST vs IGST routing
   const [branch, client] = await Promise.all([
     db.branch.findUnique({ where: { id: order.branchId }, select: { stateCode: true } }),

@@ -55,7 +55,7 @@ export function PaymentsPanel({ payments, canCreate }: Props) {
         <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
           Payments
         </div>
-        {canCreate && hasOrder && (
+        {canCreate && hasOrder && !hasInvoices && (
           <button
             type="button"
             onClick={createInvoice}

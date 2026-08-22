@@ -177,15 +177,30 @@ export interface InvoiceableOrderRow {
 
 /** Orders that can be invoiced (not COMPLETED/CANCELLED), with full project
  *  context so the invoice picker can present by project rather than by order
- *  number. Sorted newest-order-first. */
+ *  number. Sorted newest-order-first.
+ *
+ *  Orders that already have an active TAX invoice are excluded — one active
+ *  invoice per order is the business rule. */
 export async function listInvoiceableOrders(
   ctx: RequestContext,
 ): Promise<InvoiceableOrderRow[]> {
   requirePermission(ctx, "order.view");
   const db = scoped(ctx);
 
+  // No Order→Invoice relation in Prisma schema — look up invoice'd orderIds
+  // separately then exclude them. The DB partial unique index enforces the
+  // same constraint at write time; this query enforces it at read time so the
+  // picker never shows an already-invoiced order.
+  const invoicedIds = await db.invoice.findMany({
+    where: { status: { not: "CANCELLED" }, type: "TAX", orderId: { not: null } },
+    select: { orderId: true },
+  }).then((rows) => rows.map((r) => r.orderId!));
+
   const rows = await db.order.findMany({
-    where: { status: { notIn: ["COMPLETED", "CANCELLED", "DRAFT"] } },
+    where: {
+      status: { notIn: ["COMPLETED", "CANCELLED", "DRAFT"] },
+      ...(invoicedIds.length > 0 ? { id: { notIn: invoicedIds } } : {}),
+    },
     orderBy: { date: "desc" },
     take: 60,
     select: {

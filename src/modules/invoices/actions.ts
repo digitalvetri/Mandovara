@@ -17,7 +17,6 @@ export interface ActionResult<T = unknown> {
   fieldErrors?: Record<string, string>;
 }
 
-
 export async function createInvoice(
   input: unknown,
 ): Promise<ActionResult<{ id: string; number: string }>> {
@@ -48,14 +47,11 @@ export async function createInvoice(
   // Compute totals from provided lines
   const lines = d.lines.map((l) => ({
     ...l,
-    rateBig:    BigInt(l.rate),
     taxableBig: BigInt(l.taxable),
     cgstBig:    BigInt(l.cgst),
     sgstBig:    BigInt(l.sgst),
     igstBig:    BigInt(l.igst),
     amountBig:  BigInt(l.amount),
-    quantityDec: new Decimal(l.quantity),
-    gstRateDec:  new Decimal(l.gstRate),
   }));
 
   const taxableAmount = lines.reduce((s, l) => s + l.taxableBig, 0n);
@@ -64,113 +60,121 @@ export async function createInvoice(
   const igstTotal     = lines.reduce((s, l) => s + l.igstBig, 0n);
   const lineTotal     = lines.reduce((s, l) => s + l.amountBig, 0n);
   const computedTotal = taxableAmount + cgstTotal + sgstTotal + igstTotal;
-  const roundOff      = lineTotal - computedTotal;  // typically ±50 paise
-
-  const total = lineTotal;
-
-  // Apply pending advances for this project (oldest first)
-  let advanceAdjusted = 0n;
-  if (order.projectId) {
-    const advances = await db.advance.findMany({
-      where: { organizationId: ctx.orgId, projectId: order.projectId },
-      orderBy: { receivedAt: "asc" },
-      select: { id: true, amount: true, adjusted: true },
-    });
-    let remaining = total;
-    for (const adv of advances) {
-      if (remaining <= 0n) break;
-      const available = adv.amount - adv.adjusted;
-      if (available <= 0n) continue;
-      const apply = available < remaining ? available : remaining;
-      advanceAdjusted += apply;
-      remaining -= apply;
-    }
-  }
+  const roundOff      = lineTotal - computedTotal;
+  const total         = lineTotal;
 
   const invoiceDate = new Date(d.date);
   const yymm        = yymmFromDate(invoiceDate);
 
-  // Compute status: PAID if fully covered by advances, else ISSUED
-  const outstanding0 = total - advanceAdjusted;
-  const initialStatus = outstanding0 <= 0n ? "PAID" : "ISSUED";
+  let created: { id: string; number: string };
+  try {
+    created = await withTransaction(async (tx: TxClient) => {
+      // ── Advance consumption inside the transaction with row locking.
+      // SELECT FOR UPDATE serialises concurrent invoice creations on the same
+      // project: a second transaction blocks at this statement until the first
+      // commits, so it sees the already-updated `adjusted` values and cannot
+      // double-consume the same advance balance.
+      let advanceAdjusted = 0n;
+      if (order.projectId) {
+        type AdvRow = { id: string; amount: bigint; adjusted: bigint };
+        const lockedAdvs = await tx.$queryRaw<AdvRow[]>`
+          SELECT id, amount, adjusted FROM "Advance"
+          WHERE "projectId" = ${order.projectId}
+            AND "organizationId" = ${ctx.orgId}
+          ORDER BY "receivedAt" ASC
+          FOR UPDATE
+        `;
 
-  const created = await withTransaction(async (tx: TxClient) => {
-    // Allocate number inside the transaction (gap-free)
-    const number = await allocateNumber(tx, {
-      orgId:  ctx.orgId,
-      series: "INV",
-      yymm,
-      prefix: branch.invoicePrefix,
-    });
-
-    const inv = await tx.invoice.create({
-      data: {
-        organizationId:    ctx.orgId,
-        branchId:          d.branchId,
-        number,
-        type:              d.type,
-        clientId:          order.clientId,
-        orderId:           d.orderId,
-        projectId:         order.projectId,
-        date:              invoiceDate,
-        dueDate:           new Date(d.dueDate),
-        placeOfSupplyCode: d.placeOfSupplyCode,
-        taxableAmount,
-        cgst:              cgstTotal,
-        sgst:              sgstTotal,
-        igst:              igstTotal,
-        roundOff,
-        total,
-        advanceAdjusted,
-        status:            initialStatus,
-        irnStatus:         "NOT_REQUIRED",
-      },
-      select: { id: true, number: true },
-    });
-
-    await tx.invoiceLine.createMany({
-      data: d.lines.map((l, i) => ({
-        organizationId: ctx.orgId,
-        invoiceId:      inv.id,
-        lineNo:         i + 1,
-        orderLineId:    l.orderLineId ?? null,
-        description:    l.description,
-        hsn:            l.hsn,
-        quantity:       new Decimal(l.quantity),
-        unit:           l.unit,
-        rate:           BigInt(l.rate),
-        taxable:        BigInt(l.taxable),
-        gstRate:        new Decimal(l.gstRate),
-        cgst:           BigInt(l.cgst),
-        sgst:           BigInt(l.sgst),
-        igst:           BigInt(l.igst),
-        amount:         BigInt(l.amount),
-      })),
-    });
-
-    // Distribute advance adjustments — update Advance.adjusted inside tx
-    if (order.projectId && advanceAdjusted > 0n) {
-      const advances = await tx.advance.findMany({
-        where: { organizationId: ctx.orgId, projectId: order.projectId },
-        orderBy: { receivedAt: "asc" },
-        select: { id: true, amount: true, adjusted: true },
-      });
-      let toDistribute = advanceAdjusted;
-      for (const adv of advances) {
-        if (toDistribute <= 0n) break;
-        const available = adv.amount - adv.adjusted;
-        if (available <= 0n) continue;
-        const apply = available < toDistribute ? available : toDistribute;
-        await tx.advance.update({
-          where: { id: adv.id },
-          data:  { adjusted: adv.adjusted + apply },
-        });
-        toDistribute -= apply;
+        let remaining = total;
+        const updates: Array<{ id: string; newAdjusted: bigint }> = [];
+        for (const adv of lockedAdvs) {
+          if (remaining <= 0n) break;
+          const amt   = BigInt(adv.amount);
+          const adj   = BigInt(adv.adjusted);
+          const avail = amt - adj;
+          if (avail <= 0n) continue;
+          const apply = avail < remaining ? avail : remaining;
+          advanceAdjusted += apply;
+          remaining       -= apply;
+          updates.push({ id: adv.id, newAdjusted: adj + apply });
+        }
+        for (const u of updates) {
+          await tx.advance.update({
+            where: { id: u.id },
+            data:  { adjusted: u.newAdjusted },
+          });
+        }
       }
-    }
 
-    return inv;
-  }, { orgId: ctx.orgId });
+      // Status: PAID if fully covered by advances, else ISSUED
+      const outstanding0  = total - advanceAdjusted;
+      const initialStatus = outstanding0 <= 0n ? "PAID" : "ISSUED";
+
+      // Allocate invoice number gap-free inside the same transaction
+      const number = await allocateNumber(tx, {
+        orgId:  ctx.orgId,
+        series: "INV",
+        yymm,
+        prefix: branch.invoicePrefix,
+      });
+
+      const inv = await tx.invoice.create({
+        data: {
+          organizationId:    ctx.orgId,
+          branchId:          d.branchId,
+          number,
+          type:              d.type,
+          clientId:          order.clientId,
+          orderId:           d.orderId,
+          projectId:         order.projectId,
+          date:              invoiceDate,
+          dueDate:           new Date(d.dueDate),
+          placeOfSupplyCode: d.placeOfSupplyCode,
+          taxableAmount,
+          cgst:              cgstTotal,
+          sgst:              sgstTotal,
+          igst:              igstTotal,
+          roundOff,
+          total,
+          advanceAdjusted,
+          status:            initialStatus,
+          irnStatus:         "NOT_REQUIRED",
+        },
+        select: { id: true, number: true },
+      });
+
+      await tx.invoiceLine.createMany({
+        data: d.lines.map((l, i) => ({
+          organizationId: ctx.orgId,
+          invoiceId:      inv.id,
+          lineNo:         i + 1,
+          orderLineId:    l.orderLineId ?? null,
+          description:    l.description,
+          hsn:            l.hsn,
+          quantity:       new Decimal(l.quantity),
+          unit:           l.unit,
+          rate:           BigInt(l.rate),
+          taxable:        BigInt(l.taxable),
+          gstRate:        new Decimal(l.gstRate),
+          cgst:           BigInt(l.cgst),
+          sgst:           BigInt(l.sgst),
+          igst:           BigInt(l.igst),
+          amount:         BigInt(l.amount),
+        })),
+      });
+
+      return inv;
+    }, { orgId: ctx.orgId });
+  } catch (err) {
+    // DB partial unique index fires when a concurrent creation slips past the
+    // pre-check in createInvoiceFromOrder. Emit a friendly error rather than
+    // a 500; the constraint name appears in the Prisma P2002 detail.
+    const code = (err as { code?: string }).code;
+    if (code === "P2002") {
+      return { ok: false, error: "An active invoice already exists for this order." };
+    }
+    throw err;
+  }
 
   revalidatePath("/invoicing");
   if (order.projectId) revalidatePath(`/projects/${order.projectId}`);
