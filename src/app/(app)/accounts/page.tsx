@@ -6,6 +6,7 @@ import { ToCollectTab }  from "./_tabs/ToCollectTab";
 import { ReceivedTab }   from "./_tabs/ReceivedTab";
 import { ToPayTab }      from "./_tabs/ToPayTab";
 import { SpendingTab }   from "./_tabs/SpendingTab";
+import { GstTab }        from "./_tabs/GstTab";
 import type { SpendingPeriod } from "@/modules/accounts/spending";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ const TABS: readonly TabDef[] = [
   { key: "received",    label: "Received" },
   { key: "to-pay",      label: "To Pay" },
   { key: "spending",    label: "Expenses" },
+  { key: "gst",         label: "GST" },
 ];
 
 const SPENDING_PERIODS: readonly SpendingPeriod[] = ["this-month", "last-3-months", "this-year"];
@@ -29,6 +31,8 @@ interface SearchParams {
   bucket?: string;
   // Spending
   period?: string; head?: string;
+  // GST
+  year?: string; gstMonth?: string;
 }
 
 export default async function AccountsPage({
@@ -69,6 +73,13 @@ export default async function AccountsPage({
           {...(params.head && { head: params.head })}
         />
       ) : null}
+      {activeTab === "gst" ? (
+        <GstTab
+          ctx={ctx}
+          year={pickGstYear(params.year)}
+          month={pickGstMonth(params.gstMonth)}
+        />
+      ) : null}
     </>
   );
 }
@@ -82,4 +93,14 @@ function parsePositiveInt(v: string | undefined): number | null {
 
 function pickPeriod(v: string | undefined): SpendingPeriod {
   return SPENDING_PERIODS.includes(v as SpendingPeriod) ? (v as SpendingPeriod) : "this-month";
+}
+
+function pickGstYear(v: string | undefined): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 2020 && n <= 2099 ? Math.floor(n) : new Date().getFullYear();
+}
+
+function pickGstMonth(v: string | undefined): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 1 && n <= 12 ? Math.floor(n) : new Date().getMonth() + 1;
 }

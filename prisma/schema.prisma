@@ -1600,6 +1600,15 @@ model Expense {
   // spawn a duplicate expense. No FK — POs can be archived without touching
   // the ledger row.
   sourcePoId     String?       @unique
+  // GST input credit fields — captured at entry so the monthly filing
+  // shows net liability (output − input). Null for exempt/unregistered bills.
+  gstRatePct     Decimal?      @db.Decimal(5,2)   // 5 | 12 | 18 | 28
+  taxable        BigInt?                            // amount excl. GST (paise)
+  cgst           BigInt?
+  sgst           BigInt?
+  igst           BigInt?                            // inter-state purchase
+  vendorGstin    String?
+  billRef        String?                            // vendor's invoice number
 
   @@index([organizationId, incurredAt])
   @@index([organizationId, approvalState, paidAt])

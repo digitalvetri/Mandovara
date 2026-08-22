@@ -91,6 +91,27 @@ export async function createExpense(
   const canApprove = ctx.permissions.has("expense.approve");
   const approvalState = canApprove ? "APPROVED" : "PENDING";
 
+  // Compute GST split from total amount + rate.
+  // amount = taxable + gst; taxable = floor(amount * 100 / (100 + rate))
+  let taxable: bigint | null = null;
+  let cgst:    bigint | null = null;
+  let sgst:    bigint | null = null;
+  let igst:    bigint | null = null;
+  let gstRatePctVal: number | null = null;
+
+  if (d.gstRatePct && d.gstRatePct > 0) {
+    gstRatePctVal = d.gstRatePct;
+    // taxable = round(amount × 100 / (100 + rate), paise)
+    taxable = (amount * 100n) / BigInt(100 + d.gstRatePct);
+    const gstTotal = amount - taxable;
+    if (d.isInterState) {
+      igst = gstTotal;
+    } else {
+      cgst = gstTotal / 2n;
+      sgst = gstTotal - cgst; // handles odd-paise rounding
+    }
+  }
+
   try {
     const expense = await db.expense.create({
       data: {
@@ -103,6 +124,13 @@ export async function createExpense(
         incurredAt:     new Date(d.incurredAt),
         billKey:        d.billKey ?? null,
         approvalState,
+        gstRatePct:     gstRatePctVal,
+        taxable,
+        cgst,
+        sgst,
+        igst,
+        vendorGstin:    d.vendorGstin?.trim() || null,
+        billRef:        d.billRef?.trim() || null,
       },
       select: { id: true },
     });

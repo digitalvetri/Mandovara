@@ -1,37 +1,33 @@
-// /invoicing/new — pick an order to invoice.
+// /invoicing/new — project-centric invoice picker.
 //
-// Mandovara invoices are always minted from an existing Order, so this
-// page is a shortlist of open orders (with client + total + line count)
-// each with a one-click "Create Invoice" button that mints the invoice
-// via createInvoiceFromOrder and routes to /invoicing/{id}.
-//
-// Landing here from the /invoicing "New Invoice" button — the confusing
-// previous behaviour was to dump the user on /orders and expect them
-// to hunt for the right one. This is explicit: only invoiceable orders,
-// nothing else.
+// Invoices are always minted from an Order. This page shows projects that
+// have a confirmed (non-COMPLETED, non-CANCELLED) order, grouped by project so
+// the user thinks "I need to invoice Dr. Kannan's villa" not "order SO-2608-0042".
+// The "Create Invoice" button calls createInvoiceFromOrder and routes to /invoicing/{id}.
 
 import Link from "next/link";
 import type { Route } from "next";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
-import { listOrders } from "@/modules/orders/queries";
+import { listInvoiceableOrders } from "@/modules/orders/queries-part2";
 import { CreateInvoiceButton } from "../../orders/_components/CreateInvoiceButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewInvoicePage() {
-  const ctx = await devContext();
+const STATUS_LABEL: Record<string, string> = {
+  CONFIRMED:        "Confirmed",
+  PROCUREMENT:      "Procuring",
+  MAKE:             "In make",
+  READY_TO_INSTALL: "Ready",
+  INSTALLING:       "Installing",
+};
 
-  // "OPEN" filter = orders still in play (not COMPLETED / CANCELLED).
-  // Fetch a healthy page so the picker isn't hiding options.
-  const { rows } = await listOrders(ctx, {
-    status:   "OPEN",
-    sort:     "recent",
-    pageSize: 50,
-  });
+export default async function NewInvoicePage() {
+  const ctx  = await devContext();
+  const rows = await listInvoiceableOrders(ctx);
 
   return (
     <>
@@ -46,65 +42,77 @@ export default async function NewInvoicePage() {
       </div>
 
       <Topbar
-        title="New Invoice"
-        eyebrow="Pick the order you want to bill. The invoice pulls its lines, client and totals from that order."
+        title="Create Invoice"
+        eyebrow="Pick the project to bill — invoices pull their lines, rates and totals from the confirmed order."
       />
 
       {rows.length === 0 ? (
         <div className="rounded-[14px] border border-rule bg-surface py-16 text-center">
-          <div className="text-[14px] text-text mb-2">No orders ready to invoice.</div>
+          <div className="text-[14px] text-text mb-2">No projects ready to invoice.</div>
           <p className="text-[12px] text-text-dim">
-            Confirm an order first — invoices are minted from orders, not created standalone.{" "}
+            A project needs a confirmed order before it can be invoiced.{" "}
             <Link href={"/orders" as Route} className="text-accent hover:underline">Open orders →</Link>
           </p>
         </div>
       ) : (
-        <div className="rounded-[14px] border border-rule bg-surface overflow-hidden">
-          <table className="w-full text-[12.5px]">
-            <thead>
-              <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
-                <Th>Order</Th>
-                <Th>Client</Th>
-                <Th align="right">Total</Th>
-                <Th>Date</Th>
-                <Th align="right">&nbsp;</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-rule/70 last:border-0 hover:bg-surface-hover transition-colors">
-                  <Td>
-                    <Link href={`/orders/${r.id}` as Route} className="tabular text-text hover:text-accent">
-                      {r.number}
-                    </Link>
-                  </Td>
-                  <Td>{r.clientName}</Td>
-                  <Td align="right"><span className="tabular text-text">{formatINR(r.totalValue)}</span></Td>
-                  <Td className="text-text-dim tabular">{formatDate(r.date)}</Td>
-                  <Td align="right"><CreateInvoiceButton orderId={r.id} /></Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <div
+              key={r.orderId}
+              className="flex items-center gap-4 rounded-[12px] border border-rule bg-surface px-5 py-4 hover:border-accent/40 transition-colors"
+            >
+              {/* project info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 mb-0.5">
+                  <Link
+                    href={`/projects/${r.projectId}` as Route}
+                    className="text-[13.5px] font-semibold text-text hover:text-accent truncate"
+                  >
+                    {r.projectName}
+                  </Link>
+                  <span className="text-[10.5px] tabular text-text-dim shrink-0">{r.projectNumber}</span>
+                </div>
+
+                <div className="flex items-center gap-3 text-[11.5px] text-text-muted">
+                  <span>{r.clientName}</span>
+                  {r.siteCity && (
+                    <>
+                      <span className="text-rule">·</span>
+                      <span className="inline-flex items-center gap-0.5">
+                        <MapPin size={10} className="shrink-0" />
+                        {r.siteCity}
+                      </span>
+                    </>
+                  )}
+                  <span className="text-rule">·</span>
+                  <Link
+                    href={`/orders/${r.orderId}` as Route}
+                    className="tabular hover:text-accent transition-colors"
+                  >
+                    {r.orderNumber}
+                  </Link>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-medium
+                    ${r.orderStatus === "READY_TO_INSTALL" ? "bg-solid/10 text-solid" :
+                      r.orderStatus === "INSTALLING"       ? "bg-heat/10  text-heat"  :
+                                                             "bg-surface-2 text-text-dim"}`}
+                  >
+                    {STATUS_LABEL[r.orderStatus] ?? r.orderStatus}
+                  </span>
+                </div>
+              </div>
+
+              {/* amount + action */}
+              <div className="flex items-center gap-5 shrink-0">
+                <div className="text-right">
+                  <div className="text-[13.5px] tabular font-semibold text-text">{formatINR(r.totalValue)}</div>
+                  <div className="text-[10.5px] tabular text-text-dim">{formatDate(r.orderDate)}</div>
+                </div>
+                <CreateInvoiceButton orderId={r.orderId} />
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </>
-  );
-}
-
-function Th({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th className={`px-4 h-[34px] font-medium ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-function Td({
-  children, align = "left", className = "",
-}: { children: React.ReactNode; align?: "left" | "right"; className?: string }) {
-  return (
-    <td className={`px-4 py-2.5 ${align === "right" ? "text-right" : "text-left"} ${className}`}>
-      {children}
-    </td>
   );
 }

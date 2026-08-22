@@ -159,6 +159,66 @@ export async function listAcceptedQuotations(
     }));
 }
 
+// ── invoice picker — project-centric order list ───────────────────────────────
+
+export interface InvoiceableOrderRow {
+  orderId: string;
+  orderNumber: string;
+  orderDate: Date;
+  orderStatus: string;
+  totalValue: bigint;
+  clientId: string;
+  clientName: string;
+  projectId: string;
+  projectName: string;
+  projectNumber: string;
+  siteCity: string | null;
+}
+
+/** Orders that can be invoiced (not COMPLETED/CANCELLED), with full project
+ *  context so the invoice picker can present by project rather than by order
+ *  number. Sorted newest-order-first. */
+export async function listInvoiceableOrders(
+  ctx: RequestContext,
+): Promise<InvoiceableOrderRow[]> {
+  requirePermission(ctx, "order.view");
+  const db = scoped(ctx);
+
+  const rows = await db.order.findMany({
+    where: { status: { notIn: ["COMPLETED", "CANCELLED", "DRAFT"] } },
+    orderBy: { date: "desc" },
+    take: 60,
+    select: {
+      id: true, number: true, date: true, status: true, totalValue: true,
+      clientId: true,
+      project: {
+        select: {
+          id: true, number: true, name: true, siteAddress: true,
+          client: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  return rows.map((r) => {
+    const addr = r.project.siteAddress as Record<string, unknown> | null;
+    const siteCity = (addr?.area ?? addr?.city) as string | null ?? null;
+    return {
+      orderId: r.id,
+      orderNumber: r.number,
+      orderDate: r.date,
+      orderStatus: r.status,
+      totalValue: r.totalValue,
+      clientId: r.clientId,
+      clientName: r.project.client.name,
+      projectId: r.project.id,
+      projectName: r.project.name,
+      projectNumber: r.project.number,
+      siteCity,
+    };
+  });
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 type WhereInput = Record<string, unknown>;

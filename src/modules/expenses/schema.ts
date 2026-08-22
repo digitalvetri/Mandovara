@@ -29,16 +29,24 @@ export const createProjectExpenseSchema = z.object({
   billKey:     z.string().max(500).optional(),
 });
 
+export const GST_RATES = [0, 5, 12, 18, 28] as const;
+export type GstRate = (typeof GST_RATES)[number];
+
 /** General overhead expense — not tied to a project. Rent, Travel,
  *  Utilities, etc. Head is a free-string so users can type "Petrol
  *  Aug 17" or "Site inspection cab" if none of the presets fit. */
 export const createExpenseSchema = z.object({
-  head:        z.string().trim().min(1).max(60),
-  subHead:     z.string().trim().max(120).optional(),
-  description: z.string().trim().min(3).max(300),
-  amount:      z.string().regex(/^\d+$/, "Amount must be positive paise integer"),
-  incurredAt:  isoDate,
-  billKey:     z.string().max(500).optional(),
+  head:         z.string().trim().min(1).max(60),
+  subHead:      z.string().trim().max(120).optional(),
+  description:  z.string().trim().min(3).max(300),
+  amount:       z.string().regex(/^\d+$/, "Amount must be positive paise integer"),
+  incurredAt:   isoDate,
+  billKey:      z.string().max(500).optional(),
+  // GST input credit — optional; omit for exempt/unregistered bills
+  gstRatePct:   z.number().refine((n) => (GST_RATES as readonly number[]).includes(n), "Invalid GST rate").optional(),
+  isInterState: z.boolean().optional(),
+  vendorGstin:  z.string().max(15).optional(),
+  billRef:      z.string().max(50).optional(),
 });
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
