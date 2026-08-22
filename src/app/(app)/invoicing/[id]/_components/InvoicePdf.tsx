@@ -28,7 +28,7 @@ const s = StyleSheet.create({
   },
 
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
-  logoImg: { width: 140, height: 34, objectFit: "contain", objectPosition: "left center" },
+  logoImg: { width: 72, height: 72, objectFit: "contain" },
   logoFallbackBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
   logoFallbackM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
   brandCol: { marginLeft: 8, justifyContent: "center" },

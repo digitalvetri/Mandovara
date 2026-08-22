@@ -52,7 +52,12 @@ export interface SerializedInvoice {
 
 export function InvoicePDFPreviewButton({ invoice }: { invoice: SerializedInvoice }) {
   const [open, setOpen] = useState(false);
-  const html = useMemo(() => buildInvoicePrintHTML(invoice), [invoice]);
+  // Build an absolute URL so the logo resolves correctly in the popup window
+  // (which has no base URL of its own) and in the iframe srcDoc.
+  const logoUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/mandovara-logo.png`
+    : undefined;
+  const html = useMemo(() => buildInvoicePrintHTML(invoice, logoUrl), [invoice, logoUrl]);
 
   function openPrintWindow() {
     const win = window.open("", "_blank", "width=960,height=800");

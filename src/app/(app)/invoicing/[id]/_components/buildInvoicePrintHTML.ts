@@ -9,7 +9,7 @@ function e(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-export function buildInvoicePrintHTML(inv: SerializedInvoice): string {
+export function buildInvoicePrintHTML(inv: SerializedInvoice, logoUrl?: string): string {
   const typeLabel = inv.type === "TAX" ? "TAX INVOICE" : inv.type.replace(/_/g, " ");
   const { isIntra } = inv;
 
@@ -48,6 +48,7 @@ export function buildInvoicePrintHTML(inv: SerializedInvoice): string {
     .page{max-width:860px;margin:0 auto;padding:32px}
     .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1B8A7E;padding-bottom:12px;margin-bottom:14px}
     .logo{width:34px;height:34px;background:#1B8A7E;border-radius:5px;color:#fff;font-size:20px;font-weight:bold;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .logo-img{height:60px;width:auto;object-fit:contain;display:block}
     .brand-row{display:flex;align-items:center;gap:10px}
     .brand-name{font-size:16pt;font-weight:bold;line-height:1}
     .brand-sub{font-size:6.5pt;color:#64748B;letter-spacing:2px;margin-top:4px}
@@ -88,7 +89,7 @@ export function buildInvoicePrintHTML(inv: SerializedInvoice): string {
 <html lang="en"><head><meta charset="UTF-8"><title>${e(typeLabel)} ${e(inv.number)}</title><style>${CSS}</style></head>
 <body><div class="page">
   <div class="hdr">
-    <div class="brand-row"><div class="logo">M</div><div><div class="brand-name">Mandovara</div><div class="brand-sub">INTERIORS  ·  COIMBATORE</div></div></div>
+    <div class="brand-row">${logoUrl ? `<img src="${logoUrl}" alt="Mandovara" class="logo-img" />` : `<div class="logo">M</div><div><div class="brand-name">Mandovara</div><div class="brand-sub">INTERIORS  ·  COIMBATORE</div></div>`}</div>
     <div class="doc-right"><div class="doc-title">${e(typeLabel)}</div><div class="doc-num">${e(inv.number)}</div>${inv.orderNumber ? `<div class="doc-sub">Order ${e(inv.orderNumber)}</div>` : ""}</div>
   </div>
   <div class="meta">
