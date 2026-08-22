@@ -41,8 +41,11 @@ COPY . .
 
 # Prisma client is generated against the schema; must run before
 # `next build` because our code imports @prisma/client.
+# Run `next build` directly (not via `pnpm build`) to skip the
+# `postbuild: prisma migrate deploy` npm hook — migrations require a live
+# database and belong at container start (docker-entrypoint.sh), not here.
 RUN pnpm prisma generate
-RUN pnpm build
+RUN pnpm exec next build
 
 
 # ─── Stage 3: runtime ───────────────────────────────────────────────
