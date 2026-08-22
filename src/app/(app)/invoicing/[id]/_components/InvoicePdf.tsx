@@ -27,8 +27,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 32,
   },
 
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
-  logoImg: { width: 100, height: 100, objectFit: "contain" },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
+  logoImg: { width: 140, height: 140, objectFit: "contain" },
+  logoTagline: { fontSize: 7, color: TEAL, letterSpacing: 2.5, marginTop: 5, textAlign: "center", fontFamily: "Helvetica-Bold" },
   logoFallbackBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
   logoFallbackM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
   brandCol: { marginLeft: 8, justifyContent: "center" },
@@ -167,7 +168,12 @@ export function InvoicePdf({ invoice: i, logoSrc }: { invoice: InvoiceDetail; lo
         <View style={s.header}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {logoSrc
-              ? <Image src={logoSrc} style={s.logoImg} />
+              ? (
+                <View style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                  <Image src={logoSrc} style={s.logoImg} />
+                  <Text style={s.logoTagline}>INTERIORS · COIMBATORE</Text>
+                </View>
+              )
               : (
                 <>
                   <View style={s.logoFallbackBox}><Text style={s.logoFallbackM}>M</Text></View>

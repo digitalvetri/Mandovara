@@ -42,46 +42,49 @@ export function buildInvoicePrintHTML(inv: SerializedInvoice, logoUrl?: string):
       <div class="tr2"><span class="tk bold dark">Outstanding</span><span class="tv bold dark">${e(inv.outstanding)}</span></div>
     </div>` : "";
 
+  const logoSection = logoUrl
+    ? `<img src="${logoUrl}" alt="Mandovara" style="height:120px;width:auto;display:block">`
+    : `<div style="width:44px;height:44px;background:#1B8A7E;border-radius:6px;color:#fff;font-size:22px;font-weight:bold;display:flex;align-items:center;justify-content:center">M</div>`;
+
   const CSS = `
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Helvetica,Arial,sans-serif;font-size:9pt;color:#111827;background:#fff}
     .page{max-width:860px;margin:0 auto;padding:32px}
-    .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1B8A7E;padding-bottom:12px;margin-bottom:14px}
-    .logo{width:34px;height:34px;background:#1B8A7E;border-radius:5px;color:#fff;font-size:20px;font-weight:bold;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .logo-img{height:130px;width:auto;object-fit:contain;display:block}
-    .brand-row{display:flex;align-items:center;gap:10px}
-    .brand-name{font-size:16pt;font-weight:bold;line-height:1}
-    .brand-sub{font-size:6.5pt;color:#64748B;letter-spacing:2px;margin-top:4px}
+    .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #1B8A7E;padding-bottom:16px;margin-bottom:16px}
+    .hdr-left{display:flex;align-items:center;gap:14px}
+    .brand-col{display:flex;flex-direction:column;gap:3px}
+    .brand-tagline{font-size:7.5pt;color:#1B8A7E;letter-spacing:3px;text-transform:uppercase;font-weight:700}
+    .brand-addr{font-size:7pt;color:#64748B}
     .doc-right{text-align:right}
-    .doc-title{font-size:13pt;font-weight:bold;color:#1B8A7E;letter-spacing:1.5px}
-    .doc-num{font-family:Courier,monospace;font-size:8.5pt;color:#64748B;margin-top:3px}
+    .doc-title{font-size:18pt;font-weight:bold;color:#1B8A7E;letter-spacing:1.5px;line-height:1}
+    .doc-num{font-family:Courier,monospace;font-size:9pt;color:#334155;margin-top:5px}
     .doc-sub{font-size:7.5pt;color:#64748B;margin-top:2px}
-    .meta{display:flex;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:3px;padding:8px 12px;margin-bottom:12px}
+    .meta{display:flex;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:4px;padding:10px 14px;margin-bottom:12px}
     .mc{flex:1}.ml{font-size:6.5pt;color:#64748B;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
-    .mv{font-size:8.5pt;font-weight:bold}
+    .mv{font-size:9pt;font-weight:bold}
     .addr-row{display:flex;gap:10px;margin-bottom:12px}
-    .addr{flex:1;border:1px solid #E2E8F0;border-radius:3px;padding:10px;background:#F8FAFC}
+    .addr{flex:1;border:1px solid #E2E8F0;border-radius:4px;padding:10px 12px;background:#F8FAFC}
     .addr-t{font-size:6.5pt;font-weight:bold;color:#1B8A7E;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px}
-    .addr-n{font-size:9.5pt;font-weight:bold;margin-bottom:2px}
-    .addr-l{font-size:7.5pt;color:#64748B;margin-top:1px}
-    .addr-m{font-family:Courier,monospace;font-size:7.5pt;color:#64748B;margin-top:2px}
+    .addr-n{font-size:10pt;font-weight:bold;margin-bottom:2px}
+    .addr-l{font-size:7.5pt;color:#64748B;margin-top:2px}
+    .addr-m{font-family:Courier,monospace;font-size:7.5pt;color:#64748B;margin-top:3px}
     table{width:100%;border-collapse:collapse;margin-bottom:12px}
     thead tr{background:#1B8A7E}
-    th{color:#fff;font-size:6.5pt;letter-spacing:.8px;padding:5px 4px;font-weight:bold}
-    td{font-size:8pt;padding:4px;border-bottom:.5px solid #E2E8F0;vertical-align:top}
-    .ctr{text-align:center;color:#64748B;width:18px}
+    th{color:#fff;font-size:6.5pt;letter-spacing:.8px;padding:6px 4px;font-weight:bold}
+    td{font-size:8pt;padding:5px 4px;border-bottom:.5px solid #E2E8F0;vertical-align:top}
+    .ctr{text-align:center;color:#64748B;width:20px}
     .desc{min-width:120px}
     .r{text-align:right;font-family:Courier,monospace;white-space:nowrap}
     .muted{color:#64748B}.xs{font-size:7pt}.bold{font-weight:bold}.dark{color:#111827}
     .totals{display:flex;justify-content:flex-end;margin-bottom:12px}
-    .tot-inner{width:250px}
-    .tr2{display:flex;justify-content:space-between;padding:3px 0;border-bottom:.5px solid #E2E8F0;font-size:8pt}
+    .tot-inner{width:260px}
+    .tr2{display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid #E2E8F0;font-size:8.5pt}
     .tk{color:#64748B}.tv{font-family:Courier,monospace}
-    .grand{display:flex;justify-content:space-between;align-items:center;background:#1B8A7E;color:#fff;padding:7px 10px;border-radius:3px;margin-top:8px}
-    .grand-k{font-size:8pt;font-weight:bold;letter-spacing:1px}
-    .grand-v{font-size:13pt;font-family:Courier,monospace;font-weight:bold}
+    .grand{display:flex;justify-content:space-between;align-items:center;background:#1B8A7E;color:#fff;padding:9px 12px;border-radius:4px;margin-top:8px}
+    .grand-k{font-size:8.5pt;font-weight:bold;letter-spacing:1px}
+    .grand-v{font-size:14pt;font-family:Courier,monospace;font-weight:bold}
     .out{margin-top:8px;border-top:1px solid #E2E8F0;padding-top:6px}
-    .foot{margin-top:28px;padding-top:8px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;font-size:7pt;color:#64748B}
+    .foot{margin-top:28px;padding-top:8px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;font-size:7pt;color:#94A3B8}
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{padding:20px}}
   `;
 
@@ -89,8 +92,19 @@ export function buildInvoicePrintHTML(inv: SerializedInvoice, logoUrl?: string):
 <html lang="en"><head><meta charset="UTF-8"><title>${e(typeLabel)} ${e(inv.number)}</title><style>${CSS}</style></head>
 <body><div class="page">
   <div class="hdr">
-    <div class="brand-row">${logoUrl ? `<img src="${logoUrl}" alt="Mandovara" class="logo-img" />` : `<div class="logo">M</div><div><div class="brand-name">Mandovara</div><div class="brand-sub">INTERIORS  ·  COIMBATORE</div></div>`}</div>
-    <div class="doc-right"><div class="doc-title">${e(typeLabel)}</div><div class="doc-num">${e(inv.number)}</div>${inv.orderNumber ? `<div class="doc-sub">Order ${e(inv.orderNumber)}</div>` : ""}</div>
+    <div class="hdr-left">
+      ${logoSection}
+      <div class="brand-col">
+        <div class="brand-tagline">INTERIORS · COIMBATORE</div>
+        <div class="brand-addr">32 Thirumoorthy Layout, RS Puram, Coimbatore 641002</div>
+        <div class="brand-addr">+91 8940430051 · mandovara.com</div>
+      </div>
+    </div>
+    <div class="doc-right">
+      <div class="doc-title">${e(typeLabel)}</div>
+      <div class="doc-num">${e(inv.number)}</div>
+      ${inv.orderNumber ? `<div class="doc-sub">Order ${e(inv.orderNumber)}</div>` : ""}
+    </div>
   </div>
   <div class="meta">
     <div class="mc"><div class="ml">Invoice No.</div><div class="mv" style="font-family:Courier,monospace">${e(inv.number)}</div></div>
@@ -107,6 +121,6 @@ export function buildInvoicePrintHTML(inv: SerializedInvoice, logoUrl?: string):
     <tbody>${lineRows}</tbody>
   </table>
   <div class="totals"><div class="tot-inner">${taxRows}<div class="grand"><span class="grand-k">INVOICE TOTAL</span><span class="grand-v">${e(inv.total)}</span></div>${outSection}</div></div>
-  <div class="foot"><span>mandovara.com  ·  +91 8940430051</span><span>32 Thirumoorthy Layout, RS Puram, Coimbatore 641002</span></div>
+  <div class="foot"><span>mandovara.com · +91 8940430051</span><span>32 Thirumoorthy Layout, RS Puram, Coimbatore 641002</span></div>
 </div></body></html>`;
 }

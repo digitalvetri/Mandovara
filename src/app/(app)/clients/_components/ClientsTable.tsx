@@ -87,27 +87,27 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
   }
 
   return (
-    <div className="rounded-[14px] border border-rule bg-surface overflow-hidden">
+    <div className="rounded-[12px] border border-rule bg-surface overflow-hidden">
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-rule bg-surface-2">
-            <th className="w-[4px] p-0" aria-hidden />
-            <th className="py-2.5 pl-4 pr-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim">
+            <th className="w-[5px] p-0" aria-hidden />
+            <th className="py-3 pl-4 pr-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">
               Client
             </th>
-            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden sm:table-cell">
+            <th className="py-3 px-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">
               Mobile
             </th>
-            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden lg:table-cell">
+            <th className="py-3 px-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">
               City
             </th>
-            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden md:table-cell">
+            <th className="py-3 px-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">
               Projects
             </th>
-            <th className="py-2.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim hidden xl:table-cell">
+            <th className="py-3 px-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden xl:table-cell">
               Owner
             </th>
-            <th className="py-2.5 pl-3 pr-4 text-[10.5px] font-medium uppercase tracking-[0.1em] text-text-dim text-right">
+            <th className="py-3 pl-4 pr-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim text-right">
               Actions
             </th>
           </tr>
@@ -128,10 +128,10 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
                 className="group cursor-pointer transition-colors hover:bg-surface-2/60"
               >
                 {/* Accent strip — td fills full row height in a table */}
-                <td className={`w-[4px] p-0 ${strip}`} aria-hidden />
+                <td className={`w-[5px] p-0 ${strip}`} aria-hidden />
 
                 {/* Name + type badge */}
-                <td className="py-3 pl-4 pr-3">
+                <td className="py-4 pl-4 pr-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[13.5px] font-semibold text-text leading-tight">
                       {r.name}
@@ -154,7 +154,7 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
 
                 {/* Mobile + quick-action icons */}
                 <td
-                  className="py-3 px-3 hidden sm:table-cell"
+                  className="py-4 px-4 hidden sm:table-cell"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center gap-1">
@@ -186,12 +186,12 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
                 </td>
 
                 {/* City */}
-                <td className="py-3 px-3 hidden lg:table-cell">
+                <td className="py-4 px-4 hidden lg:table-cell">
                   <span className="text-[12.5px] text-text-dim">{r.city || "—"}</span>
                 </td>
 
                 {/* Project count */}
-                <td className="py-3 px-3 hidden md:table-cell">
+                <td className="py-4 px-4 hidden md:table-cell">
                   {r.projectCount > 0 ? (
                     <span className="inline-flex items-center gap-1 text-[11px] text-text-dim bg-surface-2 border border-rule px-1.5 py-0.5 rounded-[3px]">
                       <Briefcase size={9} strokeWidth={2} />
@@ -203,7 +203,7 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
                 </td>
 
                 {/* Owner */}
-                <td className="py-3 px-3 hidden xl:table-cell">
+                <td className="py-4 px-4 hidden xl:table-cell">
                   {initial ? (
                     <div className="flex items-center gap-1.5">
                       <span className="w-[22px] h-[22px] rounded-full bg-accent/15 text-accent text-[9px] font-bold flex items-center justify-center uppercase select-none shrink-0">
@@ -220,7 +220,7 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
 
                 {/* Actions */}
                 <td
-                  className="py-3 pl-3 pr-4"
+                  className="py-4 pl-4 pr-4"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-end gap-1">
