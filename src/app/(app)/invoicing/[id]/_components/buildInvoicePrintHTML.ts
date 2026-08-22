@@ -46,9 +46,9 @@ export function buildInvoicePrintHTML(inv: SerializedInvoice, logoUrl?: string):
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Helvetica,Arial,sans-serif;font-size:9pt;color:#111827;background:#fff}
     .page{max-width:860px;margin:0 auto;padding:32px}
-    .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1B8A7E;padding-bottom:12px;margin-bottom:14px}
+    .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1B8A7E;padding-bottom:12px;margin-bottom:14px}
     .logo{width:34px;height:34px;background:#1B8A7E;border-radius:5px;color:#fff;font-size:20px;font-weight:bold;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .logo-img{height:60px;width:auto;object-fit:contain;display:block}
+    .logo-img{height:130px;width:auto;object-fit:contain;display:block}
     .brand-row{display:flex;align-items:center;gap:10px}
     .brand-name{font-size:16pt;font-weight:bold;line-height:1}
     .brand-sub{font-size:6.5pt;color:#64748B;letter-spacing:2px;margin-top:4px}

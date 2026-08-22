@@ -27,8 +27,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 32,
   },
 
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
-  logoImg: { width: 72, height: 72, objectFit: "contain" },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
+  logoImg: { width: 100, height: 100, objectFit: "contain" },
   logoFallbackBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
   logoFallbackM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
   brandCol: { marginLeft: 8, justifyContent: "center" },
