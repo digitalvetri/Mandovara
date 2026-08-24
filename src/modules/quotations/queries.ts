@@ -67,6 +67,15 @@ export interface QuotationLine {
   igst: bigint;
   amount: bigint;
   isOptional: boolean;
+  // Enriched fields for PDF/preview (populated by getQuotation)
+  hsn:           string | null;
+  colourHex:     string | null;
+  colourwayCode: string | null;
+  designName:    string | null;
+  brandName:     string | null;
+  calcSnapshot:  Record<string, unknown> | null;
+  widthMm:       string | null;
+  heightMm:      string | null;
 }
 
 export interface QuotationDetail {
@@ -77,6 +86,7 @@ export interface QuotationDetail {
   branchId: string;
   branchName: string;
   supplierStateCode: string;
+  ownerName: string | null;
   // Party — FIXES-01 §5.1. Exactly one of leadId / clientId is set.
   // The client* fields carry the party's display info regardless of
   // which side is set (lead's name/mobile OR client's).

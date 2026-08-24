@@ -16,7 +16,7 @@ export async function getQuotation(
     where: { id },
     select: {
       id: true, number: true, revision: true, status: true, branchId: true,
-      leadId: true, projectId: true, clientId: true,
+      leadId: true, projectId: true, clientId: true, ownerId: true,
       date: true, validUntil: true, termsText: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
       project: {
@@ -33,6 +33,8 @@ export async function getQuotation(
           quantity: true, unit: true, rate: true,
           discountPct: true, taxable: true, gstRate: true,
           cgst: true, sgst: true, igst: true, amount: true, isOptional: true,
+          calcSnapshot: true,
+          item: { select: { widthMm: true, heightMm: true } },
         },
       },
     },
@@ -69,6 +71,15 @@ export async function getQuotation(
     }
   }
 
+  // Batch-resolve colourways (plain string FK — no Prisma relation)
+  const colIds = [...new Set(row.lines.map(l => l.colourwayId).filter((x): x is string => !!x))];
+  const cws = colIds.length ? await db.colourway.findMany({
+    where: { id: { in: colIds } },
+    select: { id: true, code: true, hex: true, design: { select: { name: true, hsn: true, collection: { select: { brand: { select: { name: true } } } } } } },
+  }) : [];
+  const cwMap = new Map(cws.map(c => [c.id, c]));
+  const owner = row.ownerId ? await db.user.findUnique({ where: { id: row.ownerId }, select: { name: true } }) : null;
+
   return {
     id: row.id,
     number: row.number,
@@ -77,6 +88,7 @@ export async function getQuotation(
     branchId: row.branchId,
     branchName: branch.name,
     supplierStateCode: branch.stateCode,
+    ownerName: owner?.name ?? null,
     leadId:      row.leadId,
     clientId:    row.clientId,
     clientName,
@@ -94,26 +106,37 @@ export async function getQuotation(
     igst: row.igst,
     roundOff: row.roundOff,
     total: row.total,
-    lines: row.lines.map((l) => ({
-      id: l.id,
-      lineNo: l.lineNo,
-      colourwayId: l.colourwayId,
-      serviceRateId: l.serviceRateId,
-      measurementItemId: l.measurementItemId,
-      roomLabel: l.roomLabel,
-      description: l.description,
-      quantity: l.quantity.toString(),
-      unit: l.unit,
-      rate: l.rate,
-      discountPct: l.discountPct.toString(),
-      taxable: l.taxable,
-      gstRate: l.gstRate.toString(),
-      cgst: l.cgst,
-      sgst: l.sgst,
-      igst: l.igst,
-      amount: l.amount,
-      isOptional: l.isOptional,
-    })),
+    lines: row.lines.map((l) => {
+      const cw = l.colourwayId ? cwMap.get(l.colourwayId) : undefined;
+      return {
+        id: l.id,
+        lineNo: l.lineNo,
+        colourwayId: l.colourwayId,
+        serviceRateId: l.serviceRateId,
+        measurementItemId: l.measurementItemId,
+        roomLabel: l.roomLabel,
+        description: l.description,
+        quantity: l.quantity.toString(),
+        unit: l.unit,
+        rate: l.rate,
+        discountPct: l.discountPct.toString(),
+        taxable: l.taxable,
+        gstRate: l.gstRate.toString(),
+        cgst: l.cgst,
+        sgst: l.sgst,
+        igst: l.igst,
+        amount: l.amount,
+        isOptional: l.isOptional,
+        hsn:           cw?.design?.hsn          ?? null,
+        colourHex:     cw?.hex                  ?? null,
+        colourwayCode: cw?.code                 ?? null,
+        designName:    cw?.design?.name         ?? null,
+        brandName:     cw?.design?.collection?.brand?.name ?? null,
+        calcSnapshot:  l.calcSnapshot as Record<string, unknown> | null,
+        widthMm:       l.item?.widthMm?.toString()  ?? null,
+        heightMm:      l.item?.heightMm?.toString() ?? null,
+      };
+    }),
   };
 }
 

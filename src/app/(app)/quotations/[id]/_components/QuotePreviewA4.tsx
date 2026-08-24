@@ -166,7 +166,7 @@ export function QuotePreviewA4({ quotation, lines, totals, isIntraState }: Props
             </thead>
             <tbody>
               {lines.map((l, i) => {
-                const { amount } = computeLine(l);
+                const { taxable } = computeLine(l);
                 return (
                   <tr key={l._key} style={{ background: i % 2 === 1 ? STRIP : WHITE, borderBottom: `0.5px solid ${BORD}` }}>
                     <td style={{ padding: "4px 5px", textAlign: "center", color: MUTED, fontSize: "8px" }}>{i + 1}</td>
@@ -180,7 +180,7 @@ export function QuotePreviewA4({ quotation, lines, totals, isIntraState }: Props
                     </td>
                     <td style={{ padding: "4px 5px", textAlign: "right", fontFamily: "monospace", fontSize: "8.5px" }}>{fmtRupee(parseFloat(l.rate) || 0)}</td>
                     <td style={{ padding: "4px 5px", textAlign: "right", color: MUTED, fontSize: "8.5px" }}>{l.gstRate}%</td>
-                    <td style={{ padding: "4px 5px", textAlign: "right", fontFamily: "monospace", fontSize: "8.5px", fontWeight: 600 }}>{fmtRupee(amount)}</td>
+                    <td style={{ padding: "4px 5px", textAlign: "right", fontFamily: "monospace", fontSize: "8.5px", fontWeight: 600 }}>{fmtRupee(taxable)}</td>
                   </tr>
                 );
               })}

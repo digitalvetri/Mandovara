@@ -80,14 +80,28 @@ export const pdfStyles = StyleSheet.create({
   tdRight: { fontSize: 8.5, textAlign: "right" },
   tdMuted: { fontSize: 7.5, color: MUTED, textAlign: "right" },
 
-  // Column widths  (467pt usable inside 32pt margins each side)
-  cNo:   { width: 22,  paddingHorizontal: 4 },
-  cDesc: { flex: 1,    paddingHorizontal: 6 },
+  // Column widths (usable width ≈ 531pt inside 32pt margins each side)
+  // cSwt(10) + cNo(18) + cQtyU(52) + cRate(72) + cHsn(36) + cGst(26) + cAmt(70) = 284pt fixed
+  // cDesc gets the remaining ~247pt via flex:1
+  cSwt:  { width: 10,  paddingHorizontal: 1 },
+  cNo:   { width: 18,  paddingHorizontal: 3 },
+  cDesc: { flex: 1,    paddingHorizontal: 5 },
+  cQtyU: { width: 52,  paddingHorizontal: 3 },
+  cRate: { width: 72,  paddingHorizontal: 3 },
+  cHsn:  { width: 36,  paddingHorizontal: 3 },
+  cGst:  { width: 26,  paddingHorizontal: 3 },
+  cAmt:  { width: 70,  paddingHorizontal: 3 },
+  // Legacy aliases retained so old references compile without breakage
   cQty:  { width: 38,  paddingHorizontal: 3 },
   cUnit: { width: 26,  paddingHorizontal: 3 },
-  cRate: { width: 76,  paddingHorizontal: 3 },
-  cGst:  { width: 28,  paddingHorizontal: 3 },
-  cAmt:  { width: 76,  paddingHorizontal: 3 },
+
+  // ── room group header ─────────────────────────────────────────────
+  roomHeader: {
+    flexDirection: "row", backgroundColor: BRANDL,
+    paddingVertical: 5, paddingHorizontal: 10, marginTop: 6, borderRadius: 3,
+    borderLeftWidth: 3, borderLeftColor: BRAND,
+  },
+  roomHeaderText: { fontSize: 7, fontWeight: "bold", color: BRAND, letterSpacing: 0.8 },
 
   // ── divider ──────────────────────────────────────────────────────
   divider: {
@@ -112,6 +126,28 @@ export const pdfStyles = StyleSheet.create({
   grandLbl:   { fontSize: 9, fontWeight: "bold", color: WHITE, letterSpacing: 0.6 },
   grandAmt:   { fontSize: 15, fontWeight: "bold", color: WHITE },
   wordsText:  { fontSize: 7, color: BRANDL, lineHeight: 1.45 },
+
+  // ── payment schedule (inside totals col, above grand total box) ──
+  paySection:  { marginBottom: 12, paddingBottom: 10, borderBottomWidth: 0.5, borderBottomColor: RULE },
+  paySec:      { fontSize: 7, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 6 },
+  payRow:      { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3.5 },
+  payLbl:      { fontSize: 7.5, color: MUTED },
+  payVal:      { fontSize: 7.5, color: INK, fontWeight: "bold" },
+
+  // ── bank / UPI block (inside terms col, below terms list) ────────
+  bankSection: { marginTop: 16, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: RULE },
+  bankSec:     { fontSize: 7, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 6 },
+  bankRow:     { flexDirection: "row", gap: 5, paddingVertical: 2 },
+  bankLbl:     { fontSize: 7, color: MUTED, width: 34 },
+  bankVal:     { fontSize: 7, color: INK },
+
+  // ── signature block ───────────────────────────────────────────────
+  sigSection:  { flexDirection: "row", gap: 20, paddingHorizontal: 32, marginTop: 20, paddingTop: 16, borderTopWidth: 0.75, borderTopColor: RULE },
+  sigCol:      { flex: 1, paddingTop: 4 },
+  sigLabel:    { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 24 },
+  sigLine:     { borderBottomWidth: 0.75, borderBottomColor: INK, marginBottom: 6 },
+  sigName:     { fontSize: 7.5, color: INK, fontWeight: "bold" },
+  sigRole:     { fontSize: 7, color: MUTED, marginTop: 2 },
 
   // ── footer ───────────────────────────────────────────────────────
   footer:      { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: DARK, paddingVertical: 12, paddingHorizontal: 32 },
