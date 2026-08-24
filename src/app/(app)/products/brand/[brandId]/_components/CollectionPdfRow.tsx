@@ -41,21 +41,33 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
   const isEmpty    = c._count.designs === 0;
   const canDestroy = canDelete && isEmpty;
   const busy       = uploading || removing || deleting;
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError(null);
+    if (file.size > 200 * 1024 * 1024) {
+      setUploadError("PDF must be under 200 MB.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
     const fd = new FormData();
     fd.set("collectionId", c.id);
     fd.set("pdf", file);
     startUpload(async () => {
-      await uploadCollectionPdf(fd);
+      const res = await uploadCollectionPdf(fd);
       if (fileRef.current) fileRef.current.value = "";
+      if (!res.ok) setUploadError(res.error ?? "PDF upload failed.");
     });
   }
 
   function handleRemove() {
-    startRemove(async () => { await removeCollectionPdf(c.id); });
+    setUploadError(null);
+    startRemove(async () => {
+      const res = await removeCollectionPdf(c.id);
+      if (!res.ok) setUploadError(res.error ?? "Failed to remove PDF.");
+    });
   }
 
   function handleDelete() {
@@ -90,6 +102,9 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
           )}
           <span className="text-[11px] text-text-dim">{c._count.designs} designs</span>
         </div>
+        {uploadError && (
+          <p className="text-[11px] text-fault mt-1 truncate" title={uploadError}>{uploadError}</p>
+        )}
       </div>
 
       {/* PDF status badge */}
