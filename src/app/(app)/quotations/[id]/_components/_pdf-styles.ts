@@ -30,8 +30,12 @@ export const pdfStyles = StyleSheet.create({
     paddingHorizontal: 32, paddingTop: 18, paddingBottom: 16,
     borderBottomWidth: 0.75, borderBottomColor: RULE,
   },
-  logoImg:     { width: 200, height: 57, objectFit: "contain", objectPosition: "left top" },
-  logoTagline: { fontSize: 6.5, color: MUTED, letterSpacing: 1.8, marginTop: 5 },
+  // The source PNG is a square with heavy white padding around the mark.
+  // objectFit:"cover" scales it to fill the container width (200pt) → rendered
+  // height = 200pt on a square image, of which we show the centre 90pt strip —
+  // revealing the butterfly + wordmark while clipping the surrounding whitespace.
+  logoImg:     { width: 200, height: 90, objectFit: "cover", objectPosition: "center center" },
+  logoTagline: { fontSize: 6.5, color: MUTED, letterSpacing: 1.8, marginTop: 3 },
 
   // right side of header
   headerMeta: { alignItems: "flex-end" },
