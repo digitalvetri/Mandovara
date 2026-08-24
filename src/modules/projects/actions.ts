@@ -294,11 +294,6 @@ function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
   }
   return { ok: false, error: "Validation failed", fieldErrors };
 }
-function tryParsePaise(v: string): bigint | null {
-  try { return parseINR(v); } catch { return null; }
-}
-function emptyToNull(v: string | undefined | null): string | null {
-  if (v == null) return null;
-  const t = v.trim();
-  return t.length === 0 ? null : t;
-}
+const tryParsePaise = (v: string): bigint | null => { try { return parseINR(v); } catch { return null; } };
+const emptyToNull = (v: string | undefined | null): string | null =>
+  v == null || v.trim().length === 0 ? null : v.trim();
