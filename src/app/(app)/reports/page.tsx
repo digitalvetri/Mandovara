@@ -72,6 +72,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // ── Serialised data for PDF export bar ───────────────────────────────
   const exportBarProps = {
     periodLabel,
+    from: p.from,
+    to:   p.to,
     kpi: {
       revenue:        formatINRShort(kpi.revenue),
       collections:    formatINRShort(kpi.collections),

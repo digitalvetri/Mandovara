@@ -69,7 +69,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <View style={s.header}>
-          <View>
+          <View style={{ width: 200 }}>
             {logoSrc
               ? <Image src={logoSrc} style={s.logoImg} />
               : <Text style={{ fontSize: 20, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
