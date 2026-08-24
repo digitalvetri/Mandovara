@@ -30,7 +30,7 @@ export const createPOSchema = z.object({
 
 export const setPOStatusSchema = z.object({
   id:     z.string().min(1),
-  status: z.enum(["PENDING_APPROVAL", "APPROVED", "SENT", "CANCELLED"]),
+  status: z.enum(["PENDING_APPROVAL", "APPROVED", "SENT", "PARTIAL", "RECEIVED", "CANCELLED"]),
 });
 
 export const rejectPOSchema = z.object({
