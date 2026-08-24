@@ -110,12 +110,14 @@ export function resolveNextAction(
     case "ORDERED":
       return {
         kind:  "RAISE_PROCUREMENT",
-        label: "Raise purchase requests",
+        label: "Procure the material",
         cta:   "Open procurement",
-        enabled: hasAny(ctx, ["po.create", "requisition.create"]),
-        disabledReason: hasAny(ctx, ["po.create", "requisition.create"]) ? null :
-          "Purchase orders are raised by the store team.",
-        href: `/purchase`,
+        enabled: hasAny(ctx, ["po.create", "requisition.create", "project.materialIssue"]),
+        disabledReason: hasAny(ctx, ["po.create", "requisition.create", "project.materialIssue"]) ? null :
+          "Purchase orders and stock issues are handled by the store team.",
+        // Project-scoped procurement console — checks stock first, offers a
+        // PO fallback only for the shortfall. Owner's ask (§4 of the audit).
+        href: `/projects/${id}/procurement`,
       };
 
     case "PROCUREMENT": {
