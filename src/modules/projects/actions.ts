@@ -8,7 +8,6 @@ import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
-import { parseINR } from "@/kernel/money/format";
 import { allocateNumber, yymmFromDate, Prisma } from "@/kernel/numbering/series";
 import { generateMilestonesForProject } from "@/kernel/milestones/generate";
 import { devContext } from "@/lib/dev-context";
@@ -18,6 +17,7 @@ import {
   addTaskSchema, setTaskStatusSchema,
   addSiteLogSchema,
 } from "./schema";
+import { zodError, tryParsePaise, emptyToNull } from "./actions-util";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -284,16 +284,3 @@ export async function addSiteLog(input: unknown): Promise<ActionResult<{ id: str
   return { ok: true, data: created };
 }
 
-// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {
-  const fieldErrors: Record<string, string> = {};
-  for (const iss of err.issues) {
-    const p = iss.path.filter((s): s is string | number => typeof s === "string" || typeof s === "number").join(".");
-    if (!fieldErrors[p]) fieldErrors[p] = iss.message;
-  }
-  return { ok: false, error: "Validation failed", fieldErrors };
-}
-const tryParsePaise = (v: string): bigint | null => { try { return parseINR(v); } catch { return null; } };
-const emptyToNull = (v: string | undefined | null): string | null =>
-  v == null || v.trim().length === 0 ? null : v.trim();
