@@ -8,6 +8,7 @@ import { getBrandById } from "@/modules/catalog/queries";
 import { scoped } from "@/kernel/db/scoped";
 import { CollectionPdfRow } from "./_components/CollectionPdfRow";
 import { NewCollectionForm } from "./_components/NewCollectionForm";
+import { DeleteBrandButton } from "./_components/DeleteBrandButton";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export default async function BrandCatalogPage({ params }: Props) {
               {brand.name[0]?.toUpperCase()}
             </span>
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-[20px] font-semibold text-text leading-tight">{brand.name}</h1>
             {brand.country && (
               <div className="text-[12.5px] text-text-dim mt-0.5">{brand.country}</div>
@@ -78,6 +79,9 @@ export default async function BrandCatalogPage({ params }: Props) {
               </div>
             </div>
           </div>
+          {canDelete && totalCount === 0 && (
+            <DeleteBrandButton brandId={brandId} brandName={brand.name} />
+          )}
         </div>
       </div>
 

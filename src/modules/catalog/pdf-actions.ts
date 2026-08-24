@@ -94,6 +94,35 @@ export async function removeCollectionPdf(collectionId: string): Promise<PdfActi
   }
 }
 
+// Delete an empty brand. Refuses if it has any collections — deleting a
+// populated brand would orphan collections/designs/colourways that other
+// modules (projects, orders, stock) may reference.
+export async function deleteBrand(
+  brandId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await devContext();
+  requirePermission(ctx, "catalog.delete");
+
+  const db = scoped(ctx);
+  const brand = await db.brand.findUniqueOrThrow({
+    where:  { id: brandId },
+    select: { id: true, _count: { select: { collections: true } } },
+  });
+
+  if (brand._count.collections > 0) {
+    return {
+      ok: false,
+      error: `Brand has ${brand._count.collections} collection${brand._count.collections === 1 ? "" : "s"} — remove them first.`,
+    };
+  }
+
+  await db.brand.delete({ where: { id: brandId } });
+
+  revalidatePath("/products");
+  revalidatePath("/catalog");
+  return { ok: true };
+}
+
 // Delete an empty collection. Refuses if any Design or SampleBook FKs into it
 // — deleting a collection with real product data underneath would silently
 // break projects/orders/stock that reference those colourways.
