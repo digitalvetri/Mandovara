@@ -3,6 +3,7 @@
 // Split out of actions.ts to stay under the §10 300-line limit.
 
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -166,6 +167,72 @@ export async function createInvoiceFromOrder(
     orderId: order.id, branchId: order.branchId,
     type: "TAX", date: toDate(now), dueDate: toDate(due),
     placeOfSupplyCode, lines,
+  });
+}
+
+export async function createCreditNote(
+  input: unknown,
+): Promise<ActionResult<{ id: string; number: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "invoice.create");
+
+  const parsed = z.object({
+    invoiceId: z.string().min(1),
+    reason:    z.string().trim().min(3).max(500),
+  }).safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { invoiceId, reason } = parsed.data;
+
+  const db  = scoped(ctx);
+  const inv = await db.invoice.findUnique({
+    where:  { id: invoiceId },
+    select: {
+      id: true, status: true, orderId: true, branchId: true, type: true,
+      placeOfSupplyCode: true,
+      lines: {
+        orderBy: { lineNo: "asc" },
+        select: {
+          id: true, description: true, hsn: true,
+          quantity: true, unit: true, rate: true,
+          taxable: true, gstRate: true,
+          cgst: true, sgst: true, igst: true, amount: true,
+        },
+      },
+    },
+  });
+  if (!inv) return { ok: false, error: "Invoice not found." };
+  if (inv.status === "CANCELLED") return { ok: false, error: "Cannot issue a credit note against a cancelled invoice." };
+  if (inv.type !== "TAX") return { ok: false, error: "Credit notes can only be issued against TAX invoices." };
+  if (!inv.orderId) return { ok: false, error: "Invoice has no linked order — cannot create credit note." };
+
+  const toDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const now = new Date();
+
+  const lines = inv.lines.map((l) => ({
+    description: `Credit — ${l.description}`,
+    hsn:         l.hsn,
+    quantity:    l.quantity.toString(),
+    unit:        l.unit as string,
+    rate:        (-l.rate).toString(),
+    taxable:     (-l.taxable).toString(),
+    gstRate:     l.gstRate.toString(),
+    cgst:        (-l.cgst).toString(),
+    sgst:        (-l.sgst).toString(),
+    igst:        (-l.igst).toString(),
+    amount:      (-l.amount).toString(),
+  }));
+
+  void reason;
+
+  return createInvoice({
+    orderId:           inv.orderId,
+    branchId:          inv.branchId,
+    type:              "CREDIT_NOTE",
+    date:              toDate(now),
+    dueDate:           toDate(now),
+    placeOfSupplyCode: inv.placeOfSupplyCode,
+    lines,
   });
 }
 

@@ -175,7 +175,9 @@ export async function addMilestone(input: unknown): Promise<ActionResult<{ id: s
   return { ok: true, data: created };
 }
 
-export async function setMilestoneStatus(input: unknown): Promise<ActionResult<{ id: string }>> {
+export async function setMilestoneStatus(
+  input: unknown,
+): Promise<ActionResult<{ id: string; billingPct?: number; projectId?: string }>> {
   const ctx = await devContext();
   requirePermission(ctx, "project.update");
   const parsed = setMilestoneStatusSchema.safeParse(input);
@@ -183,7 +185,7 @@ export async function setMilestoneStatus(input: unknown): Promise<ActionResult<{
   const { id, status } = parsed.data;
   const db = scoped(ctx);
   const before = await db.milestone.findUniqueOrThrow({
-    where: { id }, select: { projectId: true },
+    where: { id }, select: { projectId: true, billingPct: true },
   });
   await db.milestone.update({
     where: { id },
@@ -193,7 +195,15 @@ export async function setMilestoneStatus(input: unknown): Promise<ActionResult<{
     },
   });
   revalidatePath(`/projects/${before.projectId}`);
-  return { ok: true, data: { id } };
+  const billingPct = before.billingPct ? Number(before.billingPct) : 0;
+  return {
+    ok: true,
+    data: {
+      id,
+      billingPct: status === "COMPLETED" && billingPct > 0 ? billingPct : undefined,
+      projectId:  status === "COMPLETED" && billingPct > 0 ? before.projectId : undefined,
+    },
+  };
 }
 
 export async function addTask(input: unknown): Promise<ActionResult<{ id: string }>> {

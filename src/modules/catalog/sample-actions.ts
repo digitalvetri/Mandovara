@@ -81,3 +81,21 @@ export async function returnSampleBook(
   revalidatePath("/samples");
   return { ok: true, data: { id: issue.id } };
 }
+
+export async function returnSampleByBookId(
+  bookId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "catalog.update");
+
+  const db = scoped(ctx);
+
+  const openIssue = await db.sampleIssue.findFirst({
+    where:   { sampleBookId: bookId, returnedAt: null },
+    orderBy: { issuedAt: "desc" },
+    select:  { id: true },
+  });
+  if (!openIssue) return { ok: false, error: "No open issue found for this book." };
+
+  return returnSampleBook(openIssue.id);
+}

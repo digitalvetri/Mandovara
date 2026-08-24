@@ -9,7 +9,7 @@ import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { allocateReceiptToInvoice } from "@/kernel/accounts/allocate";
 import { computeOutstanding } from "@/kernel/money/outstanding";
 import { devContext } from "@/lib/dev-context";
-import { createReceiptSchema, bounceReceiptSchema } from "./schema";
+import { createReceiptSchema, bounceReceiptSchema, clearChequeSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -228,6 +228,37 @@ export async function bounceReceipt(
 
   revalidatePath("/receipts");
   revalidatePath("/invoicing");
+  return { ok: true, data: { id } };
+}
+
+export async function clearCheque(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "receipt.reverse");
+
+  const parsed = clearChequeSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { id } = parsed.data;
+
+  const db  = scoped(ctx);
+  const row = await db.receipt.findUnique({
+    where:  { id },
+    select: { id: true, chequeStatus: true },
+  });
+  if (!row) return { ok: false, error: "Receipt not found." };
+  if (row.chequeStatus === "CLEARED")  return { ok: false, error: "Already cleared." };
+  if (row.chequeStatus !== "PENDING") {
+    return { ok: false, error: "Only PENDING cheques can be marked cleared." };
+  }
+
+  await db.receipt.update({
+    where: { id },
+    data:  { chequeStatus: "CLEARED" },
+  });
+
+  revalidatePath("/receipts");
+  revalidatePath("/accounts");
   return { ok: true, data: { id } };
 }
 

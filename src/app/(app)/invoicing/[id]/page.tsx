@@ -8,6 +8,7 @@ import { devContext } from "@/lib/dev-context";
 import { getInvoice } from "@/modules/invoices/queries";
 import { StatusPill } from "../_components/StatusPill";
 import { CancelInvoiceButton } from "../_components/CancelInvoiceButton";
+import { CreditNoteButton } from "../_components/CreditNoteButton";
 import { InvoicePDFPreviewButton } from "./_components/InvoicePDFPreviewButton";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,8 @@ export default async function InvoiceDetailPage({
   const isIntra = inv.supplierStateCode === inv.placeOfSupplyCode;
   const overdueDays = Math.floor((Date.now() - inv.dueDate.getTime()) / 86_400_000);
   const isOverdue = inv.status !== "PAID" && inv.status !== "CANCELLED" && overdueDays > 0;
-  const canCancel = inv.status === "ISSUED" || inv.status === "DRAFT";
+  const canCancel    = inv.status === "ISSUED" || inv.status === "DRAFT";
+  const canCreditNote = inv.type === "TAX" && (inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID" || inv.status === "PAID") && inv.orderId != null;
 
   // WhatsApp pre-filled message. FIXES-01 §4.3 preference is a REAL
   // PDF attachment via Meta's media endpoint — that needs WABA setup.
@@ -129,9 +131,12 @@ export default async function InvoiceDetailPage({
                 </Link>
               )}
             </div>
-            {canCancel && (
-              <CancelInvoiceButton id={inv.id} number={inv.number} createdAt={inv.date} />
-            )}
+            <div className="flex items-center gap-2">
+              {canCreditNote && <CreditNoteButton invoiceId={inv.id} />}
+              {canCancel && (
+                <CancelInvoiceButton id={inv.id} number={inv.number} createdAt={inv.date} />
+              )}
+            </div>
           </div>
 
           {inv.status === "CANCELLED" && inv.cancelReason && (

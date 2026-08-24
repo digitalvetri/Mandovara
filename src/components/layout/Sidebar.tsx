@@ -64,6 +64,7 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
     section: "People",
     items: [
       { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },
+      { label: "Leave applications", href: "/leave",      icon: CalendarCheck, perm: "leave.view" },
       { label: "Payroll",            href: "/payroll",    icon: IndianRupee   },
     ],
   },

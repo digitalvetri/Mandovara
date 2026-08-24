@@ -2,6 +2,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { formatINR } from "@/kernel/money/format";
 import { listSampleBooks } from "@/modules/samples/queries";
+import { ReturnBookButton } from "./_components/ReturnBookButton";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,7 @@ export default async function SamplesPage({
                 <Th>Due date</Th>
                 <Th align="right">Overdue</Th>
                 <Th align="right">Value</Th>
+                <Th></Th>
               </tr>
             </thead>
             <tbody>
@@ -140,6 +142,19 @@ export default async function SamplesPage({
                   </Td>
                   <Td align="right">
                     <span className="tabular text-text-dim">{formatINR(book.costValue)}</span>
+                  </Td>
+                  <Td align="right">
+                    {book.status === "IN_LIBRARY" && (
+                      <a
+                        href={`/samples/issue/${book.id}`}
+                        className="h-[24px] px-2.5 rounded-[4px] text-[10.5px] font-medium bg-info/12 text-info hover:bg-info/20 transition-colors inline-flex items-center whitespace-nowrap"
+                      >
+                        Issue
+                      </a>
+                    )}
+                    {(book.status === "ISSUED" || book.status === "OVERDUE") && (
+                      <ReturnBookButton bookId={book.id} />
+                    )}
                   </Td>
                 </tr>
               ))}

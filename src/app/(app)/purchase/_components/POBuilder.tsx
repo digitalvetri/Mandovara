@@ -22,11 +22,12 @@ interface Draft {
 const EMPTY: Draft = { colourwayId: "", unit: "METRE", quantity: "1", rate: "" };
 
 interface Props {
-  vendors: VendorPickerRow[];
-  colourways: ColourwayPickerRow[];
+  vendors:      VendorPickerRow[];
+  colourways:   ColourwayPickerRow[];
+  initialLines?: Draft[];
 }
 
-export function POBuilder({ vendors, colourways }: Props) {
+export function POBuilder({ vendors, colourways, initialLines }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export function POBuilder({ vendors, colourways }: Props) {
   const [date, setDate] = useState<string>(iso(today));
   const [expectedAt, setExpectedAt] = useState<string>(iso(nextMonth));
   const [vendorId, setVendorId] = useState<string>("");
-  const [lines, setLines] = useState<Draft[]>([{ ...EMPTY }]);
+  const [lines, setLines] = useState<Draft[]>(initialLines?.length ? initialLines : [{ ...EMPTY }]);
 
   const colourwayMap = useMemo(() => new Map(colourways.map((c) => [c.id, c])), [colourways]);
 

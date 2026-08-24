@@ -3,10 +3,12 @@ import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
+import { scoped } from "@/kernel/db/scoped";
 import { getPO } from "@/modules/purchase/queries";
 import { POStatusPill } from "../_components/StatusPill";
 import { SendOnWhatsAppButton } from "./_components/SendOnWhatsAppButton";
 import { POStatusActions } from "./_components/POStatusActions";
+import { MarkPaidButton } from "@/app/(app)/accounts/_components/MarkPaidButton";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,13 @@ export default async function PODetailPage({
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await devContext();
-  const po = await getPO(ctx, id);
+  const [po, vendorExpense] = await Promise.all([
+    getPO(ctx, id),
+    scoped(ctx).expense.findUnique({
+      where: { sourcePoId: id },
+      select: { id: true, amount: true, approvalState: true, paidAt: true },
+    }),
+  ]);
   if (!po) notFound();
 
   // ── Financial summary ────────────────────────────────────────────────────
@@ -135,6 +143,33 @@ export default async function PODetailPage({
 
         {/* ── Status actions ──────────────────────────────────────────────── */}
         <POStatusActions poId={po.id} status={po.status} vendorName={po.vendorName} />
+
+        {/* ── Vendor payment ──────────────────────────────────────────────── */}
+        {vendorExpense && (
+          <div className="rounded-[14px] bg-surface border border-rule p-5">
+            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Vendor payment</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[18px] font-semibold tabular text-text">{formatINR(vendorExpense.amount)}</div>
+                <div className="text-[11.5px] text-text-dim mt-0.5">
+                  {vendorExpense.paidAt
+                    ? `Paid ${formatDate(vendorExpense.paidAt)}`
+                    : vendorExpense.approvalState === "APPROVED"
+                    ? "Approved — payment pending"
+                    : "Pending approval"}
+                </div>
+              </div>
+              {vendorExpense.approvalState === "APPROVED" && !vendorExpense.paidAt && (
+                <MarkPaidButton expenseId={vendorExpense.id} />
+              )}
+              {vendorExpense.paidAt && (
+                <span className="inline-flex items-center gap-1 h-7 px-2.5 rounded-[6px] text-[11px] font-medium bg-good/10 text-good border border-good/20">
+                  Paid
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── GRN history ─────────────────────────────────────────────────── */}
         {po.grns.length > 0 && (

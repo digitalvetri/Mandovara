@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Scissors } from "lucide-react";
+import { Scissors, Plus } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { listMakeJobs } from "@/modules/make/queries";
 import { MAKE_KANBAN_COLUMNS, MAKE_STATUS_LABELS, MAKE_STATUS_COLORS, PRIORITY_LABELS } from "@/modules/make/schema";
@@ -87,16 +87,25 @@ export default async function MakePage() {
 
   return (
     <div className="py-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Scissors size={22} className="text-gold" strokeWidth={1.5} />
-        <div>
-          <h1 className="text-[22px] font-display font-semibold text-text leading-none">
-            Make
-          </h1>
-          <p className="text-[12px] text-text-muted mt-0.5">
-            Cut &amp; stitch job tracking — {allJobs.length} active job{allJobs.length !== 1 ? "s" : ""}
-          </p>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <Scissors size={22} className="text-gold" strokeWidth={1.5} />
+          <div>
+            <h1 className="text-[22px] font-display font-semibold text-text leading-none">
+              Make
+            </h1>
+            <p className="text-[12px] text-text-muted mt-0.5">
+              Cut &amp; stitch job tracking — {allJobs.length} active job{allJobs.length !== 1 ? "s" : ""}
+            </p>
+          </div>
         </div>
+        <Link
+          href={"/make/new" as Route}
+          className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[8px] bg-accent text-white text-[12px] font-medium hover:bg-accent/90 transition-colors"
+        >
+          <Plus size={13} strokeWidth={2.5} />
+          New job
+        </Link>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-4">

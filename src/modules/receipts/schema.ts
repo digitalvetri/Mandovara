@@ -29,5 +29,10 @@ export const bounceReceiptSchema = z.object({
   id: z.string().min(1),
 });
 
+export const clearChequeSchema = z.object({
+  id: z.string().min(1),
+});
+
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>;
 export type BounceReceiptInput = z.infer<typeof bounceReceiptSchema>;
+export type ClearChequeInput   = z.infer<typeof clearChequeSchema>;

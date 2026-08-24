@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import type { Route } from "next";
 import { Plus, Check } from "lucide-react";
 import { addMilestone, setMilestoneStatus } from "@/modules/projects/actions";
 import type { ProjectMilestone } from "@/modules/projects/queries";
@@ -19,6 +21,7 @@ export function Milestones({ projectId, milestones }: { projectId: string; miles
   const [plannedDate, setPlannedDate] = useState(iso(new Date()));
   const [billingPct, setBillingPct] = useState("25");
   const [error, setError] = useState<string | null>(null);
+  const [billingAlert, setBillingAlert] = useState<{ pct: number; projectId: string } | null>(null);
 
   function addOne(e: React.FormEvent) {
     e.preventDefault();
@@ -33,9 +36,13 @@ export function Milestones({ projectId, milestones }: { projectId: string; miles
 
   function complete(id: string) {
     setError(null);
+    setBillingAlert(null);
     startTransition(async () => {
       const res = await setMilestoneStatus({ id, status: "COMPLETED" });
       if (!res.ok) { setError(res.error ?? "Could not complete"); return; }
+      if (res.data?.billingPct && res.data.projectId) {
+        setBillingAlert({ pct: res.data.billingPct, projectId: res.data.projectId });
+      }
       router.refresh();
     });
   }
@@ -76,6 +83,20 @@ export function Milestones({ projectId, milestones }: { projectId: string; miles
       )}
       {error && (
         <div className="px-4 py-2 text-[11.5px] text-bad bg-bad/6 border-b border-bad/20">{error}</div>
+      )}
+      {billingAlert && (
+        <div className="px-4 py-2.5 text-[11.5px] bg-gold/8 border-b border-gold/20 flex items-center justify-between gap-3">
+          <span className="text-text">
+            This milestone has a <strong>{billingAlert.pct}%</strong> billing trigger.
+          </span>
+          <Link
+            href={`/invoicing/new?projectId=${billingAlert.projectId}` as Route}
+            className="shrink-0 h-[24px] px-3 rounded-[4px] bg-gold/20 text-gold text-[11px] font-medium hover:bg-gold/30 transition-colors inline-flex items-center"
+            onClick={() => setBillingAlert(null)}
+          >
+            Create invoice
+          </Link>
+        </div>
       )}
       {milestones.length === 0 ? (
         <div className="py-8 text-center text-[12px] text-text-faint">No milestones yet.</div>

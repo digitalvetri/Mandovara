@@ -7,6 +7,7 @@ import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { getReceipt } from "@/modules/receipts/queries";
 import { ModePill } from "../_components/ModePill";
+import { ChequeActionButtons } from "../_components/ChequeActionButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function ReceiptDetailPage({
                 </div>
               )}
             </div>
+            <ChequeActionButtons receiptId={r.id} chequeStatus={r.chequeStatus} />
           </div>
 
           <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
