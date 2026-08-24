@@ -48,5 +48,6 @@ export interface SerializedQuotation {
   roundOffStr: string;
   totalStr: string;
   termsText: string | null;
+  shareToken: string | null;
   lines: SerializedLine[];
 }

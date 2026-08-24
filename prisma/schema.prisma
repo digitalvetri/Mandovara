@@ -1102,8 +1102,10 @@ model Quotation {
   approvedById   String?
   approvedAt     DateTime?
   rejectionReason String?
-  sentAt         DateTime?
-  pdfKey         String?
+  sentAt              DateTime?
+  pdfKey              String?
+  shareToken          String?   @unique
+  shareTokenExpiresAt DateTime?
   // Owner sign-off to CONVERT a lead-scoped quotation into a Client +
   // Project (FIXES-01 §5.1). Independent of `approvedById` (which is
   // internal quote approval before send). Both must be present + the

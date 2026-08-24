@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { randomBytes } from "crypto";
 import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { getQuotation, type QuotationDetail } from "@/modules/quotations/queries";
@@ -11,7 +12,7 @@ import type { SerializedQuotation } from "./_types";
 
 export const dynamic = "force-dynamic";
 
-function serializeQuotation(q: QuotationDetail): SerializedQuotation {
+function serializeQuotation(q: QuotationDetail, shareToken: string | null): SerializedQuotation {
   return {
     id: q.id,
     number: q.number,
@@ -37,6 +38,7 @@ function serializeQuotation(q: QuotationDetail): SerializedQuotation {
     roundOffStr: q.roundOff.toString(),
     totalStr: q.total.toString(),
     termsText: q.termsText,
+    shareToken,
     lines: q.lines.map((l) => ({
       id: l.id,
       lineNo: l.lineNo,
@@ -70,8 +72,20 @@ export default async function QuotationDetailPage({
   const q = await getQuotation(ctx, id);
   if (!q) notFound();
 
+  // Ensure a valid share token exists — generate (or refresh) if missing/expired.
+  const now = new Date();
+  let shareToken = q.shareToken;
+  if (!shareToken || (q.shareTokenExpiresAt !== null && q.shareTokenExpiresAt < now)) {
+    shareToken = randomBytes(32).toString("hex");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (scoped(ctx).quotation as any).update({
+      where: { id: q.id },
+      data: { shareToken, shareTokenExpiresAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000) },
+    });
+  }
+
   const canApprove = can(ctx, "quotation.approve");
-  const serialized = serializeQuotation(q);
+  const serialized = serializeQuotation(q, shareToken);
 
   // Work out up front whether this estimate can become a firm quotation, so
   // the button can say WHY not instead of just being absent.

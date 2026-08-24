@@ -17,7 +17,7 @@ export async function getQuotation(
     select: {
       id: true, number: true, revision: true, status: true, branchId: true,
       leadId: true, projectId: true, clientId: true, ownerId: true,
-      date: true, validUntil: true, termsText: true,
+      date: true, validUntil: true, termsText: true, shareToken: true, shareTokenExpiresAt: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
       project: {
         select: {
@@ -99,7 +99,7 @@ export async function getQuotation(
     projectId:   row.projectId,
     date: row.date,
     validUntil: row.validUntil,
-    termsText: row.termsText,
+    termsText: row.termsText, shareToken: row.shareToken ?? null, shareTokenExpiresAt: row.shareTokenExpiresAt ?? null,
     taxableAmount: row.taxableAmount,
     cgst: row.cgst,
     sgst: row.sgst,

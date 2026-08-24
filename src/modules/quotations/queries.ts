@@ -107,6 +107,8 @@ export interface QuotationDetail {
   roundOff: bigint;
   total: bigint;
   termsText: string | null;
+  shareToken: string | null;
+  shareTokenExpiresAt: Date | null;
   lines: QuotationLine[];
 }
 

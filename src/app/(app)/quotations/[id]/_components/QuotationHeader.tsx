@@ -46,11 +46,14 @@ interface Props {
 
 export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }: Props) {
   const [copied, setCopied] = useState(false);
-  const [link, setLink]     = useState(`/quotations/${quotation.id}`);
+  const [link, setLink]     = useState(
+    quotation.shareToken ? `/q/${quotation.shareToken}` : `/quotations/${quotation.id}`,
+  );
 
   useEffect(() => {
-    setLink(`${window.location.origin}/quotations/${quotation.id}`);
-  }, [quotation.id]);
+    const base = window.location.origin;
+    setLink(quotation.shareToken ? `${base}/q/${quotation.shareToken}` : `${base}/quotations/${quotation.id}`);
+  }, [quotation.id, quotation.shareToken]);
 
   const isIntraState = BigInt(quotation.igstStr) === 0n;
   const total     = pToINR(quotation.totalStr);
