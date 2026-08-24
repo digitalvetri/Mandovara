@@ -140,7 +140,7 @@ export async function updateSiteVisitStatus(
         ...(observations    !== undefined ? { observations }    : {}),
         ...(customerNotes   !== undefined ? { customerNotes }   : {}),
       },
-      select: { id: true, projectId: true },
+      select: { id: true, projectId: true, purpose: true },
     });
 
     // FIXES-01 §9 — fire siteVisit.completed when transitioning to
@@ -156,6 +156,43 @@ export async function updateSiteVisitStatus(
         projectId:   visit.projectId,
       });
       revalidatePath(`/projects/${visit.projectId}`);
+
+      // Fix 5.C — auto-create the invoice when a HANDOVER visit completes.
+      // Best-effort: if the project has no order yet, or an invoice already
+      // exists, or the caller lacks invoice.create, we skip silently — the
+      // /projects/[id] page still surfaces the "Create invoice" button as
+      // a fallback.
+      if (visit.purpose === "HANDOVER") {
+        try {
+          const order = await db.order.findFirst({
+            where:   { projectId: visit.projectId, status: { not: "CANCELLED" } },
+            orderBy: { date: "desc" },
+            select:  { id: true },
+          });
+          if (order && ctx.permissions.has("invoice.create")) {
+            const { createInvoiceFromOrder } = await import("@/modules/invoices/actions-part2");
+            const res = await createInvoiceFromOrder({ salesOrderId: order.id });
+            if (!res.ok) {
+              console.warn("auto-createInvoiceFromOrder on handover:", res.error);
+            } else {
+              revalidatePath("/invoicing");
+            }
+          }
+        } catch (invErr) {
+          console.warn("auto-invoice on HANDOVER completed failed:", invErr);
+        }
+
+        // Advance the project to COMPLETED once the handover is signed off.
+        // Guarded — never regress from CANCELLED / COMPLETED.
+        try {
+          await db.project.updateMany({
+            where: { id: visit.projectId, stage: { notIn: ["COMPLETED", "CANCELLED"] } },
+            data:  { stage: "COMPLETED" },
+          });
+        } catch (stageErr) {
+          console.warn("auto-advance project to COMPLETED failed:", stageErr);
+        }
+      }
     }
 
     revalidatePath("/site-visits");
