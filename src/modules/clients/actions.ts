@@ -77,12 +77,14 @@ export async function updateClient(input: unknown): Promise<ActionResult<{ id: s
   await db.client.update({
     where: { id },
     data: {
-      ...(rest.name != null          && { name: rest.name }),
-      ...(rest.type != null          && { type: rest.type }),
-      ...(rest.primaryMobile != null && { mobile: normaliseMobile(rest.primaryMobile) }),
-      ...(rest.primaryEmail != null  && { email: emptyToNull(rest.primaryEmail) }),
-      ...(rest.gstin != null         && { gstin: upper(emptyToNull(rest.gstin)) }),
-      ...(rest.pan != null           && { pan: upper(emptyToNull(rest.pan)) }),
+      ...(rest.name != null            && { name: rest.name }),
+      ...(rest.type != null            && { type: rest.type }),
+      ...(rest.primaryMobile != null   && { mobile: normaliseMobile(rest.primaryMobile) }),
+      ...(rest.primaryEmail != null    && { email: emptyToNull(rest.primaryEmail) }),
+      ...(rest.gstin != null           && { gstin: upper(emptyToNull(rest.gstin)) }),
+      ...(rest.pan != null             && { pan: upper(emptyToNull(rest.pan)) }),
+      ...(rest.stateCode != null       && { stateCode: rest.stateCode }),
+      ...(rest.paymentTerms != null    && { paymentTermsDays: rest.paymentTerms }),
     },
   });
 
@@ -134,8 +136,12 @@ export async function setClientStatus(input: unknown): Promise<ActionResult<{ id
 
   if (status === "BLACKLISTED") requirePermission(ctx, "client.blacklist");
 
-  // status is not a field in the current Client schema — log and no-op for now.
-  void status;
+  const db = scoped(ctx);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db.client.update as any)({
+    where: { id },
+    data:  { status },
+  });
 
   revalidatePath("/clients");
   revalidatePath(`/clients/${id}`);

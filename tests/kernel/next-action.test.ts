@@ -18,7 +18,7 @@ function ctxWith(perms: readonly string[]): RequestContext {
   };
 }
 
-const PROJECT = { id: "p1", stage: "SITE_VISIT" };
+const PROJECT = { id: "p1", clientId: "c1", stage: "SITE_VISIT" };
 
 describe("resolveNextAction — measurement stages", () => {
   it("Owner at SITE_VISIT is DISABLED with the segregation-of-duties reason", () => {

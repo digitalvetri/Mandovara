@@ -39,7 +39,7 @@ export async function appendColourwayToQuotation(
   const q = await db.quotation.findUnique({
     where:  { id: quotationId },
     select: {
-      id: true, status: true, branchId: true,
+      id: true, status: true, branchId: true, clientId: true,
       lines: { select: { lineNo: true, taxable: true, gstRate: true } },
     },
   });
@@ -63,21 +63,26 @@ export async function appendColourwayToQuotation(
   });
   if (!cw) return { ok: false, error: "Colourway not found" };
 
-  const branch = await db.branch.findUniqueOrThrow({
-    where:  { id: q.branchId },
-    select: { stateCode: true },
-  });
+  const [branch, client] = await Promise.all([
+    db.branch.findUniqueOrThrow({ where: { id: q.branchId }, select: { stateCode: true } }),
+    q.clientId
+      ? db.client.findUnique({ where: { id: q.clientId }, select: { stateCode: true } })
+      : Promise.resolve(null),
+  ]);
 
   const ratePaise = cw.prices[0]?.amount ?? 0n;
   const qtyFixed  = BigInt(Math.round(quantity * 10_000));
   const grossPaise = (ratePaise * qtyFixed) / 10_000n;
   const { taxable } = applyLineDiscount(grossPaise, 0);
   const gstRate = Number(cw.design.gstRate);
+  // Use the client's stateCode as place of supply — correctly splits CGST/SGST
+  // for intra-state vs IGST for inter-state quotes.
+  const supplyState = client?.stateCode ?? branch.stateCode;
   const tax = computeLineTax({
     taxable,
     gstRate,
     supplierStateCode: branch.stateCode,
-    placeOfSupplyCode: branch.stateCode,
+    placeOfSupplyCode: supplyState,
   });
   const nextLineNo = (q.lines.reduce((m, l) => Math.max(m, l.lineNo), 0)) + 1;
 
@@ -110,7 +115,7 @@ export async function appendColourwayToQuotation(
       ];
       const totals = computeDocumentTotals(allLines, {
         supplierStateCode: branch.stateCode,
-        placeOfSupplyCode: branch.stateCode,
+        placeOfSupplyCode: supplyState,
       });
       await tx.quotation.update({
         where: { id: quotationId },

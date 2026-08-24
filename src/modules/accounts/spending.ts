@@ -45,6 +45,7 @@ export async function loadSpending(
     db.expense.findMany({
       where:   {
         incurredAt: { gte: start, lt: end },
+        approvalState: "APPROVED",
         ...(opts.head ? { head: opts.head } : {}),
       },
       orderBy: { incurredAt: "desc" },
@@ -57,6 +58,7 @@ export async function loadSpending(
     db.projectExpense.findMany({
       where: {
         incurredAt: { gte: start, lt: end },
+        approvalState: "APPROVED",
         ...(opts.head ? { head: opts.head } : {}),
       },
       orderBy: { incurredAt: "desc" },

@@ -156,6 +156,12 @@ enum ClientType {
   DEALER
 }
 
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  BLACKLISTED
+}
+
 enum ProjectStage {
   ENQUIRY
   SITE_VISIT
@@ -726,6 +732,7 @@ model Client {
   notes          String?
   // Owner-flagged: never surface in the chase list. Sales still see the balance,
   // but the money page doesn't nudge the owner to call them.
+  status           ClientStatus @default(ACTIVE)
   doNotChase       Boolean  @default(false)
   // Bumped by any OUTBOUND CommunicationLog write. Drives the contact-penalty
   // tier in the chase-score algorithm (docs/ACCOUNTS-PAGE.md §6.1).

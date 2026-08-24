@@ -152,23 +152,40 @@ export async function approveExpense(
   if (!parsed.success) return zodError(parsed.error);
   const { id, state } = parsed.data;
 
-  const db      = scoped(ctx);
-  const expense = await db.projectExpense.findUnique({
+  const db = scoped(ctx);
+
+  // Try ProjectExpense first, then general Expense.
+  const projExpense = await db.projectExpense.findUnique({
     where: { id },
     select: { id: true, approvalState: true, projectId: true },
   });
-  if (!expense) return { ok: false, error: "Expense not found." };
-  if (expense.approvalState !== "PENDING") {
-    return { ok: false, error: `Expense is already ${expense.approvalState}.` };
+
+  if (projExpense) {
+    if (projExpense.approvalState !== "PENDING") {
+      return { ok: false, error: `Expense is already ${projExpense.approvalState}.` };
+    }
+    await db.projectExpense.update({
+      where: { id },
+      data: { approvalState: state, approvedById: ctx.userId },
+    });
+    revalidatePath(`/projects/${projExpense.projectId}`);
+    revalidatePath("/accounts");
+    return { ok: true, data: { id } };
   }
 
-  await db.projectExpense.update({
+  const genExpense = await db.expense.findUnique({
     where: { id },
-    data: { approvalState: state, approvedById: ctx.userId },
+    select: { id: true, approvalState: true },
   });
-
-  revalidatePath(`/projects/${expense.projectId}`);
-  revalidatePath("/expenses");
+  if (!genExpense) return { ok: false, error: "Expense not found." };
+  if (genExpense.approvalState !== "PENDING") {
+    return { ok: false, error: `Expense is already ${genExpense.approvalState}.` };
+  }
+  await db.expense.update({
+    where: { id },
+    data: { approvalState: state },
+  });
+  revalidatePath("/accounts");
   return { ok: true, data: { id } };
 }
 

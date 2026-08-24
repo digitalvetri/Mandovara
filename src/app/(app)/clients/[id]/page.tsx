@@ -78,6 +78,14 @@ export default async function ClientDetailPage({
       />
 
       <div className="flex justify-end gap-2 pb-3">
+        {ctx.permissions.has("client.update") && (
+          <Link
+            href={`/clients/${client.id}/edit` as Route}
+            className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule bg-surface px-3 py-1.5 text-[12px] text-text-dim hover:text-text hover:border-gold transition-colors"
+          >
+            Edit
+          </Link>
+        )}
         <Link
           href={`/quotations/quick?client=${client.id}` as Route}
           className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule bg-surface px-3 py-1.5 text-[12px] text-text-dim hover:text-text hover:border-accent/60 transition-colors"

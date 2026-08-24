@@ -65,11 +65,11 @@ export async function buildSpentSum(
   const [expAgg, projExpAgg, slipAgg] = await Promise.all([
     db.expense.aggregate({
       _sum: { amount: true },
-      where: { incurredAt: { gte: start, lt: end } },
+      where: { incurredAt: { gte: start, lt: end }, approvalState: "APPROVED" },
     }),
     db.projectExpense.aggregate({
       _sum: { amount: true },
-      where: { incurredAt: { gte: start, lt: end } },
+      where: { incurredAt: { gte: start, lt: end }, approvalState: "APPROVED" },
     }),
     db.payslip.aggregate({
       _sum: { netPay: true },

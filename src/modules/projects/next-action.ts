@@ -40,6 +40,7 @@ export interface NextAction {
 
 export interface ProjectSnapshot {
   id: string;
+  clientId?: string;
   stage: string;
   openSnags?: number;
   makeInProgress?: { done: number; total: number };
@@ -60,7 +61,7 @@ export function resolveNextAction(
   ctx: RequestContext,
   project: ProjectSnapshot,
 ): NextAction {
-  const { stage, id } = project;
+  const { stage, id, clientId } = project;
 
   switch (stage) {
     case "ENQUIRY":
@@ -150,7 +151,7 @@ export function resolveNextAction(
         cta:   "Send review request",
         enabled: hasAny(ctx, ["client.viewOthers"]),
         disabledReason: null,
-        href: `/clients/${id}`,
+        href: clientId ? `/clients/${clientId}` : `/projects/${id}`,
       };
 
     case "CANCELLED":

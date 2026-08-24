@@ -61,7 +61,7 @@ export default async function ProjectDetailPage({
       canViewProfitability ? getProjectProfitability(ctx, id) : null,
     ]);
 
-  const action = resolveNextAction(ctx, { id: p.id, stage: p.stage });
+  const action = resolveNextAction(ctx, { id: p.id, clientId: p.clientId, stage: p.stage });
   const receivedTotal = money?.receiptTotal ?? 0n;
   const pctCompleteHeader = milestones.length > 0
     ? Math.round(
@@ -93,16 +93,26 @@ export default async function ProjectDetailPage({
             </h1>
           </div>
 
-          {/* "Create invoice" surfaces here only when all three gates hold:
-              user has invoice.create, project has a confirmed order, AND
-              no active invoice exists yet. Hidden once invoiced to prevent
-              accidental duplicates — the Payments panel below handles
-              further billing actions. */}
-          {ctx.permissions.has("invoice.create") &&
-            payments?.latestOrderId &&
-            (payments.invoices.length === 0) && (
-            <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
-          )}
+          <div className="flex items-center gap-2">
+            {ctx.permissions.has("project.update") && (
+              <a
+                href={`/projects/${p.id}/edit`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-rule bg-surface-2 px-3 text-[12px] text-text-dim hover:border-gold hover:text-text transition-colors"
+              >
+                Edit
+              </a>
+            )}
+            {/* "Create invoice" surfaces here only when all three gates hold:
+                user has invoice.create, project has a confirmed order, AND
+                no active invoice exists yet. Hidden once invoiced to prevent
+                accidental duplicates — the Payments panel below handles
+                further billing actions. */}
+            {ctx.permissions.has("invoice.create") &&
+              payments?.latestOrderId &&
+              (payments.invoices.length === 0) && (
+              <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
+            )}
+          </div>
         </div>
 
         <div className="mt-4">

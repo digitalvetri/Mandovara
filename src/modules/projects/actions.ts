@@ -3,7 +3,7 @@
 // Project server actions. Every mutation goes through db.scoped(ctx) + audit
 // via the scoped extension.
 
-import type { z } from "zod";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
@@ -84,6 +84,46 @@ export async function createProject(input: unknown): Promise<ActionResult<{ id: 
 
   revalidatePath("/projects");
   return { ok: true, data: created };
+}
+
+export async function updateProject(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "project.update");
+
+  const parsed = z.object({
+    id:                 z.string().min(1),
+    name:               z.string().trim().min(2).max(200).optional(),
+    orderValue:         z.string().trim().optional(),
+    expectedInstallAt:  z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional().or(z.literal("")),
+    siteContactName:    z.string().trim().max(120).optional(),
+    siteContactMobile:  z.string().trim().max(20).optional(),
+  }).safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { id, name, orderValue, expectedInstallAt, siteContactName, siteContactMobile } = parsed.data;
+
+  let orderPaise: bigint | undefined;
+  if (orderValue && orderValue.trim()) {
+    const v = tryParsePaise(orderValue);
+    if (v == null) return { ok: false, error: "Validation failed", fieldErrors: { orderValue: "Could not parse order value" } };
+    orderPaise = v;
+  }
+
+  const db = scoped(ctx);
+  await db.project.update({
+    where: { id },
+    data: {
+      ...(name != null       && { name }),
+      ...(orderPaise != null && { orderValue: orderPaise }),
+      ...(expectedInstallAt != null && {
+        expectedInstallAt: expectedInstallAt ? new Date(expectedInstallAt) : null,
+      }),
+      ...(siteContactName   != null && { siteContactName:   siteContactName   || null }),
+      ...(siteContactMobile != null && { siteContactMobile: siteContactMobile || null }),
+    },
+  });
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${id}`);
+  return { ok: true, data: { id } };
 }
 
 export async function setProjectStatus(input: unknown): Promise<ActionResult<{ id: string }>> {

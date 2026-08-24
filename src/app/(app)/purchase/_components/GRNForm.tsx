@@ -7,6 +7,7 @@ import type { POLineRow } from "@/modules/purchase/queries";
 
 interface LineState {
   quantity: string;
+  dyeLot: string;
   binLocation: string;
 }
 
@@ -28,7 +29,7 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
   if (pendingLines.length === 0) return null;
 
   function lineState(id: string): LineState {
-    return stateByLine[id] ?? { quantity: "", binLocation: "" };
+    return stateByLine[id] ?? { quantity: "", dyeLot: "", binLocation: "" };
   }
   function updateLine(id: string, patch: Partial<LineState>) {
     setStateByLine((s) => ({ ...s, [id]: { ...lineState(id), ...patch } }));
@@ -45,6 +46,7 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
         return {
           colourwayId:  l.colourwayId,
           quantity:     qty,
+          dyeLot:       st.dyeLot || undefined,
           binLocation:  st.binLocation || undefined,
         };
       })
@@ -103,7 +105,8 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
               <Th>Colourway</Th>
               <Th align="right">Pending</Th>
               <Th align="right" width={110}>Receive now</Th>
-              <Th width={110}>Bin</Th>
+              <Th width={120}>Dye lot</Th>
+              <Th width={100}>Bin</Th>
             </tr>
           </thead>
           <tbody>
@@ -124,6 +127,13 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
                     onChange={(e) => updateLine(l.id, { quantity: e.target.value })}
                     placeholder="0"
                     className={`${cellCls} tabular text-right`} />
+                </Td>
+                <Td>
+                  <input
+                    value={lineState(l.id).dyeLot}
+                    onChange={(e) => updateLine(l.id, { dyeLot: e.target.value })}
+                    placeholder="e.g. DL-2408"
+                    className={`${cellCls} tabular`} />
                 </Td>
                 <Td>
                   <input

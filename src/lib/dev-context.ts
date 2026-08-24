@@ -57,11 +57,14 @@ async function buildContext(userId: string): Promise<RequestContext | null> {
       permissions = allRegisteredPermissions();
     }
 
+    const isOwnerRole = user.dynamicRole?.isOwnerRole ?? (user.role === "OWNER");
+    const branchScope = isOwnerRole || user.branchIds.length === 0 ? "ALL" : "MEMBERS";
+
     return {
       userId: user.id,
       orgId: user.organizationId,
       branchIds: user.branchIds,
-      branchScope: "ALL",
+      branchScope,
       roles: [user.role as string],
       permissions,
     };

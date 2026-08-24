@@ -67,8 +67,8 @@ export function ClientForm({ mode, initial }: ClientFormProps) {
         return;
       }
       const targetId = mode === "create" ? result.data?.id : initial?.id;
-      const createTarget = (targetId ? `/clients/${targetId}` : "/clients") as Route;
-      router.push(mode === "edit" ? ("/clients" as Route) : createTarget);
+      const target = (targetId ? `/clients/${targetId}` : "/clients") as Route;
+      router.push(target);
       router.refresh();
     });
   }

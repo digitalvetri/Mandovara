@@ -120,8 +120,22 @@ export async function setPOStatus(
   const db = scoped(ctx);
   const po = await db.purchaseOrder.findUniqueOrThrow({
     where: { id },
-    select: { status: true },
+    select: {
+      status: true,
+      lines: { select: { receivedQty: true } },
+    },
   });
+
+  // Prevent marking RECEIVED without any GRN having been posted.
+  if (status === "RECEIVED") {
+    const totalReceived = po.lines.reduce(
+      (sum, l) => sum + parseFloat(l.receivedQty.toString()),
+      0,
+    );
+    if (totalReceived === 0) {
+      return { ok: false, error: "Cannot mark as received — no GRN has been posted for this PO. Post a GRN first." };
+    }
+  }
 
   const VALID_TRANSITIONS: Record<string, string[]> = {
     DRAFT:            ["PENDING_APPROVAL", "SENT"],

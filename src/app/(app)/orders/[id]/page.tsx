@@ -8,6 +8,7 @@ import { devContext } from "@/lib/dev-context";
 import { getOrder } from "@/modules/orders/queries";
 import { StatusPill } from "../_components/StatusPill";
 import { CreateInvoiceButton } from "../_components/CreateInvoiceButton";
+import { OrderStatusActions } from "./_components/OrderStatusActions";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +108,9 @@ export default async function OrderDetailPage({
             </div>
             {canEdit && <CreateInvoiceButton orderId={o.id} />}
           </div>
+
+          {/* Workflow advance */}
+          <OrderStatusActions orderId={o.id} status={o.status} />
 
           {/* Lines table */}
           <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
