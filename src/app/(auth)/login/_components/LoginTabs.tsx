@@ -109,6 +109,7 @@ export function LoginCard() {
                 onClick={() => setShowCreds((v) => !v)}
                 className="flex items-center gap-1 text-[10.5px] font-medium transition-opacity hover:opacity-70"
                 style={{ color: "#2BA89A" }}
+                suppressHydrationWarning
               >
                 <Info size={10} strokeWidth={2.2} />
                 View credentials
@@ -159,6 +160,7 @@ export function LoginCard() {
               href="/forgot-password"
               className="text-[11.5px] font-medium transition-opacity hover:opacity-70"
               style={{ color: "#2BA89A" }}
+              suppressHydrationWarning
             >
               Forgot password?
             </a>
