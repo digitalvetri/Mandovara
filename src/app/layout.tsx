@@ -56,7 +56,7 @@ export default async function RootLayout({
   // (MetaMask, Grammarly, etc.) that inject attributes onto <html> after SSR.
   return (
     <html lang="en" className={htmlClass} data-theme={isDark ? "dark" : "light"} suppressHydrationWarning>
-      <body className="bg-bg text-text font-body">
+      <body className="bg-bg text-text font-body" suppressHydrationWarning>
         {children}
         <ServiceWorkerRegistrar />
       </body>
