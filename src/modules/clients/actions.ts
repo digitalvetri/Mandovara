@@ -137,8 +137,7 @@ export async function setClientStatus(input: unknown): Promise<ActionResult<{ id
   if (status === "BLACKLISTED") requirePermission(ctx, "client.blacklist");
 
   const db = scoped(ctx);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.client.update as any)({
+  await db.client.update({
     where: { id },
     data:  { status },
   });
