@@ -9,9 +9,7 @@ import {
 } from "lucide-react";
 import { StatusPill } from "../../_components/StatusPill";
 import { StatusChanger } from "../../_components/StatusChanger";
-import { ReissueButton } from "./ReissueButton";
 import type { SerializedQuotation } from "../_types";
-import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 import { pToINR, fmtDate, digitsOnly, shortNum, effectiveGstRate } from "./quote-header-utils";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 
@@ -40,11 +38,10 @@ function ClientAvatar({ name }: { name: string }) {
 
 interface Props {
   quotation: SerializedQuotation;
-  reissueBlockedReason?: string;
   canApprove: boolean;
 }
 
-export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }: Props) {
+export function QuotationHeader({ quotation, canApprove }: Props) {
   const [copied, setCopied] = useState(false);
   const [link, setLink]     = useState(
     quotation.shareToken ? `/q/${quotation.shareToken}` : `/quotations/${quotation.id}`,
@@ -114,14 +111,6 @@ export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }:
 
         <StatusPill status={quotation.status} />
 
-        {isEstimate(quotation.lines) && (
-          <span
-            title={ESTIMATE_CAVEAT}
-            className="text-[10px] uppercase tracking-[0.12em] px-2 py-[3px] rounded-[5px] bg-heat/10 text-heat border border-heat/20"
-          >
-            Estimate
-          </span>
-        )}
         {quotation.revision > 0 && (
           <span className="tabular text-[11px] text-text-dim bg-surface border border-rule px-2 py-0.5 rounded-[5px]">
             Rev {quotation.revision}
@@ -130,9 +119,6 @@ export function QuotationHeader({ quotation, canApprove, reissueBlockedReason }:
 
         <div className="ml-auto flex items-center gap-2 flex-wrap shrink-0">
           <StatusChanger id={quotation.id} current={quotation.status} canApprove={canApprove} />
-          {isEstimate(quotation.lines) && quotation.status !== "REVISED" && (
-            <ReissueButton quotationId={quotation.id} blockedReason={reissueBlockedReason} />
-          )}
           <PdfPreviewModal
             quotationId={quotation.id}
             label={quotation.number}
