@@ -131,6 +131,7 @@ export default async function LeadDetailPage({
         leadName={lead.name}
         mobile={lead.mobile}
         email={lead.email ?? null}
+        hasQuotes={leadScopedQuotes.length > 0}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">

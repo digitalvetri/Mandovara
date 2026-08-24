@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
-import { Zap } from "lucide-react";
+import { Zap, FolderPlus } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { AgeingBars } from "@/components/data/AgeingBars";
@@ -92,6 +92,14 @@ export default async function ClientDetailPage({
         >
           <Zap size={13} /> New quick quote
         </Link>
+        {ctx.permissions.has("project.create") && (
+          <Link
+            href={`/projects/new?client=${client.id}` as Route}
+            className="inline-flex items-center gap-1.5 rounded-[8px] bg-accent text-white px-3 py-1.5 text-[12px] font-medium hover:bg-accent/90 transition-colors"
+          >
+            <FolderPlus size={13} /> Start project
+          </Link>
+        )}
         <StartMeasurementFromClientButton
           clientId={client.id}
           projects={client.projects.map((p) => ({ id: p.id, name: p.name, stage: p.stage }))}

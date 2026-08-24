@@ -19,9 +19,13 @@ interface Props {
   leadName: string;
   mobile: string;
   email: string | null;
+  // When quotes exist under the lead, the ConversionApprovalCard is the
+  // sanctioned conversion path (needs client-accepted + owner-approved).
+  // Hide the free-form Convert button here to remove the duplicate CTA.
+  hasQuotes?: boolean;
 }
 
-export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email }: Props) {
+export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email, hasQuotes }: Props) {
   const router = useRouter();
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showVisitModal, setShowVisitModal] = useState(false);
@@ -92,7 +96,9 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
             <ArrowUpRight size={14} strokeWidth={1.75} />
             {convertedProjectId ? "Open Project" : "Open Client"}
           </Link>
-        ) : !isLost ? (
+        ) : !isLost && !hasQuotes ? (
+          // No quotes yet — allow free-form conversion. Once a quote exists,
+          // ConversionApprovalCard becomes the single sanctioned path.
           <button
             type="button"
             onClick={() => setShowConvertModal(true)}

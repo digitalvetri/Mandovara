@@ -14,21 +14,30 @@ import { EntityForm } from "@/components/data/EntityForm";
 interface Props {
   clients: ClientPickerRow[];
   branches: BranchOption[];
+  // When arriving via /projects/new?client=X (from a client detail page),
+  // prefill the client picker so the owner doesn't re-choose.
+  defaultClientId?: string;
 }
 
-export function ProjectForm({ clients, branches }: Props) {
+export function ProjectForm({ clients, branches, defaultClientId }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
   const today = new Date();
   const later = new Date(); later.setDate(today.getDate() + 60);
 
+  // Only accept the prefill if the id actually matches a client we're
+  // allowed to see — silently ignore stale/invalid query params.
+  const prefill = defaultClientId && clients.some((c) => c.id === defaultClientId)
+    ? defaultClientId
+    : "";
+
   const {
     register, handleSubmit, formState: { errors }, setError,
   } = useForm<CreateProjectInput>({
     resolver: zodResolver(createProjectSchema),
     defaultValues: {
-      name: "", clientId: "", branchId: branches[0]?.id ?? "",
+      name: "", clientId: prefill, branchId: branches[0]?.id ?? "",
       startDate: iso(today), targetEndDate: iso(later),
       orderValue: "",
     },

@@ -6,16 +6,26 @@ import { ProjectForm } from "../_components/ProjectForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewProjectPage() {
+interface Props {
+  // Next 16 passes searchParams as a Promise to server pages.
+  searchParams: Promise<{ client?: string }>;
+}
+
+export default async function NewProjectPage({ searchParams }: Props) {
   const ctx = await devContext();
-  const [clients, branches] = await Promise.all([
+  const [clients, branches, { client: preselectedClientId }] = await Promise.all([
     listClientsForProject(ctx),
     listBranches(ctx),
+    searchParams,
   ]);
   return (
     <>
       <Topbar title="New project" eyebrow="Milestones and tasks are added on the detail page after creating." />
-      <ProjectForm clients={clients} branches={branches} />
+      <ProjectForm
+        clients={clients}
+        branches={branches}
+        defaultClientId={preselectedClientId}
+      />
     </>
   );
 }
