@@ -31,7 +31,6 @@ function gstHalf(cgst: bigint, taxable: bigint): string {
 
 // ── constants ──────────────────────────────────────────────────────────────
 const FROM = { name: "Mandovara", addr1: "32 Thirumoorthy Layout, Thadagam Road", addr2: "RS Puram, Coimbatore 641002", state: "Tamil Nadu (33), India", phone: "+91 89404 30051", email: "mandovara22@gmail.com" };
-const BANK = { name: "Mandovara Home Furnishing LLP", ac: "— confirm with accounts —", ifsc: "— confirm with accounts —", upi: "mandovara22@okaxis" };
 const STATUS_LABEL: Record<string, string> = { DRAFT: "DRAFT", SENT: "QUOTATION", REVISED: "REVISED", ACCEPTED: "ACCEPTED", REJECTED: "REJECTED", EXPIRED: "EXPIRED" };
 const ESTIMATE_TERMS = [ESTIMATE_CAVEAT, "This estimate is indicative — a firm quotation follows site measurement.", "Estimate is valid until the date shown above."];
 const DEFAULT_TERMS  = ["Quotation is valid until the date shown above.", "50% advance required to confirm the order.", "Balance payable before or on delivery / installation.", "Goods once delivered cannot be returned.", "Delivery timeline is as per the agreed schedule.", "All prices inclusive of GST."];
@@ -131,12 +130,6 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
           <View style={s.termsCol}>
             <Text style={s.termsSec}>TERMS &amp; CONDITIONS</Text>
             {terms.map((t, i) => <Text key={i} style={s.termsBullet}>{i + 1}.{"  "}{t}</Text>)}
-            <View style={s.bankSection}>
-              <Text style={s.bankSec}>PAYMENT DETAILS</Text>
-              {[{ lbl: "A/C", val: BANK.ac }, { lbl: "IFSC", val: BANK.ifsc }, { lbl: "UPI", val: BANK.upi }, { lbl: "Name", val: BANK.name }].map(({ lbl, val }) => (
-                <View key={lbl} style={s.bankRow}><Text style={s.bankLbl}>{lbl}</Text><Text style={s.bankVal}>{val}</Text></View>
-              ))}
-            </View>
           </View>
 
           <View style={s.totalsCol}>
