@@ -34,10 +34,35 @@ export default async function EmployeeDashboardPage() {
   const ctx = await devContext();
   const db  = scoped(ctx);
 
-  const employee = await db.employee.findUnique({
+  // Primary lookup: Employee.userId → User.id (set when the user logs in for
+  // the first time or when HR links the account). Fallback: match by mobile,
+  // since mobile is the identity primary key on both tables and Employee rows
+  // created before account linking will still have it.
+  let employee = await db.employee.findUnique({
     where:  { userId: ctx.userId },
     select: { id: true, name: true, designation: true, department: true, code: true },
   });
+
+  if (!employee) {
+    const user = await db.user.findUnique({
+      where:  { id: ctx.userId },
+      select: { mobile: true, organizationId: true },
+    });
+    if (user) {
+      employee = await db.employee.findFirst({
+        where:  { mobile: user.mobile, organizationId: user.organizationId },
+        select: { id: true, name: true, designation: true, department: true, code: true },
+      });
+      // Back-fill the userId link so the primary lookup works next time.
+      if (employee) {
+        await db.employee.update({
+          where: { id: employee.id },
+          data:  { userId: ctx.userId },
+        });
+      }
+    }
+  }
+
   if (!employee) notFound();
 
   const now        = new Date();
