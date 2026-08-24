@@ -6,8 +6,8 @@ import { Document, Page, View, Text, Image, Font } from "@react-pdf/renderer";
 import type { QuotationDetail } from "@/modules/quotations/queries";
 import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 import { rupeesToWords } from "./_words";
-import { pdfStyles as s, MUTED, BRAND } from "./_pdf-styles";
-import { TH, TR, RoomHeader, SigBlock, fm } from "./_pdf-table";
+import { pdfStyles as s, BRAND } from "./_pdf-styles";
+import { TH, TR, RoomHeader, fm } from "./_pdf-table";
 
 // ── fonts ──────────────────────────────────────────────────────────────────
 const FONTS = path.join(process.cwd(), "public", "fonts");
@@ -70,12 +70,13 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <View style={s.header}>
-          {logoSrc ? <Image src={logoSrc} style={s.logoImg} /> : (
-            <View>
-              <Text style={{ fontSize: 17, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
-              <Text style={{ fontSize: 6.5, color: MUTED, letterSpacing: 1.5, marginTop: 2 }}>INTERIORS · COIMBATORE</Text>
-            </View>
-          )}
+          <View>
+            {logoSrc
+              ? <Image src={logoSrc} style={s.logoImg} />
+              : <Text style={{ fontSize: 20, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
+            }
+            <Text style={s.logoTagline}>INTERIORS · COIMBATORE</Text>
+          </View>
           <View style={s.headerMeta}>
             <Text style={s.docBadge}>{docLabel}</Text>
             <Text style={s.docNumber}>{q.number}</Text>
@@ -165,9 +166,6 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
             </View>
           </View>
         </View>
-
-        {/* ── Signature block ───────────────────────────────────────── */}
-        <SigBlock clientName={q.clientName} ownerName={q.ownerName} phone={FROM.phone} />
 
         {/* ── Footer ───────────────────────────────────────────────── */}
         <View style={s.footer} fixed>

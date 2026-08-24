@@ -23,12 +23,15 @@ export const pdfStyles = StyleSheet.create({
   stripe: { height: 6, backgroundColor: BRAND },
 
   // ── header ───────────────────────────────────────────────────────
+  // alignItems: flex-start so logo and right meta both top-align, preventing
+  // the logo from floating vertically when the right column is taller.
   header: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingHorizontal: 32, paddingTop: 22, paddingBottom: 20,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start",
+    paddingHorizontal: 32, paddingTop: 18, paddingBottom: 16,
     borderBottomWidth: 0.75, borderBottomColor: RULE,
   },
-  logoImg: { width: 280, height: 79, objectFit: "contain", objectPosition: "left center" },
+  logoImg:     { width: 200, height: 57, objectFit: "contain", objectPosition: "left top" },
+  logoTagline: { fontSize: 6.5, color: MUTED, letterSpacing: 1.8, marginTop: 5 },
 
   // right side of header
   headerMeta: { alignItems: "flex-end" },
@@ -45,14 +48,14 @@ export const pdfStyles = StyleSheet.create({
   // ── party boxes ──────────────────────────────────────────────────
   partyRow: {
     flexDirection: "row", gap: 12,
-    paddingHorizontal: 32, paddingTop: 20, paddingBottom: 20,
+    paddingHorizontal: 32, paddingTop: 12, paddingBottom: 12,
     borderBottomWidth: 0.75, borderBottomColor: RULE,
   },
-  partyBox:   { flex: 1, borderWidth: 0.75, borderColor: RULE, borderRadius: 6, padding: 16, backgroundColor: STRIP },
-  partyLabel: { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1.3, marginBottom: 9 },
-  partyName:  { fontSize: 11, fontWeight: "bold", color: INK, marginBottom: 5 },
-  partyLine:  { fontSize: 8, color: MUTED, lineHeight: 1.65, marginBottom: 1 },
-  partyAccent:{ fontSize: 8, color: BRAND, marginTop: 5 },
+  partyBox:   { flex: 1, borderWidth: 0.75, borderColor: RULE, borderRadius: 6, padding: 10, backgroundColor: STRIP },
+  partyLabel: { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1.3, marginBottom: 6 },
+  partyName:  { fontSize: 10, fontWeight: "bold", color: INK, marginBottom: 3 },
+  partyLine:  { fontSize: 7.5, color: MUTED, lineHeight: 1.55, marginBottom: 1 },
+  partyAccent:{ fontSize: 7.5, color: BRAND, marginTop: 4 },
 
   // ── supply band ──────────────────────────────────────────────────
   supplyBand: {
@@ -67,7 +70,7 @@ export const pdfStyles = StyleSheet.create({
   supplyVal:  { fontSize: 7.5, color: INK },
 
   // ── table ────────────────────────────────────────────────────────
-  tableWrap: { paddingHorizontal: 32, marginTop: 18, marginBottom: 6 },
+  tableWrap: { paddingHorizontal: 32, marginTop: 12, marginBottom: 6 },
   thead: {
     flexDirection: "row", backgroundColor: BRAND,
     paddingVertical: 9, borderRadius: 4, marginBottom: 1,
