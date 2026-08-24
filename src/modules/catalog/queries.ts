@@ -275,11 +275,12 @@ export async function getOverdueSampleBooks(ctx: RequestContext) {
 
 export async function listBrandsWithPdf(ctx: RequestContext) {
   const db = scoped(ctx);
+  // All active brands, PDF or not — so a freshly-created brand is visible
+  // on /products immediately, and BrandCard's "0 PDFs" AlertCircle state
+  // is reachable. The counters on the page still tell PDF coverage from
+  // the collections array.
   return db.brand.findMany({
-    where: {
-      isActive: true,
-      collections: { some: { isActive: true, catalogPdfKey: { not: null } } },
-    },
+    where: { isActive: true },
     orderBy: { name: "asc" },
     select: {
       id: true, name: true, country: true, logoKey: true,

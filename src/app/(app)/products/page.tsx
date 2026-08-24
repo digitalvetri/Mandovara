@@ -1,5 +1,6 @@
 // /products — PDF catalog management hub.
-// Shows only brands that have at least one PDF uploaded.
+// Shows every active brand so new ones appear immediately after creation;
+// BrandCard's AlertCircle state marks brands that don't yet have a PDF.
 // Owners/Store can add new brands via the modal.
 
 import Link from "next/link";

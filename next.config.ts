@@ -36,6 +36,15 @@ const config: NextConfig = {
   turbopack: {
     root: path.resolve("."),
   },
+  // Server actions default to a 1 MB request body — that's a hard block on
+  // catalogue PDF uploads (typical brand catalogues are 5–100 MB). The
+  // uploadCollectionPdf action itself refuses anything over 200 MB, so
+  // 210 MB here matches with a small margin for multipart overhead.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "210mb",
+    },
+  },
 };
 
 // Sentry build-time wrapper. Source-map upload only runs when
