@@ -5,7 +5,6 @@
 // Cost / price operations require catalog.viewCost (OWNER, ACCOUNTS only).
 
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -33,10 +32,13 @@ function zodError<T>(err: z.ZodError): ActionResult<T> {
 // Prisma throws known-request errors like P2002 (unique violation) that
 // otherwise surface as an unhandled server-action rejection — the client
 // then falls back to the generic "Failed to create…" text. Catching here
-// so we can hand the real reason back to the form.
+// so we can hand the real reason back to the form. Duck-typed on the
+// `code`/`meta` shape rather than `instanceof PrismaClientKnownRequestError`
+// so this file doesn't need to import from @prisma/client (kernel boundary).
 function prismaError<T>(err: unknown, entity: string): ActionResult<T> {
-  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-    const target = Array.isArray(err.meta?.target) ? err.meta?.target.join(", ") : "name";
+  if (err && typeof err === "object" && "code" in err && (err as { code: unknown }).code === "P2002") {
+    const meta = (err as { meta?: { target?: unknown } }).meta;
+    const target = Array.isArray(meta?.target) ? meta.target.join(", ") : "name";
     return { ok: false, error: `A ${entity} with the same ${target} already exists.` };
   }
   console.error(`${entity} action failed:`, err);
@@ -256,65 +258,5 @@ export async function setPrice(input: unknown): Promise<ActionResult<{ id: strin
   return { ok: true, data: { id: row.id } };
 }
 
-// ── Sample library ────────────────────────────────────────────────────────────
-
-const IssueSampleSchema = z.object({
-  sampleBookId: z.string().min(1),
-  issuedToType: z.enum(["CLIENT", "ARCHITECT", "STAFF"]),
-  clientId: z.string().min(1).optional().nullable(),
-  architectId: z.string().min(1).optional().nullable(),
-  userId: z.string().min(1).optional().nullable(),
-  dueAt: z.date(),
-  depositAmount: z.bigint().min(0n).default(0n),
-  notes: z.string().max(500).optional(),
-});
-
-export async function issueSampleBook(
-  input: unknown,
-): Promise<ActionResult<{ id: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "catalog.update");
-
-  const parsed = IssueSampleSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
-  const d = parsed.data;
-
-  const db = scoped(ctx);
-
-  const [issue] = await db.$transaction([
-    db.sampleIssue.create({
-      data: { organizationId: ctx.orgId, ...d },
-      select: { id: true },
-    }),
-    db.sampleBook.update({
-      where: { id: d.sampleBookId },
-      data: { status: "ISSUED" },
-    }),
-  ]);
-
-  revalidatePath("/samples");
-  return { ok: true, data: { id: issue.id } };
-}
-
-export async function returnSampleBook(
-  issueId: string,
-): Promise<ActionResult<{ id: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "catalog.update");
-
-  const db = scoped(ctx);
-
-  const issue = await db.sampleIssue.update({
-    where: { id: issueId },
-    data: { returnedAt: new Date() },
-    select: { id: true, sampleBookId: true },
-  });
-
-  await db.sampleBook.update({
-    where: { id: issue.sampleBookId },
-    data: { status: "IN_LIBRARY" },
-  });
-
-  revalidatePath("/samples");
-  return { ok: true, data: { id: issue.id } };
-}
+// Sample library actions (issueSampleBook, returnSampleBook) live in
+// ./sample-actions.ts to keep this file under the 300-line boundary.

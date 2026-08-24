@@ -120,7 +120,7 @@ async function main() {
       const remaining = fs.readdirSync(src);
       if (remaining.length === 0) { fs.rmdirSync(src); }
       else                        { console.log(`   (folder not empty, kept: ${folder})`); }
-    } catch (e) { /* silent */ }
+    } catch { /* silent */ }
   }
 
   console.log(`\n=== Summary ===`);
