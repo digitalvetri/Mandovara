@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { ShoppingCart, TrendingUp, AlertTriangle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
@@ -9,6 +9,12 @@ import { PO_STATUSES, type POStatus } from "@/modules/purchase/schema";
 import { formatINR } from "@/kernel/money/format";
 
 export const dynamic = "force-dynamic";
+
+// Hide internal approval-flow statuses from the filter strip —
+// they exist in the schema but aren't part of the everyday PO workflow.
+const VISIBLE_STATUSES = PO_STATUSES.filter(
+  (s) => s !== "PENDING_APPROVAL" && s !== "APPROVED",
+);
 
 interface SearchParams {
   q?: string;
@@ -37,7 +43,6 @@ export default async function PurchasePage({
     <>
       <Topbar
         title="Purchase & Vendors"
-        eyebrow={`${total} PO${total === 1 ? "" : "s"} · ${eyebrowFor(status, q)}`}
         actions={
           <Link
             href={"/purchase/new" as Route}
@@ -49,50 +54,29 @@ export default async function PurchasePage({
         }
       />
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <KpiCard
-          icon={<ShoppingCart size={16} />}
-          label="Open POs"
-          value={kpis.openCount.toLocaleString("en-IN")}
-          accent="text-accent"
-          bg="bg-accent/6"
-          iconBg="bg-accent/10"
-        />
-        <KpiCard
-          icon={<TrendingUp size={16} />}
-          label="Outstanding value"
-          value={formatINR(kpis.outstandingValue)}
-          accent="text-heat"
-          bg="bg-heat/6"
-          iconBg="bg-heat/10"
-        />
-        <KpiCard
-          icon={<AlertTriangle size={16} />}
-          label="Overdue"
-          value={kpis.overdueCount.toLocaleString("en-IN")}
-          accent={kpis.overdueCount > 0 ? "text-fault" : "text-solid"}
-          bg={kpis.overdueCount > 0 ? "bg-fault/6" : "bg-solid/6"}
-          iconBg={kpis.overdueCount > 0 ? "bg-fault/10" : "bg-solid/10"}
-        />
+      {/* ── Compact KPI bar ─────────────────────────────────────────────── */}
+      <div className="flex items-stretch rounded-[10px] border border-rule bg-surface divide-x divide-rule mb-5">
+        <StatCell label="Open POs"    value={kpis.openCount.toLocaleString("en-IN")} />
+        <StatCell label="Outstanding" value={formatINR(kpis.outstandingValue)} />
+        <StatCell label="Overdue"     value={kpis.overdueCount.toLocaleString("en-IN")} warn={kpis.overdueCount > 0} />
       </div>
 
-      {/* Tabs + filters row */}
+      {/* ── Tabs + filters row ──────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex gap-1 rounded-[10px] border border-rule bg-surface-2 p-1">
-          <TabLink href="/purchase" label="Purchase Orders" active />
-          <TabLink href="/purchase/vendors" label="Vendors" active={false} />
+          <TabLink href="/purchase"         label="Purchase Orders" active />
+          <TabLink href="/purchase/vendors" label="Vendors"         active={false} />
         </div>
 
         <div className="h-5 w-px bg-rule hidden sm:block" />
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <StatusChip label="Open" href="/purchase" active={status === "OPEN"} />
-          <StatusChip label="All" href="/purchase?status=ALL" active={status === "ALL"} />
-          {PO_STATUSES.map((s) => (
+          <StatusChip label="Open" href="/purchase"           active={status === "OPEN"} />
+          <StatusChip label="All"  href="/purchase?status=ALL" active={status === "ALL"} />
+          {VISIBLE_STATUSES.map((s) => (
             <StatusChip
               key={s}
-              label={s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ")}
+              label={s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ")}
               href={`/purchase?status=${s}` as Route}
               active={status === s}
             />
@@ -106,24 +90,12 @@ export default async function PurchasePage({
   );
 }
 
-function KpiCard({
-  icon, label, value, accent, bg, iconBg,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  accent: string;
-  bg: string;
-  iconBg: string;
-}) {
+function StatCell({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className={`rounded-[12px] border border-rule ${bg} px-5 py-4 flex items-center gap-4`}>
-      <div className={`shrink-0 rounded-[8px] ${iconBg} w-10 h-10 flex items-center justify-center ${accent}`}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10.5px] uppercase tracking-[0.1em] text-text-dim mb-0.5">{label}</div>
-        <div className={`tabular text-[20px] font-semibold leading-tight ${accent}`}>{value}</div>
+    <div className="flex-1 px-5 py-3">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-text-dim mb-0.5">{label}</div>
+      <div className={`tabular text-[15px] font-semibold leading-tight ${warn ? "text-bad" : "text-text"}`}>
+        {value}
       </div>
     </div>
   );
@@ -170,16 +142,4 @@ function parsePositiveInt(v: string | undefined): number | null {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 1) return null;
   return Math.floor(n);
-}
-function eyebrowFor(status: string, q: string | undefined): string {
-  const bits: string[] = [];
-  bits.push(
-    status === "OPEN"
-      ? "open"
-      : status === "ALL"
-        ? "all statuses"
-        : status.toLowerCase().replace(/_/g, " "),
-  );
-  if (q) bits.push(`matching "${q}"`);
-  return bits.join(" · ");
 }

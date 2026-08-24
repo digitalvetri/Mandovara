@@ -18,7 +18,7 @@ const STATUS_STRIP: Record<POStatus, string> = {
 export function POTable({ rows }: { rows: PORow[] }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-[14px] bg-surface border border-rule py-16 text-center">
+      <div className="rounded-[14px] bg-surface border border-rule py-10 text-center">
         <div className="text-[14px] font-medium text-text mb-1.5">No purchase orders yet.</div>
         <p className="text-[12px] text-text-dim">
           Add a vendor and raise your first PO to start receiving stock.{" "}
