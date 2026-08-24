@@ -36,6 +36,10 @@ export default async function BrandCatalogPage({ params }: Props) {
 
   const withPdf    = collections.filter((c) => c.catalogPdfKey).length;
   const totalCount = collections.length;
+  // Brand is deletable when every collection is a bare placeholder — no
+  // designs, no sample books — so a mistakenly-created brand with an empty
+  // collection under it can still be swept away in one action.
+  const brandDeletable = collections.every((c) => c._count.designs === 0);
 
   return (
     <>
@@ -79,8 +83,12 @@ export default async function BrandCatalogPage({ params }: Props) {
               </div>
             </div>
           </div>
-          {canDelete && totalCount === 0 && (
-            <DeleteBrandButton brandId={brandId} brandName={brand.name} />
+          {canDelete && brandDeletable && (
+            <DeleteBrandButton
+              brandId={brandId}
+              brandName={brand.name}
+              emptyCollectionCount={totalCount}
+            />
           )}
         </div>
       </div>

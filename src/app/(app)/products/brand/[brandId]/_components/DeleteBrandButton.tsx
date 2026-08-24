@@ -8,9 +8,10 @@ import { deleteBrand } from "@/modules/catalog/pdf-actions";
 interface Props {
   brandId: string;
   brandName: string;
+  emptyCollectionCount?: number;
 }
 
-export function DeleteBrandButton({ brandId, brandName }: Props) {
+export function DeleteBrandButton({ brandId, brandName, emptyCollectionCount = 0 }: Props) {
   const router = useRouter();
   const [open, setOpen]       = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -60,6 +61,11 @@ export function DeleteBrandButton({ brandId, brandName }: Props) {
               <p className="text-[13px] text-text">
                 Delete <span className="font-semibold">{brandName}</span>?
               </p>
+              {emptyCollectionCount > 0 && (
+                <p className="text-[12px] text-text-dim">
+                  {emptyCollectionCount} empty collection{emptyCollectionCount === 1 ? "" : "s"} will be removed with it.
+                </p>
+              )}
               {error && <p className="text-[12px] text-fault">{error}</p>}
               <div className="flex justify-end gap-2 pt-1">
                 <button

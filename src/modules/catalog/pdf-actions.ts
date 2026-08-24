@@ -94,9 +94,11 @@ export async function removeCollectionPdf(collectionId: string): Promise<PdfActi
   }
 }
 
-// Delete an empty brand. Refuses if it has any collections — deleting a
-// populated brand would orphan collections/designs/colourways that other
-// modules (projects, orders, stock) may reference.
+// Delete a brand. Empty collections underneath (0 designs, 0 sample books)
+// are swept along with it — those are placeholders that would otherwise
+// block cleanup of a mistakenly-created brand. Any collection carrying
+// real product data blocks the delete, so projects/orders/stock that
+// reference those colourways can never be orphaned.
 export async function deleteBrand(
   brandId: string,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -106,17 +108,43 @@ export async function deleteBrand(
   const db = scoped(ctx);
   const brand = await db.brand.findUniqueOrThrow({
     where:  { id: brandId },
-    select: { id: true, _count: { select: { collections: true } } },
+    select: {
+      id: true,
+      collections: {
+        select: {
+          id: true,
+          name: true,
+          catalogPdfKey: true,
+          _count: { select: { designs: true, sampleBooks: true } },
+        },
+      },
+    },
   });
 
-  if (brand._count.collections > 0) {
+  const [blocker] = brand.collections.filter(
+    (c) => c._count.designs > 0 || c._count.sampleBooks > 0,
+  );
+  if (blocker) {
     return {
       ok: false,
-      error: `Brand has ${brand._count.collections} collection${brand._count.collections === 1 ? "" : "s"} — remove them first.`,
+      error: `Collection "${blocker.name}" still has ${blocker._count.designs} design${blocker._count.designs === 1 ? "" : "s"} and ${blocker._count.sampleBooks} sample book${blocker._count.sampleBooks === 1 ? "" : "s"} — remove them first.`,
     };
   }
 
-  await db.brand.delete({ where: { id: brandId } });
+  // Best-effort PDF cleanup before the transaction — file writes aren't
+  // rolled back if the DB fails, but an orphan PDF is cheaper than a
+  // half-deleted brand.
+  for (const col of brand.collections) {
+    if (col.catalogPdfKey) {
+      try { await unlink(path.join(PDFS_DIR, col.catalogPdfKey)); }
+      catch { /* already gone */ }
+    }
+  }
+
+  await db.$transaction([
+    db.collection.deleteMany({ where: { brandId } }),
+    db.brand.delete({ where: { id: brandId } }),
+  ]);
 
   revalidatePath("/products");
   revalidatePath("/catalog");
