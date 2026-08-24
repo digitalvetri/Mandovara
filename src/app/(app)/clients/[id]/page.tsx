@@ -15,6 +15,7 @@ import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 import { BillingAddressCard } from "../_components/BillingAddressCard";
 import { StartMeasurementFromClientButton } from "../_components/StartMeasurementFromClientButton";
 import { ClientLedgerPanel, type InvoiceLedgerRow, type ReceiptLedgerRow } from "../_components/ClientLedgerPanel";
+import { DeleteClientAction } from "../_components/DeleteClientAction";
 
 const STAGE_LABEL: Record<string, string> = {
   ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
@@ -109,6 +110,13 @@ export default async function ClientDetailPage({
             ctx.permissions.has("measurement.create")
           }
         />
+        {ctx.permissions.has("client.delete") && (
+          <DeleteClientAction
+            clientId={client.id}
+            clientName={client.name}
+            projectCount={client.projects.length}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ConvertLeadModal } from "./ConvertLeadModal";
 import { ScheduleVisitModal } from "./ScheduleVisitModal";
+import { DeleteLeadAction } from "./DeleteLeadAction";
 
 interface Props {
   leadId: string;
@@ -23,9 +24,10 @@ interface Props {
   // sanctioned conversion path (needs client-accepted + owner-approved).
   // Hide the free-form Convert button here to remove the duplicate CTA.
   hasQuotes?: boolean;
+  canDelete?: boolean;
 }
 
-export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email, hasQuotes }: Props) {
+export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email, hasQuotes, canDelete }: Props) {
   const router = useRouter();
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showVisitModal, setShowVisitModal] = useState(false);
@@ -108,6 +110,12 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
             Convert to Client
           </button>
         ) : null}
+
+        {/* Delete — server refuses converted leads, but we still hide
+            the button for them so the danger action isn't a red herring. */}
+        {canDelete && !isConverted && (
+          <DeleteLeadAction leadId={leadId} leadName={leadName} />
+        )}
 
       </div>
 

@@ -170,12 +170,42 @@ export async function deleteLead(id: string): Promise<ActionResult> {
   const ctx = await devContext();
   requirePermission(ctx, "lead.delete");
   const db = scoped(ctx);
+
+  // Refuse to delete a lead that already converted into a client — the
+  // convertedClientId link is the audit trail of that conversion, and the
+  // client + downstream project/order/invoice would still reference it.
+  // Owner should archive the client instead.
+  const lead = await db.lead.findUnique({
+    where:  { id },
+    select: { convertedClientId: true },
+  });
+  if (!lead) return { ok: false, error: "Lead not found." };
+  if (lead.convertedClientId) {
+    return {
+      ok: false,
+      error: "This lead was converted to a client — delete the client instead (if it has no projects).",
+    };
+  }
+
+  // Null out every nullable FK that points at this lead so the delete
+  // doesn't crash with a P2003 FK-constraint error. Historical rows
+  // (quotations sent to the lead, WhatsApp messages, follow-ups) survive
+  // in a lead-less state — the fields are all nullable in the schema.
   try {
-    await db.lead.delete({ where: { id } });
+    await db.$transaction([
+      db.quotation.updateMany({ where: { leadId: id }, data: { leadId: null } }),
+      db.siteVisit.updateMany({ where: { leadId: id }, data: { leadId: null } }),
+      db.communicationLog.updateMany({ where: { leadId: id }, data: { leadId: null } }),
+      db.document.updateMany({ where: { leadId: id }, data: { leadId: null } }),
+      db.followUp.deleteMany({ where: { refType: "LEAD", refId: id } }),
+      db.lead.delete({ where: { id } }),
+    ]);
     revalidatePath("/leads");
     return { ok: true };
   } catch (e) {
-    return dbError(e);
+    console.error("deleteLead failed:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `Delete failed: ${msg.split("\n")[0]}` };
   }
 }
 
