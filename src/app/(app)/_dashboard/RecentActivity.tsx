@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ActivityItem, ActivityKind } from "./types";
 
 const dotClass: Record<ActivityKind, string> = {
@@ -10,16 +9,10 @@ const dotClass: Record<ActivityKind, string> = {
 export function RecentActivity({ items }: { items: ActivityItem[] }) {
   return (
     <div className="rounded-[14px] bg-surface border border-rule p-6">
-      <div className="flex items-baseline justify-between mb-5">
+      <div className="mb-5">
         <div className="font-display text-[18px] font-semibold text-text">
           Recent activity
         </div>
-        <Link
-          href="/leads"
-          className="text-[11px] text-text-dim hover:text-accent transition-colors"
-        >
-          View all →
-        </Link>
       </div>
 
       <div className="space-y-1">
