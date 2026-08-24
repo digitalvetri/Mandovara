@@ -191,21 +191,43 @@ export async function deleteBrand(
     }
   }
 
-  // Order matters — children before parents.
-  await db.$transaction([
-    ...(colourwayIds.length > 0
-      ? [
-          db.stockBalance.deleteMany({ where: { colourwayId: { in: colourwayIds } } }),
-          db.price.deleteMany({ where: { colourwayId: { in: colourwayIds } } }),
-          db.colourway.deleteMany({ where: { id: { in: colourwayIds } } }),
-        ]
-      : []),
-    ...(designIds.length > 0
-      ? [db.design.deleteMany({ where: { id: { in: designIds } } })]
-      : []),
-    db.collection.deleteMany({ where: { brandId } }),
-    db.brand.delete({ where: { id: brandId } }),
-  ]);
+  // Order matters — children before parents. `updateMany` on nullable FKs
+  // (CalcResult, PurchaseRequestLine) preserves the historical record but
+  // detaches it from the SKU we're about to delete.
+  try {
+    await db.$transaction([
+      ...(colourwayIds.length > 0
+        ? [
+            db.calcResult.updateMany({
+              where: { colourwayId: { in: colourwayIds } },
+              data:  { colourwayId: null },
+            }),
+            db.purchaseRequestLine.updateMany({
+              where: { colourwayId: { in: colourwayIds } },
+              data:  { colourwayId: null },
+            }),
+            db.stockBalance.deleteMany({ where: { colourwayId: { in: colourwayIds } } }),
+            db.price.deleteMany({ where: { colourwayId: { in: colourwayIds } } }),
+            db.colourway.deleteMany({ where: { id: { in: colourwayIds } } }),
+          ]
+        : []),
+      ...(designIds.length > 0
+        ? [db.design.deleteMany({ where: { id: { in: designIds } } })]
+        : []),
+      db.collection.deleteMany({ where: { brandId } }),
+      db.brand.delete({ where: { id: brandId } }),
+    ]);
+  } catch (err) {
+    // Surface the real Prisma error rather than letting Next.js wrap it
+    // into a generic "something went wrong". P2003 is the FK violation
+    // that shows up when another table references what we're deleting.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("deleteBrand cascade failed:", err);
+    return {
+      ok: false,
+      error: `Delete failed: ${msg.split("\n")[0]}. Contact support if this persists.`,
+    };
+  }
 
   revalidatePath("/products");
   revalidatePath("/catalog");
