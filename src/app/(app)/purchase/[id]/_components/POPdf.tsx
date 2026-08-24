@@ -2,7 +2,7 @@
 // Built-in fonts only (Helvetica / Courier) — no external font downloads.
 // Rupee amounts use "Rs." prefix (Helvetica does not include U+20B9).
 
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { PODetail, POLineRow } from "@/modules/purchase/queries";
 
 const TEAL   = "#1B8A7E";
@@ -24,11 +24,8 @@ const s = StyleSheet.create({
   },
 
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
-  logoBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-  logoM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
-  brandCol: { marginLeft: 8, justifyContent: "center" },
-  brandName: { fontSize: 16, fontFamily: "Helvetica-Bold", color: INK, letterSpacing: 0.3 },
-  brandSub: { fontSize: 6.5, color: MUTED, letterSpacing: 2, marginTop: 3 },
+  logoImg:  { width: 140, height: 46, objectFit: "cover", objectPosition: "center center" },
+  brandSub: { fontSize: 6.5, color: MUTED, letterSpacing: 2, marginTop: 4 },
   docLabel: { textAlign: "right" },
   docTitle: { fontSize: 14, fontFamily: "Helvetica-Bold", color: TEAL, letterSpacing: 1.5 },
   docNum: { fontSize: 8.5, color: MUTED, fontFamily: "Courier", marginTop: 3 },
@@ -124,18 +121,18 @@ function TableRow({ line, idx }: { line: POLineRow; idx: number }) {
   );
 }
 
-export function POPdf({ po }: { po: PODetail }) {
+export function POPdf({ po, logoSrc }: { po: PODetail; logoSrc?: string }) {
   return (
     <Document title={`Purchase Order ${po.number}`} author="Mandovara" creator="Mandovara Interior OS">
       <Page size="A4" style={s.page}>
 
         <View style={s.header}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={s.logoBox}><Text style={s.logoM}>M</Text></View>
-            <View style={s.brandCol}>
-              <Text style={s.brandName}>Mandovara</Text>
-              <Text style={s.brandSub}>INTERIORS  ·  COIMBATORE</Text>
-            </View>
+          <View>
+            {logoSrc
+              ? <Image src={logoSrc} style={s.logoImg} />
+              : <Text style={{ fontSize: 16, fontFamily: "Helvetica-Bold", color: INK }}>Mandovara</Text>
+            }
+            <Text style={s.brandSub}>INTERIORS  ·  COIMBATORE</Text>
           </View>
           <View style={s.docLabel}>
             <Text style={s.docTitle}>PURCHASE ORDER</Text>
