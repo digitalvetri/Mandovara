@@ -205,7 +205,7 @@ export async function listColourwaysForPO(ctx: RequestContext) {
     take: 500,
     select: {
       id: true, code: true, colourName: true, sellUnit: true,
-      design: { select: { code: true, family: true, gstRate: true } },
+      design: { select: { code: true, family: true } },
     },
   });
 }
