@@ -217,3 +217,4 @@ export async function getProject(ctx: RequestContext, id: string): Promise<Proje
 }
 
 export * from "./queries-detail";
+export * from "./queries-quotations";

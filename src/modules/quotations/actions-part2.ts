@@ -12,6 +12,7 @@ import "@/kernel/events/register";
 import { zodError } from "./lib";
 import { setStatusSchema } from "./schema";
 import { ActionResult } from "./actions";
+import { createOrderFromQuotation } from "@/modules/orders/actions";
 
 export async function setQuotationStatus(
   input: unknown,
@@ -124,6 +125,18 @@ export async function setQuotationStatus(
       quotationId: id,
       clientId:    q.clientId ?? "",
     });
+
+    // Auto-create the Order — spec §5 says an accepted quote converts to
+    // an order. The manual "Convert to order" button in StatusChanger
+    // stays as a safety net for lead-scoped quotes (need lead conversion
+    // first) or if this call fails for any reason. Best-effort — a
+    // failure here does NOT roll back the ACCEPTED status.
+    try {
+      await createOrderFromQuotation({ quotationId: id });
+      revalidatePath("/orders");
+    } catch (err) {
+      console.warn("auto-createOrderFromQuotation failed (owner can still click manually):", err);
+    }
   }
 
   revalidatePath("/quotations");
