@@ -38,6 +38,7 @@ const SCRIPTS_ROOT = existsSync("/app/scripts/fedora-swatches")
   : path.resolve("scripts");
 const FEDORA_SWATCHES = path.join(SCRIPTS_ROOT, "fedora-swatches");
 const RUGWAY_CROPS    = path.join(SCRIPTS_ROOT, "rugway-crops");
+const RUGWAY_PDF      = path.join(RUGWAY_CROPS, "rugway-rugs.pdf");
 
 // The upload target is the volume-mounted /app/public/catalog/uploads
 // inside the container. Locally it's the same relative path from cwd.
@@ -45,6 +46,12 @@ const UPLOAD_DIR = existsSync("/app/public/catalog")
   ? "/app/public/catalog/uploads"
   : path.resolve("public", "catalog", "uploads");
 const PUBLIC_ROUTE = "/catalog/uploads";
+
+// PDFs served by /api/catalog/pdf/[collectionId]. Separate dir from uploads
+// because the route only serves files that match ^[a-zA-Z0-9_-]+\.pdf$.
+const PDF_DIR = existsSync("/app/public/catalog")
+  ? "/app/public/catalog/pdfs"
+  : path.resolve("public", "catalog", "pdfs");
 
 // Fedora catalogue map (from scripts/fedora-scan-codes.py + one manual
 // override for 57225 whose labels are vector outlines).
@@ -111,6 +118,7 @@ async function main() {
       }
     }
     await mkdir(UPLOAD_DIR, { recursive: true });
+    await mkdir(PDF_DIR, { recursive: true });
 
     // ── Resolve Organization by name (id differs between envs) ──
     const org = await prisma.organization.findFirst({
@@ -184,6 +192,19 @@ async function importRugway(db, orgId) {
     data:   { organizationId: orgId, brandId: brand.id, name: "Rugs", family: "RUG" },
     select: { id: true },
   });
+
+  // Attach the source catalogue PDF so the "View PDF" button shows on
+  // /products/brand/[rugwayId]. File key = <collectionId>.pdf matches the
+  // convention used by uploadCollectionPdf (src/modules/catalog/pdf-actions.ts).
+  if (existsSync(RUGWAY_PDF)) {
+    const pdfKey  = `${collection.id}.pdf`;
+    const pdfDest = path.join(PDF_DIR, pdfKey);
+    await writeFile(pdfDest, await readFile(RUGWAY_PDF));
+    await db.collection.update({
+      where: { id: collection.id },
+      data:  { catalogPdfKey: pdfKey },
+    });
+  }
 
   const now = new Date();
   const files = await listRugwayCrops();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { X, Download, BookOpen, Loader2 } from "lucide-react";
 
 interface Props {
@@ -12,17 +12,33 @@ interface Props {
 export function PdfViewerModal({ collectionId, collectionName, brandName }: Props) {
   const [open, setOpen]     = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const prewarmed = useRef(false);
 
   const pdfUrl = `/api/catalog/pdf/${collectionId}`;
 
   function openModal() { setLoaded(false); setOpen(true); }
   function closeModal() { setOpen(false); setLoaded(false); }
 
+  // Warm the browser cache with the first 256KB the moment the user hovers
+  // or focuses the button — masks the auth + DB + first-byte latency so the
+  // iframe finds bytes already sitting in cache when it actually opens.
+  function prewarm() {
+    if (prewarmed.current) return;
+    prewarmed.current = true;
+    void fetch(pdfUrl, {
+      headers: { Range: "bytes=0-262143" },
+      credentials: "same-origin",
+    }).catch(() => { prewarmed.current = false; });
+  }
+
   return (
     <>
       <button
         type="button"
         onClick={openModal}
+        onMouseEnter={prewarm}
+        onFocus={prewarm}
+        onTouchStart={prewarm}
         className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[7px] text-[12px] font-medium bg-accent text-ink hover:bg-accent/85 transition-colors shrink-0"
       >
         <BookOpen size={13} strokeWidth={1.75} />

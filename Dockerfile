@@ -100,6 +100,7 @@ COPY --chown=nextjs:nodejs scripts/pre-migrate.mjs          /app/scripts/pre-mig
 # folders so it can run entirely inside the container.
 # Gate: CONFIRM_WIPE=I_UNDERSTAND must be set — see script header.
 COPY --chown=nextjs:nodejs scripts/prod-reset-catalog.mjs  /app/scripts/prod-reset-catalog.mjs
+COPY --chown=nextjs:nodejs scripts/attach-rugway-pdf.mjs   /app/scripts/attach-rugway-pdf.mjs
 COPY --chown=nextjs:nodejs scripts/fedora-swatches         /app/scripts/fedora-swatches
 COPY --chown=nextjs:nodejs scripts/rugway-crops            /app/scripts/rugway-crops
 
