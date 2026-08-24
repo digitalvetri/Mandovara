@@ -59,7 +59,7 @@ describe("resolveNextAction — stage → CTA mapping", () => {
   it.each([
     ["ENQUIRY",      "SCHEDULE_VISIT",     "Schedule a site visit"],
     ["QUOTATION",    "BUILD_QUOTATION",    "Build the quotation"],
-    ["ORDERED",      "RAISE_PROCUREMENT",  "Raise purchase requests"],
+    ["ORDERED",      "RAISE_PROCUREMENT",  "Procure the material"],
     // Label changed when the dye-lot allocation console was removed — the
     // stage still exists, but there is nothing to allocate to any more.
     ["PROCUREMENT",  "ALLOCATE_MATERIAL",  "Material in procurement"],
