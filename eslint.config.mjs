@@ -160,6 +160,7 @@ export default tseslint.config(
       "src/app/api/webhooks/whatsapp/route.ts",   // resolves the tenant from the WABA payload
       "src/app/api/admin/import-stock/route.ts",  // single-tenant admin importer
       "src/app/api/admin/bootstrap/route.ts",     // one-time org bootstrap — runs before any tenant exists
+      "src/app/api/admin/test-user/route.ts",     // create / delete disposable OWNER for QA
     ],
     rules: {
       "no-restricted-imports": "off",
