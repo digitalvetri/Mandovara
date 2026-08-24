@@ -50,7 +50,7 @@ export async function loadDaySummary(ctx: RequestContext): Promise<DaySummaryIte
     ]);
 
     if (leadsOpen > 0)        push(items, { id: "leads",     icon: "Users",        count: leadsOpen,        singular: "lead to contact",       plural: "leads to contact",        href: "/leads",        urgency: "normal" });
-    if (followupsDue > 0)     push(items, { id: "followups", icon: "CalendarCheck", count: followupsDue,     singular: "follow-up due today",    plural: "follow-ups due today",     href: "/leads",        urgency: followupsDue > 5 ? "warn" : "normal" });
+    if (followupsDue > 0)     push(items, { id: "followups", icon: "CalendarCheck", count: followupsDue,     singular: "follow-up due today",    plural: "follow-ups due today",     href: "/calendar",     urgency: followupsDue > 5 ? "warn" : "normal" });
     if (measurementsToday > 0)push(items, { id: "measure",   icon: "Ruler",         count: measurementsToday,singular: "site measurement today",  plural: "site measurements today",  href: "/measurements", urgency: "normal" });
     if (makeJobsReady > 0)    push(items, { id: "makejobs",  icon: "Package",       count: makeJobsReady,    singular: "job ready to finalise",  plural: "jobs ready to finalise",   href: "/make",         urgency: "normal" });
     if (overdueInvoices > 0)  push(items, { id: "invoices",  icon: "AlertCircle",   count: overdueInvoices,  singular: "invoice overdue",        plural: "invoices overdue",         href: "/invoicing",    urgency: overdueInvoices > 5 ? "hot" : "warn" });
@@ -64,7 +64,7 @@ export async function loadDaySummary(ctx: RequestContext): Promise<DaySummaryIte
       db.followUp.count({ where: { ownerId: ctx.userId, dueAt: { lte: end }, completedAt: null } }),
     ]);
     if (myLeads > 0)     push(items, { id: "leads",     icon: "Users",        count: myLeads,     singular: "lead to contact",    plural: "leads to contact",    href: "/leads", urgency: "normal" });
-    if (myFollowups > 0) push(items, { id: "followups", icon: "CalendarCheck", count: myFollowups, singular: "follow-up due today", plural: "follow-ups due today", href: "/leads", urgency: myFollowups > 5 ? "warn" : "normal" });
+    if (myFollowups > 0) push(items, { id: "followups", icon: "CalendarCheck", count: myFollowups, singular: "follow-up due today", plural: "follow-ups due today", href: "/calendar", urgency: myFollowups > 5 ? "warn" : "normal" });
     return items;
   }
 
@@ -74,7 +74,7 @@ export async function loadDaySummary(ctx: RequestContext): Promise<DaySummaryIte
       db.followUp.count({ where: { ownerId: ctx.userId, dueAt: { lte: end }, completedAt: null } }),
     ]);
     if (inQuote > 0)     push(items, { id: "projects",  icon: "FileText",     count: inQuote,     singular: "project awaiting quote",  plural: "projects awaiting quote",  href: "/projects", urgency: "normal" });
-    if (myFollowups > 0) push(items, { id: "followups", icon: "CalendarCheck", count: myFollowups, singular: "follow-up due today",      plural: "follow-ups due today",      href: "/leads",    urgency: myFollowups > 5 ? "warn" : "normal" });
+    if (myFollowups > 0) push(items, { id: "followups", icon: "CalendarCheck", count: myFollowups, singular: "follow-up due today",      plural: "follow-ups due today",      href: "/calendar", urgency: myFollowups > 5 ? "warn" : "normal" });
     return items;
   }
 
