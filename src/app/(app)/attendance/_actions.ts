@@ -11,6 +11,8 @@ export interface CheckResult {
   error?: string;
 }
 
+export type GeoCoords = { lat: number; lng: number };
+
 function fmtIST(d: Date): string {
   return d.toLocaleTimeString("en-IN", {
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
@@ -28,7 +30,7 @@ function workedStr(inAt: Date, outAt: Date): string {
 // Creates the attendance record for today. Idempotent: returns a clear error
 // if already checked in rather than overwriting the original time.
 
-export async function selfCheckIn(): Promise<CheckResult> {
+export async function selfCheckIn(geo?: GeoCoords): Promise<CheckResult> {
   const ctx = await devContext();
   const db  = scoped(ctx);
   const now = new Date();
@@ -65,12 +67,20 @@ export async function selfCheckIn(): Promise<CheckResult> {
       date:           today,
       status:         "PRESENT",
       inAt:           now,
+      inLat:          geo?.lat ?? null,
+      inLng:          geo?.lng ?? null,
     },
-    update: { status: "PRESENT", inAt: now },
+    update: {
+      status: "PRESENT",
+      inAt:   now,
+      inLat:  geo?.lat ?? null,
+      inLng:  geo?.lng ?? null,
+    },
     select: { id: true },
   });
 
   revalidatePath("/attendance");
+  revalidatePath("/employee");
   return { ok: true, time: fmtIST(now) };
 }
 
@@ -78,7 +88,7 @@ export async function selfCheckIn(): Promise<CheckResult> {
 // Records outAt for today. Returns error if no check-in exists or already
 // checked out. Calculates and returns total worked duration.
 
-export async function selfCheckOut(): Promise<CheckResult> {
+export async function selfCheckOut(geo?: GeoCoords): Promise<CheckResult> {
   const ctx = await devContext();
   const db  = scoped(ctx);
   const now = new Date();
@@ -109,10 +119,15 @@ export async function selfCheckOut(): Promise<CheckResult> {
 
   await db.attendance.update({
     where: { employeeId_date: { employeeId: employee.id, date: today } },
-    data:  { outAt: now },
+    data:  {
+      outAt:   now,
+      outLat:  geo?.lat ?? null,
+      outLng:  geo?.lng ?? null,
+    },
     select: { id: true },
   });
 
   revalidatePath("/attendance");
+  revalidatePath("/employee");
   return { ok: true, time: fmtIST(now), worked: workedStr(existing.inAt, now) };
 }

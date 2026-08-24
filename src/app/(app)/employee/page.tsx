@@ -6,6 +6,7 @@ import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { Topbar } from "@/components/layout/Topbar";
 import { LeaveStateBadge, humaniseType } from "./_components/EmployeeChips";
+import { AttendanceCTA } from "./_components/AttendanceCTA";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,6 @@ const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"
 function todayIST() {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-function fmtTime(d: Date) {
-  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
 }
 function fmtDate(d: Date) {
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
@@ -32,18 +30,6 @@ function todayLabel() {
     weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata",
   });
 }
-function heroAttendanceColor(status: string): string {
-  const map: Record<string, string> = {
-    PRESENT: "text-solid-chrome", HALF_DAY: "text-heat-chrome",
-    ABSENT: "text-fault-chrome", LEAVE: "text-info-chrome",
-    HOLIDAY: "text-gold-chrome", WEEK_OFF: "text-sidebar-dim",
-  };
-  return map[status] ?? "text-sidebar-dim";
-}
-function heroAttendanceLabel(status: string): string {
-  return { PRESENT: "Present", HALF_DAY: "Half Day", ABSENT: "Absent", LEAVE: "On Leave", HOLIDAY: "Holiday", WEEK_OFF: "Week Off" }[status] ?? status;
-}
-
 export default async function EmployeeDashboardPage() {
   const ctx = await devContext();
   const db  = scoped(ctx);
@@ -62,7 +48,7 @@ export default async function EmployeeDashboardPage() {
   const [todayAttendance, monthRows, leaveRows] = await Promise.all([
     db.attendance.findUnique({
       where:  { employeeId_date: { employeeId: employee.id, date: today } },
-      select: { status: true, inAt: true, outAt: true },
+      select: { status: true, inAt: true, outAt: true, lockedAt: true },
     }),
     db.attendance.findMany({
       where:  { employeeId: employee.id, date: { gte: monthStart, lt: monthEnd } },
@@ -123,37 +109,13 @@ export default async function EmployeeDashboardPage() {
             </div>
           </div>
 
-          {/* Attendance CTA */}
-          {todayAttendance ? (
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <span className={`text-[13px] font-semibold ${heroAttendanceColor(todayAttendance.status)}`}>
-                {heroAttendanceLabel(todayAttendance.status)}
-              </span>
-              {todayAttendance.inAt && (
-                <span className="tabular-nums text-[12px] text-sidebar-dim">In {fmtTime(todayAttendance.inAt)}</span>
-              )}
-              {todayAttendance.outAt ? (
-                <span className="tabular-nums text-[12px] text-sidebar-dim">· Out {fmtTime(todayAttendance.outAt)}</span>
-              ) : todayAttendance.inAt ? (
-                <Link
-                  href={"/m/attendance" as Route}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-heat-chrome/30 bg-heat-chrome/10 px-3.5 py-1.5 text-[12px] font-medium text-heat-chrome hover:bg-heat-chrome/20 transition-colors"
-                >
-                  Punch Out →
-                </Link>
-              ) : null}
-            </div>
-          ) : (
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <span className="text-[12.5px] text-sidebar-dim">Not yet punched in.</span>
-              <Link
-                href={"/m/attendance" as Route}
-                className="inline-flex items-center gap-1.5 rounded-full border border-accent-chrome/30 bg-accent-chrome/15 px-4 py-1.5 text-[12px] font-semibold text-accent-chrome hover:bg-accent-chrome/25 transition-colors"
-              >
-                Punch In Now →
-              </Link>
-            </div>
-          )}
+          {/* Attendance CTA — GPS-aware, stays on this page */}
+          <AttendanceCTA
+            initialInAt={todayAttendance?.inAt?.toISOString() ?? null}
+            initialOutAt={todayAttendance?.outAt?.toISOString() ?? null}
+            initialStatus={todayAttendance?.status ?? null}
+            isLocked={!!todayAttendance?.lockedAt}
+          />
 
           {/* Quick chips */}
           <div className="mt-5 flex flex-wrap gap-2">
