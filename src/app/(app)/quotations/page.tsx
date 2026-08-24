@@ -48,7 +48,7 @@ export default async function QuotationsPage({
 
   const newQuotationHref = projectId
     ? `/quotations/new?project=${encodeURIComponent(projectId)}`
-    : "/quotations/new";
+    : "/quotations/quick";
 
   // Build export URL with current filters so it matches what's shown on screen
   const exportParams = new URLSearchParams();
