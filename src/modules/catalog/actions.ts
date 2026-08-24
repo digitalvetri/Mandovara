@@ -5,6 +5,7 @@
 // Cost / price operations require catalog.viewCost (OWNER, ACCOUNTS only).
 
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
@@ -29,6 +30,19 @@ function zodError<T>(err: z.ZodError): ActionResult<T> {
   return { ok: false, error: "Validation failed", fieldErrors };
 }
 
+// Prisma throws known-request errors like P2002 (unique violation) that
+// otherwise surface as an unhandled server-action rejection — the client
+// then falls back to the generic "Failed to create…" text. Catching here
+// so we can hand the real reason back to the form.
+function prismaError<T>(err: unknown, entity: string): ActionResult<T> {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    const target = Array.isArray(err.meta?.target) ? err.meta?.target.join(", ") : "name";
+    return { ok: false, error: `A ${entity} with the same ${target} already exists.` };
+  }
+  console.error(`${entity} action failed:`, err);
+  return { ok: false, error: err instanceof Error ? err.message : `Failed to save ${entity}.` };
+}
+
 // ── Brands ──────────────────────────────────────────────────────────────────
 
 export async function createBrand(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -38,15 +52,19 @@ export async function createBrand(input: unknown): Promise<ActionResult<{ id: st
   const parsed = BrandSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
 
-  const db = scoped(ctx);
-  const row = await db.brand.create({
-    data: { organizationId: ctx.orgId, ...parsed.data },
-    select: { id: true },
-  });
+  try {
+    const db = scoped(ctx);
+    const row = await db.brand.create({
+      data: { organizationId: ctx.orgId, ...parsed.data },
+      select: { id: true },
+    });
 
-  revalidatePath("/catalog");
-  revalidatePath("/products");
-  return { ok: true, data: { id: row.id } };
+    revalidatePath("/catalog");
+    revalidatePath("/products");
+    return { ok: true, data: { id: row.id } };
+  } catch (err) {
+    return prismaError(err, "brand");
+  }
 }
 
 export async function updateBrand(
@@ -81,14 +99,20 @@ export async function createCollection(
   const parsed = CollectionSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
 
-  const db = scoped(ctx);
-  const row = await db.collection.create({
-    data: { organizationId: ctx.orgId, ...parsed.data },
-    select: { id: true },
-  });
+  try {
+    const db = scoped(ctx);
+    const row = await db.collection.create({
+      data: { organizationId: ctx.orgId, ...parsed.data },
+      select: { id: true },
+    });
 
-  revalidatePath("/catalog");
-  return { ok: true, data: { id: row.id } };
+    revalidatePath("/catalog");
+    revalidatePath("/products");
+    revalidatePath(`/products/brand/${parsed.data.brandId}`);
+    return { ok: true, data: { id: row.id } };
+  } catch (err) {
+    return prismaError(err, "collection");
+  }
 }
 
 export async function updateCollection(
