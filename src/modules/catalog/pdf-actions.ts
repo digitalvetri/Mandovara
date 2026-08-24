@@ -70,3 +70,40 @@ export async function removeCollectionPdf(collectionId: string) {
   revalidatePath("/products");
   revalidatePath(`/products/brand/${col.brandId}`);
 }
+
+// Delete an empty collection. Refuses if any Design or SampleBook FKs into it
+// — deleting a collection with real product data underneath would silently
+// break projects/orders/stock that reference those colourways.
+export async function deleteCollection(
+  collectionId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await devContext();
+  requirePermission(ctx, "catalog.delete");
+
+  const db = scoped(ctx);
+  const col = await db.collection.findUniqueOrThrow({
+    where:  { id: collectionId },
+    select: {
+      id: true, brandId: true, catalogPdfKey: true,
+      _count: { select: { designs: true, sampleBooks: true } },
+    },
+  });
+
+  if (col._count.designs > 0) {
+    return { ok: false, error: `Collection has ${col._count.designs} design${col._count.designs === 1 ? "" : "s"} — remove them first.` };
+  }
+  if (col._count.sampleBooks > 0) {
+    return { ok: false, error: `Collection has ${col._count.sampleBooks} sample book${col._count.sampleBooks === 1 ? "" : "s"} — remove them first.` };
+  }
+
+  if (col.catalogPdfKey) {
+    const filePath = path.join(PDFS_DIR, col.catalogPdfKey);
+    try { await unlink(filePath); } catch { /* already gone */ }
+  }
+
+  await db.collection.delete({ where: { id: collectionId } });
+
+  revalidatePath("/products");
+  revalidatePath(`/products/brand/${col.brandId}`);
+  return { ok: true };
+}

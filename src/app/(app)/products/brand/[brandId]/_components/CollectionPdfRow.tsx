@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useTransition } from "react";
-import { Upload, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
-import { uploadCollectionPdf, removeCollectionPdf } from "@/modules/catalog/pdf-actions";
+import { useRef, useState, useTransition } from "react";
+import { Upload, Trash2, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { uploadCollectionPdf, removeCollectionPdf, deleteCollection } from "@/modules/catalog/pdf-actions";
 import { PdfViewerModal } from "./PdfViewerModal";
 
 const FAMILY_LABELS: Record<string, string> = {
@@ -26,15 +26,21 @@ interface Props {
   };
   brandName: string;
   canWrite: boolean;
+  canDelete: boolean;
 }
 
-export function CollectionPdfRow({ collection: c, brandName, canWrite }: Props) {
+export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, startUpload] = useTransition();
-  const [removing, startRemove] = useTransition();
+  const [uploading, startUpload]   = useTransition();
+  const [removing,  startRemove]   = useTransition();
+  const [deleting,  startDelete]   = useTransition();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const hasPdf   = !!c.catalogPdfKey;
-  const busy     = uploading || removing;
+  const hasPdf     = !!c.catalogPdfKey;
+  const isEmpty    = c._count.designs === 0;
+  const canDestroy = canDelete && isEmpty;
+  const busy       = uploading || removing || deleting;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -50,6 +56,15 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite }: Props) 
 
   function handleRemove() {
     startRemove(async () => { await removeCollectionPdf(c.id); });
+  }
+
+  function handleDelete() {
+    setDeleteError(null);
+    startDelete(async () => {
+      const res = await deleteCollection(c.id);
+      if (!res.ok) { setDeleteError(res.error ?? "Delete failed"); return; }
+      setConfirmOpen(false);
+    });
   }
 
   const familyLabel = FAMILY_LABELS[c.family] ?? c.family;
@@ -132,7 +147,70 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite }: Props) 
             )}
           </>
         )}
+
+        {canDestroy && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => { setDeleteError(null); setConfirmOpen(true); }}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[7px] text-[12px] font-medium text-text-dim/70 border border-rule hover:text-fault hover:border-fault/40 disabled:opacity-50 transition-colors shrink-0"
+            aria-label={`Delete collection ${c.name}`}
+            title="Delete collection"
+          >
+            <Trash2 size={13} strokeWidth={1.75} />
+            Delete
+          </button>
+        )}
       </div>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal aria-label={`Delete ${c.name}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => !deleting && setConfirmOpen(false)} />
+          <div className="relative w-full max-w-sm rounded-[14px] bg-surface border border-rule shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-rule">
+              <h3 className="text-[14px] font-semibold text-text">Delete collection?</h3>
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                disabled={deleting}
+                className="h-7 w-7 flex items-center justify-center rounded-[6px] text-text-dim hover:text-text hover:bg-ink/30 disabled:opacity-50 transition-colors"
+                aria-label="Cancel"
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-[13px] text-text">
+                Delete <span className="font-semibold">{c.name}</span>?
+              </p>
+              {hasPdf && (
+                <p className="text-[12px] text-text-dim">The attached PDF will also be removed.</p>
+              )}
+              {deleteError && (
+                <p className="text-[12px] text-fault">{deleteError}</p>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(false)}
+                  disabled={deleting}
+                  className="h-8 px-4 rounded-[7px] text-[12px] text-text-dim border border-rule hover:bg-ink/20 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="h-8 px-4 rounded-[7px] text-[12px] font-semibold bg-fault text-white hover:bg-fault/85 disabled:opacity-60 transition-colors"
+                >
+                  {deleting ? "Deleting…" : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

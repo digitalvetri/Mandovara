@@ -17,9 +17,10 @@ interface Props {
 
 export default async function BrandCatalogPage({ params }: Props) {
   const { brandId } = await params;
-  const ctx      = await devContext();
-  const canWrite = can(ctx, "catalog.update");
-  const canAdd   = can(ctx, "catalog.create");
+  const ctx       = await devContext();
+  const canWrite  = can(ctx, "catalog.update");
+  const canAdd    = can(ctx, "catalog.create");
+  const canDelete = can(ctx, "catalog.delete");
 
   const brand = await getBrandById(ctx, brandId);
 
@@ -106,6 +107,7 @@ export default async function BrandCatalogPage({ params }: Props) {
                 collection={col}
                 brandName={brand.name}
                 canWrite={canWrite}
+                canDelete={canDelete}
               />
             ))}
           </div>
