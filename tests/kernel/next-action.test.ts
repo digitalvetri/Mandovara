@@ -59,7 +59,10 @@ describe("resolveNextAction — stage → CTA mapping", () => {
   it.each([
     ["ENQUIRY",      "SCHEDULE_VISIT",     "Schedule a site visit"],
     ["QUOTATION",    "BUILD_QUOTATION",    "Build the quotation"],
-    ["ORDERED",      "RAISE_PROCUREMENT",  "Awaiting advance payment"],
+    // Owner canonical flow post-acceptance: invoice → advance → install.
+    // With no money snapshot (test defaults), the ORDERED CTA is "Create
+    // invoice" not the retired "Prepare material" pointing to procurement.
+    ["ORDERED",      "CREATE_INVOICE",     "Firm quote accepted"],
     // Label changed when the dye-lot allocation console was removed — the
     // stage still exists, but there is nothing to allocate to any more.
     ["PROCUREMENT",  "ALLOCATE_MATERIAL",  "Material in procurement"],
@@ -68,6 +71,32 @@ describe("resolveNextAction — stage → CTA mapping", () => {
     const a = resolveNextAction(ctx, { id: "p1", stage });
     expect(a.kind).toBe(kind);
     expect(a.label).toContain(label);
+  });
+
+  it("stage=ORDERED with money loaded walks invoice → advance → install", () => {
+    const richCtx = ctxWith(["invoice.create", "receipt.create", "sitelog.create"]);
+    // no invoice yet
+    const step1 = resolveNextAction(richCtx, {
+      id: "p1", stage: "ORDERED",
+      money: { invoiceTotal: 0n, advanceReceived: 0n, advanceRequired: 500_00n },
+    });
+    expect(step1.kind).toBe("CREATE_INVOICE");
+    expect(step1.enabled).toBe(true);
+
+    // invoice raised, no advance yet
+    const step2 = resolveNextAction(richCtx, {
+      id: "p1", stage: "ORDERED",
+      money: { invoiceTotal: 10_000_00n, advanceReceived: 0n, advanceRequired: 500_00n },
+    });
+    expect(step2.kind).toBe("RECORD_ADVANCE");
+
+    // advance met — install unlocks without waiting on MAKE
+    const step3 = resolveNextAction(richCtx, {
+      id: "p1", stage: "ORDERED",
+      money: { invoiceTotal: 10_000_00n, advanceReceived: 500_00n, advanceRequired: 500_00n },
+    });
+    expect(step3.kind).toBe("SCHEDULE_INSTALL");
+    expect(step3.cta).toBe("Book install visit");
   });
 
   it("stage=MAKE reflects make progress in subLine", () => {
