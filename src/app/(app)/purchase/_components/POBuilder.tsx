@@ -9,6 +9,7 @@ import { createPO } from "@/modules/purchase/actions";
 import type { VendorPickerRow } from "@/modules/vendors/queries";
 import type { ColourwayPickerRow } from "@/modules/purchase/queries";
 import type { SELL_UNITS } from "@/modules/purchase/schema";
+import { GST_RATES } from "@/modules/purchase/schema";
 
 type SellUnit = (typeof SELL_UNITS)[number];
 
@@ -17,9 +18,10 @@ interface Draft {
   unit: SellUnit;
   quantity: string;
   rate: string;
+  gstRate: string;
 }
 
-const EMPTY: Draft = { colourwayId: "", unit: "METRE", quantity: "1", rate: "" };
+const EMPTY: Draft = { colourwayId: "", unit: "METRE", quantity: "1", rate: "", gstRate: "0" };
 
 interface Props {
   vendors:      VendorPickerRow[];
@@ -77,6 +79,7 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
             unit: l.unit,
             quantity: Number(l.quantity),
             rate: l.rate,
+            gstRate: Number(l.gstRate) || 0,
           })),
       };
       const res = await createPO(payload);
@@ -120,6 +123,7 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
               <Th>Colourway</Th>
               <Th align="right" width={110}>Qty</Th>
               <Th align="right" width={140}>Rate (₹)</Th>
+              <Th align="right" width={80}>GST %</Th>
               <Th align="right" width={130}>Amount</Th>
               <Th width={30}></Th>
             </tr>
@@ -154,6 +158,15 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
                     <input inputMode="decimal" value={l.rate}
                            onChange={(e) => updateLine(i, { rate: e.target.value })}
                            className={`${cellCls} tabular text-right`} />
+                  </Td>
+                  <Td align="right">
+                    <select value={l.gstRate}
+                            onChange={(e) => updateLine(i, { gstRate: e.target.value })}
+                            className={`${cellCls} text-right w-[56px]`}>
+                      {GST_RATES.map((r) => (
+                        <option key={r} value={String(r)}>{r}%</option>
+                      ))}
+                    </select>
                   </Td>
                   <Td align="right"><span className="tabular text-text font-medium">{formatINR(amount)}</span></Td>
                   <Td>

@@ -11,11 +11,14 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/);
 
 // ── PO creation ───────────────────────────────────────────────────────────────
 
+export const GST_RATES = [0, 5, 12, 18, 28] as const;
+
 export const poLineInput = z.object({
   colourwayId: z.string().min(1, "Pick a colourway"),
   unit:        z.enum(SELL_UNITS),
   quantity:    z.number().positive("Quantity must be > 0"),
   rate:        z.string().trim().min(1, "Rate is required"),   // INR string, parsed server-side
+  gstRate:     z.number().int().refine((v) => (GST_RATES as readonly number[]).includes(v), "Invalid GST rate").default(0),
 });
 
 export const createPOSchema = z.object({

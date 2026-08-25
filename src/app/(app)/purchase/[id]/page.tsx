@@ -8,6 +8,7 @@ import { getPO } from "@/modules/purchase/queries";
 import { POStatusPill } from "../_components/StatusPill";
 import { SendOnWhatsAppButton } from "./_components/SendOnWhatsAppButton";
 import { POStatusActions } from "./_components/POStatusActions";
+import { GRNForm } from "../_components/GRNForm";
 import { MarkPaidButton } from "@/app/(app)/accounts/_components/MarkPaidButton";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export default async function PODetailPage({
     return s + BigInt(Math.round(Number(l.rate) * parseFloat(l.receivedQty)));
   }, 0n);
   const pendingValue = orderedValue - receivedValue;
+  const pendingLineCount = po.lines.filter((l) => parseFloat(l.pendingQty) > 0).length;
 
   // ── Urgency ──────────────────────────────────────────────────────────────
   let urgency: { label: string; level: "ok" | "warn" | "bad" } | null = null;
@@ -141,8 +143,13 @@ export default async function PODetailPage({
           </table>
         </div>
 
+        {/* ── GRN form (only when PO is active and has pending lines) ─────── */}
+        {(po.status === "SENT" || po.status === "PARTIAL") && (
+          <GRNForm purchaseOrderId={po.id} lines={po.lines} />
+        )}
+
         {/* ── Status actions ──────────────────────────────────────────────── */}
-        <POStatusActions poId={po.id} status={po.status} vendorName={po.vendorName} />
+        <POStatusActions poId={po.id} status={po.status} vendorName={po.vendorName} pendingLineCount={pendingLineCount} />
 
         {/* ── Vendor payment ──────────────────────────────────────────────── */}
         {vendorExpense && (

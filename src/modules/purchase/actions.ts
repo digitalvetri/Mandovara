@@ -79,7 +79,7 @@ export async function createPO(
         date:       now,
         ...(d.expectedAt && { expectedAt: new Date(d.expectedAt) }),
         ...(d.projectId  && { projectId: d.projectId }),
-        status:     "SENT",
+        status:     "DRAFT",
         totalValue,
       },
       select: { id: true, number: true },
@@ -92,6 +92,7 @@ export async function createPO(
         unit:            l.unit,
         quantity:        new Decimal(l.quantity),
         rate:            parseINR(l.rate),
+        gstRate:         new Decimal(l.gstRate ?? 0),
       })),
     });
     return po;

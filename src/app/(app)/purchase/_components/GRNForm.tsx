@@ -18,7 +18,7 @@ interface Props {
 
 export function GRNForm({ purchaseOrderId, lines }: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [receivedAt, setReceivedAt] = useState<string>(iso(new Date()));

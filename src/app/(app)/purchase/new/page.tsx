@@ -23,7 +23,7 @@ export default async function NewPOPage({
 
   // Pre-populate lines from an approved purchase request
   type SellUnit = "METRE" | "ROLL" | "SQFT" | "SQM" | "PIECE" | "SET" | "BOX" | "RUNNING_FT";
-  let initialLines: { colourwayId: string; unit: SellUnit; quantity: string; rate: string }[] | undefined;
+  let initialLines: { colourwayId: string; unit: SellUnit; quantity: string; rate: string; gstRate: string }[] | undefined;
 
   if (params.requestId) {
     const pr = await db.purchaseRequest.findUnique({
@@ -38,6 +38,7 @@ export default async function NewPOPage({
           unit:        l.unit as SellUnit,
           quantity:    Number(l.quantity).toString(),
           rate:        "",
+          gstRate:     "0",
         }));
     }
   }

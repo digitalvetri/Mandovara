@@ -211,6 +211,14 @@ enum POStatus {
   CANCELLED
 }
 
+enum VendorBillStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
 enum RequestStatus {
   DRAFT
   SUBMITTED
@@ -1276,6 +1284,7 @@ model POLine {
   quantity        Decimal       @db.Decimal(12, 3)
   unit            SellUnit
   rate            BigInt
+  gstRate         Decimal       @db.Decimal(5, 2)  @default(0)
   receivedQty     Decimal       @db.Decimal(12, 3) @default(0)
 
   po PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
@@ -1292,6 +1301,7 @@ model GRN {
   receivedById    String?
 
   lines GRNLine[]
+  bills VendorBill[]
   po    PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
 
   @@unique([organizationId, number])
@@ -1313,6 +1323,56 @@ model GRNLine {
   grn GRN @relation(fields: [grnId], references: [id])
 
   @@index([organizationId, colourwayId, dyeLot])
+}
+
+model VendorBill {
+  id                String           @id @default(cuid())
+  organizationId    String
+  number            String
+  vendorId          String
+  purchaseOrderId   String?
+  grnId             String?
+  vendorInvoiceNo   String?
+  vendorInvoiceDate DateTime?
+  billDate          DateTime
+  status            VendorBillStatus @default(DRAFT)
+  taxableAmount     BigInt
+  cgst              BigInt           @default(0)
+  sgst              BigInt           @default(0)
+  igst              BigInt           @default(0)
+  roundOff          BigInt           @default(0)
+  total             BigInt
+  vendorGstin       String?
+  placeOfSupply     String?
+
+  grn         GRN?                @relation(fields: [grnId], references: [id])
+  lines       VendorBillLine[]
+  allocations PaymentAllocation[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, vendorId, status])
+  @@index([organizationId, purchaseOrderId])
+}
+
+model VendorBillLine {
+  id             String   @id @default(cuid())
+  organizationId String
+  vendorBillId   String
+  lineNo         Int
+  colourwayId    String?
+  description    String
+  hsn            String?
+  quantity       Decimal  @db.Decimal(12, 3)
+  unit           SellUnit
+  rate           BigInt
+  gstRate        Decimal  @db.Decimal(5, 2) @default(0)
+  taxable        BigInt
+  cgst           BigInt   @default(0)
+  sgst           BigInt   @default(0)
+  igst           BigInt   @default(0)
+  amount         BigInt
+
+  bill VendorBill @relation(fields: [vendorBillId], references: [id], onDelete: Cascade)
 }
 
 model StockBalance {
@@ -1565,11 +1625,14 @@ model PaymentAllocation {
   paymentId       String
   invoiceId       String?
   purchaseOrderId String?
+  vendorBillId    String?
   amount          BigInt
 
-  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  payment    Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  vendorBill VendorBill? @relation(fields: [vendorBillId], references: [id])
 
   @@index([invoiceId])
+  @@index([vendorBillId])
 }
 
 model ProjectExpense {

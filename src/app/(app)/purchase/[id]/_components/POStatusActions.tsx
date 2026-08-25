@@ -5,25 +5,33 @@ import { useRouter } from "next/navigation";
 import { setPOStatus } from "@/modules/purchase/actions";
 
 interface Props {
-  poId:       string;
-  status:     string;
-  vendorName: string;
+  poId:            string;
+  status:          string;
+  vendorName:      string;
+  pendingLineCount?: number;
 }
 
-export function POStatusActions({ poId, status, vendorName }: Props) {
+export function POStatusActions({ poId, status, vendorName, pendingLineCount = 0 }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmReceive, setConfirmReceive] = useState(false);
 
   if (["RECEIVED", "CANCELLED", "PENDING_APPROVAL", "APPROVED"].includes(status)) return null;
 
   function apply(next: string) {
     setError(null);
+    setConfirmReceive(false);
     start(async () => {
       const res = await setPOStatus({ id: poId, status: next });
       if (!res.ok) { setError(res.error ?? "Failed"); return; }
       router.refresh();
     });
+  }
+
+  function onMarkReceived() {
+    if (pendingLineCount > 0) { setConfirmReceive(true); return; }
+    apply("RECEIVED");
   }
 
   const hint = error
@@ -42,15 +50,30 @@ export function POStatusActions({ poId, status, vendorName }: Props) {
             {pending ? "Updating…" : "Mark as Sent"}
           </button>
         )}
-        {(status === "SENT" || status === "PARTIAL") && (
+        {(status === "SENT" || status === "PARTIAL") && !confirmReceive && (
           <>
             <button onClick={() => apply("CANCELLED")} disabled={pending}
               className="h-[34px] px-5 rounded-[8px] border border-fault/40 text-fault text-[12.5px] hover:bg-fault/5 disabled:opacity-50 transition-colors">
               Cancel PO
             </button>
-            <button onClick={() => apply("RECEIVED")} disabled={pending}
+            <button onClick={onMarkReceived} disabled={pending}
               className="h-[34px] px-5 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
               {pending ? "Updating…" : "Mark as Received"}
+            </button>
+          </>
+        )}
+        {confirmReceive && (
+          <>
+            <span className="text-[12px] text-warn font-medium">
+              {pendingLineCount} line{pendingLineCount === 1 ? "" : "s"} still pending — mark as received anyway?
+            </span>
+            <button onClick={() => setConfirmReceive(false)} disabled={pending}
+              className="h-[34px] px-4 rounded-[8px] border border-rule text-text-dim text-[12.5px] hover:bg-surface-hover disabled:opacity-50 transition-colors">
+              Go back
+            </button>
+            <button onClick={() => apply("RECEIVED")} disabled={pending}
+              className="h-[34px] px-5 rounded-[8px] bg-accent text-white text-[12.5px] font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
+              {pending ? "Updating…" : "Yes, close PO"}
             </button>
           </>
         )}
