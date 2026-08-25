@@ -56,7 +56,11 @@ export function NewVisitButton({
       const res = await createSiteVisit(data);
       if (!res.ok) { setError(res.error ?? "Failed to create visit"); return; }
       setOpen(false);
-      if (onCloseHref) router.push(onCloseHref as never);
+      // Always land on the newly created visit's detail page — the owner
+      // needs to see what was just scheduled, not the project page or a
+      // silent list refresh where the new row is easy to miss.
+      if (res.data?.id) router.push(`/site-visits/${res.data.id}` as never);
+      else if (onCloseHref) router.push(onCloseHref as never);
       else router.refresh();
     });
   }
