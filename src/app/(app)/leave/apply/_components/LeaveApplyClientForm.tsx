@@ -1,7 +1,4 @@
 "use client";
-/* eslint-disable max-lines -- 541 lines; owner UX-critical shipping today, refactor into
-   sub-components (calendar / balance card / submit panel) in a follow-up. Left as-is here
-   to unblock the concurrent advance-gate fix from deploying. */
 
 import { useState, useTransition, useMemo } from "react";
 import { Check, Calendar, ArrowRight, Loader2, AlertCircle } from "lucide-react";
