@@ -98,13 +98,9 @@ export async function SelfView({ ctx }: { ctx: Awaited<ReturnType<typeof devCont
   return (
     <>
       <Topbar
-        title="Attendance & Leave"
+        title="Attendance"
         eyebrow={`${employee.name}${employee.designation ? ` · ${employee.designation}` : ""}`}
       />
-
-      <p className="text-[13px] text-text-muted mb-5 -mt-1">
-        Track your attendance, working hours, and manage leave requests.
-      </p>
 
       {/* ── TODAY'S ATTENDANCE — interactive client component ── */}
       <TodayCard {...todayCardProps} />

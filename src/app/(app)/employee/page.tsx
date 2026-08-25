@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { CalendarDays, FileText, Smartphone, TrendingUp } from "lucide-react";
+import { CalendarDays, FileText, TrendingUp } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { Topbar } from "@/components/layout/Topbar";
@@ -180,9 +180,8 @@ export default async function EmployeeDashboardPage() {
           {/* Quick chips */}
           <div className="mt-5 flex flex-wrap gap-2">
             {[
-              { href: "/m/attendance", label: "Mark Attendance", icon: <Smartphone size={13} strokeWidth={2} /> },
-              { href: "/attendance",   label: "My Attendance",   icon: <CalendarDays size={13} strokeWidth={2} /> },
-              { href: "/payroll",      label: "My Payslips",     icon: <FileText size={13} strokeWidth={2} /> },
+              { href: "/attendance", label: "Attendance",  icon: <CalendarDays size={13} strokeWidth={2} /> },
+              { href: "/payroll",    label: "My Payslips", icon: <FileText size={13} strokeWidth={2} /> },
             ].map(({ href, label, icon }) => (
               <Link
                 key={href}
