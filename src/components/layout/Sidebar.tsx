@@ -64,7 +64,11 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
     section: "People",
     items: [
       { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },
-      { label: "Leave applications", href: "/leave",      icon: CalendarCheck, perm: "leave.view" },
+      // "Leave applications" removed from owner nav 25 Aug 2026 — owner
+      // asked for it to appear only for employees (who reach it via
+      // Attendance & Leave on their own /employee dashboard). Owner can
+      // still open /leave directly if needed; it just isn't cluttering
+      // the primary sidebar.
       { label: "Payroll",            href: "/payroll",    icon: IndianRupee   },
     ],
   },
