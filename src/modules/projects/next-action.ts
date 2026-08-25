@@ -61,7 +61,6 @@ const PERM_START_MEASUREMENT = [
 ] as const;
 const PERM_BUILD_QUOTATION = ["quotation.create"] as const;
 const PERM_SEND_QUOTATION  = ["quotation.send"]   as const;
-const PERM_STOCK           = ["stock.view"] as const;   // what /inventory gates on
 const PERM_CREATE_INVOICE  = ["invoice.create"] as const;
 const PERM_RECORD_ADVANCE  = ["receipt.create"] as const;
 const PERM_BOOK_INSTALL    = ["sitelog.create", "project.update"] as const;
@@ -179,15 +178,19 @@ export function resolveNextAction(
     }
 
     case "PROCUREMENT": {
-      const enabled = hasAny(ctx, PERM_STOCK);
+      // Owner canonical flow (2026-08-25): after advance is received,
+      // the next visible action is Book install visit — procurement
+      // happens in the background via the stock-reservation flow and
+      // shouldn't force the owner into the stock ledger.
+      const enabled = hasAny(ctx, PERM_BOOK_INSTALL);
       return {
-        kind:  "ALLOCATE_MATERIAL",
-        label: "Material in procurement",
-        cta:   "Open stock ledger",
+        kind:  "SCHEDULE_INSTALL",
+        label: "Advance received — ready to install",
+        cta:   "Book install visit",
         enabled,
         disabledReason: enabled ? null :
-          "Stock is handled by the store team.",
-        href: `/inventory`,
+          "Install visits are scheduled by the sales team.",
+        href: `/site-visits/new?projectId=${id}&purpose=HANDOVER`,
       };
     }
 

@@ -63,9 +63,10 @@ describe("resolveNextAction — stage → CTA mapping", () => {
     // With no money snapshot (test defaults), the ORDERED CTA is "Create
     // invoice" not the retired "Prepare material" pointing to procurement.
     ["ORDERED",      "CREATE_INVOICE",     "Firm quote accepted"],
-    // Label changed when the dye-lot allocation console was removed — the
-    // stage still exists, but there is nothing to allocate to any more.
-    ["PROCUREMENT",  "ALLOCATE_MATERIAL",  "Material in procurement"],
+    // Owner canonical flow: after advance is received the project stage
+    // moves to PROCUREMENT internally but the visible CTA jumps straight
+    // to "Book install visit" (procurement happens in the background).
+    ["PROCUREMENT",  "SCHEDULE_INSTALL",   "Advance received — ready to install"],
     ["CANCELLED",    "PROJECT_CANCELLED",  "This project was cancelled"],
   ])("stage=%s → kind=%s / label=%s", (stage, kind, label) => {
     const a = resolveNextAction(ctx, { id: "p1", stage });
@@ -116,11 +117,11 @@ describe("resolveNextAction — disabled fallbacks", () => {
     expect(a.disabledReason).toContain("sales / designers");
   });
 
-  it("PROCUREMENT without allocation.create is disabled", () => {
+  it("PROCUREMENT without install perms is disabled with a sales-team reason", () => {
     const ctx = ctxWith(["project.view"]);
     const a = resolveNextAction(ctx, { id: "p1", stage: "PROCUREMENT" });
     expect(a.enabled).toBe(false);
-    expect(a.disabledReason).toContain("store team");
+    expect(a.disabledReason).toContain("sales team");
   });
 
   it("CANCELLED is disabled regardless of perms", () => {
