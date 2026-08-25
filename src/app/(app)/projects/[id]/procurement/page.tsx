@@ -48,23 +48,15 @@ export default async function ProjectProcurementPage({ params }: Props) {
         <EmptyState projectId={id} />
       ) : (
         <>
-          {/* Order summary */}
-          <div className="mb-5 rounded-[14px] border border-rule bg-surface p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <ShoppingCart size={16} className="text-solid" />
-              <div>
-                <div className="text-[13px] font-medium text-text">Order {data.order.number}</div>
-                <div className="text-[11px] text-text-dim uppercase tracking-[0.14em] mt-0.5">
-                  {data.order.status.toLowerCase()}
-                </div>
-              </div>
+          {/* Accepted-quote pill. Batch A (25 Aug 2026) hid the Order
+              document — no "Order MDV/SO-..." number, no "View order"
+              link. Just the confirmation that a quote landed for this
+              project so procurement makes sense. */}
+          <div className="mb-5 rounded-[14px] border border-solid/25 bg-solid/5 p-4 flex items-center gap-3">
+            <ShoppingCart size={16} className="text-solid" />
+            <div className="text-[13px] font-medium text-text">
+              Quote accepted — procuring materials for this project
             </div>
-            <Link
-              href={`/orders/${data.order.id}` as Route}
-              className="text-[12px] text-accent hover:underline"
-            >
-              View order →
-            </Link>
           </div>
 
           {/* Info banners */}
