@@ -50,8 +50,8 @@ export default async function NewInvoicePage() {
         <div className="rounded-[14px] border border-rule bg-surface py-16 text-center">
           <div className="text-[14px] text-text mb-2">No projects ready to invoice.</div>
           <p className="text-[12px] text-text-dim">
-            A project needs a confirmed order before it can be invoiced.{" "}
-            <Link href={"/orders" as Route} className="text-accent hover:underline">Open orders →</Link>
+            A project needs an accepted firm quotation before it can be invoiced.{" "}
+            <Link href={"/projects" as Route} className="text-accent hover:underline">Open projects →</Link>
           </p>
         </div>
       ) : (

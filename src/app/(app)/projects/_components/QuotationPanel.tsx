@@ -37,21 +37,14 @@ export function QuotationPanel({ projectId, data, canCreate }: Props) {
         )}
       </div>
 
-      {/* Order link — Fix 2.D. Only when a real order exists. */}
+      {/* "Accepted quote → work in progress" indicator. Was a "View order"
+          link — Order is now an internal record the owner doesn't need
+          to see (25 Aug 2026 redesign). Kept as a simple status pill. */}
       {latestOrder && (
-        <Link
-          href={`/orders/${latestOrder.id}` as Route}
-          className="group mb-4 flex items-center justify-between gap-3 rounded-[10px] border border-solid/25 bg-solid/5 px-3.5 py-2.5 text-[12px] transition-colors hover:border-solid/50 hover:bg-solid/10"
-        >
-          <span className="flex items-center gap-2 text-text">
-            <ShoppingCart size={13} className="text-solid" />
-            <span className="font-medium">Order confirmed</span>
-            <span className="text-text-dim tabular-nums">{shortNumber(latestOrder.number)}</span>
-          </span>
-          <span className="flex items-center gap-1 text-[11px] text-text-dim group-hover:text-text">
-            View order <ArrowRight size={11} />
-          </span>
-        </Link>
+        <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-solid/25 bg-solid/5 px-3.5 py-2.5 text-[12px]">
+          <ShoppingCart size={13} className="text-solid" />
+          <span className="font-medium text-text">Accepted quote in Work in Progress</span>
+        </div>
       )}
 
       {hasQuotes ? (
