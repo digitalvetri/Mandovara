@@ -16,6 +16,8 @@ export type NextActionKind =
   | "BUILD_QUOTATION"
   | "SEND_QUOTATION"
   | "AWAITING_ACCEPTANCE"
+  | "CREATE_INVOICE"
+  | "RECORD_ADVANCE"
   | "RAISE_PROCUREMENT"
   | "ALLOCATE_MATERIAL"
   | "MAKE_IN_PROGRESS"
@@ -44,6 +46,14 @@ export interface ProjectSnapshot {
   stage: string;
   openSnags?: number;
   makeInProgress?: { done: number; total: number };
+  /** Owner canonical flow after quote acceptance: invoice → advance →
+   *  install. When present, drives the ORDERED-stage CTA between
+   *  "Create invoice", "Record advance", and "Book install". */
+  money?: {
+    invoiceTotal:    bigint;
+    advanceReceived: bigint;
+    advanceRequired: bigint;
+  };
 }
 
 const PERM_START_MEASUREMENT = [
@@ -52,6 +62,9 @@ const PERM_START_MEASUREMENT = [
 const PERM_BUILD_QUOTATION = ["quotation.create"] as const;
 const PERM_SEND_QUOTATION  = ["quotation.send"]   as const;
 const PERM_STOCK           = ["stock.view"] as const;   // what /inventory gates on
+const PERM_CREATE_INVOICE  = ["invoice.create"] as const;
+const PERM_RECORD_ADVANCE  = ["receipt.create"] as const;
+const PERM_BOOK_INSTALL    = ["sitelog.create", "project.update"] as const;
 function hasAny(ctx: RequestContext, keys: readonly string[]): boolean {
   for (const k of keys) if (ctx.permissions.has(k as never)) return true;
   return false;
@@ -107,21 +120,59 @@ export function resolveNextAction(
       };
     }
 
-    case "ORDERED":
-      // Advance-Awaited phase (Batch A). Quote is accepted but the
-      // advance hasn't landed yet — that gate lands in Batch B. For
-      // now, still surface the procurement console since that's where
-      // the owner readies stock. Once Batch B ships, this changes to
-      // "Collect the advance" as the primary CTA.
+    case "ORDERED": {
+      // Owner canonical flow post-acceptance: Create invoice → collect
+      // advance → book install. Procurement is background; it is not
+      // the primary CTA here anymore. When money snapshot isn't loaded
+      // we fall through to "Create invoice" (safe default; owner still
+      // clicks through to the invoice picker).
+      const m = project.money;
+      const invoiced = m ? m.invoiceTotal > 0n : false;
+      const advanceMet = m
+        ? m.advanceRequired > 0n
+            ? m.advanceReceived >= m.advanceRequired
+            : m.advanceReceived > 0n
+        : false;
+
+      if (!invoiced) {
+        const enabled = hasAny(ctx, PERM_CREATE_INVOICE);
+        return {
+          kind:  "CREATE_INVOICE",
+          label: "Firm quote accepted",
+          cta:   "Create invoice",
+          enabled,
+          disabledReason: enabled ? null :
+            "Invoices are raised by the accounts team.",
+          href: `/invoicing/new`,
+          subLine: "Invoice → advance → install.",
+        };
+      }
+      if (!advanceMet) {
+        const enabled = hasAny(ctx, PERM_RECORD_ADVANCE);
+        return {
+          kind:  "RECORD_ADVANCE",
+          label: "Invoice raised — awaiting advance",
+          cta:   "Record advance receipt",
+          enabled,
+          disabledReason: enabled ? null :
+            "Receipts are recorded by the accounts team.",
+          href: `/accounts/new`,
+          subLine: "Install is unlocked once the advance is in.",
+        };
+      }
+      // Advance in. Book install as the next visible step, even before
+      // MAKE catches up — matches owner flow (Task 7).
+      const enabled = hasAny(ctx, PERM_BOOK_INSTALL);
       return {
-        kind:  "RAISE_PROCUREMENT",
-        label: "Awaiting advance payment",
-        cta:   "Prepare material",
-        enabled: hasAny(ctx, ["po.create", "requisition.create", "project.materialIssue"]),
-        disabledReason: hasAny(ctx, ["po.create", "requisition.create", "project.materialIssue"]) ? null :
-          "Material preparation is handled by the store team.",
-        href: `/projects/${id}/procurement`,
+        kind:  "SCHEDULE_INSTALL",
+        label: "Advance received — ready to install",
+        cta:   "Book install visit",
+        enabled,
+        disabledReason: enabled ? null :
+          "Install visits are scheduled by the sales team.",
+        href: `/site-visits/new?projectId=${id}&purpose=HANDOVER`,
       };
+    }
 
     case "PROCUREMENT": {
       const enabled = hasAny(ctx, PERM_STOCK);
@@ -201,81 +252,8 @@ export function resolveNextAction(
   }
 }
 
-export const PROJECT_STAGES: readonly string[] = [
-  "ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION", "ORDERED",
-  "PROCUREMENT", "MAKE", "COMPLETED",
-];
-
-export const STAGE_SHORT_LABEL: Record<string, string> = {
-  ENQUIRY:      "Enquiry",
-  SITE_VISIT:   "Site Visit",
-  MEASUREMENT:  "Measure",
-  QUOTATION:    "Quote",
-  ORDERED:      "Order",
-  PROCUREMENT:  "Procure",
-  MAKE:         "Make",
-  COMPLETED:    "Done",
-  CANCELLED:    "Cancelled",
-};
-
-// Customer-facing 6-phase view (25 Aug 2026 owner redesign, Batch A).
-// The old Order / Procurement / Make substates roll into two phases:
-//   ADVANCE_AWAITED  — quote accepted, waiting on advance payment
-//   INSTALLATION     — advance received, work + install in progress
-// Advance is the physical gate to installation (Batch B enforces it).
-export type ProjectPhase =
-  | "ENQUIRY"
-  | "MEASUREMENT"
-  | "QUOTATION"
-  | "ADVANCE_AWAITED"
-  | "INSTALLATION"
-  | "COMPLETED";
-
-export const PROJECT_PHASES: readonly ProjectPhase[] = [
-  "ENQUIRY", "MEASUREMENT", "QUOTATION", "ADVANCE_AWAITED", "INSTALLATION", "COMPLETED",
-];
-
-export const PHASE_LABEL: Record<ProjectPhase, string> = {
-  ENQUIRY:          "Enquiry",
-  MEASUREMENT:      "Measurement",
-  QUOTATION:        "Quotation",
-  ADVANCE_AWAITED:  "Advance Awaited",
-  INSTALLATION:     "Installation",
-  COMPLETED:        "Completed",
-};
-
-// The first internal stage jumped to when the user clicks a phase in the
-// stepper — lets a manual override still map cleanly onto ProjectStage.
-// Internal enum unchanged: ORDERED holds the "quote accepted, advance
-// pending" state; PROCUREMENT/MAKE cover "installation in progress".
-export const PHASE_TARGET_STAGE: Record<ProjectPhase, string> = {
-  ENQUIRY:          "ENQUIRY",
-  MEASUREMENT:      "MEASUREMENT",
-  QUOTATION:        "QUOTATION",
-  ADVANCE_AWAITED:  "ORDERED",
-  INSTALLATION:     "PROCUREMENT",
-  COMPLETED:        "COMPLETED",
-};
-
-export function phaseForStage(stage: string): ProjectPhase | "CANCELLED" {
-  switch (stage) {
-    case "ENQUIRY":
-    case "SITE_VISIT":
-      return "ENQUIRY";
-    case "MEASUREMENT":
-      return "MEASUREMENT";
-    case "QUOTATION":
-      return "QUOTATION";
-    case "ORDERED":
-      return "ADVANCE_AWAITED";
-    case "PROCUREMENT":
-    case "MAKE":
-      return "INSTALLATION";
-    case "COMPLETED":
-      return "COMPLETED";
-    case "CANCELLED":
-      return "CANCELLED";
-    default:
-      return "ENQUIRY";
-  }
-}
+export {
+  PROJECT_STAGES, STAGE_SHORT_LABEL,
+  PROJECT_PHASES, PHASE_LABEL, PHASE_TARGET_STAGE, phaseForStage,
+} from "./stage-phases";
+export type { ProjectPhase } from "./stage-phases";

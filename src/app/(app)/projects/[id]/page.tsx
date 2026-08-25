@@ -64,7 +64,16 @@ export default async function ProjectDetailPage({
       getProjectQuotationsAndOrder(ctx, id),
     ]);
 
-  const action = resolveNextAction(ctx, { id: p.id, clientId: p.clientId, stage: p.stage });
+  const action = resolveNextAction(ctx, {
+    id:       p.id,
+    clientId: p.clientId,
+    stage:    p.stage,
+    ...(money ? { money: {
+      invoiceTotal:    money.invoiceTotal,
+      advanceReceived: money.advanceReceived,
+      advanceRequired: money.advanceRequired,
+    } } : {}),
+  });
   const receivedTotal = money?.receiptTotal ?? 0n;
   const pctCompleteHeader = milestones.length > 0
     ? Math.round(
