@@ -10,6 +10,7 @@ import { StatusPill } from "../_components/StatusPill";
 import { CancelInvoiceButton } from "../_components/CancelInvoiceButton";
 import { CreditNoteButton } from "../_components/CreditNoteButton";
 import { InvoicePDFPreviewButton } from "./_components/InvoicePDFPreviewButton";
+import { SendInvoiceOnWhatsAppButton } from "./_components/SendInvoiceOnWhatsAppButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,19 +28,11 @@ export default async function InvoiceDetailPage({
   const canCancel    = inv.status === "ISSUED" || inv.status === "DRAFT";
   const canCreditNote = inv.type === "TAX" && (inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID" || inv.status === "PAID") && inv.orderId != null;
 
-  // WhatsApp pre-filled message. FIXES-01 §4.3 preference is a REAL
-  // PDF attachment via Meta's media endpoint — that needs WABA setup.
-  // Until then: wa.me click-to-chat with the invoice summary, and the
-  // user drags the downloaded PDF into WhatsApp Web. The "Download PDF"
-  // button next to it makes that flow one-two-three.
-  const waText = encodeURIComponent(
-    `Namaste ${inv.clientName.split(/\s+/)[0] ?? inv.clientName},\n\n` +
-    `Please find your invoice ${inv.number} for ${formatINR(inv.total)} dated ${formatDate(inv.date)}.\n` +
-    (inv.outstanding > 0n ? `Outstanding: ${formatINR(inv.outstanding)} due ${formatDate(inv.dueDate)}.\n` : "") +
-    `\n— Mandovara, Coimbatore`,
-  );
-  const waDigits = inv.clientMobile.replace(/\D/g, "");
-  const waHref = `https://wa.me/${waDigits.startsWith("91") ? waDigits : "91" + waDigits}?text=${waText}`;
+  // Invoice-share flow lives entirely in <SendInvoiceOnWhatsAppButton>
+  // now — it fetches the PDF, triggers a real download, and only then
+  // opens WhatsApp with a one-line caption. No more "Namaste …" body,
+  // since the PDF itself is the payload (the owner drops it into the
+  // chat). Real Meta-media-endpoint upload still needs WABA (§13).
 
   const serialized = {
     id:               inv.id,
@@ -94,14 +87,11 @@ export default async function InvoiceDetailPage({
           <div className="flex items-center gap-2" data-no-print>
             <InvoicePDFPreviewButton invoice={serialized} />
             {inv.clientMobile && (
-              <a
-                href={waHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-[#25D366] text-white text-[12px] font-medium hover:bg-[#1ebe57] transition-colors"
-              >
-                Send on WhatsApp
-              </a>
+              <SendInvoiceOnWhatsAppButton
+                invoiceId={inv.id}
+                invoiceNumber={inv.number}
+                clientMobile={inv.clientMobile}
+              />
             )}
             {inv.outstanding > 0n && (
               <Link
