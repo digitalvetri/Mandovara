@@ -189,7 +189,7 @@ export default async function ProductDetailPage({
             {product.dyeLotHint && (
               <span
                 className="inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-full bg-gold/15 text-[11px] uppercase tracking-[0.1em] text-accent"
-                title="Dye-lot-sensitive family"
+                title={`Dye lot: ${product.dyeLotHint}`}
               >
                 Dye lot {product.dyeLotHint}
               </span>
