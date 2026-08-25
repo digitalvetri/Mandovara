@@ -36,16 +36,20 @@ import { prisma } from "./client";
 import { rlsExtensionConfig } from "./rls";
 import { BRANCH_SCOPED, TENANT_SCOPED } from "./scoping-map";
 
-// Returns true for the "DB server not reachable" error that appears when
-// Docker / Postgres is not running in local dev. We swallow this error on
-// read-only operations so every page renders with empty data instead of
-// crashing. Mutations are NOT silenced — write failures must still surface.
+// Returns true for transient DB errors (server unreachable, connection pool
+// exhausted). We swallow these on read-only operations so pages render with
+// empty data instead of crashing. Mutations are NOT silenced.
 function isDbOffline(e: unknown): boolean {
   if (!(e instanceof Error)) return false;
-  return (
+  if (
     e.constructor.name === "PrismaClientInitializationError" ||
-    e.message.includes("Can't reach database server")
-  );
+    e.message.includes("Can't reach database server") ||
+    e.message.includes("connection pool") ||        // P2024 pool timeout
+    e.message.includes("connection refused")        // ECONNREFUSED
+  ) return true;
+  // Prisma P2024: timed out waiting for a connection from the pool
+  const pe = e as { code?: string };
+  return pe.code === "P2024";
 }
 
 function safeRead<T>(p: Promise<T>, empty: T): Promise<T> {
