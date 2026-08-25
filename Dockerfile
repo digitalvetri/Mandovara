@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 # Multi-stage production build for Mandovara Interior OS.
 #
 # Coolify picks this up automatically when the app's build pack is set
@@ -9,6 +10,12 @@
 #
 # The runtime entrypoint runs `prisma migrate deploy` before starting
 # the server so every deploy is schema-current with zero manual steps.
+#
+# BuildKit cache mounts (--mount=type=cache) on `pnpm install` and
+# `next build` reuse the pnpm store and Next's incremental compile
+# cache across deploys. Requires BuildKit (default on Coolify + modern
+# Docker); with it, subsequent builds skip 60-70% of the deps + compile
+# work when only app source changed.
 
 # ─── Stage 1: dependencies ──────────────────────────────────────────
 FROM node:22-alpine AS deps
@@ -20,7 +27,11 @@ RUN corepack enable && corepack prepare pnpm@10 --activate
 
 COPY package.json pnpm-lock.yaml* ./
 COPY prisma ./prisma
-RUN pnpm install --frozen-lockfile
+ENV PNPM_HOME=/pnpm
+ENV PATH="$PNPM_HOME:$PATH"
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store \
+ && pnpm install --frozen-lockfile
 
 
 # ─── Stage 2: build ─────────────────────────────────────────────────
@@ -44,8 +55,13 @@ COPY . .
 # Run `next build` directly (not via `pnpm build`) to skip the
 # `postbuild: prisma migrate deploy` npm hook — migrations require a live
 # database and belong at container start (docker-entrypoint.sh), not here.
+#
+# `.next/cache` mount reuses Next's incremental compile artefacts across
+# deploys, so unchanged pages/routes don't get retypechecked and rebundled.
+# Empty cache on first run — populated after the first successful build.
 RUN pnpm prisma generate
-RUN pnpm exec next build
+RUN --mount=type=cache,id=next-cache,target=/app/.next/cache \
+    pnpm exec next build
 
 
 # ─── Stage 3: runtime ───────────────────────────────────────────────
@@ -75,7 +91,8 @@ COPY --from=build --chown=nextjs:nodejs /app/public           ./public
 # doesn't collide with the pnpm-structured node_modules that came
 # out of the standalone build. tsx joins it so the entrypoint can
 # run prisma/seed.ts (TypeScript) directly on an empty DB.
-RUN mkdir -p /opt/prisma-cli \
+RUN --mount=type=cache,id=npm-prisma-cli,target=/root/.npm \
+    mkdir -p /opt/prisma-cli \
  && cd /opt/prisma-cli \
  && npm init -y >/dev/null \
  && npm install --omit=dev --no-audit --no-fund prisma@6.19.0 tsx@4 \
