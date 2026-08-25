@@ -180,8 +180,8 @@ export default async function EmployeeDashboardPage() {
           {/* Quick chips */}
           <div className="mt-5 flex flex-wrap gap-2">
             {[
-              { href: "/m/attendance", label: "Attendance PWA",  icon: <Smartphone size={13} strokeWidth={2} /> },
-              { href: "/attendance",   label: "View Attendance", icon: <CalendarDays size={13} strokeWidth={2} /> },
+              { href: "/m/attendance", label: "Mark Attendance", icon: <Smartphone size={13} strokeWidth={2} /> },
+              { href: "/attendance",   label: "My Attendance",   icon: <CalendarDays size={13} strokeWidth={2} /> },
               { href: "/payroll",      label: "My Payslips",     icon: <FileText size={13} strokeWidth={2} /> },
             ].map(({ href, label, icon }) => (
               <Link

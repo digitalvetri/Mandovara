@@ -4,6 +4,97 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 
+// ── Employee self-service payslip view ────────────────────────────────────────
+
+export interface MyPayslipEarnings {
+  basic:      string;
+  hra:        string;
+  conveyance: string;
+  ot?:        string;
+  incentive?: string;
+  gross:      string;
+}
+export interface MyPayslipDeductions {
+  pf:       string;
+  esi:      string;
+  pt:       string;
+  tds?:     string;
+  advance?: string;
+  total:    string;
+}
+
+export interface MyPayslipRow {
+  id:             string;
+  month:          number;
+  year:           number;
+  runStatus:      string;
+  daysPresent:    number;
+  lopDays:        number;
+  otHours:        number;
+  earnings:       MyPayslipEarnings;
+  deductions:     MyPayslipDeductions;
+  reimbursements: bigint;
+  netPay:         bigint;
+}
+
+export interface MyPayslipsView {
+  employee: { id: string; name: string; designation: string | null; department: string | null } | null;
+  payslips:  MyPayslipRow[];
+}
+
+// No requirePermission — employees are entitled to read their own payslips.
+// Payslip is not in TENANT_SCOPED, so organizationId is added explicitly.
+export async function loadMyPayslips(ctx: RequestContext): Promise<MyPayslipsView> {
+  const db = scoped(ctx);
+
+  const employee = await db.employee.findUnique({
+    where:  { userId: ctx.userId },
+    select: { id: true, name: true, designation: true, department: true },
+  });
+  if (!employee) return { employee: null, payslips: [] };
+
+  const rows = await db.payslip.findMany({
+    where:   { employeeId: employee.id, organizationId: ctx.orgId },
+    select:  {
+      id: true, payrollRunId: true,
+      daysPresent: true, lopDays: true, otHours: true,
+      earnings: true, deductions: true, reimbursements: true, netPay: true,
+    },
+    take:    24,
+  });
+
+  if (rows.length === 0) return { employee, payslips: [] };
+
+  const runIds = [...new Set(rows.map((r) => r.payrollRunId))];
+  const runs   = await db.payrollRun.findMany({
+    where:  { id: { in: runIds } },
+    select: { id: true, month: true, year: true, status: true },
+  });
+  const runById = new Map(runs.map((r) => [r.id, r]));
+
+  const payslips: MyPayslipRow[] = rows
+    .flatMap((r) => {
+      const run = runById.get(r.payrollRunId);
+      if (!run) return [];
+      return [{
+        id:             r.id,
+        month:          run.month,
+        year:           run.year,
+        runStatus:      run.status,
+        daysPresent:    Number(r.daysPresent),
+        lopDays:        Number(r.lopDays),
+        otHours:        Number(r.otHours),
+        earnings:       r.earnings  as unknown as MyPayslipEarnings,
+        deductions:     r.deductions as unknown as MyPayslipDeductions,
+        reimbursements: r.reimbursements,
+        netPay:         r.netPay,
+      }];
+    })
+    .sort((a, b) => b.year - a.year || b.month - a.month);
+
+  return { employee, payslips };
+}
+
 // The earnings / deductions JSON stored on Payslip — all values are BigInt paise as strings.
 interface PayslipEarnings {
   basic:      string;

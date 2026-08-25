@@ -1,13 +1,21 @@
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
-import { loadPayroll } from "@/modules/payroll/queries";
+import { loadPayroll, loadMyPayslips } from "@/modules/payroll/queries";
 import { ApproveButton, SendPayslipButton } from "./_components/PayrollActions";
+import { MyPayslipsView } from "./_components/MyPayslipsView";
 
 export const dynamic = "force-dynamic";
 
 export default async function PayrollPage() {
   const ctx = await devContext();
+
+  // Employees without payroll.view see their own payslips only.
+  if (!ctx.permissions.has("payroll.view")) {
+    const data = await loadMyPayslips(ctx);
+    return <MyPayslipsView data={data} />;
+  }
+
   const p = await loadPayroll(ctx);
 
   return (
