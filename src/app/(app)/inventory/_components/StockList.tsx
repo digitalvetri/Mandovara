@@ -55,7 +55,7 @@ export function StockList({ rows }: Props) {
         {/* Header row (desktop) */}
         <div className="hidden md:grid grid-cols-[minmax(0,2fr)_84px_84px_84px_100px_100px_60px] items-center gap-3 border-b border-rule px-5 py-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-text-dim">
           <span>Item</span>
-          <span className="text-right">On hand</span>
+          <span className="text-right">Available</span>
           <span className="text-right">Reorder</span>
           <span>Family</span>
           <span className="text-right">Cost</span>
@@ -80,8 +80,10 @@ export function StockList({ rows }: Props) {
 }
 
 function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
-  const inclGst  = grossFromCost(r.lastCostPaise, r.gstRate);
-  const swatchBg = r.hex ?? "var(--color-surface-2)";
+  const inclGst    = grossFromCost(r.lastCostPaise, r.gstRate);
+  const swatchBg   = r.hex ?? "var(--color-surface-2)";
+  const reservedN  = Number(r.reserved);
+  const hasReserve = reservedN > 0;
   const statusBadge = r.isOut ? (
     <span className="rounded-full bg-fault/15 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-fault">
       Out
@@ -125,9 +127,14 @@ function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
           <div className="mt-2 flex items-center gap-3">
             <div className="flex items-baseline gap-1">
               <span className={`tabular-nums text-[15px] font-semibold ${r.isOut ? "text-fault" : r.isLow ? "text-heat" : "text-text"}`}>
-                {formatQty(r.onHand)}
+                {formatQty(r.available)}
               </span>
               <span className="text-[11px] text-text-dim">{unitLabel(r.sellUnit)}</span>
+              {hasReserve && (
+                <span className="ml-1 text-[10.5px] text-text-dim">
+                  ({formatQty(r.onHand)} on hand, {formatQty(r.reserved)} committed)
+                </span>
+              )}
             </div>
 
             <span aria-hidden className="text-[10px] text-text-faint">·</span>
@@ -183,12 +190,16 @@ function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
           </div>
         </div>
 
-        {/* On hand */}
+        {/* Available (was On hand — swapped to show live number after reservations) */}
         <div className="text-right">
-          <div className={`tabular-nums text-[13.5px] font-medium ${r.isOut ? "text-fault" : r.isLow ? "text-heat" : "text-text"}`}>
-            {formatQty(r.onHand)}
+          <div className={`tabular-nums text-[13.5px] font-medium ${r.isOut ? "text-fault" : r.isLow ? "text-heat" : "text-text"}`}
+               title={hasReserve ? `${formatQty(r.onHand)} on hand · ${formatQty(r.reserved)} committed to quotes/orders` : undefined}>
+            {formatQty(r.available)}
           </div>
-          <div className="text-[10px] text-text-dim">{unitLabel(r.sellUnit)}</div>
+          <div className="text-[10px] text-text-dim">
+            {unitLabel(r.sellUnit)}
+            {hasReserve && <span className="ml-1 text-fabric-heat">· {formatQty(r.reserved)} held</span>}
+          </div>
         </div>
 
         {/* Reorder */}

@@ -6,6 +6,7 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import { computeReservations } from "@/modules/stock/reservations";
 
 // ── Stock tab: one row per Colourway (SKU) ────────────────────────────
 export interface StockItemRow {
@@ -18,12 +19,14 @@ export interface StockItemRow {
   brandName:     string;
   family:        string;
   sellUnit:      string;
-  onHand:        string;          // Σ StockBalance.quantity (decimal string)
+  onHand:        string;          // Σ StockBalance.quantity (physical, decimal string)
+  reserved:      string;          // committed to active firm quotes + non-terminal orders
+  available:     string;          // onHand - reserved; the number the owner actually cares about
   reorderLevel:  string | null;   // Colourway.reorderLevel, decimal string
   lastCostPaise: bigint;          // most recent StockMove.rate for GRN, else 0
   gstRate:       string;          // Design.gstRate decimal string
-  isLow:         boolean;         // onHand <= reorderLevel (when set)
-  isOut:         boolean;         // onHand === 0
+  isLow:         boolean;         // available <= reorderLevel (when set)
+  isOut:         boolean;         // available <= 0
 }
 
 export interface InventoryKpis {
@@ -70,11 +73,16 @@ export async function getInventoryKpis(ctx: RequestContext): Promise<InventoryKp
     stockValue += b.value;
   }
 
+  // Fold live reservations into low-stock so a fully-committed SKU shows
+  // as low even if physical qty is fine. Matches the /inventory row logic.
+  const reservations = await computeReservations(ctx, colourways.map((c) => c.id));
+
   let low = 0;
   for (const it of colourways) {
     if (it.reorderLevel == null) continue;
     const on = onHandByCw.get(it.id) ?? 0;
-    if (on <= Number(it.reorderLevel)) low += 1;
+    const av = on - (reservations.get(it.id)?.total ?? 0);
+    if (av <= Number(it.reorderLevel)) low += 1;
   }
 
   return {
@@ -148,7 +156,7 @@ export async function listStockItems(
   ]);
 
   const colourwayIds = items.map((i) => i.id);
-  const [balances, lastCosts] = await Promise.all([
+  const [balances, lastCosts, reservations] = await Promise.all([
     colourwayIds.length === 0 ? [] :
       db.stockBalance.findMany({
         where:  { colourwayId: { in: colourwayIds } },
@@ -163,6 +171,7 @@ export async function listStockItems(
         orderBy: { occurredAt: "desc" },
         select: { colourwayId: true, rate: true, occurredAt: true },
       }),
+    computeReservations(ctx, colourwayIds),
   ]);
 
   const onHandByCw = new Map<string, number>();
@@ -175,8 +184,10 @@ export async function listStockItems(
   }
 
   let rows: StockItemRow[] = items.map((c) => {
-    const onHand = onHandByCw.get(c.id) ?? 0;
-    const reorder = c.reorderLevel == null ? null : Number(c.reorderLevel);
+    const onHand    = onHandByCw.get(c.id) ?? 0;
+    const reserved  = reservations.get(c.id)?.total ?? 0;
+    const available = onHand - reserved;
+    const reorder   = c.reorderLevel == null ? null : Number(c.reorderLevel);
     return {
       colourwayId:   c.id,
       code:          c.code,
@@ -188,11 +199,13 @@ export async function listStockItems(
       family:        c.design.family,
       sellUnit:      c.sellUnit,
       onHand:        String(onHand),
+      reserved:      String(reserved),
+      available:     String(available),
       reorderLevel:  reorder == null ? null : String(reorder),
       lastCostPaise: lastCostByCw.get(c.id) ?? 0n,
       gstRate:       c.design.gstRate.toString(),
-      isLow:         reorder != null && onHand <= reorder,
-      isOut:         onHand === 0,
+      isLow:         reorder != null && available <= reorder,
+      isOut:         available <= 0,
     };
   });
 
