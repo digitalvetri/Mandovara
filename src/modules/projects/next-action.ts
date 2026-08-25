@@ -108,15 +108,18 @@ export function resolveNextAction(
     }
 
     case "ORDERED":
+      // Advance-Awaited phase (Batch A). Quote is accepted but the
+      // advance hasn't landed yet — that gate lands in Batch B. For
+      // now, still surface the procurement console since that's where
+      // the owner readies stock. Once Batch B ships, this changes to
+      // "Collect the advance" as the primary CTA.
       return {
         kind:  "RAISE_PROCUREMENT",
-        label: "Procure the material",
-        cta:   "Open procurement",
+        label: "Awaiting advance payment",
+        cta:   "Prepare material",
         enabled: hasAny(ctx, ["po.create", "requisition.create", "project.materialIssue"]),
         disabledReason: hasAny(ctx, ["po.create", "requisition.create", "project.materialIssue"]) ? null :
-          "Purchase orders and stock issues are handled by the store team.",
-        // Project-scoped procurement console — checks stock first, offers a
-        // PO fallback only for the shortfall. Owner's ask (§4 of the audit).
+          "Material preparation is handled by the store team.",
         href: `/projects/${id}/procurement`,
       };
 
@@ -215,36 +218,42 @@ export const STAGE_SHORT_LABEL: Record<string, string> = {
   CANCELLED:    "Cancelled",
 };
 
-// Customer-facing 5-phase view of the internal workflow (25 Aug 2026
-// owner redesign — see docs/PROJECT-FLOW-AUDIT.md). Owners and clients
-// think in these terms; the internal ORDERED / PROCUREMENT / MAKE
-// substates all roll up into "Work in Progress".
+// Customer-facing 6-phase view (25 Aug 2026 owner redesign, Batch A).
+// The old Order / Procurement / Make substates roll into two phases:
+//   ADVANCE_AWAITED  — quote accepted, waiting on advance payment
+//   INSTALLATION     — advance received, work + install in progress
+// Advance is the physical gate to installation (Batch B enforces it).
 export type ProjectPhase =
   | "ENQUIRY"
   | "MEASUREMENT"
   | "QUOTATION"
-  | "WORK_IN_PROGRESS"
+  | "ADVANCE_AWAITED"
+  | "INSTALLATION"
   | "COMPLETED";
 
 export const PROJECT_PHASES: readonly ProjectPhase[] = [
-  "ENQUIRY", "MEASUREMENT", "QUOTATION", "WORK_IN_PROGRESS", "COMPLETED",
+  "ENQUIRY", "MEASUREMENT", "QUOTATION", "ADVANCE_AWAITED", "INSTALLATION", "COMPLETED",
 ];
 
 export const PHASE_LABEL: Record<ProjectPhase, string> = {
   ENQUIRY:          "Enquiry",
   MEASUREMENT:      "Measurement",
   QUOTATION:        "Quotation",
-  WORK_IN_PROGRESS: "Work in Progress",
+  ADVANCE_AWAITED:  "Advance Awaited",
+  INSTALLATION:     "Installation",
   COMPLETED:        "Completed",
 };
 
 // The first internal stage jumped to when the user clicks a phase in the
 // stepper — lets a manual override still map cleanly onto ProjectStage.
+// Internal enum unchanged: ORDERED holds the "quote accepted, advance
+// pending" state; PROCUREMENT/MAKE cover "installation in progress".
 export const PHASE_TARGET_STAGE: Record<ProjectPhase, string> = {
   ENQUIRY:          "ENQUIRY",
   MEASUREMENT:      "MEASUREMENT",
   QUOTATION:        "QUOTATION",
-  WORK_IN_PROGRESS: "ORDERED",    // first internal state in the WIP bucket
+  ADVANCE_AWAITED:  "ORDERED",
+  INSTALLATION:     "PROCUREMENT",
   COMPLETED:        "COMPLETED",
 };
 
@@ -258,9 +267,10 @@ export function phaseForStage(stage: string): ProjectPhase | "CANCELLED" {
     case "QUOTATION":
       return "QUOTATION";
     case "ORDERED":
+      return "ADVANCE_AWAITED";
     case "PROCUREMENT":
     case "MAKE":
-      return "WORK_IN_PROGRESS";
+      return "INSTALLATION";
     case "COMPLETED":
       return "COMPLETED";
     case "CANCELLED":

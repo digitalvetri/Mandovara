@@ -37,13 +37,14 @@ export function QuotationPanel({ projectId, data, canCreate }: Props) {
         )}
       </div>
 
-      {/* "Accepted quote → work in progress" indicator. Was a "View order"
-          link — Order is now an internal record the owner doesn't need
-          to see (25 Aug 2026 redesign). Kept as a simple status pill. */}
+      {/* Accepted-quote indicator. Batch A (25 Aug 2026): reads
+          "advance awaited" until the deposit lands. Batch B will
+          flip this to "installation in progress" once advance is
+          received. Order is an internal record the owner doesn't see. */}
       {latestOrder && (
         <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-solid/25 bg-solid/5 px-3.5 py-2.5 text-[12px]">
           <ShoppingCart size={13} className="text-solid" />
-          <span className="font-medium text-text">Accepted quote in Work in Progress</span>
+          <span className="font-medium text-text">Quote accepted — advance awaited</span>
         </div>
       )}
 
