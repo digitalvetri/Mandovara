@@ -132,6 +132,7 @@ export function LoginCard() {
             placeholder="rohit@mandovara.com  or  +91 98xxxxxxxx"
             autoComplete="username"
             className="w-full outline-none transition-all"
+            suppressHydrationWarning
             style={{
               height: 54,
               borderRadius: 14,
@@ -174,6 +175,7 @@ export function LoginCard() {
               placeholder="Enter your password"
               autoComplete="current-password"
               className="w-full outline-none transition-all"
+              suppressHydrationWarning
               style={{
                 height: 54,
                 borderRadius: 14,
