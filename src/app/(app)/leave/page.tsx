@@ -70,8 +70,7 @@ export default async function LeavePage() {
     : [];
   const approverName = new Map(approvers.map((u) => [u.id, u.name]));
 
-  const pending  = leaves.filter((l) => l.state === "PENDING");
-  const resolved = leaves.filter((l) => l.state !== "PENDING");
+  const pending = leaves.filter((l) => l.state === "PENDING");
 
   return (
     <>
