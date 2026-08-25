@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { selfCheckIn, selfCheckOut } from "../_actions";
-import { ActionArea, StatusBadge, TimeCell } from "./TodayCardParts";
+import { CompactAction, StatusBadge, TimeCol } from "./TodayCardParts";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -180,38 +180,25 @@ export function TodayCard({
           <span className="font-data tabular-nums text-[11.5px] text-text-muted">{currentTime}</span>
         </div>
 
-        {/* ── Time grid — 3 cells ── */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <TimeCell
-            label="Check In"
-            value={inAt ? fmtTimeISO(inAt) : "—"}
-            active={!!inAt}
-          />
-          <TimeCell
-            label="Check Out"
-            value={outAt ? fmtTimeISO(outAt) : "—"}
-            active={!!outAt}
-          />
-          <TimeCell
-            label={isComplete ? "Total Time" : "Working Time"}
-            value={elapsed ?? "—"}
-            active={!!elapsed}
-            mono
+        {/* ── Time columns + compact action buttons on the same row ── */}
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex gap-6 sm:gap-10">
+            <TimeCol label="Check In"    value={inAt  ? fmtTimeISO(inAt)  : "—"} active={!!inAt}  />
+            <TimeCol label="Check Out"   value={outAt ? fmtTimeISO(outAt) : "—"} active={!!outAt} />
+            <TimeCol label={isComplete ? "Total Time" : "Working Time"} value={elapsed ?? "—"} active={!!elapsed} mono />
+          </div>
+          <CompactAction
+            notCheckedIn={notCheckedIn}
+            isCheckedIn={isCheckedIn}
+            isComplete={isComplete}
+            isNonWorkDay={isNonWorkDay}
+            isLocked={isLocked}
+            status={status}
+            pending={pending}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
           />
         </div>
-
-        {/* ── Primary action area ── */}
-        <ActionArea
-          notCheckedIn={notCheckedIn}
-          isCheckedIn={isCheckedIn}
-          isComplete={isComplete}
-          isNonWorkDay={isNonWorkDay}
-          isLocked={isLocked}
-          status={status}
-          pending={pending}
-          onCheckIn={handleCheckIn}
-          onCheckOut={handleCheckOut}
-        />
       </div>
     </div>
   );

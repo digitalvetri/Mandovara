@@ -5,6 +5,113 @@
 import { CheckCircle2, LogIn, LogOut, Loader2, Info, CalendarX } from "lucide-react";
 import { STATUS_LABEL } from "./TodayCard";
 
+// ── Inline time column (no background box) ────────────────────────────────────
+
+export function TimeCol({
+  label, value, active, mono,
+}: {
+  label: string;
+  value: string;
+  active?: boolean;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-text-muted mb-1.5">
+        {label}
+      </p>
+      <p className={[
+        "text-[20px] sm:text-[22px] font-semibold leading-none",
+        mono ? "font-data tabular-nums" : "",
+        active ? "text-text" : "text-text-subtle",
+      ].join(" ")}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// ── Compact inline action buttons ─────────────────────────────────────────────
+
+export function CompactAction({
+  notCheckedIn, isCheckedIn, isComplete, isNonWorkDay,
+  isLocked, status, pending, onCheckIn, onCheckOut,
+}: {
+  notCheckedIn: boolean;
+  isCheckedIn: boolean;
+  isComplete: boolean;
+  isNonWorkDay: boolean;
+  isLocked: boolean;
+  status: string | null;
+  pending: boolean;
+  onCheckIn: () => void;
+  onCheckOut: () => void;
+}) {
+  if (isLocked) {
+    return (
+      <span className="text-[12px] text-text-muted flex items-center gap-1.5 pb-0.5">
+        🔒 Locked
+      </span>
+    );
+  }
+  if (isNonWorkDay) {
+    return (
+      <span className="text-[12px] text-text-muted flex items-center gap-1.5 pb-0.5">
+        <CalendarX size={13} strokeWidth={1.8} />
+        {STATUS_LABEL[status ?? ""] ?? "Non-working day"}
+      </span>
+    );
+  }
+  if (isComplete) {
+    return (
+      <span className="text-[12.5px] font-medium text-solid flex items-center gap-1.5 pb-0.5">
+        <CheckCircle2 size={14} strokeWidth={2} />
+        Day complete
+      </span>
+    );
+  }
+
+  const doingCheckIn  = notCheckedIn || (!isCheckedIn && !isComplete && !isNonWorkDay);
+  const doingCheckOut = isCheckedIn;
+
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <button
+        type="button"
+        onClick={doingCheckIn ? onCheckIn : undefined}
+        disabled={pending || !doingCheckIn}
+        className={[
+          "inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] border text-[12px] font-semibold transition-colors active:scale-[0.98]",
+          doingCheckIn
+            ? "border-solid/50 text-solid hover:bg-solid/8 disabled:cursor-not-allowed disabled:opacity-60"
+            : "border-border text-text-subtle opacity-40 cursor-default pointer-events-none",
+        ].join(" ")}
+      >
+        {pending && doingCheckIn
+          ? <Loader2 size={13} className="animate-spin" />
+          : <LogIn  size={13} strokeWidth={2} />}
+        Check In
+      </button>
+      <button
+        type="button"
+        onClick={doingCheckOut ? onCheckOut : undefined}
+        disabled={pending || !doingCheckOut}
+        className={[
+          "inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] border text-[12px] font-semibold transition-colors active:scale-[0.98]",
+          doingCheckOut
+            ? "border-fault/50 text-fault hover:bg-fault/8 disabled:cursor-not-allowed disabled:opacity-60"
+            : "border-border text-text-subtle opacity-40 cursor-default pointer-events-none",
+        ].join(" ")}
+      >
+        {pending && doingCheckOut
+          ? <Loader2 size={13} className="animate-spin" />
+          : <LogOut size={13} strokeWidth={2} />}
+        Check Out
+      </button>
+    </div>
+  );
+}
+
 export function StatusBadge({
   notCheckedIn, isCheckedIn, isComplete, isNonWorkDay, status, isLocked,
 }: {
