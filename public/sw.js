@@ -15,7 +15,11 @@
  * offline story for data; this worker only keeps the shell loadable.
  */
 
-const VERSION      = "mandovara-v2";
+// Bump this on any deploy where server-action IDs change (typically every
+// deploy that touches server code). New VERSION → browser installs the new
+// SW → activate handler pings all controlled tabs to reload → users pick
+// up the new client bundle without a manual hard refresh.
+const VERSION      = "mandovara-v3-20260825";
 const SHELL_CACHE  = `${VERSION}-shell`;
 const ASSET_CACHE  = `${VERSION}-assets`;
 const OFFLINE_URL  = "/offline";
@@ -44,7 +48,14 @@ self.addEventListener("activate", (event) => {
       .then((keys) => Promise.all(
         keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)),
       ))
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: "window" }))
+      .then((clients) => {
+        // Nudge every open tab to reload once. Without this, existing tabs
+        // keep serving the old JS bundle and any server-action call from
+        // them 404s ("Server Action X was not found on the server").
+        for (const c of clients) c.postMessage({ type: "SW_ACTIVATED" });
+      }),
   );
 });
 
