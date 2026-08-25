@@ -32,13 +32,10 @@ interface Props {
 
 export function MilestonesPanel({ milestones: raw, orderValue }: Props) {
   const milestones = dedupeByCode(raw);
-  if (milestones.length === 0) {
-    return (
-      <Section title="Milestones">
-        <EmptyRow message="Milestones auto-generate when the project's product families are known. Add a measurement to seed them." />
-      </Section>
-    );
-  }
+  // Owner asked (2026-08-25) for the empty-state box to disappear —
+  // the "will be auto-generated" note is noise on new projects. Only
+  // render the panel when there are actual milestones to show.
+  if (milestones.length === 0) return null;
 
   const totalWeight = milestones.reduce((s, m) => s + weight(m), 0);
   const completedWeight = milestones
@@ -198,10 +195,3 @@ function Section({ title, right, children }: {
   );
 }
 
-function EmptyRow({ message }: { message: string }) {
-  return (
-    <div className="rounded-[10px] border border-dashed border-rule px-4 py-6 text-center text-[11.5px] text-text-dim">
-      {message}
-    </div>
-  );
-}
