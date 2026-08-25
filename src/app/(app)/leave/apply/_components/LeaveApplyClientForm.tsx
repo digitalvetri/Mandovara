@@ -106,8 +106,16 @@ export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
                     type="button"
                     onClick={() => setLeaveType(t.value)}
                     aria-pressed={active}
-                    className="group relative flex flex-col items-center gap-2 rounded-[12px] border px-2 py-3 text-center transition-all duration-150 focus-visible:outline-none"
-                    style={{ background: active ? t.bgHex : "var(--surface)", borderColor: active ? t.rHex : "var(--rule)", boxShadow: active ? `0 0 0 2px ${t.hex}28` : "none" }}
+                    style={{
+                      background:  active ? t.bgHex : undefined,
+                      borderColor: active ? t.rHex  : undefined,
+                      boxShadow:   active ? `0 0 0 2px ${t.hex}28` : "none",
+                    }}
+                    className={[
+                      "group relative flex flex-col items-center gap-2 rounded-[12px] border px-2 py-3 text-center",
+                      "transition-all duration-150 focus-visible:outline-none",
+                      active ? "" : "bg-surface border-rule",
+                    ].join(" ")}
                   >
                     {active && (
                       <span className="absolute top-1.5 right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full" style={{ background: t.hex }}>
@@ -118,7 +126,7 @@ export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
                       <t.Icon size={16} strokeWidth={1.7} style={{ color: t.hex }} />
                     </div>
                     <div>
-                      <div className="text-[12px] font-semibold leading-tight" style={{ color: active ? t.hex : "var(--text)" }}>{t.label}</div>
+                      <div className="text-[12px] font-semibold leading-tight" style={{ color: t.hex }} >{t.label}</div>
                       <div className="mt-0.5 text-[9px] text-text-dim leading-tight hidden sm:block">{t.desc}</div>
                     </div>
                   </button>
@@ -187,12 +195,16 @@ export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
       <button
         type="submit"
         disabled={pending || days === 0}
-        className="mt-5 w-full h-[52px] rounded-[13px] font-semibold text-[15px] flex items-center justify-center gap-2.5 transition-all duration-150 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        style={{
-          background: days > 0 ? "var(--accent)" : "var(--surface-hover)",
-          color:      days > 0 ? "#fff"          : "var(--text-subtle)",
-          opacity:    pending ? 0.7 : 1,
-        }}
+        className={[
+          "mt-5 w-full h-[52px] rounded-[13px] font-semibold text-[15px]",
+          "flex items-center justify-center gap-2.5 transition-colors duration-150",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          "disabled:cursor-not-allowed",
+          days > 0
+            ? "bg-accent text-white hover:bg-accent-hover"
+            : "bg-surface-hover text-text-subtle",
+          pending ? "opacity-70" : "",
+        ].join(" ")}
       >
         {pending ? (
           <Loader2 size={18} className="animate-spin" />
