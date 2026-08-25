@@ -48,12 +48,15 @@ export function LeadQuotationsSidebar({
           )}
         </div>
         {!isConverted && (
+          // Same builder as the "Send Rough Estimate" button in the top
+          // action bar — was pointing at /quotations/new which is a
+          // different form. Owner reported the mismatch 25 Aug 2026.
           <Link
-            href={`/quotations/new?lead=${leadId}` as Route}
+            href={`/quotations/quick?leadId=${leadId}` as Route}
             className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
           >
             <Plus size={11} strokeWidth={2.2} />
-            New
+            New estimate
           </Link>
         )}
       </div>
@@ -64,11 +67,11 @@ export function LeadQuotationsSidebar({
           <div className="text-[12px] text-text-dim mb-3">No quotations yet.</div>
           {!isConverted && (
             <Link
-              href={`/quotations/new?lead=${leadId}` as Route}
+              href={`/quotations/quick?leadId=${leadId}` as Route}
               className="inline-flex items-center gap-1.5 rounded-[8px] bg-accent px-4 py-1.5 text-[12px] font-medium text-white hover:opacity-90 transition-opacity"
             >
               <Plus size={11} strokeWidth={2.2} />
-              New quotation
+              Send rough estimate
             </Link>
           )}
         </div>
