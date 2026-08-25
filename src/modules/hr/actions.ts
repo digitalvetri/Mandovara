@@ -62,6 +62,78 @@ export async function applyLeave(
   });
 
   revalidatePath("/leave");
+  revalidatePath("/employee");
+  return { ok: true, data: { id: leave.id } };
+}
+
+// Self-service: any authenticated user applies for their own leave.
+// No leave.apply permission required — the action resolves the caller's
+// own employee record and always applies for themselves.
+export async function selfApplyLeave(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+
+  const schema = z.object({
+    type:     z.enum(LEAVE_TYPES),
+    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+    toDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+    reason:   z.string().trim().max(500).optional(),
+  });
+
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const d = parsed.data;
+
+  const from = new Date(d.fromDate);
+  const to   = new Date(d.toDate);
+  if (to < from) return { ok: false, error: "End date must be after start date." };
+
+  const db = scoped(ctx);
+
+  // Two-step employee lookup — same as the employee dashboard
+  let employee = await db.employee.findUnique({
+    where:  { userId: ctx.userId },
+    select: { id: true },
+  });
+  if (!employee) {
+    const user = await db.user.findUnique({
+      where:  { id: ctx.userId },
+      select: { mobile: true, organizationId: true },
+    });
+    if (user) {
+      employee = await db.employee.findFirst({
+        where:  { mobile: user.mobile, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (employee) {
+        await db.employee.update({ where: { id: employee.id }, data: { userId: ctx.userId } });
+      }
+    }
+  }
+  if (!employee) {
+    return { ok: false, error: "Employee profile not found. Contact HR to link your account." };
+  }
+
+  const msPerDay = 86_400_000;
+  const days = new Decimal(Math.round((to.getTime() - from.getTime()) / msPerDay) + 1);
+
+  const leave = await db.leave.create({
+    data: {
+      organizationId: ctx.orgId,
+      employeeId:     employee.id,
+      type:           d.type,
+      fromDate:       from,
+      toDate:         to,
+      days,
+      reason:         d.reason ?? null,
+      state:          "PENDING",
+    },
+    select: { id: true },
+  });
+
+  revalidatePath("/leave");
+  revalidatePath("/employee");
   return { ok: true, data: { id: leave.id } };
 }
 
@@ -90,6 +162,7 @@ export async function approveLeave(
   });
 
   revalidatePath("/leave");
+  revalidatePath("/employee");
   return { ok: true, data: { id } };
 }
 
@@ -119,6 +192,7 @@ export async function rejectLeave(
   });
 
   revalidatePath("/leave");
+  revalidatePath("/employee");
   return { ok: true, data: { id } };
 }
 

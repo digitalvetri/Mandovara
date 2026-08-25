@@ -226,7 +226,7 @@ export default async function EmployeeDashboardPage() {
             <LeaveRow label="Total days taken"   value={leavesTaken}           color="text-text"  />
             <div className="pt-2">
               <Link
-                href={"/attendance" as Route}
+                href={"/leave/apply" as Route}
                 className="inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:underline"
               >
                 Apply for leave →
