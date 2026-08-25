@@ -266,11 +266,11 @@ export async function SelfView({ ctx }: { ctx: Awaited<ReturnType<typeof devCont
           </div>
           <div className="px-4 pb-4">
             <Link
-              href={"/m/attendance" as Route}
+              href={"/leave/apply" as Route}
               className="inline-flex items-center gap-2 h-9 px-4 rounded-[8px] border border-border text-[12.5px] text-text-muted hover:text-text hover:border-border/80 transition-colors"
             >
               <ChevronRight size={13} strokeWidth={2} className="text-gold" />
-              Request Leave via App
+              Apply for Leave →
             </Link>
           </div>
         </div>
