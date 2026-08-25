@@ -2,22 +2,35 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LEAD_STATUSES } from "@/modules/leads/schema";
+import { ACTIVE_LEAD_STAGES, normalizeLeadStage } from "@/modules/leads/schema";
 import { changeLeadStage } from "@/modules/leads/actions";
+import { ConvertLeadModal } from "./ConvertLeadModal";
 
 const LABEL: Record<string, string> = {
-  NEW: "New", CONTACTED: "Contacted", QUALIFIED: "Qualified",
-  MEASUREMENT_SCHEDULED: "Meas. Scheduled", VISIT_SCHEDULED: "Visit Scheduled",
-  MEASURED: "Measured", QUOTED: "Quoted",
-  NEGOTIATION: "Negotiation", WON: "Won", LOST: "Lost",
+  NEW: "New", QUOTED: "Quoted", WON: "Won", LOST: "Lost",
 };
 
-export function StatusChanger({ id, current }: { id: string; current: string }) {
+interface Props {
+  id:       string;
+  current:  string;
+  // Needed for the ConvertLeadModal when the user picks WON.
+  leadName: string;
+  mobile:   string;
+  email:    string | null;
+}
+
+export function StatusChanger({ id, current, leadName, mobile, email }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [askLostReason, setAskLostReason] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+
+  // Any legacy stage (CONTACTED / QUALIFIED / etc) displays as "New" in
+  // the picker so the owner is never staring at a stage that isn't in
+  // the picker's options list.
+  const displayed = normalizeLeadStage(current);
 
   function commit(to: string, reason?: string) {
     setError(null);
@@ -35,7 +48,11 @@ export function StatusChanger({ id, current }: { id: string; current: string }) 
 
   function onSelect(e: React.ChangeEvent<HTMLSelectElement>) {
     const to = e.target.value;
-    if (to === current) return;
+    if (to === displayed) return;
+    // WON is only reachable via lead conversion — the modal fires convertLead
+    // which sets the stage to WON server-side. Prevents "orphan WON" leads
+    // that never became clients.
+    if (to === "WON") { setShowConvertModal(true); return; }
     if (to === "LOST") { setAskLostReason(true); return; }
     commit(to);
   }
@@ -43,12 +60,12 @@ export function StatusChanger({ id, current }: { id: string; current: string }) 
   return (
     <div className="flex items-center gap-2">
       <select
-        value={current}
+        value={displayed}
         onChange={onSelect}
         disabled={pending}
         className="h-[30px] px-2 bg-white/60 border border-rule rounded-[6px] text-[12px] outline-none focus:border-accent"
       >
-        {LEAD_STATUSES.map((s) => (
+        {ACTIVE_LEAD_STAGES.map((s) => (
           <option key={s} value={s}>{LABEL[s]}</option>
         ))}
       </select>
@@ -80,6 +97,15 @@ export function StatusChanger({ id, current }: { id: string; current: string }) 
       )}
 
       {error && <div className="text-[11.5px] text-bad">{error}</div>}
+
+      <ConvertLeadModal
+        leadId={id}
+        leadName={leadName}
+        mobile={mobile}
+        email={email}
+        open={showConvertModal}
+        onClose={() => setShowConvertModal(false)}
+      />
     </div>
   );
 }

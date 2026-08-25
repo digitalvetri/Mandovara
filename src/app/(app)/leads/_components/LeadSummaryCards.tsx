@@ -4,17 +4,21 @@ import type { LeadSummaryCounts } from "@/modules/leads/queries";
 
 interface Props { counts: LeadSummaryCounts }
 
-// PDF §6: Total, New, Contacted, Qualified, Follow-up, Won, Lost — clickable to filter.
+// Summary cards — one per sanctioned stage after the 25 Aug 2026
+// simplification. "New" absorbs contacted / qualified / measurement-scheduled
+// (the previously separate cards were noise); "Quoted" absorbs negotiation.
+// See src/modules/leads/schema.ts ACTIVE_LEAD_STAGES.
 export function LeadSummaryCards({ counts }: Props) {
+  // Legacy pre-quote stages roll up into "New" — otherwise leads at those
+  // stages disappear from the summary until they're re-saved.
+  const newLike = counts.newLeads + counts.contacted + counts.qualified;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-5">
-      <Card href="/leads"             label="Total"      value={counts.total}     />
-      <Card href="/leads?status=NEW"       label="New"        value={counts.newLeads}  accent="text-accent" dot="bg-accent" />
-      <Card href="/leads?status=CONTACTED" label="Contacted"  value={counts.contacted} accent="text-warn" dot="bg-warn" />
-      <Card href="/leads?status=QUALIFIED" label="Qualified"  value={counts.qualified} accent="text-info" dot="bg-info" />
-      <Card href="/leads"             label="Follow-up"  value={counts.followUp}  accent="text-gold" dot="bg-gold" />
-      <Card href="/leads?status=WON"       label="Won"        value={counts.won}       accent="text-solid" dot="bg-solid" />
-      <Card href="/leads?status=LOST"      label="Lost"       value={counts.lost}      accent="text-fault" dot="bg-fault" />
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-5">
+      <Card href="/leads"            label="Total"      value={counts.total}    />
+      <Card href="/leads?status=NEW"    label="New"        value={newLike}         accent="text-accent" dot="bg-accent" />
+      <Card href="/leads?status=QUOTED" label="Quoted"     value={counts.quoted}   accent="text-info" dot="bg-info" />
+      <Card href="/leads?status=WON"    label="Won"        value={counts.won}      accent="text-solid" dot="bg-solid" />
+      <Card href="/leads?status=LOST"   label="Lost"       value={counts.lost}     accent="text-fault" dot="bg-fault" />
     </div>
   );
 }

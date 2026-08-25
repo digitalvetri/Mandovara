@@ -60,9 +60,10 @@ export interface ListLeadsResult {
 export interface LeadSummaryCounts {
   total: number;
   newLeads: number;
-  contacted: number;
-  qualified: number;
-  followUp: number;   // pending follow-ups (due date <= now, not completed)
+  contacted: number;   // legacy — still exposed for back-compat
+  qualified: number;   // legacy — still exposed for back-compat
+  quoted: number;      // sanctioned QUOTED bucket (also absorbs NEGOTIATION)
+  followUp: number;    // pending follow-ups (due date <= now, not completed)
   won: number;
   lost: number;
 }

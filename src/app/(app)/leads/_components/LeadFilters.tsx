@@ -9,18 +9,14 @@ import { Search, X } from "lucide-react";
 import { LEAD_SOURCE_OPTIONS, LEAD_PRIORITIES } from "@/modules/leads/schema";
 import type { SalesUserOption } from "@/modules/leads/queries";
 
-// Key stages shown as tabs; MEASUREMENT_SCHEDULED / MEASURED are legacy-only
+// Only the four sanctioned stages after the 25 Aug 2026 simplification.
+// See src/modules/leads/schema.ts ACTIVE_LEAD_STAGES for the rationale.
 const STATUS_TABS = [
-  { key: "ALL",              label: "All" },
-  { key: "OPEN",             label: "Open" },
-  { key: "NEW",              label: "New" },
-  { key: "CONTACTED",        label: "Contacted" },
-  { key: "QUALIFIED",        label: "Qualified" },
-  { key: "VISIT_SCHEDULED",  label: "Site Visit" },
-  { key: "QUOTED",           label: "Quoted" },
-  { key: "NEGOTIATION",      label: "Negotiation" },
-  { key: "WON",              label: "Won" },
-  { key: "LOST",             label: "Lost" },
+  { key: "ALL",     label: "All" },
+  { key: "NEW",     label: "New" },
+  { key: "QUOTED",  label: "Quoted" },
+  { key: "WON",     label: "Won" },
+  { key: "LOST",    label: "Lost" },
 ] as const;
 
 const PRIORITY_OPTS = LEAD_PRIORITIES.map((p) => ({

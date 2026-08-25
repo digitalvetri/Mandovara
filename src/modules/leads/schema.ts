@@ -39,12 +39,36 @@ export const SOURCE_LABEL: Record<string, string> = {
   OTHER:              "Other",
 };
 
-// Must match prisma/schema.prisma enum LeadStage exactly
+// Must match prisma/schema.prisma enum LeadStage exactly — this is the DB
+// shape. Old rows may still carry any of these values; the UI collapses
+// them to the four sanctioned ACTIVE_LEAD_STAGES via normalizeLeadStage.
 export const LEAD_STATUSES = [
   "NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED",
   "MEASURED", "QUOTED", "NEGOTIATION", "WON", "LOST",
 ] as const;
 
+// The stages the owner actually cares about (25 Aug 2026 request).
+// CONTACTED / QUALIFIED / MEASUREMENT_SCHEDULED / VISIT_SCHEDULED /
+// MEASURED / NEGOTIATION were removed from the UI as noise. Old rows
+// at those stages are readable but display via normalizeLeadStage below.
+export const ACTIVE_LEAD_STAGES = ["NEW", "QUOTED", "WON", "LOST"] as const;
+export type ActiveLeadStage = (typeof ACTIVE_LEAD_STAGES)[number];
+
+/** Collapse any DB LeadStage value onto one of the four sanctioned stages. */
+export function normalizeLeadStage(stage: string): ActiveLeadStage {
+  switch (stage) {
+    case "QUOTED":
+    case "NEGOTIATION":
+      return "QUOTED";
+    case "WON":  return "WON";
+    case "LOST": return "LOST";
+    // NEW / CONTACTED / QUALIFIED / MEASUREMENT_SCHEDULED /
+    // VISIT_SCHEDULED / MEASURED all read as "NEW" — pre-quote.
+    default:     return "NEW";
+  }
+}
+
+// "Open" for chase-list purposes = anything that isn't terminal.
 export const OPEN_LEAD_STATUSES = [
   "NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED",
   "MEASURED", "QUOTED", "NEGOTIATION",
@@ -109,7 +133,10 @@ export const updateLeadSchema = createLeadSchema.partial().extend({
 export const statusChangeSchema = z
   .object({
     id:         z.string().min(1),
-    to:         z.enum(LEAD_STATUSES),
+    // Only the four sanctioned stages accepted via the picker. WON is
+    // reached exclusively via convertLead — the UI intercepts a WON
+    // pick and opens the conversion modal instead of calling this.
+    to:         z.enum(ACTIVE_LEAD_STAGES),
     lostReason: z.string().trim().max(500).optional(),
   })
   .refine(

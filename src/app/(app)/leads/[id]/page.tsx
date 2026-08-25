@@ -115,7 +115,13 @@ export default async function LeadDetailPage({
             ) : (
               <>
                 <span className="text-[11px] uppercase tracking-[0.1em] text-text-dim">Move Status</span>
-                <StatusChanger id={lead.id} current={lead.stage} />
+                <StatusChanger
+                  id={lead.id}
+                  current={lead.stage}
+                  leadName={lead.name}
+                  mobile={lead.mobile}
+                  email={lead.email ?? null}
+                />
               </>
             )}
           </div>

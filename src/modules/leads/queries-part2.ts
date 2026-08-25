@@ -80,6 +80,8 @@ export async function getLeadSummaryCounts(ctx: RequestContext): Promise<LeadSum
     newLeads:  m.get("NEW")       ?? 0,
     contacted: m.get("CONTACTED") ?? 0,
     qualified: m.get("QUALIFIED") ?? 0,
+    // Sanctioned "quoted" bucket = QUOTED + NEGOTIATION (legacy).
+    quoted: (m.get("QUOTED") ?? 0) + (m.get("NEGOTIATION") ?? 0),
     followUp,
     won:  m.get("WON")  ?? 0,
     lost: m.get("LOST") ?? 0,
@@ -130,7 +132,17 @@ export function buildWhere(q: ListLeadsQuery): WhereInput {
 
   if (q.stage && q.stage !== "ALL") {
     if (q.stage === "OPEN") {
+      // Retained for old bookmarks / dashboard links; UI no longer offers it.
       conditions.push({ stage: { in: [...OPEN_STAGES] } });
+    } else if (q.stage === "NEW") {
+      // Sanctioned NEW absorbs the pre-quote legacy stages so leads
+      // stuck at CONTACTED / QUALIFIED / etc still show up in the tab.
+      conditions.push({
+        stage: { in: ["NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED", "MEASURED"] },
+      });
+    } else if (q.stage === "QUOTED") {
+      // QUOTED absorbs NEGOTIATION for the same reason.
+      conditions.push({ stage: { in: ["QUOTED", "NEGOTIATION"] } });
     } else {
       conditions.push({ stage: q.stage });
     }

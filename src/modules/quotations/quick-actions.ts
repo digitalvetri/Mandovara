@@ -287,6 +287,17 @@ export async function createQuickQuote(
       select: { id: true },
     });
 
+    // Auto-move the lead to QUOTED when the first quote lands (25 Aug
+    // 2026 owner request). Only bumps forward — never regresses a WON /
+    // LOST lead — and only touches leads that aren't already at QUOTED
+    // so we don't reset any earlier state stamps.
+    if (isLeadScoped && d.leadId) {
+      await tx.lead.updateMany({
+        where: { id: d.leadId, stage: { notIn: ["QUOTED", "NEGOTIATION", "WON", "LOST"] } },
+        data:  { stage: "QUOTED" },
+      });
+    }
+
     await tx.quotationLine.createMany({
       data: computed.map((l) => {
         // measurementItemId is null for lead-scoped lines (no measurement
