@@ -34,7 +34,7 @@ export async function setQuotationStatus(
   const db = scoped(ctx);
   const q = await db.quotation.findUnique({
     where: { id },
-    select: { id: true, status: true, clientId: true },
+    select: { id: true, status: true, clientId: true, leadId: true, rejectionReason: true },
   });
   if (!q) return { ok: false, error: "Quotation not found" };
 
@@ -139,7 +139,56 @@ export async function setQuotationStatus(
     }
   }
 
+  // Owner canonical flow (2026-08-25): "if the client approves the rough
+  // estimate they convert; if not they're a lost lead." Fire that
+  // transition automatically when the last active rough estimate on a
+  // lead gets rejected. Guarded so a lead with another live quote in
+  // negotiation stays NEW/QUOTED.
+  if (status === "REJECTED" && q.leadId) {
+    await maybeMarkLeadLost(db, q.leadId, id, q.rejectionReason);
+  }
+
   revalidatePath("/quotations");
   revalidatePath(`/quotations/${id}`);
   return { ok: true, data: { id } };
+}
+
+/** If no other non-terminal quotation exists on this lead, mark it LOST.
+ *  Skips leads already WON/LOST — those are terminal. Reason falls back
+ *  to a generic "Quote rejected" when the quotation carries no
+ *  free-form rejectionReason. Best-effort: failure here does NOT roll
+ *  back the quotation transition. */
+async function maybeMarkLeadLost(
+  db:                  ReturnType<typeof scoped>,
+  leadId:              string,
+  justRejectedQuoteId: string,
+  quoteReason:         string | null,
+): Promise<void> {
+  try {
+    const lead = await db.lead.findUnique({
+      where:  { id: leadId },
+      select: { stage: true },
+    });
+    if (!lead) return;
+    if (lead.stage === "WON" || lead.stage === "LOST") return;
+
+    const activeOther = await db.quotation.count({
+      where: {
+        leadId,
+        id:     { not: justRejectedQuoteId },
+        status: { in: ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT"] },
+      },
+    });
+    if (activeOther > 0) return;
+
+    const reason = quoteReason?.trim() || "Quotation rejected";
+    await db.lead.update({
+      where: { id: leadId },
+      data:  { stage: "LOST", lostReason: reason },
+    });
+    revalidatePath(`/leads/${leadId}`);
+    revalidatePath("/leads");
+  } catch (err) {
+    console.warn("auto-mark lead LOST on quote reject failed:", err);
+  }
 }
