@@ -41,15 +41,27 @@ export async function checkAndAdvanceStage(
   projectId: string,
 ): Promise<{ advanced: boolean; totalReceived: bigint; required: bigint }> {
   try {
-    const [advAgg, receiptAgg, requiredAgg, project] = await Promise.all([
+    // ReceiptAllocation has no `invoice` relation in Prisma — grab the
+    // project's invoice IDs first, then aggregate allocations by ID.
+    const invRows = await db.invoice.findMany({
+      where:  { projectId, status: { not: "CANCELLED" } },
+      select: { id: true },
+    });
+    const invIds = invRows.map((i) => i.id);
+
+    const [advAgg, allocAgg, requiredAgg, project] = await Promise.all([
       db.advance.aggregate({
         where: { projectId },
         _sum:  { amount: true },
       }),
-      db.receipt.aggregate({
-        where: { projectId },
-        _sum:  { amount: true },
-      }),
+      // Receipts don't carry projectId (PaymentSheet omits it). The
+      // authoritative link is ReceiptAllocation → Invoice.projectId.
+      invIds.length === 0
+        ? Promise.resolve({ _sum: { amount: 0n } as { amount: bigint | null } })
+        : db.receiptAllocation.aggregate({
+            where: { invoiceId: { in: invIds } },
+            _sum:  { amount: true },
+          }),
       db.order.aggregate({
         where: { projectId, status: { not: "CANCELLED" } },
         _sum:  { advanceRequired: true },
@@ -61,7 +73,7 @@ export async function checkAndAdvanceStage(
     ]);
 
     const advTotal      = advAgg._sum.amount            ?? 0n;
-    const receiptTotal  = receiptAgg._sum.amount        ?? 0n;
+    const receiptTotal  = allocAgg._sum.amount          ?? 0n;
     const totalReceived = advTotal + receiptTotal;
     const required      = requiredAgg._sum.advanceRequired ?? 0n;
 

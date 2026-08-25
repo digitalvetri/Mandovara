@@ -68,15 +68,20 @@ export async function getProjectMoney(
   const advanceReq     = order._sum.advanceRequired ?? 0n;
   const advanceRecvOrd = order._sum.advanceReceived ?? 0n;
   const advanceRecvOwn = advances._sum.amount       ?? 0n;
-  const receiptTotal   = receipts._sum.amount       ?? 0n;
+  // Legacy receipts._sum.amount only counted receipts whose row-level
+  // projectId was set — PaymentSheet doesn't set it, so this was
+  // effectively unused. Kept as a name-only reference; the real total
+  // now uses allocationSum below.
+  void receipts;
 
   // Owner canonical flow (2026-08-25): "advance received" spans BOTH
-  // the legacy Advance table AND receipts recorded via /accounts/new
-  // (the modern invoice → payment → install path). Take the larger of
-  // (order.advanceReceived, sum-of-advances) — those two tend to track
-  // the same event — then always add receiptTotal on top.
+  // the legacy Advance table AND receipts allocated to this project's
+  // invoices (the modern invoice → payment → install path). Receipts
+  // don't carry projectId directly — the authoritative link is via
+  // ReceiptAllocation → Invoice.projectId, which `allocationSum`
+  // already computes above.
   const legacyAdvance = advanceRecvOrd > 0n ? advanceRecvOrd : advanceRecvOwn;
-  const advanceReceived = legacyAdvance + receiptTotal;
+  const advanceReceived = legacyAdvance + allocationSum;
 
   return {
     orderValue,
@@ -84,7 +89,10 @@ export async function getProjectMoney(
     advanceRequired: advanceReq,
     outstanding:     computeOutstanding(invoiceTotal, advAdjTotal, allocationSum),
     invoiceTotal,
-    receiptTotal,
+    // Surface allocationSum as receiptTotal so the RECEIVED KPI on the
+    // project page reflects money actually landed on this project's
+    // invoices (not a stale receipt.projectId filter that's always 0).
+    receiptTotal:    allocationSum,
   };
 }
 
