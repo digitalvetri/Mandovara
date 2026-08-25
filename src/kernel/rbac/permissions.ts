@@ -96,6 +96,7 @@ export const PERMISSIONS = {
   admin: [
     "settings", "permissions", "users", "branches",
     "backup", "audit.view", "numbering", "integrations",
+    "wipe",   // destructive: TRUNCATE all transactional tables. OWNER only.
   ],
 } as const satisfies Record<string, readonly string[]>;
 

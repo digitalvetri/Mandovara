@@ -1,0 +1,112 @@
+"use server";
+
+// Destructive: wipes ALL transactional data (leads → clients → projects
+// → measurements → quotations → orders → invoices → receipts → visits
+// → make jobs → POs → GRNs → stock movements → audit log). Preserves
+// catalog (Design/Colourway/Brand/Collection/Price), inventory master
+// (StockBalance), users, roles, branches, org, and numbering series.
+//
+// Gated on OWNER role at runtime. Uses TRUNCATE ... CASCADE with the
+// append-only StockMove trigger disabled for the duration, exactly like
+// the vitest fixture in tests/kernel/fixtures.ts.
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { authBootstrapPrisma } from "@/kernel/db/client";
+import { requirePermission } from "@/kernel/rbac/guard";
+import { devContext } from "@/lib/dev-context";
+
+export interface WipeResult {
+  ok:      boolean;
+  wiped?:  string[];
+  error?:  string;
+}
+
+// Tables to wipe. Order doesn't matter — TRUNCATE CASCADE fires FKs in
+// dependency order automatically. Missing a child table just means
+// CASCADE will report it as being cleared implicitly. Order this list
+// alphabetically for review, not for correctness.
+const TABLES_TO_WIPE = [
+  "Advance",
+  "Allocation",
+  "AuditLog",
+  "AutomationLog",
+  "CalcResult",
+  "Client",
+  "Expense",
+  "GoodsReceipt",
+  "GoodsReceiptLine",
+  "Invoice",
+  "InvoiceLine",
+  "Lead",
+  "MakeJob",
+  "MakeJobEvent",
+  "MakeJobLine",
+  "Measurement",
+  "MeasurementItem",
+  "Order",
+  "OrderLine",
+  "Project",
+  "ProjectMember",
+  "ProjectMilestone",
+  "ProjectTask",
+  "PurchaseOrder",
+  "PurchaseOrderLine",
+  "PurchaseRequest",
+  "PurchaseRequestLine",
+  "Quotation",
+  "QuotationLine",
+  "Receipt",
+  "ReceiptAllocation",
+  "Room",
+  "SiteLog",
+  "SiteVisit",
+  "StockMove",
+  "VendorBill",
+  "VendorBillLine",
+] as const;
+
+const confirmSchema = z.object({
+  confirmPhrase: z.literal("WIPE ALL DATA"),
+});
+
+export async function wipeTransactionalData(input: unknown): Promise<WipeResult> {
+  const ctx = await devContext();
+  requirePermission(ctx, "admin.wipe");   // must be added to OWNER role perms
+
+  const parsed = confirmSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: 'Type exactly "WIPE ALL DATA" to confirm.' };
+  }
+
+  const wiped: string[] = [];
+  try {
+    // Use the unscoped root client so RLS and org filters can't hide
+    // rows from us during the wipe. Disable append-only triggers on
+    // AuditLog and StockMove so TRUNCATE works.
+    await authBootstrapPrisma.$executeRawUnsafe(`
+      DO $$ DECLARE t text;
+      BEGIN
+        ALTER TABLE "AuditLog" DISABLE TRIGGER USER;
+        ALTER TABLE "StockMove" DISABLE TRIGGER USER;
+        FOREACH t IN ARRAY ARRAY[${TABLES_TO_WIPE.map((n) => `'${n}'`).join(",")}]
+        LOOP EXECUTE format('TRUNCATE TABLE %I RESTART IDENTITY CASCADE;', t);
+        END LOOP;
+        ALTER TABLE "AuditLog" ENABLE TRIGGER USER;
+        ALTER TABLE "StockMove" ENABLE TRIGGER USER;
+      END $$;
+    `);
+    wiped.push(...TABLES_TO_WIPE);
+
+    // Reset numbering sequences so document numbers restart at 0001.
+    await authBootstrapPrisma.numberSequence.updateMany({ data: { counter: 0 } });
+
+    revalidatePath("/");
+    return { ok: true, wiped };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Wipe failed",
+    };
+  }
+}
