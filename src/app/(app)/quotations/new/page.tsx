@@ -3,6 +3,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { listBranches } from "@/modules/branches/queries";
+import { listItemsForFirmQuote } from "@/modules/measurement/queries-firm-quote";
 import { QuotationBuilder } from "../_components/QuotationBuilder";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +34,27 @@ export default async function NewQuotationPage({
     leadName = lead.name;
   }
 
+  // Fetch project name + preload measurement items for firm-quote build.
+  // Owner canonical flow: firm quote is built by picking a product per
+  // approved measurement item. Empty list → builder falls back to blank.
+  let projectName = "";
+  let preloadedItems = [] as Awaited<ReturnType<typeof listItemsForFirmQuote>>;
+  if (projectId) {
+    const project = await db.project.findUnique({
+      where:  { id: projectId },
+      select: { name: true, number: true },
+    });
+    if (!project) notFound();
+    projectName = `${project.number} · ${project.name}`;
+    preloadedItems = await listItemsForFirmQuote(ctx, projectId);
+  }
+
   const branches = await listBranches(ctx);
 
   const eyebrow = leadId
     ? `For lead: ${leadName}`
     : projectId
-      ? `Project ${projectId}`
+      ? projectName
       : "Select a project first";
 
   return (
@@ -49,6 +65,7 @@ export default async function NewQuotationPage({
         leadId={leadId || undefined}
         leadName={leadName || undefined}
         branches={branches}
+        preloadedItems={preloadedItems}
       />
     </>
   );
