@@ -26,16 +26,30 @@ export interface WipeResult {
 // dependency order automatically. Missing a child table just means
 // CASCADE will report it as being cleared implicitly. Order this list
 // alphabetically for review, not for correctness.
+//
+// The runtime SQL below skips any name that isn't a live table (see
+// information_schema.tables lookup) so a stale entry here fails soft
+// instead of aborting the whole wipe.
 const TABLES_TO_WIPE = [
   "Advance",
   "Allocation",
+  "Architect",
+  "ArchitectCommission",
   "AuditLog",
   "AutomationLog",
   "CalcResult",
+  "CalendarEvent",
+  "ChatChannel",
+  "ChatMember",
+  "ChatMessage",
   "Client",
+  "CommunicationLog",
+  "ContactPerson",
+  "Document",
   "Expense",
-  "GoodsReceipt",
-  "GoodsReceiptLine",
+  "FollowUp",
+  "GRN",
+  "GRNLine",
   "Invoice",
   "InvoiceLine",
   "Lead",
@@ -44,14 +58,19 @@ const TABLES_TO_WIPE = [
   "MakeJobLine",
   "Measurement",
   "MeasurementItem",
+  "Milestone",
+  "Notification",
   "Order",
   "OrderLine",
+  "Payment",
+  "PaymentAllocation",
+  "POLine",
   "Project",
+  "ProjectDocument",
+  "ProjectExpense",
   "ProjectMember",
-  "ProjectMilestone",
-  "ProjectTask",
+  "PromiseToPay",
   "PurchaseOrder",
-  "PurchaseOrderLine",
   "PurchaseRequest",
   "PurchaseRequestLine",
   "Quotation",
@@ -59,11 +78,15 @@ const TABLES_TO_WIPE = [
   "Receipt",
   "ReceiptAllocation",
   "Room",
+  "SampleIssue",
   "SiteLog",
   "SiteVisit",
   "StockMove",
+  "Task",
+  "TaskComment",
   "VendorBill",
   "VendorBillLine",
+  "WhatsAppConversation",
 ] as const;
 
 const confirmSchema = z.object({
@@ -84,13 +107,22 @@ export async function wipeTransactionalData(input: unknown): Promise<WipeResult>
     // Use the unscoped root client so RLS and org filters can't hide
     // rows from us during the wipe. Disable append-only triggers on
     // AuditLog and StockMove so TRUNCATE works.
+    // Skip any table name that isn't a live table in the public schema
+    // — keeps the wipe robust against schema drift (renamed/removed
+    // models don't abort the whole transaction with 42P01).
     await authBootstrapPrisma.$executeRawUnsafe(`
       DO $$ DECLARE t text;
       BEGIN
         ALTER TABLE "AuditLog" DISABLE TRIGGER USER;
         ALTER TABLE "StockMove" DISABLE TRIGGER USER;
         FOREACH t IN ARRAY ARRAY[${TABLES_TO_WIPE.map((n) => `'${n}'`).join(",")}]
-        LOOP EXECUTE format('TRUNCATE TABLE %I RESTART IDENTITY CASCADE;', t);
+        LOOP
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = t
+          ) THEN
+            EXECUTE format('TRUNCATE TABLE %I RESTART IDENTITY CASCADE;', t);
+          END IF;
         END LOOP;
         ALTER TABLE "AuditLog" ENABLE TRIGGER USER;
         ALTER TABLE "StockMove" ENABLE TRIGGER USER;
