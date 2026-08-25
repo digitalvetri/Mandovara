@@ -70,9 +70,17 @@ export async function getProjectMoney(
   const advanceRecvOwn = advances._sum.amount       ?? 0n;
   const receiptTotal   = receipts._sum.amount       ?? 0n;
 
+  // Owner canonical flow (2026-08-25): "advance received" spans BOTH
+  // the legacy Advance table AND receipts recorded via /accounts/new
+  // (the modern invoice → payment → install path). Take the larger of
+  // (order.advanceReceived, sum-of-advances) — those two tend to track
+  // the same event — then always add receiptTotal on top.
+  const legacyAdvance = advanceRecvOrd > 0n ? advanceRecvOrd : advanceRecvOwn;
+  const advanceReceived = legacyAdvance + receiptTotal;
+
   return {
     orderValue,
-    advanceReceived: advanceRecvOrd > 0n ? advanceRecvOrd : advanceRecvOwn,
+    advanceReceived,
     advanceRequired: advanceReq,
     outstanding:     computeOutstanding(invoiceTotal, advAdjTotal, allocationSum),
     invoiceTotal,
