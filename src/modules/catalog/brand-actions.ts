@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
-import { PDFS_DIR } from "./pdf-actions";
+import { PDFS_DIR } from "./pdf-paths";
 
 async function scanTransactionalRefs(
   db: ReturnType<typeof scoped>,

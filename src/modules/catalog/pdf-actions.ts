@@ -1,27 +1,18 @@
 "use server";
 
 import { writeFile, unlink, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
+import { PDFS_DIR } from "./pdf-paths";
+import type { PdfActionResult } from "./pdf-actions-types";
 
-// `/app` reliably indicates the Docker runtime; local dev falls back to
-// the repo-relative path. The pdfs subfolder is not committed (public/catalog
-// is gitignored) so it may not exist at container boot — every write path
-// mkdirs first.
-// Exported so brand-actions.ts (destructive brand-level ops) can reuse
-// the same path resolution when cleaning up attached PDFs.
-export const PDFS_DIR = existsSync("/app")
-  ? "/app/public/catalog/pdfs"
-  : path.resolve("public", "catalog", "pdfs");
-
-export interface PdfActionResult {
-  ok: boolean;
-  error?: string;
-}
+// PDFS_DIR + PdfActionResult moved to sibling files — a "use server"
+// file can only export async functions. Nothing here re-exports them;
+// external callers import from ./pdf-paths and ./pdf-actions-types
+// directly.
 
 export async function uploadCollectionPdf(formData: FormData): Promise<PdfActionResult> {
   try {
