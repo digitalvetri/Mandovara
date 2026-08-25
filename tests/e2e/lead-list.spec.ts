@@ -14,13 +14,18 @@ test.describe("Lead List — Phase 2 PDF spec", () => {
     expect(hasTable || hasEmpty).toBe(true);
   });
 
-  test("status tabs include key stages including Qualified", async ({ page }) => {
+  test("status tabs show the four sanctioned stages", async ({ page }) => {
+    // Qualified / Contacted / Site Visit / Negotiation / Open were removed
+    // from the tab row on 25 Aug 2026 at the owner's request — see
+    // src/modules/leads/schema.ts ACTIVE_LEAD_STAGES.
     await page.goto("/leads");
-    const tabs = ["All", "New", "Qualified", "Won", "Lost"];
+    const tabs = ["All", "New", "Quoted", "Won", "Lost"];
     for (const label of tabs) {
       await expect(page.getByRole("button", { name: label, exact: true })).toBeVisible();
     }
-    await expect(page.getByRole("button", { name: "Open", exact: true })).toBeVisible();
+    // Removed tabs must not reappear silently.
+    await expect(page.getByRole("button", { name: "Qualified", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open", exact: true })).toHaveCount(0);
   });
 
   test("table layout shows customer name, status, mobile and action buttons on desktop", async ({ page }) => {
