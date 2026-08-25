@@ -9,6 +9,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { CollectionPdfRow } from "./_components/CollectionPdfRow";
 import { NewCollectionForm } from "./_components/NewCollectionForm";
 import { DeleteBrandButton } from "./_components/DeleteBrandButton";
+import { WipeCollectionsButton } from "./_components/WipeCollectionsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -81,12 +82,20 @@ export default async function BrandCatalogPage({ params }: Props) {
             </div>
           </div>
           {canDelete && (
-            <DeleteBrandButton
-              brandId={brandId}
-              brandName={brand.name}
-              collectionCount={totalCount}
-              designCount={designCount}
-            />
+            <div className="flex items-center gap-2">
+              <WipeCollectionsButton
+                brandId={brandId}
+                brandName={brand.name}
+                collectionCount={totalCount}
+                designCount={designCount}
+              />
+              <DeleteBrandButton
+                brandId={brandId}
+                brandName={brand.name}
+                collectionCount={totalCount}
+                designCount={designCount}
+              />
+            </div>
           )}
         </div>
       </div>

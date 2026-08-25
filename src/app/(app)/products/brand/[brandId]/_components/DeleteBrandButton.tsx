@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, X, AlertTriangle } from "lucide-react";
-import { deleteBrand } from "@/modules/catalog/pdf-actions";
+import { deleteBrand } from "@/modules/catalog/brand-actions";
 
 interface Props {
   brandId: string;
