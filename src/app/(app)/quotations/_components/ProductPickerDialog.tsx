@@ -25,28 +25,36 @@ export function ProductPickerDialog({ open, onClose, onPick, family }: Props) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<PickerRow[]>([]);
   const [pending, start] = useTransition();
+  // The family from the measurement is a suggestion. If the catalog has
+  // nothing matching it (small orgs won't have every family seeded), the
+  // user can widen to all families with one click.
+  const [strictFamily, setStrictFamily] = useState(true);
+  const activeFamily = strictFamily ? family : undefined;
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reset the toggle whenever the dialog reopens for a new row.
+  useEffect(() => { if (open) setStrictFamily(true); }, [open]);
 
   useEffect(() => {
     if (!open) return;
     inputRef.current?.focus();
     // initial load with empty query — shows a starter set
     start(async () => {
-      const r = await searchColourwaysForPicker({ family, limit: 20 });
+      const r = await searchColourwaysForPicker({ family: activeFamily, limit: 20 });
       setRows(r);
     });
-  }, [open, family]);
+  }, [open, activeFamily]);
 
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => {
       start(async () => {
-        const r = await searchColourwaysForPicker({ q, family, limit: 30 });
+        const r = await searchColourwaysForPicker({ q, family: activeFamily, limit: 30 });
         setRows(r);
       });
     }, 220);
     return () => clearTimeout(t);
-  }, [q, open, family]);
+  }, [q, open, activeFamily]);
 
   if (!open) return null;
 
@@ -59,8 +67,30 @@ export function ProductPickerDialog({ open, onClose, onPick, family }: Props) {
           <div>
             <div className="text-[14px] font-display font-medium text-text">Pick a product</div>
             {family && (
-              <div className="text-[11px] text-text-muted mt-0.5">
-                Filtered to {family.toLowerCase()} designs
+              <div className="text-[11px] text-text-muted mt-0.5 flex items-center gap-2">
+                {strictFamily ? (
+                  <>
+                    Filtered to {family.toLowerCase()} designs
+                    <button
+                      type="button"
+                      onClick={() => setStrictFamily(false)}
+                      className="underline underline-offset-2 text-gold hover:text-gold-strong"
+                    >
+                      Search all families
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Searching all product families
+                    <button
+                      type="button"
+                      onClick={() => setStrictFamily(true)}
+                      className="underline underline-offset-2 text-gold hover:text-gold-strong"
+                    >
+                      Only {family.toLowerCase()}
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -91,8 +121,17 @@ export function ProductPickerDialog({ open, onClose, onPick, family }: Props) {
             </div>
           )}
           {!pending && rows.length === 0 && (
-            <div className="p-8 text-center text-[12.5px] text-text-muted">
-              No products match. Try a different search.
+            <div className="p-8 text-center text-[12.5px] text-text-muted space-y-3">
+              <div>No products match. Try a different search.</div>
+              {strictFamily && family && (
+                <button
+                  type="button"
+                  onClick={() => setStrictFamily(false)}
+                  className="inline-flex items-center gap-1.5 h-[30px] px-3 rounded-[6px] bg-gold/10 border border-gold/30 text-[12px] font-medium text-gold hover:bg-gold/20 transition-colors"
+                >
+                  Search all families instead
+                </button>
+              )}
             </div>
           )}
           <ul className="divide-y divide-rule/60">
