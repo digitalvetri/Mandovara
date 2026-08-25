@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
   Wifi, WifiOff, Clock, MapPin, CheckCircle2, Loader2, AlertCircle,
+  ArrowLeft, ChevronRight, RefreshCw,
 } from "lucide-react";
 import {
   enqueuePunch, attendanceCuid, countPendingPunches,
@@ -54,11 +56,11 @@ export function AttendancePWA({ employee, attendance }: Props) {
     outAt:  attendance?.outAt  ?? null,
     locked: attendance?.locked ?? false,
   });
-  const [isOnline, setIsOnline]   = useState(true);
-  const [pending, setPending]     = useState(0);
-  const [gpsWarn, setGpsWarn]     = useState<string | null>(null);
-  const [loading, setLoading]     = useState(false);
-  const [lastSync, setLastSync]   = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+  const [pending, setPending]   = useState(0);
+  const [gpsWarn, setGpsWarn]   = useState<string | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   // Online / offline
   useEffect(() => {
@@ -104,7 +106,7 @@ export function AttendancePWA({ employee, attendance }: Props) {
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
     } catch {
-      setGpsWarn("Location unavailable — punch recorded without GPS coordinates.");
+      setGpsWarn("Location unavailable — punch recorded without GPS.");
     }
 
     const id        = attendanceCuid();
@@ -112,14 +114,12 @@ export function AttendancePWA({ employee, attendance }: Props) {
 
     await enqueuePunch({ id, type, timestamp, lat, lng });
 
-    // Optimistic update — show the time immediately, sync in background
     setLocal((prev) => ({
       ...prev,
       inAt:  type === "in"  ? timestamp : prev.inAt,
       outAt: type === "out" ? timestamp : prev.outAt,
     }));
 
-    // Trigger drain (drain loop picks it up via the listener; nudge count)
     countPendingPunches().then(setPending);
     setLoading(false);
   }, []);
@@ -127,70 +127,85 @@ export function AttendancePWA({ employee, attendance }: Props) {
   const hasPunchIn  = !!local.inAt;
   const hasPunchOut = !!local.outAt;
   const nextType: PunchType = hasPunchIn ? "out" : "in";
+  const actionDone = local.locked || (hasPunchIn && hasPunchOut);
 
   return (
-    <div className="min-h-screen bg-ink flex flex-col">
-      {/* ── Status bar ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border/50">
-        <div className="flex items-center gap-2 text-[12px] text-text-muted">
+    <div className="min-h-screen bg-surface flex flex-col">
+
+      {/* ── Top nav bar ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-rule bg-surface">
+        <Link
+          href="/employee"
+          className="inline-flex items-center gap-1.5 text-[13px] text-text-dim hover:text-text transition-colors"
+        >
+          <ArrowLeft size={15} strokeWidth={2} />
+          Dashboard
+        </Link>
+        <span className="text-[13px] font-semibold text-text">Mark Attendance</span>
+        {/* Connectivity status (right-aligned) */}
+        <div className="flex items-center gap-1.5 text-[12px]">
           {isOnline ? (
-            <>
-              <Wifi size={13} className="text-solid" />
+            <span className="flex items-center gap-1 text-solid">
+              <Wifi size={12} strokeWidth={2} />
               Online
-            </>
+            </span>
           ) : (
-            <>
-              <WifiOff size={13} className="text-fault" />
+            <span className="flex items-center gap-1 text-fault">
+              <WifiOff size={12} strokeWidth={2} />
               Offline
-            </>
-          )}
-          {pending > 0 && (
-            <span className="ml-2 rounded-full bg-heat/20 text-heat px-2 py-0.5 text-[11px] font-medium tabular-nums">
-              {pending} pending
             </span>
           )}
         </div>
-        {lastSync && (
-          <span className="text-[11px] text-text-subtle tabular-nums">
-            Synced {lastSync}
-          </span>
-        )}
       </div>
 
-      {/* ── Main ───────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-7">
+      {/* ── Pending sync banner ───────────────────────────────────── */}
+      {pending > 0 && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-heat/8 border-b border-heat/20 text-[12px]">
+          <span className="flex items-center gap-2 text-heat">
+            <RefreshCw size={12} strokeWidth={2} className={isOnline ? "animate-spin" : ""} />
+            {pending} punch{pending !== 1 ? "es" : ""} queued
+            {isOnline ? " — syncing…" : " — will sync when back online"}
+          </span>
+          {lastSync && (
+            <span className="text-text-faint tabular-nums">Last synced {lastSync}</span>
+          )}
+        </div>
+      )}
+
+      {/* ── Main content — centered, capped width on desktop ─────── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-7 w-full max-w-sm mx-auto">
 
         {/* Employee + date */}
         <div className="text-center">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-text-muted">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-text-dim">
             {todayLabel()}
           </p>
-          <h1 className="mt-1 font-display text-[28px] font-semibold tracking-[-0.015em] text-text leading-snug">
+          <h1 className="mt-1.5 font-display text-[28px] font-semibold tracking-[-0.015em] text-text leading-snug">
             {employee.name}
           </h1>
         </div>
 
         {/* Punch times card */}
         {(hasPunchIn || hasPunchOut) && (
-          <div className="w-full max-w-xs divide-y divide-border/40 rounded-[12px] border border-border bg-surface text-[13px]">
+          <div className="w-full divide-y divide-rule/50 rounded-[14px] border border-rule bg-surface-2 text-[13px] overflow-hidden">
             {hasPunchIn && (
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="flex items-center gap-2 text-text-muted">
+              <div className="flex items-center justify-between px-5 py-3.5">
+                <span className="flex items-center gap-2 text-text-dim">
                   <Clock size={14} strokeWidth={1.8} />
                   Punch in
                 </span>
-                <span className="font-data tabular-nums text-text">
+                <span className="font-data tabular-nums text-solid font-medium">
                   {fmtTime(local.inAt!)}
                 </span>
               </div>
             )}
             {hasPunchOut && (
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="flex items-center gap-2 text-text-muted">
+              <div className="flex items-center justify-between px-5 py-3.5">
+                <span className="flex items-center gap-2 text-text-dim">
                   <Clock size={14} strokeWidth={1.8} />
                   Punch out
                 </span>
-                <span className="font-data tabular-nums text-text">
+                <span className="font-data tabular-nums text-fault font-medium">
                   {fmtTime(local.outAt!)}
                 </span>
               </div>
@@ -200,7 +215,7 @@ export function AttendancePWA({ employee, attendance }: Props) {
 
         {/* GPS warning */}
         {gpsWarn && (
-          <p className="flex items-start gap-1.5 text-[12px] text-heat max-w-xs text-center leading-snug">
+          <p className="flex items-start gap-1.5 text-[12px] text-heat text-center leading-snug">
             <AlertCircle size={13} className="mt-0.5 shrink-0" />
             {gpsWarn}
           </p>
@@ -208,14 +223,18 @@ export function AttendancePWA({ employee, attendance }: Props) {
 
         {/* Action */}
         {local.locked ? (
-          <div className="flex items-center gap-2 text-[13px] text-text-muted">
-            <CheckCircle2 size={16} className="text-text-subtle" />
-            Attendance is locked for today.
+          <div className="w-full rounded-[14px] border border-rule bg-surface-2 px-5 py-4 text-center">
+            <CheckCircle2 size={22} className="text-solid mx-auto mb-2" />
+            <p className="text-[13px] font-medium text-text">Attendance locked</p>
+            <p className="mt-0.5 text-[12px] text-text-dim">Your attendance for today has been finalised by HR.</p>
           </div>
         ) : hasPunchIn && hasPunchOut ? (
-          <div className="flex items-center gap-2 text-solid text-[15px] font-medium">
-            <CheckCircle2 size={18} strokeWidth={1.8} />
-            All done — see you tomorrow!
+          <div className="w-full rounded-[14px] border border-solid/25 bg-solid/8 px-5 py-4 text-center">
+            <CheckCircle2 size={22} className="text-solid mx-auto mb-2" />
+            <p className="text-[13px] font-semibold text-solid">All done for today!</p>
+            <p className="mt-0.5 text-[12px] text-text-dim">
+              In at {fmtTime(local.inAt!)} · Out at {fmtTime(local.outAt!)}
+            </p>
           </div>
         ) : (
           <button
@@ -223,11 +242,11 @@ export function AttendancePWA({ employee, attendance }: Props) {
             disabled={loading}
             onClick={() => handlePunch(nextType)}
             className={[
-              "w-full max-w-xs min-h-16 rounded-[14px] text-[16px] font-semibold",
+              "w-full min-h-[60px] rounded-[14px] text-[16px] font-semibold",
               "flex items-center justify-center gap-3 transition-all active:scale-[0.98]",
               nextType === "in"
-                ? "bg-gold text-ink hover:bg-gold-strong"
-                : "bg-heat/15 border border-heat/30 text-heat hover:bg-heat/25",
+                ? "bg-accent text-white hover:bg-accent-hover"
+                : "bg-bad/10 border border-bad/25 text-bad hover:bg-bad/18",
               "disabled:opacity-60 disabled:pointer-events-none",
             ].join(" ")}
           >
@@ -242,11 +261,24 @@ export function AttendancePWA({ employee, attendance }: Props) {
           </button>
         )}
 
-        {/* Offline queue note */}
-        {pending > 0 && !isOnline && (
-          <p className="text-[12px] text-text-subtle text-center max-w-xs leading-snug">
-            {pending} punch{pending !== 1 ? "es" : ""} queued locally — will sync automatically when back online.
-          </p>
+        {/* After action — quick links ───────────────────────────── */}
+        {actionDone && (
+          <div className="w-full space-y-2">
+            <Link
+              href="/attendance"
+              className="flex items-center justify-between w-full rounded-[11px] border border-rule bg-surface-2 px-4 py-3 text-[13px] text-text-dim hover:text-text hover:bg-surface-hover transition-colors"
+            >
+              <span>View my attendance history</span>
+              <ChevronRight size={15} strokeWidth={2} />
+            </Link>
+            <Link
+              href="/leave/apply"
+              className="flex items-center justify-between w-full rounded-[11px] border border-rule bg-surface-2 px-4 py-3 text-[13px] text-text-dim hover:text-text hover:bg-surface-hover transition-colors"
+            >
+              <span>Apply for leave</span>
+              <ChevronRight size={15} strokeWidth={2} />
+            </Link>
+          </div>
         )}
       </div>
     </div>
