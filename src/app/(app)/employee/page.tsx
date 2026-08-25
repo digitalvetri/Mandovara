@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { notFound } from "next/navigation";
 import { CalendarDays, FileText, Smartphone, TrendingUp } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
@@ -63,7 +62,43 @@ export default async function EmployeeDashboardPage() {
     }
   }
 
-  if (!employee) notFound();
+  // No employee record linked yet — show a minimal greeting so the page
+  // doesn't crash in production when HR hasn't linked the account.
+  if (!employee) {
+    const user = await db.user.findUnique({
+      where:  { id: ctx.userId },
+      select: { name: true },
+    });
+    const name = user?.name ?? "there";
+    const initials = name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
+    return (
+      <>
+        <Topbar title="Dashboard" eyebrow={todayLabel()} />
+        <div className="relative overflow-hidden rounded-[16px] bg-sidebar text-sidebar-text mb-5">
+          <div aria-hidden className="pointer-events-none absolute inset-0 chrome-veil" />
+          <div aria-hidden className="pointer-events-none absolute inset-0 hero-facets" />
+          <div className="relative z-10 px-6 py-6 sm:px-8 sm:py-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] font-medium tracking-[0.04em] text-sidebar-dim">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-chrome" />
+              {todayLabel()}
+            </div>
+            <div className="mt-5 flex items-center gap-4">
+              <div className="h-14 w-14 rounded-full border border-accent-chrome/30 bg-accent-chrome/15 flex items-center justify-center shrink-0">
+                <span className="font-display text-[20px] font-semibold text-accent-chrome">{initials}</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[12.5px] text-sidebar-dim">{greet()},</p>
+                <h1 className="font-display text-[26px] sm:text-[30px] font-[560] leading-[1.18] tracking-[-0.015em] text-sidebar-text truncate">
+                  {name}
+                </h1>
+                <p className="mt-0.5 text-[12px] text-sidebar-dim">Your employee profile is being set up.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const now        = new Date();
   const today      = todayIST();

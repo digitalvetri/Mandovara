@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
@@ -14,13 +15,6 @@ import { RevenueChart } from "./_dashboard/RevenueChart";
 import { ProjectStages } from "./_dashboard/ProjectStages";
 import { SiteVisits } from "./_dashboard/SiteVisits";
 import { RecentActivity } from "./_dashboard/RecentActivity";
-import { DesignerView } from "./_dashboard/DesignerView";
-import { SalesView } from "./_dashboard/SalesView";
-import { MeasureExecView } from "./_dashboard/MeasureExecView";
-import { StoreView } from "./_dashboard/StoreView";
-import { MakeSupervisorView } from "./_dashboard/MakeSupervisorView";
-import { AccountsView } from "./_dashboard/AccountsView";
-import { HrView } from "./_dashboard/HrView";
 
 export const dynamic = "force-dynamic";
 
@@ -56,18 +50,18 @@ export default async function DashboardPage() {
   const ctx  = await devContext();
   const role = ctx.roles[0] ?? "OWNER";
 
+  // All non-owner roles use the employee dashboard (/employee).
+  // This prevents crashing on role-specific views and keeps one consistent
+  // employee experience.
+  if (role !== "OWNER") {
+    redirect("/employee");
+  }
+
   const [userName, daySummary] = await Promise.all([
     getUserName(ctx),
     safeLoadDaySummary(ctx),
   ]);
 
-  // The dashboard hero. This used to be a dark slab carrying a greeting and a
-  // live clock, with the day's work in a smaller card beneath it. The clock is
-  // gone and the two are now one band: §1.3 wants "what's stuck and what money
-  // is due, in 30 seconds" in this space, not the time.
-  //
-  // Hour and date are resolved on the server in IST so the copy does not
-  // flicker from a client-locale render on hydrate.
   const istNow = new Date();
   const istHour = Number(
     new Intl.DateTimeFormat("en-GB", {
@@ -87,71 +81,7 @@ export default async function DashboardPage() {
     />
   );
 
-  if (role === "DESIGNER") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="designer" />
-        {greeting}
-        <div className="mt-4"><DesignerView ctx={ctx} /></div>
-      </>
-    );
-  }
-  if (role === "SALES") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="sales" />
-        {greeting}
-        <div className="mt-4"><SalesView ctx={ctx} /></div>
-      </>
-    );
-  }
-  if (role === "MEASURE_EXEC") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="measurement" />
-        {greeting}
-        <div className="mt-4"><MeasureExecView ctx={ctx} /></div>
-      </>
-    );
-  }
-  if (role === "STORE") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="store" />
-        {greeting}
-        <div className="mt-4"><StoreView ctx={ctx} /></div>
-      </>
-    );
-  }
-  if (role === "MAKE_SUPERVISOR") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="production" />
-        {greeting}
-        <div className="mt-4"><MakeSupervisorView ctx={ctx} /></div>
-      </>
-    );
-  }
-  if (role === "ACCOUNTS") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="accounts" />
-        {greeting}
-        <div className="mt-4"><AccountsView ctx={ctx} /></div>
-      </>
-    );
-  }
-  if (role === "HR") {
-    return (
-      <>
-        <Topbar title="Dashboard" eyebrow="hr" />
-        {greeting}
-        <div className="mt-4"><HrView ctx={ctx} /></div>
-      </>
-    );
-  }
-
-  // OWNER / fallback — full cockpit
+  // OWNER — full cockpit
   let d: DashboardData;
   try {
     d = await loadDashboard(ctx);
