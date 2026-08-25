@@ -15,13 +15,14 @@ interface Props {
   email: string | null;
   open: boolean;
   onClose: () => void;
+  afterConvert?: (data: { clientId: string; projectId: string | null }) => void;
 }
 
 const lbl = "block mb-1 text-[10.5px] uppercase tracking-[0.12em] text-text-dim";
 const inp = "w-full h-[34px] px-3 bg-surface-2 border border-rule rounded-[7px] text-[13px] text-text outline-none focus:border-accent transition-colors";
 const ta  = "w-full px-3 py-2 bg-surface-2 border border-rule rounded-[7px] text-[13px] text-text outline-none focus:border-accent transition-colors resize-y";
 
-export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClose }: Props) {
+export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClose, afterConvert }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -80,10 +81,14 @@ export function ConvertLeadModal({ leadId, leadName, mobile, email, open, onClos
       });
       if (!res.ok || !res.data) { setError(res.error ?? "Could not convert lead"); return; }
       onClose();
-      const target: Route = res.data.projectId
-        ? (`/projects/${res.data.projectId}` as Route)
-        : (`/clients/${res.data.clientId}` as Route);
-      router.push(target);
+      if (afterConvert) {
+        afterConvert(res.data);
+      } else {
+        const target: Route = res.data.projectId
+          ? (`/projects/${res.data.projectId}` as Route)
+          : (`/clients/${res.data.clientId}` as Route);
+        router.push(target);
+      }
     });
   }
 

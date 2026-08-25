@@ -118,7 +118,15 @@ export function QuotationHeader({ quotation, canApprove }: Props) {
         )}
 
         <div className="ml-auto flex items-center gap-2 flex-wrap shrink-0">
-          <StatusChanger id={quotation.id} current={quotation.status} canApprove={canApprove} />
+          <StatusChanger
+            id={quotation.id}
+            current={quotation.status}
+            canApprove={canApprove}
+            leadId={quotation.leadId}
+            leadName={quotation.clientName}
+            leadMobile={quotation.clientMobile}
+            leadEmail={quotation.clientEmail}
+          />
           <PdfPreviewModal
             quotationId={quotation.id}
             label={quotation.number}

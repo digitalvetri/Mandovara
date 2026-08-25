@@ -71,8 +71,8 @@ export default async function PurchasePage({
         <div className="h-5 w-px bg-rule hidden sm:block" />
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <StatusChip label="Open" href="/purchase"           active={status === "OPEN"} />
-          <StatusChip label="All"  href="/purchase?status=ALL" active={status === "ALL"} />
+          <StatusChip label="All"  href="/purchase"            active={status === "ALL"} />
+          <StatusChip label="Open" href="/purchase?status=OPEN" active={status === "OPEN"} />
           {VISIBLE_STATUSES.map((s) => (
             <StatusChip
               key={s}
@@ -132,7 +132,7 @@ function StatusChip({ label, href, active }: { label: string; href: string; acti
 }
 
 function normaliseStatus(v: string | undefined): POStatus | "OPEN" | "ALL" {
-  if (v == null || v === "") return "OPEN";
+  if (v == null || v === "") return "ALL";
   if (v === "OPEN" || v === "ALL") return v;
   if ((PO_STATUSES as readonly string[]).includes(v)) return v as POStatus;
   return "OPEN";

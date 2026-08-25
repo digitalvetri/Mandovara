@@ -133,7 +133,9 @@ export async function createInvoiceFromOrder(
     const hsn        = info?.hsn ?? "9987";
     const gstRateStr = info?.gstRate ?? "18";
     const gstRate    = parseFloat(gstRateStr);
-    const taxable    = l.amount;
+    // Compute taxable from rate × quantity (NOT l.amount which is GST-inclusive)
+    const qtyFixed   = BigInt(Math.round(parseFloat(l.quantity.toString()) * 10_000));
+    const taxable    = (l.rate * qtyFixed) / 10_000n;
     const tax        = computeLineTax({ taxable, gstRate, supplierStateCode, placeOfSupplyCode });
     return {
       orderLineId: l.id,
@@ -152,11 +154,13 @@ export async function createInvoiceFromOrder(
   });
 
   if (lines.length === 0) {
-    const tax = computeLineTax({ taxable: order.totalValue, gstRate: 18, supplierStateCode, placeOfSupplyCode });
+    // totalValue is the GST-inclusive order total — back out GST to get taxable base
+    const taxable = (order.totalValue * 10_000n) / 11_800n; // ÷1.18 for 18% GST
+    const tax = computeLineTax({ taxable, gstRate: 18, supplierStateCode, placeOfSupplyCode });
     lines.push({
       description: `As per Order ${order.number}`,
       hsn: "9987", quantity: "1.000", unit: "PIECE",
-      rate: order.totalValue.toString(), taxable: order.totalValue.toString(),
+      rate: taxable.toString(), taxable: taxable.toString(),
       gstRate: "18",
       cgst: tax.cgst.toString(), sgst: tax.sgst.toString(), igst: tax.igst.toString(),
       amount: (order.totalValue + tax.cgst + tax.sgst + tax.igst).toString(),

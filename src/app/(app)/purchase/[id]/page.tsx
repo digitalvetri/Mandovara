@@ -1,15 +1,19 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import type { Route } from "next";
 import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { getPO } from "@/modules/purchase/queries";
+import { listVendorBillsForPO, getGRNsForBilling } from "@/modules/purchase/vendor-bill-queries";
 import { POStatusPill } from "../_components/StatusPill";
 import { SendOnWhatsAppButton } from "./_components/SendOnWhatsAppButton";
 import { POStatusActions } from "./_components/POStatusActions";
 import { GRNForm } from "../_components/GRNForm";
 import { MarkPaidButton } from "@/app/(app)/accounts/_components/MarkPaidButton";
+import { ApproveBillButton } from "./_components/ApproveBillButton";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +22,14 @@ export default async function PODetailPage({
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await devContext();
-  const [po, vendorExpense] = await Promise.all([
+  const [po, vendorExpense, vendorBills, unbilledGRNs] = await Promise.all([
     getPO(ctx, id),
     scoped(ctx).expense.findUnique({
       where: { sourcePoId: id },
       select: { id: true, amount: true, approvalState: true, paidAt: true },
     }),
+    listVendorBillsForPO(ctx, id),
+    getGRNsForBilling(ctx, id),
   ]);
   if (!po) notFound();
 
@@ -198,6 +204,41 @@ export default async function PODetailPage({
             </ul>
           </div>
         )}
+
+        {/* ── Vendor bills ─────────────────────────────────────────────────── */}
+        <div className="rounded-[14px] bg-surface border border-rule p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] uppercase tracking-[0.16em] text-text-dim">
+              Vendor bills{vendorBills.length > 0 ? ` (${vendorBills.length})` : ""}
+            </div>
+            {unbilledGRNs.length > 0 && (
+              <Link href={`/purchase/${po.id}/bills/new` as Route}
+                    className="h-[28px] px-3 rounded-[6px] bg-accent text-white text-[11.5px] font-medium hover:bg-accent-hover transition-colors inline-flex items-center">
+                Raise vendor bill
+              </Link>
+            )}
+          </div>
+          {vendorBills.length === 0 ? (
+            <div className="text-[12.5px] text-text-dim">No vendor bills yet.</div>
+          ) : (
+            <ul className="divide-y divide-rule/60">
+              {vendorBills.map((b) => (
+                <li key={b.id} className="flex items-center gap-4 py-3">
+                  <div className="tabular text-[13px] text-text w-[180px]">{b.number}</div>
+                  <div className="text-[12px] text-text-dim w-[90px] tabular">{formatDate(b.billDate)}</div>
+                  <div className="text-[12px] text-text-dim flex-1">
+                    {b.vendorInvoiceNo && <span>inv {b.vendorInvoiceNo}</span>}
+                  </div>
+                  <div className="tabular text-[13px] text-text font-medium w-[110px] text-right">
+                    {formatINR(b.total)}
+                  </div>
+                  <BillStatusPill status={b.status} />
+                  {b.status === "DRAFT" && <ApproveBillButton billId={b.id} />}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </>
   );
@@ -222,4 +263,20 @@ function Th({ children, align = "left" }: { children: React.ReactNode; align?: "
 }
 function Td({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
   return <td className={`px-4 py-3.5 ${align === "right" ? "text-right" : "text-left"} align-top`}>{children}</td>;
+}
+
+const BILL_STATUS_CLASSES: Record<string, string> = {
+  DRAFT:          "bg-surface-hover text-text-dim border-rule",
+  APPROVED:       "bg-accent/10 text-accent border-accent/20",
+  PARTIALLY_PAID: "bg-warn/10 text-warn border-warn/20",
+  PAID:           "bg-good/10 text-good border-good/20",
+  CANCELLED:      "bg-fault/10 text-fault border-fault/20",
+};
+function BillStatusPill({ status }: { status: string }) {
+  const cls = BILL_STATUS_CLASSES[status] ?? "bg-surface-hover text-text-dim border-rule";
+  return (
+    <span className={`inline-flex items-center h-[22px] px-2.5 rounded-full text-[10.5px] font-medium border ${cls}`}>
+      {status.replace("_", " ")}
+    </span>
+  );
 }

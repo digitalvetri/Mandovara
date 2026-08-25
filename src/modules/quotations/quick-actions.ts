@@ -17,7 +17,6 @@ import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
-import { parseINR } from "@/kernel/money/format";
 import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kernel/tax/gst";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
@@ -111,7 +110,7 @@ export async function createQuickQuote(
   const computed = d.lines.map((line, i) => {
     const cw = line.colourwayId ? cwMap.get(line.colourwayId) : undefined;
     const gstRate = cw ? Number(cw.design.gstRate) : (line.gstRate ?? 18);
-    const ratePaise = parseINR(line.ratePaise);
+    const ratePaise = BigInt(line.ratePaise);
     const qtyFixed  = BigInt(Math.round(line.quantity * 10_000));
     const gross     = (ratePaise * qtyFixed) / 10_000n;
     const { taxable } = applyLineDiscount(gross, line.discountPct);

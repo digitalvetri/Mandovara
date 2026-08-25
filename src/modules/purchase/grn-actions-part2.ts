@@ -255,8 +255,20 @@ async function autoCreateExpenseForPO(
 ): Promise<void> {
   const fullPo = await tx.purchaseOrder.findUniqueOrThrow({
     where:  { id: poId },
-    select: { id: true, number: true, totalValue: true, vendorId: true },
+    select: {
+      id: true, number: true, totalValue: true, vendorId: true,
+      lines: { select: { rate: true, quantity: true, gstRate: true } },
+    },
   });
+
+  // Compute GST-inclusive total from PO lines (totalValue is pre-tax)
+  const totalWithGst = fullPo.lines.reduce((sum, l) => {
+    const qty     = BigInt(Math.round(parseFloat(l.quantity.toString()) * 10_000));
+    const taxable = (l.rate * qty) / 10_000n;
+    const gstPct  = BigInt(Math.round(Number(l.gstRate)));
+    const gst     = (taxable * gstPct) / 100n;
+    return sum + taxable + gst;
+  }, 0n);
   const vendor = await tx.vendor.findUnique({
     where:  { id: fullPo.vendorId },
     select: { name: true },
@@ -284,7 +296,7 @@ async function autoCreateExpenseForPO(
         head:           "Vendor payment",
         subHead:        vendorName,
         description:    `${fullPo.number} — ${vendorName}`,
-        amount:         fullPo.totalValue,
+        amount:         totalWithGst,
         incurredAt:     new Date(),
         approvalState:  "APPROVED",   // PO already went through its own approval; skip a second loop
         paidAt:         null,          // still owes vendor — shows up in To Pay

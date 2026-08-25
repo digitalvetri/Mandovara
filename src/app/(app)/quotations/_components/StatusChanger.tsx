@@ -6,11 +6,16 @@ import type { Route } from "next";
 import { setQuotationStatus } from "@/modules/quotations/actions-part2";
 import { rejectQuotation } from "@/modules/quotations/actions-status";
 import { createOrderFromQuotation } from "@/modules/orders/actions";
+import { ConvertLeadModal } from "../../leads/_components/ConvertLeadModal";
 
 interface Props {
-  id:         string;
-  current:    string;
-  canApprove: boolean;  // true when user has quotation.approve permission
+  id:          string;
+  current:     string;
+  canApprove:  boolean;
+  leadId?:     string | null;
+  leadName?:   string;
+  leadMobile?: string;
+  leadEmail?:  string | null;
 }
 
 // Transitions available per state. "approve" and "reject" are gated by canApprove.
@@ -40,12 +45,15 @@ const TONE_CLS: Record<string, string> = {
   bad:    "bg-fault/12 text-fault hover:bg-fault/20",
 };
 
-export function StatusChanger({ id, current, canApprove }: Props) {
+export function StatusChanger({ id, current, canApprove, leadId, leadName, leadMobile, leadEmail }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError]         = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectBox, setShowRejectBox] = useState(false);
+  const [showConvertLead, setShowConvertLead] = useState(false);
+
+  const isLeadScoped = !!leadId && current === "ACCEPTED";
 
   const allSteps = NEXT[current] ?? [];
   const nextSteps = allSteps.filter((s) => !s.requiresApprove || canApprove);
@@ -81,25 +89,47 @@ export function StatusChanger({ id, current, canApprove }: Props) {
     });
   }
 
-  if (nextSteps.length === 0) return null;
+  if (nextSteps.length === 0 && !isLeadScoped) return null;
 
   return (
     <div className="flex flex-col gap-2 items-end">
       <div className="flex items-center gap-2">
-        {nextSteps.map((s) => (
-          <button
-            key={s.to}
-            type="button"
-            disabled={pending}
-            onClick={() => commit(s)}
-            className={[
-              "h-[30px] px-3 rounded-[6px] text-[11.5px] font-medium transition-colors disabled:opacity-60",
-              s.tone ? TONE_CLS[s.tone] : "bg-surface border border-rule text-text-dim hover:text-text hover:bg-surface-hover",
-            ].join(" ")}
-          >
-            {s.label}
-          </button>
-        ))}
+        {isLeadScoped ? (
+          <>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setShowConvertLead(true)}
+              className="h-[30px] px-3 rounded-[6px] text-[11.5px] font-medium transition-colors disabled:opacity-60 bg-solid/12 text-solid hover:bg-solid/20"
+            >
+              Convert lead to client
+            </button>
+            <ConvertLeadModal
+              leadId={leadId!}
+              leadName={leadName ?? "Lead"}
+              mobile={leadMobile ?? ""}
+              email={leadEmail ?? null}
+              open={showConvertLead}
+              onClose={() => setShowConvertLead(false)}
+              afterConvert={() => { setShowConvertLead(false); router.refresh(); }}
+            />
+          </>
+        ) : (
+          nextSteps.map((s) => (
+            <button
+              key={s.to}
+              type="button"
+              disabled={pending}
+              onClick={() => commit(s)}
+              className={[
+                "h-[30px] px-3 rounded-[6px] text-[11.5px] font-medium transition-colors disabled:opacity-60",
+                s.tone ? TONE_CLS[s.tone] : "bg-surface border border-rule text-text-dim hover:text-text hover:bg-surface-hover",
+              ].join(" ")}
+            >
+              {s.label}
+            </button>
+          ))
+        )}
         {error && <div className="text-[11.5px] text-fault">{error}</div>}
       </div>
 
