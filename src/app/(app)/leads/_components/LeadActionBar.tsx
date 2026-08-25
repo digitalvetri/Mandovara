@@ -70,20 +70,21 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
           </button>
         )}
 
-        {/* Quick Quote — opens the builder in either client-scoped
-            (isConverted) or lead-scoped mode. Lead-scoped quotes leave
-            the lead as a lead; conversion is now a separate step. */}
+        {/* Rough Estimate — pre-measurement, ballpark price sent while
+            the client is still shopping around. The Firm Quotation
+            happens later on the project page after a real site
+            measurement (§ two-quote model). */}
         {!isLost && (
           <button
             type="button"
             onClick={doQuickQuote}
             className={btn("accent")}
             title={isConverted
-              ? "Open the Quick Quote builder for this client"
-              : "Draft a preliminary quote against this lead — no client/project created yet"}
+              ? "Send a rough (pre-measurement) estimate for this client"
+              : "Send a rough estimate — no measurement yet, no client/project created"}
           >
             <FileText size={14} strokeWidth={1.75} />
-            Quick Quote
+            Send Rough Estimate
           </button>
         )}
 

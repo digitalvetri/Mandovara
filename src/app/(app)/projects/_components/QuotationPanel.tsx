@@ -32,7 +32,7 @@ export function QuotationPanel({ projectId, data, canCreate }: Props) {
             className="inline-flex items-center gap-1.5 rounded-[8px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:bg-accent/90"
           >
             <Plus size={11} strokeWidth={2.6} />
-            New quotation
+            Send Firm Quotation
           </Link>
         )}
       </div>
@@ -63,7 +63,7 @@ export function QuotationPanel({ projectId, data, canCreate }: Props) {
       ) : (
         <div className="rounded-[10px] border border-dashed border-rule px-4 py-6 text-center text-[11.5px] text-text-dim">
           {canCreate
-            ? <>No quotations yet. Use <span className="text-text">New quotation</span> above once measurements are in.</>
+            ? <>No quotations yet. Use <span className="text-text">Send Firm Quotation</span> above once measurements are in.</>
             : <>No quotations yet.</>
           }
         </div>

@@ -91,7 +91,7 @@ export default async function ClientDetailPage({
           href={`/quotations/quick?client=${client.id}` as Route}
           className="inline-flex items-center gap-1.5 rounded-[8px] border border-rule bg-surface px-3 py-1.5 text-[12px] text-text-dim hover:text-text hover:border-accent/60 transition-colors"
         >
-          <Zap size={13} /> New quick quote
+          <Zap size={13} /> Send Rough Estimate
         </Link>
         {ctx.permissions.has("project.create") && (
           <Link
