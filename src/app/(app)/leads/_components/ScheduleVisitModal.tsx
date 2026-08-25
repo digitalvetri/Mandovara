@@ -4,7 +4,6 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createSiteVisit, listAssignableUsers, type AssignableUser } from "@/modules/site-visits/actions";
-import { changeLeadStage } from "@/modules/leads/actions";
 
 const PURPOSES = [
   { value: "INITIAL_SURVEY", label: "Initial Survey" },
@@ -13,17 +12,18 @@ const PURPOSES = [
   { value: "SUPERVISION",    label: "Supervision" },
 ];
 
-// Stages before VISIT_SCHEDULED — advance only from these.
-const EARLY_STAGES = new Set(["NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED"]);
-
 interface Props {
   open: boolean;
   onClose: () => void;
   leadId: string;
-  stage: string;
+  // Kept in the API for callsite compatibility. Since the lead stage
+  // simplification (25 Aug 2026) VISIT_SCHEDULED / CONTACTED / QUALIFIED
+  // are no longer sanctioned; scheduling a visit no longer moves the
+  // lead — it stays NEW until a quote is sent or the lead is converted.
+  stage?: string;
 }
 
-export function ScheduleVisitModal({ open, onClose, leadId, stage }: Props) {
+export function ScheduleVisitModal({ open, onClose, leadId }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -49,10 +49,9 @@ export function ScheduleVisitModal({ open, onClose, leadId, stage }: Props) {
         observations: (fd.get("observations") as string) || undefined,
       });
       if (!res.ok) { setError(res.error ?? "Could not schedule visit"); return; }
-
-      if (EARLY_STAGES.has(stage)) {
-        await changeLeadStage({ id: leadId, to: "VISIT_SCHEDULED" });
-      }
+      // Lead stage no longer auto-advances on visit scheduling — sanctioned
+      // stages are NEW/QUOTED/WON/LOST only. Visits are a pre-conversion
+      // touch; the lead stays NEW until a quote lands or it's converted.
       onClose();
       router.refresh();
     });
