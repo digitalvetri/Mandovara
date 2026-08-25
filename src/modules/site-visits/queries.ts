@@ -26,6 +26,11 @@ export interface SiteVisitDetail extends SiteVisitRow {
   photoKeys:     string[];
   startedAt:     Date | null;
   completedAt:   Date | null;
+  // Raw values needed by the stock-status panel (which only fires
+  // for HANDOVER + a project). `purpose` above is a display label,
+  // so the raw enum value ships alongside.
+  purposeRaw:    string;
+  projectId:     string | null;
 }
 
 const PURPOSE_LABEL: Record<string, string> = {
@@ -142,6 +147,7 @@ export async function getSiteVisit(
       id: true, number: true, purpose: true, scheduledAt: true, status: true,
       assignedToId: true, observations: true, checkInLat: true, checkInLng: true,
       customerNotes: true, photoKeys: true, startedAt: true, completedAt: true,
+      projectId: true,
       project: {
         select: {
           name: true,
@@ -171,5 +177,7 @@ export async function getSiteVisit(
     photoKeys:    v.photoKeys,
     startedAt:    v.startedAt,
     completedAt:  v.completedAt,
+    purposeRaw:   v.purpose,
+    projectId:    v.projectId ?? null,
   };
 }

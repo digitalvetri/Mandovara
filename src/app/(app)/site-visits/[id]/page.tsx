@@ -7,6 +7,7 @@ import { getSiteVisit } from "@/modules/site-visits/queries";
 import { formatDate } from "@/kernel/datetime";
 import { Calendar, MapPin, User, FileText, Camera, ArrowLeft } from "lucide-react";
 import { VisitStatusActions } from "./_components/VisitStatusActions";
+import { StockStatusPanel } from "./_components/StockStatusPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,14 @@ export default async function SiteVisitDetailPage({
         </section>
 
         <VisitStatusActions visitId={visit.id} status={visit.status} />
+
+        {/* Batch C (25 Aug 2026): HANDOVER visits show per-line stock
+            status so the owner sees at a glance what needs a PO before
+            completing the visit. Completing the visit auto-deducts
+            stock (updateSiteVisitStatus → deductStockForOrderOnHandover). */}
+        {visit.purposeRaw === "HANDOVER" && visit.projectId && (
+          <StockStatusPanel ctx={ctx} projectId={visit.projectId} />
+        )}
 
         {/* Notes */}
         {(hasObserved || hasCustomer) && (

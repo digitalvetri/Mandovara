@@ -169,6 +169,22 @@ export async function updateSiteVisitStatus(
             orderBy: { date: "desc" },
             select:  { id: true },
           });
+
+          // Batch C (25 Aug 2026) — auto-deduct stock when the HANDOVER
+          // visit completes. Reuses issueMaterialFromStock per order
+          // line for the outstanding quantity (best-effort per line —
+          // one line running short does not block the others). Any
+          // shortfall stays on the line's procuredQty gap; the visit
+          // page surfaces a "Raise PO" link for those.
+          if (order && ctx.permissions.has("project.materialIssue")) {
+            try {
+              const { deductStockForOrderOnHandover } = await import("@/modules/procurement/actions-handover");
+              await deductStockForOrderOnHandover({ orderId: order.id, actorId: ctx.userId, orgId: ctx.orgId });
+            } catch (deductErr) {
+              console.warn("auto stock-deduct on handover failed (best-effort):", deductErr);
+            }
+          }
+
           if (order && ctx.permissions.has("invoice.create")) {
             const { createInvoiceFromOrder } = await import("@/modules/invoices/actions-part2");
             const res = await createInvoiceFromOrder({ salesOrderId: order.id });
