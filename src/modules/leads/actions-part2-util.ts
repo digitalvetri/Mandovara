@@ -23,7 +23,13 @@ export function dbError<T>(e: unknown): ActionResult<T> {
   )) {
     return { ok: false, error: "Database is unavailable. Please ensure the database server is running and try again." };
   }
-  throw e;
+  // Surface the real Prisma / runtime error instead of letting Next.js
+  // swallow it into a generic "Something went wrong" toast. Owner needs
+  // the specific message to know what to fix (unique constraint, missing
+  // FK, RLS, etc). Only the first line — full stack goes to server log.
+  console.error("leads.dbError:", e);
+  const msg = e instanceof Error ? e.message : String(e);
+  return { ok: false, error: `Save failed: ${msg.split("\n")[0]}` };
 }
 
 export function normaliseMobile(m: string): string {
