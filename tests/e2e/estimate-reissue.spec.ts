@@ -6,7 +6,12 @@
 
 import { test, expect } from "@playwright/test";
 
-test.describe("estimate → firm quotation", () => {
+// Both tests here depend on the Estimate badge and "Reissue as firm
+// quotation" button in the quotation header. Both were deliberately
+// removed by a2cf285 (24 Aug 2026, owner's request). Keeping the file
+// so the intent survives if the feature comes back — but skipping the
+// specs so CI is not held hostage by obsolete UI assertions.
+test.describe.skip("estimate → firm quotation (feature removed 2026-08-24)", () => {
   test("a fresh lead-scoped estimate offers reissue but explains what is missing", async ({ page }) => {
     await page.goto("/quotations/estimate");
     const unique = `Reissue Probe ${Date.now()}`;

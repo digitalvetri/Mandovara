@@ -33,13 +33,12 @@ test.describe("free-text estimate", () => {
 
     await page.getByRole("button", { name: /create estimate/i }).click();
 
-    // Lands on the created document, visibly marked as an estimate.
+    // Lands on the created document.
     await page.waitForURL(/\/quotations\/[a-z0-9-]{20,}/i, { timeout: 20_000 });
     await expect(page.getByText(/MDV\/QT-/).first()).toBeVisible();
-    await expect(
-      page.getByText("Estimate", { exact: true }).first(),
-      "an un-measured quote must be badged so it is not mistaken for a firm one",
-    ).toBeVisible();
+    // The "Estimate" badge in the header was removed at owner's request
+    // (see a2cf285 — 24 Aug 2026). Creation still works and the record
+    // still exists; the badge just no longer surfaces in the header.
     await expect(page.getByText(unique).first()).toBeVisible();
   });
 
