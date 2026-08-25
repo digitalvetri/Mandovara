@@ -16,8 +16,8 @@ const LABEL: Record<QuotationStatus, string> = {
   APPROVED:         "Approved",
   SENT:             "Sent",
   REVISED:          "Revised",
-  ACCEPTED:         "Accepted",
-  REJECTED:         "Rejected",
+  ACCEPTED:         "Client Accepted",
+  REJECTED:         "Client Rejected",
   EXPIRED:          "Expired",
 };
 
