@@ -14,10 +14,22 @@ const PURPOSES = [
   { value: "HANDOVER",       label: "Handover" },
 ];
 
-interface Props { projects: ProjectSelectOption[] }
+interface Props {
+  projects: ProjectSelectOption[];
+  /** Auto-open the modal on mount (used by /site-visits/new to make the
+   *  "Book install visit" CTA land straight in the form). */
+  autoOpen?:         boolean;
+  defaultProjectId?: string;
+  defaultPurpose?:   string;
+  /** Where to send the user after they close/cancel. Defaults to reload
+   *  the current list, which is what the standalone list button wants. */
+  onCloseHref?:      string;
+}
 
-export function NewVisitButton({ projects }: Props) {
-  const [open, setOpen] = useState(false);
+export function NewVisitButton({
+  projects, autoOpen = false, defaultProjectId, defaultPurpose, onCloseHref,
+}: Props) {
+  const [open, setOpen] = useState(autoOpen);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<AssignableUser[]>([]);
@@ -44,24 +56,34 @@ export function NewVisitButton({ projects }: Props) {
       const res = await createSiteVisit(data);
       if (!res.ok) { setError(res.error ?? "Failed to create visit"); return; }
       setOpen(false);
-      router.refresh();
+      if (onCloseHref) router.push(onCloseHref as never);
+      else router.refresh();
     });
+  }
+
+  function handleClose() {
+    setOpen(false);
+    if (onCloseHref) router.push(onCloseHref as never);
   }
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="h-[32px] px-4 rounded-[8px] bg-accent text-ink text-[12px] font-semibold hover:bg-accent-strong transition-colors"
-      >
-        + Schedule Visit
-      </button>
+      {/* When autoOpen is true we're on the /new page — the modal IS the
+          page, so don't render the launcher button behind it. */}
+      {!autoOpen && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="h-[32px] px-4 rounded-[8px] bg-accent text-ink text-[12px] font-semibold hover:bg-accent-strong transition-colors"
+        >
+          + Schedule Visit
+        </button>
+      )}
 
       {open && (
         <div
           className="fixed inset-0 z-50 bg-ink/60 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setOpen(false)}
+          onClick={handleClose}
         >
           <form
             onSubmit={submit}
@@ -72,7 +94,7 @@ export function NewVisitButton({ projects }: Props) {
 
             <div className="space-y-3">
               <Field label="Purpose">
-                <select name="purpose" required className={inputCls}>
+                <select name="purpose" required defaultValue={defaultPurpose} className={inputCls}>
                   {PURPOSES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </Field>
@@ -82,7 +104,7 @@ export function NewVisitButton({ projects }: Props) {
               </Field>
 
               <Field label="Project (optional)">
-                <select name="projectId" className={inputCls}>
+                <select name="projectId" defaultValue={defaultProjectId ?? ""} className={inputCls}>
                   <option value="">— none —</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>{p.number} · {p.name}</option>
@@ -109,7 +131,7 @@ export function NewVisitButton({ projects }: Props) {
             {error && <div className="text-[11.5px] text-fault">{error}</div>}
 
             <div className="flex gap-2 justify-end pt-1">
-              <button type="button" onClick={() => setOpen(false)}
+              <button type="button" onClick={handleClose}
                 className="h-[32px] px-4 rounded-[7px] text-[12px] text-text-dim border border-rule hover:border-text-dim transition-colors">
                 Cancel
               </button>
