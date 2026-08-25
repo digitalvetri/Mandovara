@@ -66,9 +66,18 @@ export default function AppError({ error, reset }: Props) {
           Dashboard
         </Link>
       </div>
-      {process.env["NODE_ENV"] === "development" && error.digest && (
-        <p className="text-[11px] text-text-subtle font-data">{error.digest}</p>
-      )}
+      {/* Temporarily surface the underlying error message + digest in
+          prod too. Owner is hitting unexplained crashes and there's no
+          server-log access; the message is safe (no PII / secrets in
+          Prisma runtime errors) and the digest lets us correlate with
+          Coolify logs when we do get access. Roll back to dev-only
+          once the current class of bugs is understood. */}
+      <details className="mt-2 max-w-md text-left">
+        <summary className="cursor-pointer text-[11px] text-text-subtle hover:text-text-dim">Show details</summary>
+        <pre className="mt-1 rounded-[6px] bg-surface-2 border border-rule px-2 py-1 text-[10.5px] font-data whitespace-pre-wrap break-words text-text-dim">
+          {error.message}{error.digest ? `\n\ndigest: ${error.digest}` : ""}
+        </pre>
+      </details>
     </div>
   );
 }
