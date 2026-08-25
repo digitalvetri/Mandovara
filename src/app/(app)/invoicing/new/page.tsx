@@ -4,6 +4,10 @@
 // have a confirmed (non-COMPLETED, non-CANCELLED) order, grouped by project so
 // the user thinks "I need to invoice Dr. Kannan's villa" not "order SO-2608-0042".
 // The "Create Invoice" button calls createInvoiceFromOrder and routes to /invoicing/{id}.
+//
+// Accepts ?project=<projectId> to scope the picker to a single project when
+// the CTA comes from a project page — avoids the "find your project in a
+// global list" friction the owner flagged 2026-08-25.
 
 import Link from "next/link";
 import type { Route } from "next";
@@ -17,6 +21,8 @@ import { CreateInvoiceButton } from "../../orders/_components/CreateInvoiceButto
 
 export const dynamic = "force-dynamic";
 
+interface SearchParams { project?: string }
+
 const STATUS_LABEL: Record<string, string> = {
   CONFIRMED:        "Confirmed",
   PROCUREMENT:      "Procuring",
@@ -25,9 +31,12 @@ const STATUS_LABEL: Record<string, string> = {
   INSTALLING:       "Installing",
 };
 
-export default async function NewInvoicePage() {
+export default async function NewInvoicePage({
+  searchParams,
+}: { searchParams: Promise<SearchParams> }) {
+  const { project } = await searchParams;
   const ctx  = await devContext();
-  const rows = await listInvoiceableOrders(ctx);
+  const rows = await listInvoiceableOrders(ctx, project ? { projectId: project } : {});
 
   return (
     <>
@@ -43,7 +52,9 @@ export default async function NewInvoicePage() {
 
       <Topbar
         title="Create Invoice"
-        eyebrow="Pick the project to bill — invoices pull their lines, rates and totals from the confirmed order."
+        eyebrow={project
+          ? "One click below — invoice pulls its lines, rates and totals from this project's confirmed order."
+          : "Pick the project to bill — invoices pull their lines, rates and totals from the confirmed order."}
       />
 
       {rows.length === 0 ? (

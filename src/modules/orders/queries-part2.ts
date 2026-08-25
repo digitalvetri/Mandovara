@@ -183,6 +183,7 @@ export interface InvoiceableOrderRow {
  *  invoice per order is the business rule. */
 export async function listInvoiceableOrders(
   ctx: RequestContext,
+  opts: { projectId?: string } = {},
 ): Promise<InvoiceableOrderRow[]> {
   requirePermission(ctx, "order.view");
   const db = scoped(ctx);
@@ -199,6 +200,7 @@ export async function listInvoiceableOrders(
   const rows = await db.order.findMany({
     where: {
       status: { notIn: ["COMPLETED", "CANCELLED", "DRAFT"] },
+      ...(opts.projectId ? { projectId: opts.projectId } : {}),
       ...(invoicedIds.length > 0 ? { id: { notIn: invoicedIds } } : {}),
     },
     orderBy: { date: "desc" },

@@ -143,7 +143,9 @@ export function resolveNextAction(
           enabled,
           disabledReason: enabled ? null :
             "Invoices are raised by the accounts team.",
-          href: `/invoicing/new`,
+          // Project-scope the picker so the owner doesn't have to find
+          // their project in the global invoiceable-orders list.
+          href: `/invoicing/new?project=${id}`,
           subLine: "Invoice → advance → install.",
         };
       }
@@ -156,7 +158,9 @@ export function resolveNextAction(
           enabled,
           disabledReason: enabled ? null :
             "Receipts are recorded by the accounts team.",
-          href: `/accounts/new`,
+          // Pre-select the client so /accounts/new opens with their
+          // outstanding invoices already loaded and the amount ready.
+          href: clientId ? `/accounts/new?clientId=${clientId}` : `/accounts/new`,
           subLine: "Install is unlocked once the advance is in.",
         };
       }
