@@ -9,16 +9,25 @@ import { FileText, ArrowRight, Plus, ShoppingCart } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import type { ProjectQuotationsPanelData, ProjectQuotationRow } from "@/modules/projects/queries";
+import { SkipQuoteButton } from "./SkipQuoteButton";
 
 interface Props {
   projectId:   string;
   data:        ProjectQuotationsPanelData;
   canCreate:   boolean;
+  stage:       string;   // Batch B: needed to decide when "Skip firm quote" is offered.
 }
 
-export function QuotationPanel({ projectId, data, canCreate }: Props) {
+export function QuotationPanel({ projectId, data, canCreate, stage }: Props) {
   const { quotations, latestOrder } = data;
   const hasQuotes = quotations.length > 0;
+  // "Skip firm quote" is only meaningful before the project has
+  // progressed to Advance Awaited (ORDERED) — after that the flow is
+  // already past the quote decision. Also require canCreate since it's
+  // effectively a project.update action.
+  const canSkip = canCreate
+    && !latestOrder
+    && ["ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION"].includes(stage);
 
   return (
     <section className="rounded-[14px] border border-rule bg-surface p-5">
@@ -60,6 +69,11 @@ export function QuotationPanel({ projectId, data, canCreate }: Props) {
             ? <>No quotations yet. Use <span className="text-text">Send Firm Quotation</span> above once measurements are in.</>
             : <>No quotations yet.</>
           }
+          {canSkip && (
+            <div className="mt-2 flex justify-center">
+              <SkipQuoteButton projectId={projectId} />
+            </div>
+          )}
         </div>
       )}
 

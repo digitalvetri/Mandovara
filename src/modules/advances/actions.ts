@@ -56,6 +56,43 @@ export async function createAdvance(
     select: { id: true, amount: true },
   });
 
+  // Batch B (25 Aug 2026) — advance-payment gate. Once total advances
+  // for this project cover the required advance (or when no order
+  // exists yet, any positive advance), move project stage from
+  // ORDERED (Advance Awaited phase) → PROCUREMENT (Installation phase).
+  // Guarded — never regresses a project past Installation, never
+  // touches CANCELLED / COMPLETED.
+  try {
+    const [totalAdvancesAgg, requiredAgg, project] = await Promise.all([
+      db.advance.aggregate({
+        where:  { projectId: d.projectId },
+        _sum:   { amount: true },
+      }),
+      db.order.aggregate({
+        where:  { projectId: d.projectId, status: { not: "CANCELLED" } },
+        _sum:   { advanceRequired: true },
+      }),
+      db.project.findUnique({
+        where:  { id: d.projectId },
+        select: { stage: true },
+      }),
+    ]);
+    const totalReceived = totalAdvancesAgg._sum.amount ?? 0n;
+    const required      = requiredAgg._sum.advanceRequired ?? 0n;
+    const gateOpen      = totalReceived >= required;
+    const stageOk       = project?.stage === "ORDERED"
+                       || project?.stage === "QUOTATION"
+                       || project?.stage === "MEASUREMENT";
+    if (gateOpen && stageOk) {
+      await db.project.update({
+        where: { id: d.projectId },
+        data:  { stage: "PROCUREMENT" },  // → Installation phase
+      });
+    }
+  } catch (err) {
+    console.warn("advance-gate auto-advance failed (best-effort):", err);
+  }
+
   revalidatePath(`/projects/${d.projectId}`);
   revalidatePath("/accounts");
 

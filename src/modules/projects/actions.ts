@@ -142,6 +142,9 @@ export async function setProjectStatus(input: unknown): Promise<ActionResult<{ i
   return { ok: true, data: { id } };
 }
 
+// skipFirmQuote (Batch B, 25 Aug 2026) lives in ./actions-flow.ts to
+// keep this file under the 300-line boundary.
+
 export async function archiveProject(id: string): Promise<ActionResult> {
   const ctx = await devContext();
   requirePermission(ctx, "project.update");

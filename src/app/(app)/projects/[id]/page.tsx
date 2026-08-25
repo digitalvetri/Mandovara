@@ -145,6 +145,7 @@ export default async function ProjectDetailPage({
             projectId={p.id}
             data={quotesData}
             canCreate={ctx.permissions.has("quotation.create")}
+            stage={p.stage}
           />
           {payments && (
             <PaymentsPanel
