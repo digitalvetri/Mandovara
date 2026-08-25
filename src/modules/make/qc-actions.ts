@@ -94,47 +94,11 @@ export async function submitQC(
           data: { status: "COMPLETED" },
         });
 
-        // Auto-schedule the HANDOVER visit (Fix 5.B). Only fires when no
-        // future HANDOVER visit already exists for this project — otherwise
-        // the owner ends up with a duplicate to clean up. Default schedule
-        // is 3 days out at 10 AM IST; the owner can reschedule from the
-        // /site-visits page. Best-effort — a failure here does not roll
-        // back the QC pass.
-        const orderRow = await tx.order.findUnique({
-          where:  { id: job.orderId },
-          select: { projectId: true },
-        });
-        if (orderRow) {
-          const existing = await tx.siteVisit.count({
-            where: {
-              projectId: orderRow.projectId,
-              purpose:   "HANDOVER",
-              status:    { in: ["SCHEDULED", "IN_PROGRESS"] },
-            },
-          });
-          if (existing === 0) {
-            try {
-              const scheduledAt = new Date();
-              scheduledAt.setDate(scheduledAt.getDate() + 3);
-              scheduledAt.setHours(10, 0, 0, 0);
-              await tx.siteVisit.create({
-                data: {
-                  organizationId: ctx.orgId,
-                  number:         `MDV/SV-AUTO-${d.makeJobId.slice(-8)}`,
-                  projectId:      orderRow.projectId,
-                  purpose:        "HANDOVER",
-                  status:         "SCHEDULED",
-                  scheduledAt,
-                  assignedToId:   ctx.userId,
-                  observations:   `Auto-scheduled on QC pass of make job ${d.makeJobId}.`,
-                  photoKeys:      [],
-                },
-              });
-            } catch (autoErr) {
-              console.warn("auto-schedule HANDOVER visit failed:", autoErr);
-            }
-          }
-        }
+        // Auto-schedule of the HANDOVER visit was removed 25 Aug 2026
+        // at the owner's request — the +3-day default was arbitrary and
+        // forced a reschedule almost every time. The project page now
+        // surfaces a "Book install visit" CTA once every make job is
+        // done (see resolveNextAction for stage=MAKE with all-done).
       }
     }
   }, { orgId: ctx.orgId });

@@ -133,7 +133,26 @@ export function resolveNextAction(
       };
     }
 
-    case "MAKE":
+    case "MAKE": {
+      // When every make job is done, the natural next action is to book
+      // the install visit — no more auto-schedule at +3 days (owner
+      // asked for that removed 25 Aug 2026). If work is still in
+      // progress, surface the make-queue CTA as before.
+      const allDone =
+        project.makeInProgress != null &&
+        project.makeInProgress.total > 0 &&
+        project.makeInProgress.done >= project.makeInProgress.total;
+      if (allDone) {
+        return {
+          kind:  "SCHEDULE_INSTALL",
+          label: "Ready to install",
+          cta:   "Book install visit",
+          enabled: hasAny(ctx, ["sitelog.create", "project.update"]),
+          disabledReason: hasAny(ctx, ["sitelog.create", "project.update"]) ? null :
+            "Install visits are scheduled by the sales team.",
+          href: `/site-visits/new?projectId=${id}&purpose=HANDOVER`,
+        };
+      }
       return {
         kind:  "MAKE_IN_PROGRESS",
         label: "Cut & stitch in progress",
@@ -145,6 +164,7 @@ export function resolveNextAction(
           ? `${project.makeInProgress.done} of ${project.makeInProgress.total} done`
           : undefined,
       };
+    }
 
     case "COMPLETED":
       return {
@@ -195,48 +215,57 @@ export const STAGE_SHORT_LABEL: Record<string, string> = {
   CANCELLED:    "Cancelled",
 };
 
-// Customer-facing 4-phase view of the internal workflow. Owners think in
-// "site visit → measurement → make → completed"; the internal
-// ENQUIRY/QUOTATION/ORDERED/PROCUREMENT states are substeps within those.
-export type ProjectPhase = "SITE_VISIT" | "MEASUREMENT" | "MAKE" | "COMPLETED";
+// Customer-facing 5-phase view of the internal workflow (25 Aug 2026
+// owner redesign — see docs/PROJECT-FLOW-AUDIT.md). Owners and clients
+// think in these terms; the internal ORDERED / PROCUREMENT / MAKE
+// substates all roll up into "Work in Progress".
+export type ProjectPhase =
+  | "ENQUIRY"
+  | "MEASUREMENT"
+  | "QUOTATION"
+  | "WORK_IN_PROGRESS"
+  | "COMPLETED";
 
 export const PROJECT_PHASES: readonly ProjectPhase[] = [
-  "SITE_VISIT", "MEASUREMENT", "MAKE", "COMPLETED",
+  "ENQUIRY", "MEASUREMENT", "QUOTATION", "WORK_IN_PROGRESS", "COMPLETED",
 ];
 
 export const PHASE_LABEL: Record<ProjectPhase, string> = {
-  SITE_VISIT:   "Site Visit",
-  MEASUREMENT:  "Measurement",
-  MAKE:         "Make",
-  COMPLETED:    "Completed",
+  ENQUIRY:          "Enquiry",
+  MEASUREMENT:      "Measurement",
+  QUOTATION:        "Quotation",
+  WORK_IN_PROGRESS: "Work in Progress",
+  COMPLETED:        "Completed",
 };
 
 // The first internal stage jumped to when the user clicks a phase in the
 // stepper — lets a manual override still map cleanly onto ProjectStage.
 export const PHASE_TARGET_STAGE: Record<ProjectPhase, string> = {
-  SITE_VISIT:   "SITE_VISIT",
-  MEASUREMENT:  "MEASUREMENT",
-  MAKE:         "MAKE",
-  COMPLETED:    "COMPLETED",
+  ENQUIRY:          "ENQUIRY",
+  MEASUREMENT:      "MEASUREMENT",
+  QUOTATION:        "QUOTATION",
+  WORK_IN_PROGRESS: "ORDERED",    // first internal state in the WIP bucket
+  COMPLETED:        "COMPLETED",
 };
 
 export function phaseForStage(stage: string): ProjectPhase | "CANCELLED" {
   switch (stage) {
     case "ENQUIRY":
     case "SITE_VISIT":
-      return "SITE_VISIT";
+      return "ENQUIRY";
     case "MEASUREMENT":
-    case "QUOTATION":
       return "MEASUREMENT";
+    case "QUOTATION":
+      return "QUOTATION";
     case "ORDERED":
     case "PROCUREMENT":
     case "MAKE":
-      return "MAKE";
+      return "WORK_IN_PROGRESS";
     case "COMPLETED":
       return "COMPLETED";
     case "CANCELLED":
       return "CANCELLED";
     default:
-      return "SITE_VISIT";
+      return "ENQUIRY";
   }
 }
