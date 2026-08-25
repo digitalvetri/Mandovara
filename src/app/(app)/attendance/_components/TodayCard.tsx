@@ -167,8 +167,8 @@ export function TodayCard({
 
       <div className="px-5 py-4">
 
-        {/* ── Status badge ── */}
-        <div className="mb-5">
+        {/* ── Status + current time on same row ── */}
+        <div className="flex items-center justify-between mb-4">
           <StatusBadge
             notCheckedIn={notCheckedIn}
             isCheckedIn={isCheckedIn}
@@ -177,10 +177,11 @@ export function TodayCard({
             status={status}
             isLocked={isLocked}
           />
+          <span className="font-data tabular-nums text-[11.5px] text-text-muted">{currentTime}</span>
         </div>
 
-        {/* ── Time grid — 4 cells ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        {/* ── Time grid — 3 cells ── */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
           <TimeCell
             label="Check In"
             value={inAt ? fmtTimeISO(inAt) : "—"}
@@ -197,20 +198,6 @@ export function TodayCard({
             active={!!elapsed}
             mono
           />
-          <TimeCell label="Scheduled" value="09:00 AM" muted />
-        </div>
-
-        {/* ── Footer meta ── */}
-        <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-text-muted mb-5">
-          <span>
-            Current time:{" "}
-            <span className="font-data tabular-nums text-text">{currentTime}</span>
-          </span>
-          {isLocked && (
-            <span className="text-text-subtle flex items-center gap-1">
-              🔒 Locked — contact HR to correct
-            </span>
-          )}
         </div>
 
         {/* ── Primary action area ── */}

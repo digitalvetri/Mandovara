@@ -117,7 +117,7 @@ export function ActionArea({
         type="button"
         onClick={onCheckOut}
         disabled={pending}
-        className="w-full h-11 rounded-[10px] bg-heat/85 text-white text-[13.5px] font-semibold flex items-center justify-center gap-2 hover:bg-heat transition-colors active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full h-11 rounded-[10px] bg-fault text-white text-[13.5px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {pending
           ? <Loader2 size={16} className="animate-spin" />

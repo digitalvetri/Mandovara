@@ -11,7 +11,7 @@ export function SummaryChip({ label, value, color, bg }: { label: string; value:
         <p className="text-[10.5px] text-text-muted mb-0.5">{label}</p>
         <p className={`font-data tabular-nums text-[22px] font-semibold leading-none ${color}`}>{value}</p>
       </div>
-      <span className="text-[10px] text-text-subtle">days</span>
+      <span className="text-[10px] text-text-subtle">{value === 1 ? "day" : "days"}</span>
     </div>
   );
 }

@@ -5,7 +5,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Info, CalendarCheck2 } from "lucide-react";
+import { CalendarDays, ChevronRight, CalendarCheck2 } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
@@ -149,9 +149,9 @@ export async function SelfView({ ctx }: { ctx: Awaited<ReturnType<typeof devCont
                       {day}
                     </span>
                     {status ? (
-                      <span className={`mt-0.5 h-1.5 w-1.5 rounded-full ${calendarDotColor(status)}`} title={STATUS_LABEL[status]} />
+                      <span className={`mt-0.5 h-2 w-2 rounded-full ${calendarDotColor(status)}`} title={STATUS_LABEL[status]} />
                     ) : day < todayDay ? (
-                      <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-border/60" />
+                      <span className="mt-0.5 h-2 w-2 rounded-full bg-border/60" />
                     ) : null}
                   </div>
                 );
@@ -166,7 +166,7 @@ export async function SelfView({ ctx }: { ctx: Awaited<ReturnType<typeof devCont
                 { label: "Holiday",  cls: "bg-gold"   },
               ].map((l) => (
                 <div key={l.label} className="flex items-center gap-1">
-                  <span className={`h-1.5 w-1.5 rounded-full ${l.cls}`} />
+                  <span className={`h-2 w-2 rounded-full ${l.cls}`} />
                   <span className="text-[10px] text-text-subtle">{l.label}</span>
                 </div>
               ))}
@@ -306,17 +306,9 @@ export async function SelfView({ ctx }: { ctx: Awaited<ReturnType<typeof devCont
         </div>
       </div>
 
-      {/* ── CORRECTION INFO ── */}
-      <div className="rounded-[12px] border border-border/60 bg-surface-2/50 px-4 py-3.5 flex items-start gap-3 mb-8">
-        <Info size={14} strokeWidth={1.8} className="text-info shrink-0 mt-0.5" />
-        <div>
-          <p className="text-[12.5px] font-medium text-text mb-0.5">Forgot to check in or out?</p>
-          <p className="text-[12px] text-text-muted leading-relaxed">
-            Use the Mandovara mobile app to submit an attendance correction request,
-            or contact your HR manager. Corrections are reviewed by your supervisor before being applied.
-          </p>
-        </div>
-      </div>
+      <p className="mb-8 text-[11.5px] text-text-subtle text-center">
+        Missed a punch? Contact your HR manager — corrections require approval.
+      </p>
     </>
   );
 }
