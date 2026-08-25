@@ -123,7 +123,9 @@ export async function setPOStatus(
     where: { id },
     select: {
       status: true,
-      lines: { select: { receivedQty: true } },
+      number: true,
+      vendorId: true,
+      lines: { select: { receivedQty: true, rate: true } },
     },
   });
 
@@ -152,13 +154,62 @@ export async function setPOStatus(
     return { ok: false, error: `Cannot move PO from ${po.status} to ${status}` };
   }
 
-  await db.purchaseOrder.update({
-    where: { id },
-    data: {
-      status,
-      ...(status === "APPROVED" ? { approvedById: ctx.userId, approvedAt: new Date() } : {}),
-    },
-  });
+  await withTransaction(async (tx: TxClient) => {
+    await tx.purchaseOrder.update({
+      where: { id },
+      data: {
+        status,
+        ...(status === "APPROVED" ? { approvedById: ctx.userId, approvedAt: new Date() } : {}),
+      },
+    });
+
+    // A PARTIAL PO that gets cancelled still owes the vendor for goods already
+    // received. Auto-create an Expense for the received value so it surfaces in
+    // accounts payable. Guarded by sourcePoId unique constraint for idempotency.
+    if (status === "CANCELLED" && po.status === "PARTIAL") {
+      const receivedValue = po.lines.reduce((sum, l) => {
+        const qty = parseFloat(l.receivedQty.toString());
+        return sum + (l.rate * BigInt(Math.round(qty * 10_000))) / 10_000n;
+      }, 0n);
+      if (receivedValue > 0n) {
+        const vendor = await tx.vendor.findUnique({
+          where: { id: po.vendorId },
+          select: { name: true },
+        });
+        const vendorName = vendor?.name ?? "Vendor";
+        let branchId = ctx.branchIds[0];
+        if (!branchId) {
+          const anyBranch = await tx.branch.findFirst({
+            where: { organizationId: ctx.orgId },
+            select: { id: true },
+          });
+          branchId = anyBranch?.id;
+        }
+        if (branchId) {
+          try {
+            await tx.expense.create({
+              data: {
+                organizationId: ctx.orgId,
+                branchId,
+                head:          "Vendor payment",
+                subHead:       vendorName,
+                description:   `${po.number} — ${vendorName} (partial receipt, PO cancelled)`,
+                amount:        receivedValue,
+                incurredAt:    new Date(),
+                approvalState: "APPROVED",
+                paidAt:        null,
+                sourcePoId:    id,
+              },
+            });
+          } catch (e) {
+            const code = (e as { code?: string } | null)?.code;
+            if (code !== "P2002") throw e;
+          }
+        }
+      }
+    }
+  }, { orgId: ctx.orgId });
+
   revalidatePath("/purchase");
   revalidatePath(`/purchase/${id}`);
   return { ok: true, data: { id } };
