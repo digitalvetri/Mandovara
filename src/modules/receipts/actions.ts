@@ -9,7 +9,7 @@ import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { allocateReceiptToInvoice } from "@/kernel/accounts/allocate";
 import { computeOutstanding } from "@/kernel/money/outstanding";
 import { devContext } from "@/lib/dev-context";
-import { checkAndAdvanceStage } from "@/modules/projects/advance-gate";
+import { checkGateForReceipt } from "@/modules/projects/advance-gate";
 import { createReceiptSchema, bounceReceiptSchema, clearChequeSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -153,14 +153,14 @@ export async function createReceipt(
     return receipt;
   }, { orgId: ctx.orgId });
 
-  // Owner canonical flow: after the invoice's advance is received, the
-  // project moves ORDERED → PROCUREMENT (customer-facing "Installation"
-  // phase). Runs on the scoped client outside the tx so a gate failure
-  // never rolls back the receipt itself.
-  if (d.projectId) {
-    await checkAndAdvanceStage(db, d.projectId);
-    revalidatePath(`/projects/${d.projectId}`);
-  }
+  // Advance-gate: derive projects from allocated invoices (PaymentSheet
+  // doesn't pass projectId), move them to Installation when the required
+  // advance is met. Best-effort; runs outside the tx.
+  const gated = await checkGateForReceipt(db, {
+    receiptProjectId: d.projectId ?? null,
+    invoiceIds:       allocationPairs.map((a) => a.invoiceId),
+  });
+  for (const pid of gated) revalidatePath(`/projects/${pid}`);
 
   revalidatePath("/receipts");
   revalidatePath("/invoicing");

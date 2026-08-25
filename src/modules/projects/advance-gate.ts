@@ -16,6 +16,26 @@ type Db = ReturnType<typeof scoped> | TxClient;
 
 const ADVANCE_ELIGIBLE_STAGES = new Set(["QUOTATION", "MEASUREMENT", "ORDERED"]);
 
+/** Run the gate for every project touched by a receipt — a receipt row
+ *  usually has no projectId, but its allocated invoices do. Returns the
+ *  set of project IDs it evaluated so the caller can revalidate paths. */
+export async function checkGateForReceipt(
+  db:                Db,
+  opts: { receiptProjectId: string | null; invoiceIds: string[] },
+): Promise<string[]> {
+  const projectIds = new Set<string>();
+  if (opts.receiptProjectId) projectIds.add(opts.receiptProjectId);
+  if (opts.invoiceIds.length > 0) {
+    const invs = await db.invoice.findMany({
+      where:  { id: { in: opts.invoiceIds } },
+      select: { projectId: true },
+    });
+    for (const inv of invs) if (inv.projectId) projectIds.add(inv.projectId);
+  }
+  for (const pid of projectIds) await checkAndAdvanceStage(db, pid);
+  return [...projectIds];
+}
+
 export async function checkAndAdvanceStage(
   db:        Db,
   projectId: string,
