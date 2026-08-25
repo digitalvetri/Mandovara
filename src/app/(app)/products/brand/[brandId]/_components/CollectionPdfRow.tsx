@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Upload, Trash2, CheckCircle2, AlertCircle, X } from "lucide-react";
-import { uploadCollectionPdf, removeCollectionPdf, deleteCollection } from "@/modules/catalog/pdf-actions";
+import { uploadCollectionPdf, deleteCollection } from "@/modules/catalog/pdf-actions";
 import { PdfViewerModal } from "./PdfViewerModal";
 
 const FAMILY_LABELS: Record<string, string> = {
@@ -32,7 +32,6 @@ interface Props {
 export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, startUpload]   = useTransition();
-  const [removing,  startRemove]   = useTransition();
   const [deleting,  startDelete]   = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -40,7 +39,7 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
   const hasPdf     = !!c.catalogPdfKey;
   const isEmpty    = c._count.designs === 0;
   const canDestroy = canDelete && isEmpty;
-  const busy       = uploading || removing || deleting;
+  const busy       = uploading || deleting;
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -59,14 +58,6 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
       const res = await uploadCollectionPdf(fd);
       if (fileRef.current) fileRef.current.value = "";
       if (!res.ok) setUploadError(res.error ?? "PDF upload failed.");
-    });
-  }
-
-  function handleRemove() {
-    setUploadError(null);
-    startRemove(async () => {
-      const res = await removeCollectionPdf(c.id);
-      if (!res.ok) setUploadError(res.error ?? "Failed to remove PDF.");
     });
   }
 
@@ -144,22 +135,6 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
               <Upload size={13} strokeWidth={1.75} />
               {uploading ? "Uploading…" : hasPdf ? "Replace" : "Upload"}
             </button>
-
-            {hasPdf && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleRemove}
-                className="h-8 w-8 flex items-center justify-center rounded-[7px] text-text-dim/60 border border-rule hover:text-fault hover:border-fault/40 disabled:opacity-50 transition-colors shrink-0"
-                aria-label={`Remove PDF for ${c.name}`}
-              >
-                {removing ? (
-                  <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                ) : (
-                  <Trash2 size={13} strokeWidth={1.75} />
-                )}
-              </button>
-            )}
           </>
         )}
 
