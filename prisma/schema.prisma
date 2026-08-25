@@ -1521,10 +1521,18 @@ model Invoice {
   cancelledAt       DateTime?
   cancelReason      String?
 
+  // Credit-note metadata. Populated when type = CREDIT_NOTE:
+  //   creditNoteReason — GST audit trail; free-text reason the CN was raised
+  //   originalInvoiceId — the TAX invoice this CN reverses (self-reference id,
+  //                       no FK relation to keep the schema flat)
+  creditNoteReason  String?
+  originalInvoiceId String?
+
   lines InvoiceLine[]
 
   @@unique([organizationId, branchId, number])
   @@index([organizationId, clientId, status])
+  @@index([organizationId, originalInvoiceId])
 }
 
 model InvoiceLine {

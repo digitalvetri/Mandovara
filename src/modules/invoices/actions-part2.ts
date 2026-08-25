@@ -223,8 +223,6 @@ export async function createCreditNote(
     amount:      (-l.amount).toString(),
   }));
 
-  void reason;
-
   return createInvoice({
     orderId:           inv.orderId,
     branchId:          inv.branchId,
@@ -233,6 +231,8 @@ export async function createCreditNote(
     dueDate:           toDate(now),
     placeOfSupplyCode: inv.placeOfSupplyCode,
     lines,
+    creditNoteReason:  reason,
+    originalInvoiceId: inv.id,
   });
 }
 

@@ -44,6 +44,9 @@ export const createInvoiceSchema = z.object({
   dueDate:           isoDate,
   placeOfSupplyCode: z.string().min(2).max(2),
   lines:             z.array(invoiceLineInput).min(1, "At least one line required"),
+  // Only populated when type = CREDIT_NOTE — see createCreditNote.
+  creditNoteReason:  z.string().trim().min(3).max(500).optional(),
+  originalInvoiceId: z.string().min(1).optional(),
 });
 
 export const cancelInvoiceSchema = z.object({

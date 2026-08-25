@@ -132,7 +132,7 @@ export default async function InvoiceDetailPage({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {canCreditNote && <CreditNoteButton invoiceId={inv.id} />}
+              {canCreditNote && <CreditNoteButton invoiceId={inv.id} invoiceNumber={inv.number} />}
               {canCancel && (
                 <CancelInvoiceButton id={inv.id} number={inv.number} createdAt={inv.date} />
               )}

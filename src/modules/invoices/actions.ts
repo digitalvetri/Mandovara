@@ -110,10 +110,12 @@ export async function createInvoice(
       const outstanding0  = total - advanceAdjusted;
       const initialStatus = outstanding0 <= 0n ? "PAID" : "ISSUED";
 
-      // Allocate invoice number gap-free inside the same transaction
+      // Allocate invoice number gap-free inside the same transaction.
+      // Credit notes get their own "CN" series so a glance at the number
+      // distinguishes them from tax invoices — matters for GSTR-1 audit.
       const number = await allocateNumber(tx, {
         orgId:  ctx.orgId,
-        series: "INV",
+        series: d.type === "CREDIT_NOTE" ? "CN" : "INV",
         yymm,
         prefix: branch.invoicePrefix,
       });
@@ -139,6 +141,8 @@ export async function createInvoice(
           advanceAdjusted,
           status:            initialStatus,
           irnStatus:         "NOT_REQUIRED",
+          ...(d.creditNoteReason  != null && { creditNoteReason:  d.creditNoteReason  }),
+          ...(d.originalInvoiceId != null && { originalInvoiceId: d.originalInvoiceId }),
         },
         select: { id: true, number: true },
       });
