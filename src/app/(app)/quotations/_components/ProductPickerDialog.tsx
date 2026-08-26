@@ -40,7 +40,7 @@ export function ProductPickerDialog({ open, onClose, onPick, family }: Props) {
     inputRef.current?.focus();
     // initial load with empty query — shows a starter set
     start(async () => {
-      const r = await searchColourwaysForPicker({ family: activeFamily, limit: 20 });
+      const r = await searchColourwaysForPicker({ family: activeFamily, limit: 100 });
       setRows(r);
     });
   }, [open, activeFamily]);
@@ -49,7 +49,7 @@ export function ProductPickerDialog({ open, onClose, onPick, family }: Props) {
     if (!open) return;
     const t = setTimeout(() => {
       start(async () => {
-        const r = await searchColourwaysForPicker({ q, family: activeFamily, limit: 30 });
+        const r = await searchColourwaysForPicker({ q, family: activeFamily, limit: 200 });
         setRows(r);
       });
     }, 220);

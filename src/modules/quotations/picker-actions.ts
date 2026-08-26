@@ -18,7 +18,7 @@ const querySchema = z.object({
   q:       z.string().trim().max(120).optional(),
   brandId: z.string().min(20).max(64).optional(),
   family:  z.string().trim().max(50).optional(),
-  limit:   z.number().int().positive().max(50).default(25),
+  limit:   z.number().int().positive().max(200).default(100),
 });
 
 export async function searchColourwaysForPicker(input: unknown): Promise<PickerRow[]> {
