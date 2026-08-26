@@ -29,46 +29,29 @@ function todayLabel() {
     weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata",
   });
 }
+
 export default async function EmployeeDashboardPage() {
   const ctx = await devContext();
   const db  = scoped(ctx);
 
-  // Primary lookup: Employee.userId → User.id (set when the user logs in for
-  // the first time or when HR links the account). Fallback: match by mobile,
-  // since mobile is the identity primary key on both tables and Employee rows
-  // created before account linking will still have it.
   let employee = await db.employee.findUnique({
     where:  { userId: ctx.userId },
     select: { id: true, name: true, designation: true, department: true, code: true },
   });
 
   if (!employee) {
-    const user = await db.user.findUnique({
-      where:  { id: ctx.userId },
-      select: { mobile: true, organizationId: true },
-    });
+    const user = await db.user.findUnique({ where: { id: ctx.userId }, select: { mobile: true, organizationId: true } });
     if (user) {
       employee = await db.employee.findFirst({
         where:  { mobile: user.mobile, organizationId: user.organizationId },
         select: { id: true, name: true, designation: true, department: true, code: true },
       });
-      // Back-fill the userId link so the primary lookup works next time.
-      if (employee) {
-        await db.employee.update({
-          where: { id: employee.id },
-          data:  { userId: ctx.userId },
-        });
-      }
+      if (employee) await db.employee.update({ where: { id: employee.id }, data: { userId: ctx.userId } });
     }
   }
 
-  // No employee record linked yet — show a minimal greeting so the page
-  // doesn't crash in production when HR hasn't linked the account.
   if (!employee) {
-    const user = await db.user.findUnique({
-      where:  { id: ctx.userId },
-      select: { name: true },
-    });
+    const user = await db.user.findUnique({ where: { id: ctx.userId }, select: { name: true } });
     const name = user?.name ?? "there";
     const initials = name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
     return (
@@ -76,23 +59,14 @@ export default async function EmployeeDashboardPage() {
         <Topbar title="Dashboard" eyebrow={todayLabel()} />
         <div className="relative overflow-hidden rounded-[16px] bg-sidebar text-sidebar-text mb-5">
           <div aria-hidden className="pointer-events-none absolute inset-0 chrome-veil" />
-          <div aria-hidden className="pointer-events-none absolute inset-0 hero-facets" />
-          <div className="relative z-10 px-6 py-6 sm:px-8 sm:py-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] font-medium tracking-[0.04em] text-sidebar-dim">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-chrome" />
-              {todayLabel()}
+          <div className="relative z-10 px-6 py-6 sm:px-8 sm:py-7 flex items-center gap-4">
+            <div className="h-14 w-14 rounded-full border border-accent-chrome/30 bg-accent-chrome/15 flex items-center justify-center shrink-0">
+              <span className="font-display text-[20px] font-semibold text-accent-chrome">{initials}</span>
             </div>
-            <div className="mt-5 flex items-center gap-4">
-              <div className="h-14 w-14 rounded-full border border-accent-chrome/30 bg-accent-chrome/15 flex items-center justify-center shrink-0">
-                <span className="font-display text-[20px] font-semibold text-accent-chrome">{initials}</span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[12.5px] text-sidebar-dim">{greet()},</p>
-                <h1 className="font-display text-[26px] sm:text-[30px] font-[560] leading-[1.18] tracking-[-0.015em] text-sidebar-text truncate">
-                  {name}
-                </h1>
-                <p className="mt-0.5 text-[12px] text-sidebar-dim">Your employee profile is being set up.</p>
-              </div>
+            <div className="min-w-0">
+              <p className="text-[12.5px] text-sidebar-dim">{greet()},</p>
+              <h1 className="font-display text-[26px] sm:text-[30px] font-[560] leading-[1.18] tracking-[-0.015em] text-sidebar-text truncate">{name}</h1>
+              <p className="mt-0.5 text-[12px] text-sidebar-dim">Your employee profile is being set up.</p>
             </div>
           </div>
         </div>
@@ -104,8 +78,7 @@ export default async function EmployeeDashboardPage() {
   const today      = todayIST();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-
-  const tomorrow = new Date(today.getTime() + 86_400_000);
+  const tomorrow   = new Date(today.getTime() + 86_400_000);
   const [todayAttendance, monthRows, leaveRows, taskCount, siteVisitCount, followUpCount] = await Promise.all([
     db.attendance.findUnique({
       where:  { employeeId_date: { employeeId: employee.id, date: today } },
@@ -126,38 +99,28 @@ export default async function EmployeeDashboardPage() {
     db.followUp.count({ where: { ownerId: ctx.userId, completedAt: null } }),
   ]);
 
-  const presentDays  = monthRows.filter((r) => r.status === "PRESENT").length;
-  const halfDays     = monthRows.filter((r) => r.status === "HALF_DAY").length;
-  const absentDays   = monthRows.filter((r) => r.status === "ABSENT").length;
-  const leaveDays    = monthRows.filter((r) => r.status === "LEAVE").length;
-  const daysElapsed  = now.getUTCDate();
-
+  const presentDays    = monthRows.filter((r) => r.status === "PRESENT").length;
+  const halfDays       = monthRows.filter((r) => r.status === "HALF_DAY").length;
+  const absentDays     = monthRows.filter((r) => r.status === "ABSENT").length;
+  const leaveDays      = monthRows.filter((r) => r.status === "LEAVE").length;
+  const daysElapsed    = now.getUTCDate();
   const approvedLeaves = leaveRows.filter((l) => l.state === "APPROVED");
   const pendingLeaves  = leaveRows.filter((l) => l.state === "PENDING");
   const leavesTaken    = approvedLeaves.reduce((s, l) => s + Number(l.days), 0);
-
-  const workParts = [taskCount > 0 && `${taskCount} Task${taskCount !== 1 ? "s" : ""}`, siteVisitCount > 0 && `${siteVisitCount} Site Visit${siteVisitCount !== 1 ? "s" : ""}`, followUpCount > 0 && `${followUpCount} Follow-up${followUpCount !== 1 ? "s" : ""}`].filter(Boolean).join(" · ");
-  const initials = employee.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  const monthLabel = `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
+  const initials       = employee.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const monthLabel     = `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
+  const hasFocus       = taskCount > 0 || siteVisitCount > 0 || followUpCount > 0;
 
   return (
     <>
       <Topbar title="Dashboard" eyebrow={todayLabel()} />
 
-      {/* ── Hero band — dark card like the owner DaySummary ──────── */}
+      {/* ── Hero — identity + attendance only ── */}
       <div className="relative overflow-hidden rounded-[16px] bg-sidebar text-sidebar-text mb-5">
         <div aria-hidden className="pointer-events-none absolute inset-0 chrome-veil" />
         <div aria-hidden className="pointer-events-none absolute inset-0 hero-facets" />
-
         <div className="relative z-10 px-6 py-6 sm:px-8 sm:py-7">
-          {/* Date pill */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] font-medium tracking-[0.04em] text-sidebar-dim">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-chrome" />
-            {todayLabel()}
-          </div>
-
-          {/* Avatar + Greeting + Name */}
-          <div className="mt-5 flex items-center gap-4">
+          <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-full border border-accent-chrome/30 bg-accent-chrome/15 flex items-center justify-center shrink-0">
               <span className="font-display text-[20px] font-semibold text-accent-chrome">{initials}</span>
             </div>
@@ -173,40 +136,39 @@ export default async function EmployeeDashboardPage() {
               </p>
             </div>
           </div>
-          <div className="mt-3">
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.10em] text-sidebar-dim/50 mb-1">Today's Focus</p>
-            {workParts ? <p className="text-[12px] text-sidebar-dim/80">{workParts}</p> : <><p className="text-[12px] font-medium text-sidebar-text/60">You're all caught up today.</p><p className="text-[11px] text-sidebar-dim/50 mt-0.5">No tasks, site visits or follow-ups need your attention.</p></>}
-          </div>
-          {/* Attendance CTA — GPS-aware, stays on this page */}
           <AttendanceCTA
             initialInAt={todayAttendance?.inAt?.toISOString() ?? null}
             initialOutAt={todayAttendance?.outAt?.toISOString() ?? null}
             initialStatus={todayAttendance?.status ?? null}
             isLocked={!!todayAttendance?.lockedAt}
           />
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {[
-              { href: "/tasks",    label: "My Tasks",    icon: <ListTodo  size={13} strokeWidth={2} /> },
-              { href: "/projects", label: "My Projects", icon: <Briefcase size={13} strokeWidth={2} /> },
-            ].map(({ href, label, icon }) => (
-              <Link
-                key={href}
-                href={href as Route}
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-1.5 text-[12px] font-medium text-sidebar-text hover:bg-white/[0.13] transition-colors"
-              >
-                <span className="text-accent-chrome">{icon}</span>
-                {label}
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* ── Stats row ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+      {/* ── Today's Focus + quick links ── */}
+      <div className="rounded-[14px] border border-rule bg-surface p-5 mb-5">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.10em] text-text-dim mb-3">Today&apos;s Focus</p>
+        {hasFocus ? (
+          <div className="flex flex-wrap gap-2">
+            {taskCount > 0 && <FocusChip label={`${taskCount} Task${taskCount !== 1 ? "s" : ""}`} />}
+            {siteVisitCount > 0 && <FocusChip label={`${siteVisitCount} Site Visit${siteVisitCount !== 1 ? "s" : ""}`} />}
+            {followUpCount > 0 && <FocusChip label={`${followUpCount} Follow-up${followUpCount !== 1 ? "s" : ""}`} />}
+          </div>
+        ) : (
+          <p className="text-[12.5px] text-text-dim">You&apos;re all caught up. Nothing needs your attention today.</p>
+        )}
+        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-rule">
+          <Link href={"/tasks" as Route} className="inline-flex items-center gap-2 rounded-full border border-rule px-3.5 py-1.5 text-[12px] font-medium text-text-dim hover:text-text transition-colors">
+            <ListTodo size={13} strokeWidth={2} className="text-accent" />My Tasks
+          </Link>
+          <Link href={"/projects" as Route} className="inline-flex items-center gap-2 rounded-full border border-rule px-3.5 py-1.5 text-[12px] font-medium text-text-dim hover:text-text transition-colors">
+            <Briefcase size={13} strokeWidth={2} className="text-accent" />My Projects
+          </Link>
+        </div>
+      </div>
 
-        {/* Month attendance */}
+      {/* ── Stats row ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
         <div className="rounded-[14px] border border-rule bg-surface overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-3.5 border-b border-rule">
             <TrendingUp size={13} strokeWidth={2} className="text-accent" />
@@ -219,8 +181,6 @@ export default async function EmployeeDashboardPage() {
             <MonthBar label="On leave" value={leaveDays}   total={daysElapsed} barColor="bg-info"   numColor="text-info" />
           </div>
         </div>
-
-        {/* Leave summary */}
         <div className="rounded-[14px] border border-rule bg-surface overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-3.5 border-b border-rule">
             <FileText size={13} strokeWidth={2} className="text-accent" />
@@ -231,10 +191,7 @@ export default async function EmployeeDashboardPage() {
             <LeaveRow label="Pending approval"   value={pendingLeaves.length}  color="text-heat"  />
             <LeaveRow label="Total days taken"   value={leavesTaken}           color="text-text"  />
             <div className="pt-2">
-              <Link
-                href={"/leave/apply" as Route}
-                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:underline"
-              >
+              <Link href={"/leave/apply" as Route} className="inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:underline">
                 Apply for leave →
               </Link>
             </div>
@@ -242,7 +199,7 @@ export default async function EmployeeDashboardPage() {
         </div>
       </div>
 
-      {/* ── Leave requests ──────────────────────────────────────────── */}
+      {/* ── Leave requests ── */}
       {leaveRows.length > 0 && (
         <div className="rounded-[14px] border border-rule bg-surface overflow-hidden">
           <div className="px-5 py-3.5 border-b border-rule">
@@ -272,6 +229,14 @@ export default async function EmployeeDashboardPage() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function FocusChip({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-rule bg-surface-2 px-3 py-1 text-[12px] font-medium text-text">
+      {label}
+    </span>
+  );
+}
 
 function MonthBar({ label, value, total, barColor, numColor }: {
   label: string; value: number; total: number; barColor: string; numColor: string;
