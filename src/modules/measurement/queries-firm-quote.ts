@@ -14,6 +14,7 @@ export interface FirmQuoteItem {
   roomName:          string;
   floorLabel:        string | null;
   label:             string;      // owner-visible "e.g. Curtain, Master BR"
+  notes:             string | null;  // owner's free-text notes from measurement
   family:            string;
   materialQty:       string;      // Decimal.toString(), 3dp
   materialUnit:      string;      // SellUnit
@@ -72,7 +73,7 @@ export async function listItemsForFirmQuote(
     where:   { measurementId: { in: headRoundIds } },
     orderBy: [{ room: { sortOrder: "asc" } }, { label: "asc" }],
     select: {
-      id: true, label: true, family: true, measurementId: true,
+      id: true, label: true, notes: true, family: true, measurementId: true,
       room: { select: { name: true, floorLabel: true } },
       calc: {
         select: {
@@ -119,6 +120,7 @@ export async function listItemsForFirmQuote(
       roomName:          it.room.name,
       floorLabel:        it.room.floorLabel,
       label:             it.label,
+      notes:             it.notes ?? null,
       family:            it.family,
       materialQty:       it.calc?.materialQty.toString() ?? "1.000",
       materialUnit:      it.calc?.materialUnit ?? "PIECE",

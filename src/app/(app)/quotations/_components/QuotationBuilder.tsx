@@ -44,8 +44,15 @@ function lineFromMeasurement(m: FirmQuoteItem): LineInput {
   const productLabel = m.colourwayId
     ? `${m.designName} — ${m.colourName} (${m.colourwayCode})`
     : undefined;
+  // Notes from the measurement (owner's free-text jotted at measurement time
+  // — often "5m dark grey linen", "sample #4", etc.) roll into the line
+  // description so the "note first, product later" flow doesn't lose context.
+  const baseLabel = `${m.label} — ${roomLabel}`;
+  const description = m.notes && m.notes.trim()
+    ? `${baseLabel} — ${m.notes.trim()}`
+    : baseLabel;
   return {
-    description:       `${m.label} — ${roomLabel}`,
+    description,
     quantity:          m.materialQty,
     unit:              m.materialUnit,
     rate:              rateRupees > 0 ? rateRupees.toFixed(2) : "",
@@ -146,14 +153,13 @@ export function QuotationBuilder({ projectId, leadId, leadName, branches, preloa
 
   function onSave() {
     setServerError(null);
-    // A measurement row is valid iff a product is picked; manual rows
-    // need description + rate.
-    const valid = lines.filter((l) => (
-      l.measurementItemId
-        ? l.colourwayId && l.rate.trim()
-        : l.description.trim() && l.rate.trim()
-    ));
-    if (!valid.length) { setServerError("Add at least one line with a product picked and rate."); return; }
+    // Save-time validation: every line needs description + rate. Product
+    // pick (colourwayId) is optional at save — measurement rows can be
+    // drafted with the auto-generated description ("<label> — <room>")
+    // and a rate, and the product can be chosen later before sending.
+    // The send transition is where "must have a product" belongs, not here.
+    const valid = lines.filter((l) => l.description.trim() && l.rate.trim());
+    if (!valid.length) { setServerError("Add at least one line with description and rate."); return; }
     if (!branchId) { setServerError("Select a branch."); return; }
     if (placeOfSupplyCode.length !== 2) { setServerError("State code must be 2 digits."); return; }
 
