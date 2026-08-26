@@ -1,164 +1,129 @@
 import { StyleSheet } from "@react-pdf/renderer";
 
-export const BRAND  = "#1B8A7E";
-export const BRANDL = "#D1EDE9";
-export const WHITE  = "#FFFFFF";
-export const INK    = "#111827";
-export const MUTED  = "#6B7280";
-export const RULE   = "#E5E7EB";
-export const STRIP  = "#F8FAFB";
-export const DARK   = "#0E1F1D";
+// Owner redesign (2026-08-26): the quotation PDF now matches the
+// hand-crafted samples the owner used to send — branded banner header,
+// yellow customer/location bars, tight 5-column table (ITEM · Unit ·
+// QTY · RATE · AMT), red TOTAL, and two blocks of prose T&C + refund
+// policy. GST breakdown, party boxes, payment schedule, bank details,
+// signature block, and page footer are dropped — the owner wanted the
+// customer-facing document to look like an interior-decor estimate,
+// not a GST tax invoice.
 
-// Cropped logo aspect ratio: 492 × 139 → 3.54 : 1
-// At width 280 → height 79  (fills the container with no whitespace wasted)
+// Palette
+export const INK     = "#111827";
+export const MUTED   = "#4B5563";
+export const RULE    = "#111827";     // heavy black rules like the sample
+export const RULE_LT = "#D1D5DB";
+export const WHITE   = "#FFFFFF";
+export const YELLOW  = "#FFF200";     // matches sample highlight bar
+export const RED     = "#D0021B";     // matches sample table header + TOTAL
+export const BRAND   = "#1B8A7E";     // Mandovara teal, used only in header
 
 export const pdfStyles = StyleSheet.create({
   page: {
-    fontFamily: "Geist", fontSize: 9, color: INK,
+    fontFamily: "Geist", fontSize: 10, color: INK,
     backgroundColor: WHITE,
-    paddingTop: 0, paddingBottom: 52, paddingHorizontal: 0,
+    paddingTop: 0, paddingBottom: 24, paddingHorizontal: 0,
   },
 
-  // ── stripe ───────────────────────────────────────────────────────
-  stripe: { height: 6, backgroundColor: BRAND },
-
-  // ── header ───────────────────────────────────────────────────────
-  // alignItems: flex-start so logo and right meta both top-align, preventing
-  // the logo from floating vertically when the right column is taller.
-  header: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start",
-    paddingHorizontal: 32, paddingTop: 18, paddingBottom: 16,
-    borderBottomWidth: 0.75, borderBottomColor: RULE,
+  // ── Branded header banner ───────────────────────────────────────
+  banner: {
+    flexDirection: "row", alignItems: "center", gap: 18,
+    paddingHorizontal: 28, paddingTop: 22, paddingBottom: 20,
+    borderBottomWidth: 1, borderBottomColor: RULE,
+    backgroundColor: "#FAFAFA",
   },
-  // The source PNG is a square with heavy white padding around the mark.
-  // objectFit:"cover" scales it to fill the container width (200pt) → rendered
-  // height = 200pt on a square image, of which we show the centre 90pt strip —
-  // revealing the butterfly + wordmark while clipping the surrounding whitespace.
-  logoImg:     { width: 200, height: 66, objectFit: "cover", objectPosition: "center center" },
-  logoTagline: { fontSize: 6.5, color: MUTED, letterSpacing: 1.8, marginTop: 4, paddingLeft: 22 },
+  bannerLogoWrap:  { width: 132 },
+  bannerLogoImg:   { width: 132, height: 44, objectFit: "contain" },
+  bannerRight:     { flex: 1, alignItems: "flex-start" },
+  bannerName:      { fontSize: 15, fontWeight: "bold", color: INK, letterSpacing: 0.3 },
+  bannerNameRow:   { flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 6 },
+  bannerRole:      { fontSize: 8, color: MUTED, letterSpacing: 1.6 },
+  bannerContact:   { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 2 },
+  bannerContactRow:{ flexDirection: "row", alignItems: "center", gap: 4 },
+  bannerContactIco:{ fontSize: 8, color: BRAND, fontWeight: "bold" },
+  bannerContactTxt:{ fontSize: 8, color: INK },
+  bannerAddr:      { fontSize: 8, color: INK, marginTop: 4 },
 
-  // right side of header
-  headerMeta: { alignItems: "flex-end" },
-  docBadge: {
-    backgroundColor: BRAND, color: WHITE, fontSize: 7, fontWeight: "bold",
-    letterSpacing: 2, paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 3, marginBottom: 9, alignSelf: "flex-end",
+  // ── Yellow highlight bars ───────────────────────────────────────
+  yellowBar: {
+    backgroundColor: YELLOW,
+    borderLeftWidth: 1, borderRightWidth: 1, borderColor: RULE,
+    paddingVertical: 5,
+    marginHorizontal: 28,
+    alignItems: "center", justifyContent: "center",
   },
-  docNumber:  { fontSize: 13, fontWeight: "bold", color: INK, marginBottom: 6 },
-  docMetaRow: { flexDirection: "row", alignItems: "baseline", gap: 5, marginTop: 3 },
-  docMetaLbl: { fontSize: 6.5, color: MUTED, letterSpacing: 0.5 },
-  docMetaVal: { fontSize: 7.5, color: INK, fontWeight: "bold" },
+  yellowBarBorderT: { borderTopWidth: 1 },
+  yellowBarBorderB: { borderBottomWidth: 1 },
+  yellowBarCustomer:{ fontSize: 11, fontWeight: "bold", color: RED, letterSpacing: 0.4 },
+  yellowBarLocation:{ fontSize: 10, fontWeight: "bold", color: INK, letterSpacing: 0.6 },
 
-  // ── party boxes ──────────────────────────────────────────────────
-  partyRow: {
-    flexDirection: "row", gap: 12,
-    paddingHorizontal: 32, paddingTop: 12, paddingBottom: 12,
-    borderBottomWidth: 0.75, borderBottomColor: RULE,
+  // ── Doc meta strip (thin, right-aligned) ────────────────────────
+  metaStrip: {
+    flexDirection: "row", justifyContent: "flex-end", gap: 16,
+    paddingHorizontal: 28, paddingTop: 6, paddingBottom: 4,
   },
-  partyBox:   { flex: 1, borderWidth: 0.75, borderColor: RULE, borderRadius: 6, padding: 10, backgroundColor: STRIP },
-  partyLabel: { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1.3, marginBottom: 6 },
-  partyName:  { fontSize: 10, fontWeight: "bold", color: INK, marginBottom: 3 },
-  partyLine:  { fontSize: 7.5, color: MUTED, lineHeight: 1.55, marginBottom: 1 },
-  partyAccent:{ fontSize: 7.5, color: BRAND, marginTop: 4 },
+  metaLbl: { fontSize: 7, color: MUTED, letterSpacing: 0.5 },
+  metaVal: { fontSize: 7.5, color: INK, fontWeight: "bold" },
 
-  // ── supply band ──────────────────────────────────────────────────
-  supplyBand: {
-    flexDirection: "row", gap: 28,
-    paddingHorizontal: 32, paddingVertical: 11,
-    backgroundColor: BRANDL,
-    borderTopWidth: 0.5, borderTopColor: BRAND,
-    borderBottomWidth: 0.5, borderBottomColor: BRAND,
+  // ── Items table ─────────────────────────────────────────────────
+  tableWrap: {
+    marginHorizontal: 28, marginTop: 0,
+    borderWidth: 1, borderColor: RULE,
   },
-  supplyItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  supplyLbl:  { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 0.5 },
-  supplyVal:  { fontSize: 7.5, color: INK },
-
-  // ── table ────────────────────────────────────────────────────────
-  tableWrap: { paddingHorizontal: 32, marginTop: 12, marginBottom: 6 },
   thead: {
-    flexDirection: "row", backgroundColor: BRAND,
-    paddingVertical: 9, borderRadius: 4, marginBottom: 1,
+    flexDirection: "row",
+    borderBottomWidth: 1, borderBottomColor: RULE,
+    paddingVertical: 6,
   },
-  th:      { fontSize: 6.5, fontWeight: "bold", color: WHITE, letterSpacing: 0.6 },
-  tr:      { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: RULE, paddingVertical: 10 },
-  tdMain:  { fontSize: 8.5, color: INK },
-  tdSub:   { fontSize: 6.5, color: MUTED, marginTop: 2.5, lineHeight: 1.5 },
-  tdOpt:   { fontSize: 6.5, color: BRAND, marginTop: 2.5 },
-  tdRight: { fontSize: 8.5, textAlign: "right" },
-  tdMuted: { fontSize: 7.5, color: MUTED, textAlign: "right" },
-
-  // Column widths (usable width ≈ 531pt inside 32pt margins each side)
-  // cSwt(10) + cNo(18) + cQtyU(52) + cRate(72) + cHsn(36) + cGst(26) + cAmt(70) = 284pt fixed
-  // cDesc gets the remaining ~247pt via flex:1
-  cSwt:  { width: 10,  paddingHorizontal: 1 },
-  cNo:   { width: 18,  paddingHorizontal: 3 },
-  cDesc: { flex: 1,    paddingHorizontal: 5 },
-  cQtyU: { width: 52,  paddingHorizontal: 3 },
-  cRate: { width: 72,  paddingHorizontal: 3 },
-  cHsn:  { width: 36,  paddingHorizontal: 3 },
-  cGst:  { width: 26,  paddingHorizontal: 3 },
-  cAmt:  { width: 70,  paddingHorizontal: 3 },
-  // Legacy aliases retained so old references compile without breakage
-  cQty:  { width: 38,  paddingHorizontal: 3 },
-  cUnit: { width: 26,  paddingHorizontal: 3 },
-
-  // ── room group header ─────────────────────────────────────────────
-  roomHeader: {
-    flexDirection: "row", backgroundColor: BRANDL,
-    paddingVertical: 5, paddingHorizontal: 10, marginTop: 6, borderRadius: 3,
-    borderLeftWidth: 3, borderLeftColor: BRAND,
+  th:     { fontSize: 10, fontWeight: "bold", color: RED, letterSpacing: 0.4 },
+  thLbl:  { textAlign: "center" },
+  tr: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5, borderBottomColor: RULE_LT,
+    paddingVertical: 5,
   },
-  roomHeaderText: { fontSize: 7, fontWeight: "bold", color: BRAND, letterSpacing: 0.8 },
+  td:       { fontSize: 9.5, color: INK },
+  tdCenter: { textAlign: "center" },
+  tdRight:  { textAlign: "right" },
 
-  // ── divider ──────────────────────────────────────────────────────
-  divider: {
-    borderTopWidth: 0.75, borderTopColor: RULE,
-    marginHorizontal: 32, marginTop: 16, marginBottom: 16,
+  // Section-header row (bare label, empty numeric cells)
+  trSection: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5, borderBottomColor: RULE_LT,
+    paddingVertical: 5,
+    backgroundColor: WHITE,
   },
+  tdSection: { fontSize: 10, fontWeight: "bold", color: INK, letterSpacing: 0.4 },
 
-  // ── bottom: terms | totals ───────────────────────────────────────
-  bottomRow:   { flexDirection: "row", gap: 20, paddingHorizontal: 32 },
-  termsCol:    { flex: 1 },
-  termsSec:    { fontSize: 7, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 8 },
-  termsBullet: { fontSize: 7.5, color: MUTED, lineHeight: 1.75, marginBottom: 2 },
+  // Discount row (line-level, red negative amount)
+  trDiscount: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5, borderBottomColor: RULE_LT,
+    paddingVertical: 5,
+  },
+  tdDiscount: { fontSize: 9.5, fontWeight: "bold", color: RED },
 
-  totalsCol:  { width: 234 },
-  totRow:     { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5.5, borderBottomWidth: 0.5, borderBottomColor: RULE },
-  totLbl:     { fontSize: 8, color: MUTED },
-  totVal:     { fontSize: 8, color: INK },
+  // Total row — red bold, thick top border
+  trTotal: {
+    flexDirection: "row",
+    borderTopWidth: 1, borderTopColor: RULE,
+    paddingVertical: 7,
+  },
+  tdTotal: { fontSize: 11, fontWeight: "bold", color: RED, letterSpacing: 0.6 },
 
-  // Grand total box — teal, with words inside
-  grandBox:   { backgroundColor: BRAND, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 5, marginTop: 10 },
-  grandRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 7 },
-  grandLbl:   { fontSize: 9, fontWeight: "bold", color: WHITE, letterSpacing: 0.6 },
-  grandAmt:   { fontSize: 15, fontWeight: "bold", color: WHITE },
-  wordsText:  { fontSize: 7, color: BRANDL, lineHeight: 1.45 },
+  // Column widths — usable width = 595pt (A4) - 2×28pt margin - 2×1pt border ≈ 537pt.
+  //   Item (flex) | Unit 56 | QTY 56 | RATE 72 | AMT 88 → totals 272pt fixed, ~265pt for Item.
+  cItem: { flex: 1,  paddingHorizontal: 8 },
+  cUnit: { width: 56, paddingHorizontal: 4, borderLeftWidth: 0.5, borderLeftColor: RULE_LT },
+  cQty:  { width: 56, paddingHorizontal: 4, borderLeftWidth: 0.5, borderLeftColor: RULE_LT },
+  cRate: { width: 72, paddingHorizontal: 6, borderLeftWidth: 0.5, borderLeftColor: RULE_LT },
+  cAmt:  { width: 88, paddingHorizontal: 8, borderLeftWidth: 0.5, borderLeftColor: RULE_LT },
 
-  // ── payment schedule (inside totals col, above grand total box) ──
-  paySection:  { marginBottom: 12, paddingBottom: 10, borderBottomWidth: 0.5, borderBottomColor: RULE },
-  paySec:      { fontSize: 7, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 6 },
-  payRow:      { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3.5 },
-  payLbl:      { fontSize: 7.5, color: MUTED },
-  payVal:      { fontSize: 7.5, color: INK, fontWeight: "bold" },
-
-  // ── bank / UPI block (inside terms col, below terms list) ────────
-  bankSection: { marginTop: 16, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: RULE },
-  bankSec:     { fontSize: 7, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 6 },
-  bankRow:     { flexDirection: "row", gap: 5, paddingVertical: 2 },
-  bankLbl:     { fontSize: 7, color: MUTED, width: 34 },
-  bankVal:     { fontSize: 7, color: INK },
-
-  // ── signature block ───────────────────────────────────────────────
-  sigSection:  { flexDirection: "row", gap: 20, paddingHorizontal: 32, marginTop: 20, paddingTop: 16, borderTopWidth: 0.75, borderTopColor: RULE },
-  sigCol:      { flex: 1, paddingTop: 4 },
-  sigLabel:    { fontSize: 6.5, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 24 },
-  sigLine:     { borderBottomWidth: 0.75, borderBottomColor: INK, marginBottom: 6 },
-  sigName:     { fontSize: 7.5, color: INK, fontWeight: "bold" },
-  sigRole:     { fontSize: 7, color: MUTED, marginTop: 2 },
-
-  // ── footer ───────────────────────────────────────────────────────
-  footer:      { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: DARK, paddingVertical: 12, paddingHorizontal: 32 },
-  footerRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  footerBrand: { fontSize: 7.5, fontWeight: "bold", color: WHITE },
-  footerText:  { fontSize: 6.5, color: "#9CA3AF" },
+  // ── Terms & Policy blocks ────────────────────────────────────────
+  policyWrap: { paddingHorizontal: 28, paddingTop: 14, paddingBottom: 4 },
+  policyLine: { fontSize: 9, color: INK, lineHeight: 1.55, marginBottom: 2 },
+  policyLineRed:  { fontSize: 9, color: RED, fontWeight: "bold", lineHeight: 1.55, marginBottom: 2 },
+  policyHeading:  { fontSize: 10, color: RED, fontWeight: "bold", fontStyle: "italic",
+                    letterSpacing: 0.4, marginTop: 10, marginBottom: 6 },
 });

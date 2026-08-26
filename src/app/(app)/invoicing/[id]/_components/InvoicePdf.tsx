@@ -1,271 +1,179 @@
-// Server-rendered Tax Invoice PDF.
+// Server-rendered invoice PDF.
 //
-// Same visual language as QuotePdf (teal + Helvetica + Courier for
-// numerals) so a client receiving quote → invoice back-to-back sees
-// consistent branding. Built-in PDF fonts only (no download step).
+// Owner redesign (2026-08-26): the invoice is now the customer-facing
+// document in the invoice-first flow, so it uses the same visual
+// language as the sample estimates (branded header banner, yellow
+// customer/location bars, tight 5-col ITEM table, red TOTAL, prose
+// T&C + refund policy). GST-line breakdown, party boxes, and legal
+// tax-invoice header are dropped — the customer sees the same clean
+// estimate the owner used to hand-write. GST is still stored on the
+// invoice for internal reports/reconciliation; it just isn't printed.
 //
-// Rupee amounts use "Rs." prefix (Helvetica does not include U+20B9).
+// Fonts + shared table components live under the quotations folder;
+// we import from there to avoid duplicating the template. A future
+// refactor could move them to src/lib/pdf/ if a third document ever
+// needs the same look.
 
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import path from "path";
+import { Document, Page, View, Text, Image, Font } from "@react-pdf/renderer";
 import type { InvoiceDetail, InvoiceLineRow } from "@/modules/invoices/queries";
+import { pdfStyles as s } from "@/app/(app)/quotations/[id]/_components/_pdf-styles";
+import { TH, fm } from "@/app/(app)/quotations/[id]/_components/_pdf-table";
 
-const TEAL   = "#1B8A7E";
-const WHITE  = "#FFFFFF";
-const INK    = "#111827";
-const MUTED  = "#64748B";
-const BORD   = "#E2E8F0";
-const STRIP  = "#F8FAFC";
-
-const s = StyleSheet.create({
-  page: {
-    fontFamily: "Helvetica",
-    fontSize: 9,
-    color: INK,
-    backgroundColor: WHITE,
-    paddingTop: 24,
-    paddingBottom: 40,
-    paddingHorizontal: 32,
-  },
-
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: TEAL },
-  logoImg: { width: 140, height: 140, objectFit: "contain" },
-  logoTagline: { fontSize: 7, color: TEAL, letterSpacing: 2.5, marginTop: 5, textAlign: "center", fontFamily: "Helvetica-Bold" },
-  logoFallbackBox: { width: 34, height: 34, backgroundColor: TEAL, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-  logoFallbackM: { color: WHITE, fontSize: 20, fontFamily: "Helvetica-Bold" },
-  brandCol: { marginLeft: 8, justifyContent: "center" },
-  brandName: { fontSize: 16, fontFamily: "Helvetica-Bold", color: INK, letterSpacing: 0.3 },
-  brandSub: { fontSize: 6.5, color: MUTED, letterSpacing: 2, marginTop: 3 },
-  docLabel: { textAlign: "right" },
-  docTitle: { fontSize: 14, fontFamily: "Helvetica-Bold", color: TEAL, letterSpacing: 1.5 },
-  docNum: { fontSize: 8.5, color: MUTED, fontFamily: "Courier", marginTop: 3 },
-  docSub: { fontSize: 7.5, color: MUTED, marginTop: 2 },
-
-  metaStrip: { flexDirection: "row", backgroundColor: STRIP, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, borderWidth: 1, borderColor: BORD, borderRadius: 3 },
-  metaCol: { flex: 1 },
-  metaLabel: { fontSize: 6.5, color: MUTED, letterSpacing: 1, marginBottom: 3 },
-  metaValue: { fontSize: 8.5, fontFamily: "Helvetica-Bold" },
-
-  addrRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
-  addrBox: { flex: 1, borderWidth: 1, borderColor: BORD, borderRadius: 3, padding: 10, backgroundColor: STRIP },
-  addrTitle: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: TEAL, letterSpacing: 1.2, marginBottom: 6 },
-  addrName: { fontSize: 9.5, fontFamily: "Helvetica-Bold", color: INK, marginBottom: 2 },
-  addrLine: { fontSize: 7.5, color: MUTED, marginTop: 1 },
-  addrMono: { fontSize: 7.5, color: MUTED, fontFamily: "Courier", marginTop: 2 },
-
-  tableWrap: { marginBottom: 12 },
-  thead: { flexDirection: "row", backgroundColor: TEAL, paddingVertical: 5 },
-  th: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: WHITE, letterSpacing: 0.8 },
-  tr: { flexDirection: "row", paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: BORD },
-  tdCenter: { fontSize: 8, color: MUTED, textAlign: "center" },
-  tdLeft: { fontSize: 8 },
-  tdRight: { fontSize: 8, fontFamily: "Courier", textAlign: "right" },
-  tdMuted: { fontSize: 7, color: MUTED, marginTop: 1 },
-
-  cNo:   { width: 20, paddingHorizontal: 4 },
-  cDesc: { flex: 1, paddingHorizontal: 5 },
-  cHsn:  { width: 42, paddingHorizontal: 3 },
-  cQty:  { width: 52, paddingHorizontal: 3 },
-  cRate: { width: 72, paddingHorizontal: 3 },
-  cTax:  { width: 42, paddingHorizontal: 3 },
-  cGst:  { width: 60, paddingHorizontal: 3 },
-  cAmt:  { width: 78, paddingHorizontal: 3 },
-
-  totalsWrap: { alignItems: "flex-end", marginBottom: 10 },
-  totalsInner: { width: 240 },
-  totRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3, borderBottomWidth: 0.5, borderBottomColor: BORD },
-  totLabel: { fontSize: 8, color: MUTED },
-  totValue: { fontSize: 8, fontFamily: "Courier" },
-  grandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: TEAL, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 3, marginTop: 8 },
-  grandLabel: { fontSize: 8, fontFamily: "Helvetica-Bold", color: WHITE, letterSpacing: 1 },
-  grandValue: { fontSize: 13, fontFamily: "Courier-Bold", color: WHITE },
-
-  outstandingWrap: { marginTop: 8, borderTopWidth: 1, borderTopColor: BORD, paddingTop: 6 },
-
-  footer: { position: "absolute", bottom: 20, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: BORD, paddingTop: 6 },
-  footerText: { fontSize: 7, color: MUTED },
+const FONTS = path.join(process.cwd(), "public", "fonts");
+Font.register({
+  family: "Geist",
+  fonts: [
+    { src: path.join(FONTS, "GeistRegular.ttf"), fontWeight: "normal" },
+    { src: path.join(FONTS, "NotoSans-Bold.ttf"), fontWeight: "bold"  },
+  ],
 });
 
 const UNIT_SHORT: Record<string, string> = {
-  METRE: "m", ROLL: "roll", SQFT: "sqft", SQM: "sqm",
-  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft",
+  METRE: "MTR", ROLL: "ROLLS", SQFT: "SQFT", SQM: "SQM",
+  PIECE: "NOS", SET: "SET", BOX: "BOX", RUNNING_FT: "RFT",
 };
 
+const TERMS: { text: string; red?: boolean }[] = [
+  { text: "1. Consumption will be as per the standard packages available either in the form of rolls or meters" },
+  { text: "2. Full Advance Payment to be paid as per mentioned order value.", red: true },
+  { text: "3. For all paid payments, customer to get customer voucher, estimate form, challan with the customer's signature." },
+  { text: "4. Incase of any discrepencies, please SMS on 08940450051." },
+  { text: "5. Any form of concession/discount/scheme is applicable on the products only." },
+  { text: "6. The discount schemes if any is NOT APPLICABLE on surface preparation / labour services / consumables / transport / misc etc." },
+  { text: "7. If the catalogues are stocked by the customer, it is subject to a MOV @ Rs. 6500 per Catalogue & Admin Charges @ Rs. 1500 is applicable." },
+];
+
+const REFUND: string[] = [
+  "1. Order once placed cannot be cancelled. Advance once paid will not be refunded.",
+  "2. Refund of advance is granted post deducting the admin charges of Rs 1500/- with an option to choose any other product offered by the company.",
+  "3. Refund against excess goods will be done only if it in a packed roll/box/package and saleable condition. Refund will be processed via cheque within 15 days of order completion.",
+  "4. For IR (Import Requisition) orders of non-stock goods, once placed will not be cancelled.",
+  "5. Incase of any issues at the customs or force majeure, the refund will be processed.",
+  "Orders once confirmed & advance paid is not subject to cancellation or aborted for whatever reason. Alternately the customer is given an option to choose any other products offered by company.",
+];
+
 function fmtDate(d: Date): string {
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+  });
 }
 
-function fmtMoney(paise: bigint): string {
-  const neg = paise < 0n;
-  const abs = neg ? -paise : paise;
-  const rupees = abs / 100n;
-  const str = rupees.toString();
-  const l3 = str.slice(-3);
-  const grouped = str.length <= 3 ? str : str.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + l3;
-  return neg ? `(Rs.${grouped})` : `Rs.${grouped}`;
+// Invoice line-level AMT — sample-style rate × qty. Discounts are not
+// currently stored on invoice lines (only on quotations), so no
+// separate discount row is needed here.
+function invoiceLineGross(line: InvoiceLineRow): bigint {
+  const qtyNum = parseFloat(line.quantity);
+  return (line.rate * BigInt(Math.round(qtyNum * 10_000))) / 10_000n;
 }
 
-function TableHeader({ isIntra }: { isIntra: boolean }) {
+function InvoiceTR({ line }: { line: InvoiceLineRow }) {
+  const qtyNum = parseFloat(line.quantity);
   return (
-    <View style={s.thead}>
-      <View style={s.cNo}><Text style={[s.th, { textAlign: "center" }]}>#</Text></View>
-      <View style={s.cDesc}><Text style={s.th}>Description</Text></View>
-      <View style={s.cHsn}><Text style={s.th}>HSN</Text></View>
-      <View style={s.cQty}><Text style={[s.th, { textAlign: "right" }]}>Qty</Text></View>
-      <View style={s.cRate}><Text style={[s.th, { textAlign: "right" }]}>Rate</Text></View>
-      <View style={s.cTax}><Text style={[s.th, { textAlign: "right" }]}>Taxable</Text></View>
-      {isIntra ? (
-        <>
-          <View style={s.cGst}><Text style={[s.th, { textAlign: "right" }]}>CGST</Text></View>
-          <View style={s.cGst}><Text style={[s.th, { textAlign: "right" }]}>SGST</Text></View>
-        </>
-      ) : (
-        <View style={s.cGst}><Text style={[s.th, { textAlign: "right" }]}>IGST</Text></View>
-      )}
-      <View style={s.cAmt}><Text style={[s.th, { textAlign: "right" }]}>Amount</Text></View>
-    </View>
-  );
-}
-
-function TableRow({ line, idx, isIntra }: { line: InvoiceLineRow; idx: number; isIntra: boolean }) {
-  const bg = idx % 2 === 1 ? STRIP : WHITE;
-  const unitStr = UNIT_SHORT[line.unit] ?? line.unit.toLowerCase();
-  const qty = parseFloat(line.quantity);
-  return (
-    <View style={[s.tr, { backgroundColor: bg }]} wrap={false}>
-      <View style={s.cNo}><Text style={s.tdCenter}>{line.lineNo}</Text></View>
-      <View style={s.cDesc}><Text style={s.tdLeft}>{line.description || "—"}</Text></View>
-      <View style={s.cHsn}><Text style={[s.tdRight, { color: MUTED }]}>{line.hsn}</Text></View>
-      <View style={s.cQty}><Text style={[s.tdRight, { fontFamily: "Courier" }]}>{qty} {unitStr}</Text></View>
-      <View style={s.cRate}><Text style={s.tdRight}>{fmtMoney(line.rate)}</Text></View>
-      <View style={s.cTax}><Text style={s.tdRight}>{fmtMoney(line.taxable)}</Text></View>
-      {isIntra ? (
-        <>
-          <View style={s.cGst}><Text style={s.tdRight}>{fmtMoney(line.cgst)}</Text></View>
-          <View style={s.cGst}><Text style={s.tdRight}>{fmtMoney(line.sgst)}</Text></View>
-        </>
-      ) : (
-        <View style={s.cGst}><Text style={s.tdRight}>{fmtMoney(line.igst)}</Text></View>
-      )}
-      <View style={s.cAmt}><Text style={[s.tdRight, { fontFamily: "Courier-Bold" }]}>{fmtMoney(line.amount)}</Text></View>
+    <View style={s.tr} wrap={false}>
+      <View style={s.cItem}>
+        <Text style={s.td}>{line.description || "—"}</Text>
+      </View>
+      <View style={s.cUnit}>
+        <Text style={[s.td, s.tdCenter]}>{UNIT_SHORT[line.unit] ?? line.unit}</Text>
+      </View>
+      <View style={s.cQty}>
+        <Text style={[s.td, s.tdCenter]}>{Number.isInteger(qtyNum) ? qtyNum : line.quantity}</Text>
+      </View>
+      <View style={s.cRate}>
+        <Text style={[s.td, s.tdCenter]}>{fm(line.rate)}</Text>
+      </View>
+      <View style={s.cAmt}>
+        <Text style={[s.td, s.tdRight]}>{fm(invoiceLineGross(line))}</Text>
+      </View>
     </View>
   );
 }
 
 export function InvoicePdf({ invoice: i, logoSrc }: { invoice: InvoiceDetail; logoSrc?: string }) {
-  const isIntra = i.supplierStateCode === i.placeOfSupplyCode;
-  const taxRows: Array<{ label: string; v: bigint }> = [
-    { label: "Taxable Amount", v: i.taxableAmount },
-    ...(isIntra
-      ? [{ label: "CGST", v: i.cgst }, { label: "SGST", v: i.sgst }]
-      : [{ label: "IGST", v: i.igst }]),
-    ...(i.roundOff !== 0n ? [{ label: "Round-off", v: i.roundOff }] : []),
-  ];
+  const customerLine = i.clientMobile
+    ? `${i.clientName.toUpperCase()} - ${i.clientMobile}`
+    : i.clientName.toUpperCase();
+  const location = ""; // InvoiceDetail doesn't currently carry projectName; leave blank.
+
+  // Sample-style total = sum of rate × qty. Ignores GST for display
+  // (still stored in the DB via i.total for reports/e-invoicing).
+  const totalPreTax = i.lines.reduce((sum, l) => sum + invoiceLineGross(l), 0n);
 
   return (
-    <Document title={`Tax Invoice ${i.number}`} author="Mandovara" creator="Mandovara Interior OS">
+    <Document title={`Invoice ${i.number}`} author="Mandovara" creator="Mandovara Interior OS">
       <Page size="A4" style={s.page}>
 
-        <View style={s.header}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {logoSrc
-              ? (
-                <View style={{ flexDirection: "column", alignItems: "flex-start" }}>
-                  <Image src={logoSrc} style={s.logoImg} />
-                  <Text style={s.logoTagline}>INTERIORS · COIMBATORE</Text>
-                </View>
-              )
-              : (
-                <>
-                  <View style={s.logoFallbackBox}><Text style={s.logoFallbackM}>M</Text></View>
-                  <View style={s.brandCol}>
-                    <Text style={s.brandName}>Mandovara</Text>
-                    <Text style={s.brandSub}>INTERIORS  ·  COIMBATORE</Text>
-                  </View>
-                </>
-              )
-            }
+        {/* ── Branded header banner ────────────────────────────── */}
+        <View style={s.banner} fixed>
+          <View style={s.bannerLogoWrap}>
+            {logoSrc && <Image src={logoSrc} style={s.bannerLogoImg} />}
           </View>
-          <View style={s.docLabel}>
-            <Text style={s.docTitle}>{i.type === "TAX" ? "TAX INVOICE" : i.type.replace(/_/g, " ")}</Text>
-            <Text style={s.docNum}>{i.number}</Text>
-            {i.orderNumber && <Text style={s.docSub}>Order {i.orderNumber}</Text>}
+          <View style={s.bannerRight}>
+            <View style={s.bannerNameRow}>
+              <Text style={s.bannerName}>Rohit Vaid</Text>
+              <Text style={s.bannerRole}>MANAGING DIRECTOR</Text>
+            </View>
+            <View style={s.bannerContact}>
+              <View style={s.bannerContactRow}>
+                <Text style={s.bannerContactIco}>Tel</Text>
+                <Text style={s.bannerContactTxt}>+91 89404 30051</Text>
+              </View>
+              <View style={s.bannerContactRow}>
+                <Text style={s.bannerContactIco}>Email</Text>
+                <Text style={s.bannerContactTxt}>mandovara22@gmail.com</Text>
+              </View>
+            </View>
+            <Text style={s.bannerAddr}>
+              32, Thirumurthy Layout, Thadagam Road, R S Puram, Coimbatore - 641 002
+            </Text>
           </View>
         </View>
 
+        {/* ── Doc meta (small paper-trail strip) ───────────────── */}
         <View style={s.metaStrip}>
-          {[
-            { label: "INVOICE NO.", value: i.number, mono: true },
-            { label: "DATE", value: fmtDate(i.date) },
-            { label: "DUE", value: fmtDate(i.dueDate) },
-            { label: "STATUS", value: i.status },
-          ].map(({ label, value, mono }) => (
-            <View key={label} style={s.metaCol}>
-              <Text style={s.metaLabel}>{label}</Text>
-              <Text style={[s.metaValue, mono ? { fontFamily: "Courier-Bold" } : {}]}>{value}</Text>
-            </View>
-          ))}
+          <Text style={s.metaLbl}>REF</Text>
+          <Text style={s.metaVal}>{i.number}</Text>
+          <Text style={s.metaLbl}>DATE</Text>
+          <Text style={s.metaVal}>{fmtDate(i.date)}</Text>
         </View>
 
-        <View style={s.addrRow}>
-          <View style={s.addrBox}>
-            <Text style={s.addrTitle}>BILL TO</Text>
-            <Text style={s.addrName}>{i.clientName}</Text>
-            <Text style={s.addrLine}>{i.clientMobile}</Text>
-            {i.clientGstin ? <Text style={s.addrMono}>GSTIN: {i.clientGstin}</Text> : null}
-          </View>
-          <View style={s.addrBox}>
-            <Text style={s.addrTitle}>FROM</Text>
-            <Text style={s.addrName}>{i.branchName}</Text>
-            <Text style={s.addrLine}>32 Thirumoorthy Layout, Thadagam Rd</Text>
-            <Text style={s.addrLine}>RS Puram, Coimbatore 641002</Text>
-            <Text style={s.addrLine}>State code {i.supplierStateCode} · {isIntra ? "Intra-state" : "Inter-state"}</Text>
-          </View>
+        {/* ── Yellow customer bar ──────────────────────────────── */}
+        <View style={[s.yellowBar, s.yellowBarBorderT, s.yellowBarBorderB]}>
+          <Text style={s.yellowBarCustomer}>{customerLine}</Text>
         </View>
 
+        {/* ── Yellow location bar (skipped if empty) ───────────── */}
+        {location.length > 0 && (
+          <View style={[s.yellowBar, s.yellowBarBorderB]}>
+            <Text style={s.yellowBarLocation}>{location.toUpperCase()}</Text>
+          </View>
+        )}
+
+        {/* ── Items table ──────────────────────────────────────── */}
         <View style={s.tableWrap}>
-          <TableHeader isIntra={isIntra} />
-          {i.lines.map((l, idx) => <TableRow key={l.id} line={l} idx={idx} isIntra={isIntra} />)}
-        </View>
-
-        <View style={s.totalsWrap} wrap={false}>
-          <View style={s.totalsInner}>
-            {taxRows.map(({ label, v }) => (
-              <View key={label} style={s.totRow}>
-                <Text style={s.totLabel}>{label}</Text>
-                <Text style={s.totValue}>{fmtMoney(v)}</Text>
-              </View>
-            ))}
-            <View style={s.grandRow}>
-              <Text style={s.grandLabel}>INVOICE TOTAL</Text>
-              <Text style={s.grandValue}>{fmtMoney(i.total)}</Text>
-            </View>
-            {(i.advanceAdjusted > 0n || i.paidTotal > 0n) && (
-              <View style={s.outstandingWrap}>
-                {i.advanceAdjusted > 0n && (
-                  <View style={s.totRow}>
-                    <Text style={s.totLabel}>Advance adjusted</Text>
-                    <Text style={s.totValue}>{fmtMoney(i.advanceAdjusted)}</Text>
-                  </View>
-                )}
-                {i.paidTotal > 0n && (
-                  <View style={s.totRow}>
-                    <Text style={s.totLabel}>Received</Text>
-                    <Text style={s.totValue}>{fmtMoney(i.paidTotal)}</Text>
-                  </View>
-                )}
-                <View style={s.totRow}>
-                  <Text style={[s.totLabel, { fontFamily: "Helvetica-Bold", color: INK }]}>Outstanding</Text>
-                  <Text style={[s.totValue, { fontFamily: "Courier-Bold", color: INK }]}>{fmtMoney(i.outstanding)}</Text>
-                </View>
-              </View>
-            )}
+          <TH fixed />
+          {i.lines.map((l) => <InvoiceTR key={l.id} line={l} />)}
+          <View style={s.trTotal} wrap={false}>
+            <View style={s.cItem}><Text style={s.tdTotal}>TOTAL</Text></View>
+            <View style={s.cUnit} />
+            <View style={s.cQty} />
+            <View style={s.cRate} />
+            <View style={s.cAmt}><Text style={[s.tdTotal, s.tdRight]}>{fm(totalPreTax)}</Text></View>
           </View>
         </View>
 
-        <View style={s.footer} fixed>
-          <Text style={s.footerText}>mandovara.com  ·  +91 8940430051</Text>
-          <Text style={s.footerText}>32 Thirumoorthy Layout, RS Puram, Coimbatore 641002</Text>
-          <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+        {/* ── Terms + Refund policy ────────────────────────────── */}
+        <View style={s.policyWrap}>
+          {TERMS.map((t, idx) => (
+            <Text key={idx} style={t.red ? s.policyLineRed : s.policyLine}>
+              {t.text}
+            </Text>
+          ))}
+          <Text style={s.policyHeading}>ORDER CANCELLATION and REFUND POLICY</Text>
+          {REFUND.map((line, idx) => (
+            <Text key={idx} style={s.policyLine}>{line}</Text>
+          ))}
         </View>
 
       </Page>

@@ -1,15 +1,20 @@
 // Server-side quotation PDF — @react-pdf/renderer.
-// Fonts: GeistRegular (normal, has ₹ U+20B9) + NotoSans-Bold (bold, has ₹).
+//
+// Owner redesign (2026-08-26): matches the hand-crafted sample PDFs
+// the owner used to send before this system. Branded header banner,
+// yellow customer/location bars, tight 5-col ITEM table, red TOTAL,
+// two verbatim policy blocks. No GST breakdown, no party boxes, no
+// payment schedule — the customer sees an interior-decor estimate,
+// not a compliance document.
+//
+// Fonts: GeistRegular (normal) + NotoSans-Bold (bold, has ₹).
 
 import path from "path";
 import { Document, Page, View, Text, Image, Font } from "@react-pdf/renderer";
 import type { QuotationDetail } from "@/modules/quotations/queries";
-import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
-import { rupeesToWords } from "./_words";
-import { pdfStyles as s, BRAND } from "./_pdf-styles";
-import { TH, TR, RoomHeader, fm } from "./_pdf-table";
+import { pdfStyles as s } from "./_pdf-styles";
+import { TH, TR, SectionRow, DiscountRow, TotalRow } from "./_pdf-table";
 
-// ── fonts ──────────────────────────────────────────────────────────────────
 const FONTS = path.join(process.cwd(), "public", "fonts");
 Font.register({
   family: "Geist",
@@ -19,155 +24,140 @@ Font.register({
   ],
 });
 
-// ── helpers ────────────────────────────────────────────────────────────────
+// Hardcoded terms + policy — verbatim from the owner's sample PDFs.
+// If the owner customises terms via the quotation.termsText field, that
+// overrides this fallback (falls back per-line, split on newline).
+const TERMS: { text: string; red?: boolean }[] = [
+  { text: "1. Consumption will be as per the standard packages available either in the form of rolls or meters" },
+  { text: "2. Full Advance Payment to be paid as per mentioned order value.", red: true },
+  { text: "3. For all paid payments, customer to get customer voucher, estimate form, challan with the customer's signature." },
+  { text: "4. Incase of any discrepencies, please SMS on 08940450051." },
+  { text: "5. Any form of concession/discount/scheme is applicable on the products only." },
+  { text: "6. The discount schemes if any is NOT APPLICABLE on surface preparation / labour services / consumables / transport / misc etc." },
+  { text: "7. If the catalogues are stocked by the customer, it is subject to a MOV @ Rs. 6500 per Catalogue & Admin Charges @ Rs. 1500 is applicable." },
+];
+
+const REFUND: string[] = [
+  "1. Order once placed cannot be cancelled. Advance once paid will not be refunded.",
+  "2. Refund of advance is granted post deducting the admin charges of Rs 1500/- with an option to choose any other product offered by the company.",
+  "3. Refund against excess goods will be done only if it in a packed roll/box/package and saleable condition. Refund will be processed via cheque within 15 days of order completion.",
+  "4. For IR (Import Requisition) orders of non-stock goods, once placed will not be cancelled.",
+  "5. Incase of any issues at the customs or force majeure, the refund will be processed.",
+  "Orders once confirmed & advance paid is not subject to cancellation or aborted for whatever reason. Alternately the customer is given an option to choose any other products offered by company.",
+];
+
 function fd(d: Date): string {
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
-}
-function gstHalf(cgst: bigint, taxable: bigint): string {
-  if (taxable === 0n) return "";
-  const r = Math.round(Number(cgst * 10000n / taxable)) / 100;
-  return `(${Number.isInteger(r) ? r : r.toFixed(1)}%)`;
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+  });
 }
 
-// ── constants ──────────────────────────────────────────────────────────────
-const FROM = { name: "Mandovara", addr1: "32 Thirumoorthy Layout, Thadagam Road", addr2: "RS Puram, Coimbatore 641002", state: "Tamil Nadu (33), India", phone: "+91 89404 30051", email: "mandovara22@gmail.com" };
-const STATUS_LABEL: Record<string, string> = { DRAFT: "DRAFT", SENT: "QUOTATION", REVISED: "REVISED", ACCEPTED: "ACCEPTED", REJECTED: "REJECTED", EXPIRED: "EXPIRED" };
-const ESTIMATE_TERMS = [ESTIMATE_CAVEAT, "This estimate is indicative — a firm quotation follows site measurement.", "Estimate is valid until the date shown above."];
-const DEFAULT_TERMS  = ["Quotation is valid until the date shown above.", "50% advance required to confirm the order.", "Balance payable before or on delivery / installation.", "Goods once delivered cannot be returned.", "Delivery timeline is as per the agreed schedule.", "All prices inclusive of GST."];
-
-// ── main ───────────────────────────────────────────────────────────────────
-interface Props { quotation: QuotationDetail; logoSrc?: string }
+interface Props {
+  quotation: QuotationDetail;
+  logoSrc?: string;
+}
 
 export function QuotePdf({ quotation: q, logoSrc }: Props) {
-  const estimate   = isEstimate(q.lines);
-  const isIntra    = q.cgst > 0n;
-  const half       = isIntra ? gstHalf(q.cgst, q.taxableAmount) : "";
-  const stateLabel = q.supplierStateCode === "33" ? "Tamil Nadu (33)" : q.supplierStateCode;
-  const docLabel   = estimate ? "ESTIMATE" : (STATUS_LABEL[q.status] ?? "QUOTATION");
-  const terms      = (() => {
-    const base = q.termsText ? q.termsText.split("\n").filter(Boolean) : (estimate ? ESTIMATE_TERMS : DEFAULT_TERMS);
-    return estimate && !base.includes(ESTIMATE_CAVEAT) ? [ESTIMATE_CAVEAT, ...base] : base;
-  })();
-  const clientLines = [q.clientMobile, q.clientEmail, q.clientGstin ? `GSTIN: ${q.clientGstin}` : null].filter(Boolean) as string[];
+  const customerLine = q.clientMobile
+    ? `${q.clientName.toUpperCase()} - ${q.clientMobile}`
+    : q.clientName.toUpperCase();
+  const location = (q.projectName ?? "").trim();
+  const customTerms = q.termsText ? q.termsText.split("\n").map((t) => t.trim()).filter(Boolean) : null;
 
-  // Build flat list with room headers interleaved
-  const tableItems: ({ type: "room"; label: string } | { type: "line"; line: typeof q.lines[0]; idx: number })[] = [];
-  let lineIdx = 0; let lastRoom: string | null | undefined;
-  for (const line of q.lines) {
-    if (line.roomLabel && line.roomLabel !== lastRoom) { tableItems.push({ type: "room", label: line.roomLabel }); lastRoom = line.roomLabel; }
-    tableItems.push({ type: "line", line, idx: lineIdx++ });
+  // Group lines by roomLabel — when it changes, insert a SectionRow.
+  // Lines without a roomLabel render as loose products (matches the
+  // sample's LINING CLOTH / TRACK / STITCHING sequence, none of which
+  // sat under a section header).
+  const rowsEls: React.ReactNode[] = [];
+  let lastSection: string | null = null;
+  for (const l of q.lines) {
+    const section = (l.roomLabel ?? "").trim();
+    if (section && section !== lastSection) {
+      rowsEls.push(<SectionRow key={`sec-${l.id}`} label={section} />);
+      lastSection = section;
+    } else if (!section) {
+      lastSection = null;
+    }
+    rowsEls.push(<TR key={l.id} line={l} />);
+    if (parseFloat(l.discountPct) > 0) {
+      rowsEls.push(<DiscountRow key={`disc-${l.id}`} line={l} />);
+    }
   }
 
-  const advance = q.total / 2n;
-  const balance = q.total - advance;
-
   return (
-    <Document title={`${docLabel} ${q.number}`} author="Mandovara" creator="Mandovara Interior OS">
+    <Document title={`Quotation ${q.number}`} author="Mandovara" creator="Mandovara Interior OS">
       <Page size="A4" style={s.page}>
 
-        <View style={s.stripe} />
-
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <View style={s.header}>
-          <View style={{ width: 200 }}>
-            {logoSrc
-              ? <Image src={logoSrc} style={s.logoImg} />
-              : <Text style={{ fontSize: 20, fontWeight: "bold", color: BRAND }}>Mandovara</Text>
-            }
-            <Text style={s.logoTagline}>INTERIORS · COIMBATORE</Text>
+        {/* ── Branded header banner ────────────────────────────── */}
+        <View style={s.banner} fixed>
+          <View style={s.bannerLogoWrap}>
+            {logoSrc && <Image src={logoSrc} style={s.bannerLogoImg} />}
           </View>
-          <View style={s.headerMeta}>
-            <Text style={s.docBadge}>{docLabel}</Text>
-            <Text style={s.docNumber}>{q.number}</Text>
-            {q.revision > 0 && <View style={s.docMetaRow}><Text style={s.docMetaLbl}>REVISION</Text><Text style={s.docMetaVal}>{q.revision}</Text></View>}
-            <View style={s.docMetaRow}><Text style={s.docMetaLbl}>DATE</Text><Text style={s.docMetaVal}>{fd(q.date)}</Text></View>
-            <View style={s.docMetaRow}><Text style={s.docMetaLbl}>VALID UNTIL</Text><Text style={s.docMetaVal}>{fd(q.validUntil)}</Text></View>
-            <View style={s.docMetaRow}><Text style={s.docMetaLbl}>BRANCH</Text><Text style={s.docMetaVal}>{q.branchName}</Text></View>
-          </View>
-        </View>
-
-        {/* ── Party boxes ──────────────────────────────────────────── */}
-        <View style={s.partyRow}>
-          <View style={s.partyBox}>
-            <Text style={s.partyLabel}>QUOTATION BY</Text>
-            <Text style={s.partyName}>{FROM.name}</Text>
-            <Text style={s.partyLine}>{FROM.addr1}</Text>
-            <Text style={s.partyLine}>{FROM.addr2}</Text>
-            <Text style={s.partyLine}>{FROM.state}</Text>
-            <Text style={s.partyLine}>{FROM.phone}</Text>
-            <Text style={s.partyAccent}>{FROM.email}</Text>
-            {q.ownerName && <Text style={[s.partyLine, { marginTop: 6, color: BRAND }]}>Designer: {q.ownerName}</Text>}
-          </View>
-          <View style={s.partyBox}>
-            <Text style={s.partyLabel}>QUOTATION TO</Text>
-            <Text style={s.partyName}>{q.clientName}</Text>
-            {clientLines.map((l) => <Text key={l} style={s.partyLine}>{l}</Text>)}
-            {q.projectName && <Text style={s.partyAccent}>Project: {q.projectName}</Text>}
+          <View style={s.bannerRight}>
+            <View style={s.bannerNameRow}>
+              <Text style={s.bannerName}>Rohit Vaid</Text>
+              <Text style={s.bannerRole}>MANAGING DIRECTOR</Text>
+            </View>
+            <View style={s.bannerContact}>
+              <View style={s.bannerContactRow}>
+                <Text style={s.bannerContactIco}>Tel</Text>
+                <Text style={s.bannerContactTxt}>+91 89404 30051</Text>
+              </View>
+              <View style={s.bannerContactRow}>
+                <Text style={s.bannerContactIco}>Email</Text>
+                <Text style={s.bannerContactTxt}>mandovara22@gmail.com</Text>
+              </View>
+            </View>
+            <Text style={s.bannerAddr}>
+              32, Thirumurthy Layout, Thadagam Road, R S Puram, Coimbatore - 641 002
+            </Text>
           </View>
         </View>
 
-        {/* ── Supply band ──────────────────────────────────────────── */}
-        <View style={s.supplyBand}>
-          <View style={s.supplyItem}><Text style={s.supplyLbl}>PLACE OF SUPPLY:</Text><Text style={s.supplyVal}>{stateLabel}</Text></View>
-          <View style={s.supplyItem}><Text style={s.supplyLbl}>TAX TYPE:</Text><Text style={s.supplyVal}>{isIntra ? "CGST + SGST" : "IGST"}</Text></View>
-          <View style={s.supplyItem}><Text style={s.supplyLbl}>COUNTRY:</Text><Text style={s.supplyVal}>India</Text></View>
+        {/* ── Doc meta (small, only shown to keep the paper trail) ── */}
+        <View style={s.metaStrip}>
+          <Text style={s.metaLbl}>REF</Text>
+          <Text style={s.metaVal}>{q.number}</Text>
+          <Text style={s.metaLbl}>DATE</Text>
+          <Text style={s.metaVal}>{fd(q.date)}</Text>
         </View>
 
-        {/* ── Items table ──────────────────────────────────────────── */}
+        {/* ── Yellow customer bar ──────────────────────────────── */}
+        <View style={[s.yellowBar, s.yellowBarBorderT, s.yellowBarBorderB]}>
+          <Text style={s.yellowBarCustomer}>{customerLine}</Text>
+        </View>
+
+        {/* ── Yellow location bar (project name if present) ────── */}
+        {location.length > 0 && (
+          <View style={[s.yellowBar, s.yellowBarBorderB]}>
+            <Text style={s.yellowBarLocation}>{location.toUpperCase()}</Text>
+          </View>
+        )}
+
+        {/* ── Items table ──────────────────────────────────────── */}
         <View style={s.tableWrap}>
           <TH fixed />
-          {tableItems.map((item, i) =>
-            item.type === "room"
-              ? <RoomHeader key={`room-${i}`} label={item.label} />
-              : <TR key={item.line.id} line={item.line} idx={item.idx} />
-          )}
+          {rowsEls}
+          <TotalRow total={q.taxableAmount} />
         </View>
 
-        <View style={s.divider} />
+        {/* ── Terms + Refund policy ────────────────────────────── */}
+        <View style={s.policyWrap}>
+          {(customTerms ?? TERMS.map((t) => t.text)).map((line, i) => {
+            // Preserve red styling on the "Full Advance Payment" line
+            // from the sample when the default set is in use.
+            const isRed = !customTerms && TERMS[i]?.red === true;
+            return (
+              <Text key={i} style={isRed ? s.policyLineRed : s.policyLine}>
+                {line}
+              </Text>
+            );
+          })}
 
-        {/* ── Terms (left) | Totals (right) ────────────────────────── */}
-        <View style={s.bottomRow} wrap={false}>
-          <View style={s.termsCol}>
-            <Text style={s.termsSec}>TERMS &amp; CONDITIONS</Text>
-            {terms.map((t, i) => <Text key={i} style={s.termsBullet}>{i + 1}.{"  "}{t}</Text>)}
-          </View>
-
-          <View style={s.totalsCol}>
-            <View style={s.totRow}><Text style={s.totLbl}>Sub Total (excl. GST)</Text><Text style={s.totVal}>{fm(q.taxableAmount)}</Text></View>
-            {isIntra ? (
-              <>
-                <View style={s.totRow}><Text style={s.totLbl}>CGST {half}</Text><Text style={s.totVal}>{fm(q.cgst)}</Text></View>
-                <View style={s.totRow}><Text style={s.totLbl}>SGST {half}</Text><Text style={s.totVal}>{fm(q.sgst)}</Text></View>
-              </>
-            ) : (
-              <View style={s.totRow}><Text style={s.totLbl}>IGST</Text><Text style={s.totVal}>{fm(q.igst)}</Text></View>
-            )}
-            {q.roundOff !== 0n && <View style={s.totRow}><Text style={s.totLbl}>Round-off</Text><Text style={s.totVal}>{fm(q.roundOff)}</Text></View>}
-
-            <View style={s.paySection}>
-              <Text style={s.paySec}>PAYMENT SCHEDULE</Text>
-              <View style={s.payRow}><Text style={s.payLbl}>Advance (50%) to confirm</Text><Text style={s.payVal}>{fm(advance)}</Text></View>
-              <View style={s.payRow}><Text style={s.payLbl}>Balance on installation</Text><Text style={s.payVal}>{fm(balance)}</Text></View>
-            </View>
-
-            <View style={s.grandBox}>
-              <View style={s.grandRow}>
-                <Text style={s.grandLbl}>GRAND TOTAL</Text>
-                <Text style={s.grandAmt}>{fm(q.total)}</Text>
-              </View>
-              <Text style={s.wordsText}>{rupeesToWords(q.total)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Footer ───────────────────────────────────────────────── */}
-        <View style={s.footer} fixed>
-          <View style={s.footerRow}>
-            <Text style={s.footerBrand}>mandovara.com</Text>
-            <Text style={s.footerText}>32 Thirumoorthy Layout, RS Puram, Coimbatore 641002</Text>
-            <Text style={s.footerText}>{`${FROM.phone} · ${FROM.email} · Ref: ${q.number}`}</Text>
-            <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}`} />
-          </View>
+          <Text style={s.policyHeading}>ORDER CANCELLATION and REFUND POLICY</Text>
+          {REFUND.map((line, i) => (
+            <Text key={i} style={s.policyLine}>{line}</Text>
+          ))}
         </View>
 
       </Page>
