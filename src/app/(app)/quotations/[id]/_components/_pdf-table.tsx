@@ -1,125 +1,141 @@
-// Table cells + row builders for the sample-style quotation PDF.
-// Exports:  fm  (₹ formatter, no symbol — matches the samples which
-// show plain numbers), TH  (5-column header), TR  (product line),
-// SectionRow  (bare label row), DiscountRow, TotalRow.
+// Table components and shared PDF helpers extracted from QuotePdf.tsx (§10 300-line limit).
+// Exports: fm, specFromSnapshot, TH, RoomHeader, TR, SigBlock.
 
 import { View, Text } from "@react-pdf/renderer";
 import type { QuotationLine } from "@/modules/quotations/queries";
-import { pdfStyles as s } from "./_pdf-styles";
+import { pdfStyles as s, WHITE, INK, MUTED, STRIP, BRAND, RULE } from "./_pdf-styles";
 
-const UNIT_SHORT: Record<string, string> = {
-  METRE: "MTR", ROLL: "ROLLS", SQFT: "SQFT", SQM: "SQM",
-  PIECE: "NOS", SET: "SET", BOX: "BOX", RUNNING_FT: "RFT",
+const UNIT: Record<string, string> = {
+  METRE: "m", ROLL: "roll", SQFT: "sqft", SQM: "sqm",
+  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft",
 };
 
-// Number formatter — matches the owner's sample PDFs, which show plain
-// numbers with no ₹ symbol and no thousand separators (e.g. "27475",
-// "33281.25"). Two decimals appear only when the paise fraction is
-// non-zero so integers stay clean.
-export function fm(paise: bigint): string {
-  const neg = paise < 0n;
-  const abs = neg ? -paise : paise;
-  const whole = abs / 100n;
-  const frac  = abs % 100n;
-  const wholeStr = whole.toString();
-  const out = frac === 0n
-    ? wholeStr
-    : `${wholeStr}.${frac.toString().padStart(2, "0")}`;
-  return neg ? `-${out}` : out;
+export function fm(p: bigint): string {
+  const neg = p < 0n;
+  const a   = neg ? -p : p;
+  const raw = (a / 100n).toString();
+  const grp = raw.length <= 3 ? raw
+    : raw.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + raw.slice(-3);
+  return neg ? `(₹${grp})` : `₹${grp}`;
 }
 
-// ── Table header ──────────────────────────────────────────────────
+// Build a concise spec line from a frozen CalcResult snapshot.
+export function specFromSnapshot(snap: Record<string, unknown> | null, w?: string | null, h?: string | null): string | null {
+  const parts: string[] = [];
+  if (w && h) parts.push(`${w} × ${h} mm`);
+  if (!snap) return parts.length ? parts.join(" · ") : null;
+  if (snap["materialQty"] && snap["materialUnit"]) {
+    const u = UNIT[snap["materialUnit"] as string] ?? String(snap["materialUnit"]).toLowerCase();
+    parts.push(`${snap["materialQty"]} ${u}`);
+  }
+  if (snap["widthsRequired"]) parts.push(`${snap["widthsRequired"]} widths`);
+  if (snap["rollsRequired"]) parts.push(`${snap["rollsRequired"]} rolls`);
+  if (snap["boxesRequired"]) parts.push(`${snap["boxesRequired"]} boxes`);
+  if (snap["areaSqft"]) parts.push(`${snap["areaSqft"]} sqft`);
+  const warns = snap["warnings"] as string[] | undefined;
+  if (warns?.[0]) parts.push(warns[0]);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+// ── Table header ──────────────────────────────────────────────────────────────
 export function TH({ fixed: fx }: { fixed?: boolean }) {
   return (
     <View style={s.thead} fixed={fx}>
-      <View style={s.cItem}><Text style={[s.th]}>ITEM</Text></View>
-      <View style={s.cUnit}><Text style={[s.th, s.thLbl]}>Unit</Text></View>
-      <View style={s.cQty}><Text style={[s.th, s.thLbl]}>QTY</Text></View>
-      <View style={s.cRate}><Text style={[s.th, s.thLbl]}>RATE</Text></View>
-      <View style={s.cAmt}><Text style={[s.th, s.thLbl]}>AMT</Text></View>
+      <View style={s.cSwt} />
+      <View style={s.cNo}><Text style={[s.th, { textAlign: "center" }]}>#</Text></View>
+      <View style={s.cDesc}><Text style={s.th}>DESCRIPTION</Text></View>
+      <View style={s.cQtyU}><Text style={[s.th, { textAlign: "right" }]}>QTY</Text></View>
+      <View style={s.cRate}><Text style={[s.th, { textAlign: "right" }]}>RATE (₹)</Text></View>
+      <View style={s.cHsn}><Text style={s.th}>HSN</Text></View>
+      <View style={s.cGst}><Text style={[s.th, { textAlign: "right" }]}>GST</Text></View>
+      <View style={s.cAmt}><Text style={[s.th, { textAlign: "right" }]}>AMOUNT (₹)</Text></View>
     </View>
   );
 }
 
-// ── Bare-label section row ────────────────────────────────────────
-// Used when a line has a roomLabel that changes — matches the sample's
-// "WALLPAPER" row (label only, all numeric cells empty).
-export function SectionRow({ label }: { label: string }) {
+// ── Room group header ─────────────────────────────────────────────────────────
+export function RoomHeader({ label }: { label: string }) {
   return (
-    <View style={s.trSection}>
-      <View style={s.cItem}><Text style={s.tdSection}>{label.toUpperCase()}</Text></View>
-      <View style={s.cUnit} />
-      <View style={s.cQty} />
-      <View style={s.cRate} />
-      <View style={s.cAmt} />
+    <View style={s.roomHeader}>
+      <Text style={s.roomHeaderText}>{label.toUpperCase()}</Text>
     </View>
   );
 }
 
-// ── Product line ──────────────────────────────────────────────────
-export function TR({ line: l }: { line: QuotationLine }) {
-  // Sample-style AMT = rate × qty (pre-discount, pre-tax). Discount
-  // is shown as a separate DiscountRow beneath. Pre-tax matches
-  // what the customer sees in the sample bottom-line TOTAL.
-  const qtyStr = l.quantity;
-  const qtyNum = parseFloat(qtyStr);
-  const grossPaise = (l.rate * BigInt(Math.round(qtyNum * 10_000))) / 10_000n;
+// ── Signature block ───────────────────────────────────────────────────────────
+export function SigBlock({ clientName, ownerName, phone }: { clientName: string; ownerName: string | null; phone: string }) {
+  return (
+    <View style={s.sigSection} wrap={false}>
+      <View style={s.sigCol}>
+        <Text style={s.sigLabel}>ACCEPTED BY (CLIENT)</Text>
+        <View style={s.sigLine} />
+        <Text style={s.sigName}>{clientName}</Text>
+        <Text style={s.sigRole}>Signature &amp; date</Text>
+      </View>
+      <View style={s.sigCol}>
+        <Text style={s.sigLabel}>PREPARED BY</Text>
+        <View style={s.sigLine} />
+        <Text style={s.sigName}>{ownerName ?? "Mandovara"}</Text>
+        <Text style={s.sigRole}>Mandovara Interiors · {phone}</Text>
+      </View>
+      <View style={s.sigCol}>
+        <Text style={s.sigLabel}>AUTHORISED SIGNATORY</Text>
+        <View style={s.sigLine} />
+        <Text style={s.sigName}>For Mandovara</Text>
+        <Text style={s.sigRole}>Stamp &amp; signature</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Table row ─────────────────────────────────────────────────────────────────
+export function TR({ line: l, idx }: { line: QuotationLine; idx: number }) {
+  const spec      = specFromSnapshot(l.calcSnapshot, l.widthMm, l.heightMm);
+  const subLabel  = [l.brandName, l.designName, l.colourwayCode].filter(Boolean).join(" · ");
+  const swatchClr = l.colourHex ?? STRIP;
+  const hasSwatch = !!l.colourHex;
 
   return (
-    <View style={s.tr} wrap={false}>
-      <View style={s.cItem}>
-        <Text style={s.td}>{l.description || "—"}</Text>
+    <View style={[s.tr, { backgroundColor: idx % 2 === 1 ? STRIP : WHITE }]} wrap={false}>
+      {/* Swatch dot */}
+      <View style={[s.cSwt, { justifyContent: "flex-start", alignItems: "center", paddingTop: 11 }]}>
+        {hasSwatch && (
+          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: swatchClr, borderWidth: 0.5, borderColor: RULE }} />
+        )}
       </View>
-      <View style={s.cUnit}>
-        <Text style={[s.td, s.tdCenter]}>{UNIT_SHORT[l.unit] ?? l.unit}</Text>
+      {/* # */}
+      <View style={s.cNo}>
+        <Text style={[s.tdMain, { textAlign: "center", color: MUTED }]}>{idx + 1}</Text>
       </View>
-      <View style={s.cQty}>
-        <Text style={[s.td, s.tdCenter]}>{Number.isInteger(qtyNum) ? qtyNum : qtyStr}</Text>
+      {/* Description + brand/colourway sub-label + spec */}
+      <View style={s.cDesc}>
+        <Text style={s.tdMain}>{l.description || "—"}</Text>
+        {subLabel ? <Text style={s.tdSub}>{subLabel}</Text> : null}
+        {spec     ? <Text style={[s.tdSub, { color: BRAND }]}>{spec}</Text> : null}
+        {l.isOptional ? <Text style={s.tdOpt}>Optional</Text> : null}
       </View>
+      {/* Qty + Unit combined */}
+      <View style={s.cQtyU}>
+        <Text style={[s.tdRight, { color: INK }]}>
+          {parseFloat(l.quantity)}{" "}{UNIT[l.unit] ?? l.unit.toLowerCase()}
+        </Text>
+      </View>
+      {/* Rate */}
       <View style={s.cRate}>
-        <Text style={[s.td, s.tdCenter]}>{fm(l.rate)}</Text>
+        <Text style={[s.tdRight, { fontWeight: "bold" }]}>{fm(l.rate)}</Text>
       </View>
+      {/* HSN */}
+      <View style={s.cHsn}>
+        <Text style={[s.tdMain, { color: MUTED, fontSize: 7 }]}>{l.hsn ?? "—"}</Text>
+      </View>
+      {/* GST % */}
+      <View style={s.cGst}>
+        <Text style={[s.tdRight, { color: MUTED }]}>{l.gstRate}%</Text>
+      </View>
+      {/* Taxable amount — FIXED: was l.amount (GST-inclusive), now l.taxable */}
       <View style={s.cAmt}>
-        <Text style={[s.td, s.tdRight]}>{fm(grossPaise)}</Text>
+        <Text style={[s.tdRight, { fontWeight: "bold", color: BRAND }]}>{fm(l.taxable)}</Text>
       </View>
-    </View>
-  );
-}
-
-// ── Discount row (line-level) ─────────────────────────────────────
-// Rendered after a TR when the line's discountPct > 0. Matches the
-// sample's "LESS DIS. 25% -8743.75" row.
-export function DiscountRow({ line: l }: { line: QuotationLine }) {
-  const pct = parseFloat(l.discountPct);
-  if (!pct || pct <= 0) return null;
-  const qtyNum = parseFloat(l.quantity);
-  const grossPaise = (l.rate * BigInt(Math.round(qtyNum * 10_000))) / 10_000n;
-  const discountPaise = (grossPaise * BigInt(Math.round(pct * 100))) / 10_000n;
-
-  return (
-    <View style={s.trDiscount} wrap={false}>
-      <View style={s.cItem}>
-        <Text style={s.tdDiscount}>LESS DIS. {Number.isInteger(pct) ? pct : pct.toFixed(2)}%</Text>
-      </View>
-      <View style={s.cUnit} />
-      <View style={s.cQty} />
-      <View style={s.cRate} />
-      <View style={s.cAmt}>
-        <Text style={[s.tdDiscount, s.tdRight]}>-{fm(discountPaise)}</Text>
-      </View>
-    </View>
-  );
-}
-
-// ── TOTAL row ─────────────────────────────────────────────────────
-export function TotalRow({ total }: { total: bigint }) {
-  return (
-    <View style={s.trTotal} wrap={false}>
-      <View style={s.cItem}><Text style={s.tdTotal}>TOTAL</Text></View>
-      <View style={s.cUnit} />
-      <View style={s.cQty} />
-      <View style={s.cRate} />
-      <View style={s.cAmt}><Text style={[s.tdTotal, s.tdRight]}>{fm(total)}</Text></View>
     </View>
   );
 }
