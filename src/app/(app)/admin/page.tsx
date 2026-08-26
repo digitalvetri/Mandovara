@@ -5,6 +5,7 @@ import { listEmployees } from "@/modules/employees/queries";
 import { AddUserForm } from "./_components/AddUserForm";
 import { CompanySettingsForm } from "./_components/CompanySettingsForm";
 import { EmployeesSection } from "./_components/EmployeesSection";
+import { BranchGeofenceSection } from "./_components/BranchGeofenceSection";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,8 @@ export default async function AdminPage() {
             activeCount={employees.activeCount}
             totalCount={employees.totalCount}
           />
+
+          <BranchGeofenceSection branches={a.branches} />
 
         </div>
 

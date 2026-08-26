@@ -29,7 +29,7 @@ export interface AdminView {
   matrix: MatrixRow[];
   audit: AuditRow[];
   company: CompanySettings;
-  branches: { id: string; name: string; invoicePrefix: string }[];
+  branches: { id: string; name: string; invoicePrefix: string; latitude: number | null; longitude: number | null; attendanceRadiusM: number | null }[];
   roles: { id: string; name: string }[];
 }
 
@@ -71,7 +71,7 @@ export async function loadAdmin(ctx: RequestContext): Promise<AdminView> {
       select: { id: true, name: true, gstin: true, fyStartMonth: true },
     }),
     db.branch.findMany({
-      select: { id: true, name: true, invoicePrefix: true },
+      select: { id: true, name: true, invoicePrefix: true, latitude: true, longitude: true, attendanceRadiusM: true },
     }),
     db.auditLog.findMany({
       orderBy: { createdAt: "desc" },
@@ -131,7 +131,14 @@ export async function loadAdmin(ctx: RequestContext): Promise<AdminView> {
       gstin:        org?.gstin ?? null,
       invoiceSeries: primaryBranch?.invoicePrefix ?? "",
     },
-    branches,
+    branches: branches.map((b) => ({
+      id: b.id,
+      name: b.name,
+      invoicePrefix: b.invoicePrefix,
+      latitude: b.latitude == null ? null : Number(b.latitude),
+      longitude: b.longitude == null ? null : Number(b.longitude),
+      attendanceRadiusM: b.attendanceRadiusM,
+    })),
     roles: APP_ROLES,
   };
 }

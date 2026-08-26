@@ -1,11 +1,14 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { ListTodo, Briefcase, FileText, TrendingUp } from "lucide-react";
+import { ListTodo, Briefcase, FileText, TrendingUp, ListChecks } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { Topbar } from "@/components/layout/Topbar";
 import { LeaveStateBadge, humaniseType } from "./_components/EmployeeChips";
 import { AttendanceCTA } from "./_components/AttendanceCTA";
+import { MyTasksList } from "./_components/MyTasksList";
+import { MonthBar, LeaveRow } from "./_components/DashboardBits";
+import { listMyOpenTasks } from "@/modules/tasks/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +82,8 @@ export default async function EmployeeDashboardPage() {
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const tomorrow   = new Date(today.getTime() + 86_400_000);
-  const [todayAttendance, monthRows, leaveRows, taskCount, siteVisitCount, followUpCount] = await Promise.all([
+
+  const [todayAttendance, monthRows, leaveRows, myTasks, siteVisitCount, followUpCount, fenceBranch] = await Promise.all([
     db.attendance.findUnique({
       where:  { employeeId_date: { employeeId: employee.id, date: today } },
       select: { status: true, inAt: true, outAt: true, lockedAt: true },
@@ -94,9 +98,13 @@ export default async function EmployeeDashboardPage() {
       take:    8,
       select:  { id: true, type: true, fromDate: true, toDate: true, days: true, state: true, reason: true },
     }),
-    db.task.count({ where: { assignedToId: ctx.userId, status: { notIn: ["DONE", "CANCELLED"] } } }),
+    listMyOpenTasks(ctx),
     db.siteVisit.count({ where: { assignedToId: ctx.userId, status: { notIn: ["COMPLETED", "CANCELLED", "NO_SHOW"] }, scheduledAt: { gte: today, lt: tomorrow } } }),
     db.followUp.count({ where: { ownerId: ctx.userId, completedAt: null } }),
+    db.branch.findFirst({
+      where:  { latitude: { not: null }, longitude: { not: null }, attendanceRadiusM: { not: null } },
+      select: { name: true, attendanceRadiusM: true },
+    }),
   ]);
 
   const presentDays    = monthRows.filter((r) => r.status === "PRESENT").length;
@@ -109,6 +117,7 @@ export default async function EmployeeDashboardPage() {
   const leavesTaken    = approvedLeaves.reduce((s, l) => s + Number(l.days), 0);
   const initials       = employee.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const monthLabel     = `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
+  const taskCount      = myTasks.length;
   const hasFocus       = taskCount > 0 || siteVisitCount > 0 || followUpCount > 0;
 
   return (
@@ -141,6 +150,8 @@ export default async function EmployeeDashboardPage() {
             initialOutAt={todayAttendance?.outAt?.toISOString() ?? null}
             initialStatus={todayAttendance?.status ?? null}
             isLocked={!!todayAttendance?.lockedAt}
+            fenceBranchName={fenceBranch?.name ?? null}
+            fenceRadiusM={fenceBranch?.attendanceRadiusM ?? null}
           />
         </div>
       </div>
@@ -166,6 +177,19 @@ export default async function EmployeeDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* ── My Tasks — full list with mark-done ── */}
+      {taskCount > 0 && (
+        <div className="mb-5">
+          <div className="mb-2 flex items-center gap-2">
+            <ListChecks size={13} strokeWidth={2} className="text-accent" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.10em] text-text-dim">
+              My Tasks <span className="text-text tabular">({taskCount})</span>
+            </span>
+          </div>
+          <MyTasksList tasks={myTasks} />
+        </div>
+      )}
 
       {/* ── Stats row ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
@@ -228,38 +252,10 @@ export default async function EmployeeDashboardPage() {
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
 function FocusChip({ label }: { label: string }) {
   return (
     <span className="inline-flex items-center rounded-full border border-rule bg-surface-2 px-3 py-1 text-[12px] font-medium text-text">
       {label}
     </span>
-  );
-}
-
-function MonthBar({ label, value, total, barColor, numColor }: {
-  label: string; value: number; total: number; barColor: string; numColor: string;
-}) {
-  const pct = total === 0 ? 0 : Math.min((value / total) * 100, 100);
-  return (
-    <div>
-      <div className="flex justify-between mb-1.5">
-        <span className="text-[12px] text-text-dim">{label}</span>
-        <span className={`tabular-nums text-[13px] font-semibold ${value > 0 ? numColor : "text-text-faint"}`}>{value}</span>
-      </div>
-      <div className="h-[5px] rounded-full bg-rule overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function LeaveRow({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[12px] text-text-dim">{label}</span>
-      <span className={`tabular-nums text-[13px] font-semibold ${color}`}>{value}</span>
-    </div>
   );
 }

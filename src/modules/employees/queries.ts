@@ -30,6 +30,40 @@ export interface EmployeesView {
   totalCount: number;
 }
 
+export interface EmployeeDetail {
+  id:          string;
+  code:        string;
+  name:        string;
+  mobile:      string;
+  designation: string | null;
+  department:  string | null;
+  status:      string;
+  joinDate:    Date;
+  userId:      string | null;
+}
+
+export async function getEmployeeById(
+  ctx: RequestContext,
+  id:  string,
+): Promise<EmployeeDetail | null> {
+  requirePermission(ctx, "employee.view");
+  const db = scoped(ctx);
+  const row = await db.employee.findUnique({
+    where:  { id },
+    select: {
+      id: true, code: true, name: true, mobile: true,
+      designation: true, department: true, status: true,
+      doj: true, userId: true,
+    },
+  });
+  if (!row) return null;
+  return {
+    id: row.id, code: row.code, name: row.name, mobile: row.mobile,
+    designation: row.designation, department: row.department,
+    status: row.status, joinDate: row.doj, userId: row.userId,
+  };
+}
+
 export async function listEmployees(
   ctx: RequestContext,
   opts: { includeTerminated?: boolean } = {},

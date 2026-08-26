@@ -15,6 +15,8 @@ export interface AttendanceCTAProps {
   initialOutAt:   string | null;
   initialStatus:  string | null;
   isLocked:       boolean;
+  fenceBranchName?: string | null;
+  fenceRadiusM?:    number | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -24,6 +26,8 @@ export function AttendanceCTA({
   initialOutAt,
   initialStatus,
   isLocked,
+  fenceBranchName,
+  fenceRadiusM,
 }: AttendanceCTAProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -131,8 +135,18 @@ export function AttendanceCTA({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const hasFence = !!fenceBranchName && !!fenceRadiusM;
+
   return (
     <div className="mt-5 space-y-3">
+
+      {/* Geofence chip — shows what location the server will enforce */}
+      {hasFence && !isComplete && !isNonWorkDay && (
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-accent-chrome/25 bg-accent-chrome/10 px-3 py-1 text-[11px] text-sidebar-text">
+          <MapPin size={11} strokeWidth={2} className="text-accent-chrome" />
+          Attendance fence: <span className="font-medium">{fenceBranchName}</span> · {fenceRadiusM}m
+        </div>
+      )}
 
       {/* Banner */}
       {banner && (

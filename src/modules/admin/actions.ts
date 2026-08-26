@@ -37,6 +37,14 @@ const updateCompanySchema = z.object({
   fyStartMonth: z.number().int().min(1).max(12),
 });
 
+// Geofence: null on any field clears the fence for that branch.
+const setBranchGeofenceSchema = z.object({
+  branchId:  z.string().min(1),
+  latitude:  z.number().gte(-90).lte(90).nullable(),
+  longitude: z.number().gte(-180).lte(180).nullable(),
+  radiusM:   z.number().int().min(10).max(50_000).nullable(),
+});
+
 export async function createUser(input: unknown): Promise<ActionResult<{ id: string }>> {
   const ctx = await devContext();
   requirePermission(ctx, "admin.users");
@@ -94,6 +102,34 @@ export async function updateCompanySettings(input: unknown): Promise<ActionResul
   });
   revalidatePath("/admin");
   return { ok: true, data: { id: d.orgId } };
+}
+
+export async function setBranchGeofence(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const ctx = await devContext();
+  requirePermission(ctx, "admin.settings");
+  const parsed = setBranchGeofenceSchema.safeParse(input);
+  if (!parsed.success) return zodError(parsed.error);
+  const { branchId, latitude, longitude, radiusM } = parsed.data;
+
+  // XOR-ish rule: either all three are set (fence enabled) or all three
+  // cleared (fence disabled). A half-configured fence would silently
+  // fall through to legacy accept-any-GPS.
+  const anySet = latitude != null || longitude != null || radiusM != null;
+  const allSet = latitude != null && longitude != null && radiusM != null;
+  if (anySet && !allSet) {
+    return { ok: false, error: "Set latitude, longitude AND radius together (or clear all three to disable the fence)." };
+  }
+
+  await scoped(ctx).branch.update({
+    where: { id: branchId },
+    data: {
+      latitude:          latitude,
+      longitude:         longitude,
+      attendanceRadiusM: radiusM,
+    },
+  });
+  revalidatePath("/admin");
+  return { ok: true, data: { id: branchId } };
 }
 
 function zodError<T = unknown>(err: z.ZodError): ActionResult<T> {

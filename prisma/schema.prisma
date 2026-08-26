@@ -440,6 +440,14 @@ model Branch {
   stateCode      String       @default("33")
   address        Json?
   invoicePrefix  String       @default("MDV")
+  // Geofence for self check-in / check-out (2026-08-26). When all
+  // three are set the attendance server actions require the caller's
+  // GPS to be within attendanceRadiusM metres of (latitude, longitude).
+  // When null, attendance falls back to legacy "accept any GPS"
+  // behaviour so existing branches don't lock people out post-migration.
+  latitude          Decimal? @db.Decimal(9, 6)
+  longitude         Decimal? @db.Decimal(9, 6)
+  attendanceRadiusM Int?
 
   org            Organization @relation(fields: [organizationId], references: [id])
 

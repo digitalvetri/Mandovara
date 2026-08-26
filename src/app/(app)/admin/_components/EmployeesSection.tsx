@@ -6,7 +6,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Archive } from "lucide-react";
+import Link from "next/link";
+import type { Route } from "next";
+import { Plus, Trash2, Archive, ChevronRight } from "lucide-react";
 import { createEmployee, deleteEmployee, setEmployeeStatus } from "@/modules/employees/actions";
 import type { EmployeeRow } from "@/modules/employees/queries";
 
@@ -177,6 +179,13 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
                   </Td>
                   <Td align="right">
                     <div className="inline-flex items-center gap-1">
+                      <Link
+                        href={`/admin/employees/${emp.id}` as Route}
+                        title="View employee + assign tasks"
+                        className="inline-flex items-center gap-1 h-[24px] px-2 rounded-[4px] text-[10.5px] text-text-dim border border-rule hover:text-accent hover:border-accent/50 transition-colors"
+                      >
+                        View <ChevronRight size={10} strokeWidth={2} />
+                      </Link>
                       {emp.status === "ACTIVE" || emp.status === "ON_LEAVE" ? (
                         emp.hasAttendance || emp.hasPayslip ? (
                           <button type="button" onClick={() => commitTerminate(emp.id)} disabled={pending}

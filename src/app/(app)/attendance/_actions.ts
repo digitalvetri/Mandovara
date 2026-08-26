@@ -26,6 +26,45 @@ function workedStr(inAt: Date, outAt: Date): string {
   return `${h}h ${m.toString().padStart(2, "0")}m`;
 }
 
+// Haversine — great-circle distance between two points in metres. Good
+// enough for a geofence check at office-radius scale (metres, not km).
+function distanceM(a: GeoCoords, b: { lat: number; lng: number }): number {
+  const R = 6_371_000; // Earth radius in metres
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+// Check the caller's GPS against the org's configured geofence (first
+// Branch with lat/lng/radius set). Returns null if allowed, or an error
+// message if outside the fence. Returns null if no fence is configured
+// (legacy behaviour — attendance still works on branches without a fence).
+async function geofenceError(
+  ctx:  Awaited<ReturnType<typeof devContext>>,
+  geo:  GeoCoords | undefined,
+): Promise<string | null> {
+  const db = scoped(ctx);
+  const branch = await db.branch.findFirst({
+    where:  { latitude: { not: null }, longitude: { not: null }, attendanceRadiusM: { not: null } },
+    select: { name: true, latitude: true, longitude: true, attendanceRadiusM: true },
+  });
+  if (!branch || branch.latitude == null || branch.longitude == null || branch.attendanceRadiusM == null) {
+    return null;
+  }
+  if (!geo) {
+    return `Location required — ${branch.name} has a check-in fence configured. Enable location and try again.`;
+  }
+  const target = { lat: Number(branch.latitude), lng: Number(branch.longitude) };
+  const dist = distanceM(geo, target);
+  if (dist <= branch.attendanceRadiusM) return null;
+  const distM = Math.round(dist);
+  return `You are ${distM}m from ${branch.name} (allowed radius ${branch.attendanceRadiusM}m). Move closer to check in / out.`;
+}
+
 // ── Check In ───────────────────────────────────────────────────────────────────
 // Creates the attendance record for today. Idempotent: returns a clear error
 // if already checked in rather than overwriting the original time.
@@ -43,6 +82,9 @@ export async function selfCheckIn(geo?: GeoCoords): Promise<CheckResult> {
   if (!employee) {
     return { ok: false, error: "No employee profile is linked to your account." };
   }
+
+  const fenceErr = await geofenceError(ctx, geo);
+  if (fenceErr) return { ok: false, error: fenceErr };
 
   const existing = await db.attendance.findUnique({
     where:  { employeeId_date: { employeeId: employee.id, date: today } },
@@ -101,6 +143,9 @@ export async function selfCheckOut(geo?: GeoCoords): Promise<CheckResult> {
   if (!employee) {
     return { ok: false, error: "No employee profile is linked to your account." };
   }
+
+  const fenceErr = await geofenceError(ctx, geo);
+  if (fenceErr) return { ok: false, error: fenceErr };
 
   const existing = await db.attendance.findUnique({
     where:  { employeeId_date: { employeeId: employee.id, date: today } },
