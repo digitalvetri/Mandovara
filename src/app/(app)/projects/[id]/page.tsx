@@ -111,6 +111,18 @@ export default async function ProjectDetailPage({
                 Edit
               </a>
             )}
+            {/* Create quotation — jumps to /quotations/new pre-scoped to
+                this project. Hidden on terminal stages so completed /
+                cancelled projects don't accumulate more quotes. */}
+            {ctx.permissions.has("quotation.create") &&
+              p.stage !== "COMPLETED" && p.stage !== "CANCELLED" && (
+              <a
+                href={`/quotations/new?project=${p.id}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-accent/40 bg-accent/8 px-3 text-[12px] font-medium text-accent hover:bg-accent/15 transition-colors"
+              >
+                Create quotation
+              </a>
+            )}
             {/* "Create invoice" surfaces here only when all three gates hold:
                 user has invoice.create, project has a confirmed order, AND
                 no active invoice exists yet. Hidden once invoiced to prevent
