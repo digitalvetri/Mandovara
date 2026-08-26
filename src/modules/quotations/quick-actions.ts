@@ -21,8 +21,7 @@ import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kern
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import { computeCalcResult } from "@/modules/measurement/engine";
-import type { ProductFamily, SellUnit } from "@prisma/client";
-import { findMeasurementGateViolation } from "./lib";
+import type { SellUnit } from "@prisma/client";
 import type { ActionResult } from "./actions";
 import { quickQuoteSchema } from "./quick-schemas";
 
@@ -86,23 +85,11 @@ export async function createQuickQuote(
   // have no Project to hang a round off — so rather than writing a
   // made-to-measure line with measurementItemId = null (exactly what §15.1
   // forbids, with no exception), refuse it and name the next action.
-  if (isLeadScoped) {
-    // Gate only applies to catalog lines — free-text lines (no colourwayId) have
-    // no known family and are treated as service / accessory items.
-    const violation = findMeasurementGateViolation(
-      d.lines,
-      (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,
-      { isLeadScoped: true, labelOf: (id) => cwMap.get(id)?.design.name },
-    );
-    if (violation) {
-      return {
-        ok: false,
-        errorCode: "MEASUREMENT_REQUIRED",
-        error: "Validation failed",
-        fieldErrors: { [`lines.${violation.index}.colourwayId`]: violation.message },
-      };
-    }
-  }
+  // Owner redesign (2026-08-26): the Quick Quote no longer enforces
+  // §15.1 for lead-scoped made-to-measure lines. The sample estimates
+  // are hand-written with just "ROLLS 8" style qty entries and the
+  // owner accepts the "quote before measure" risk here. Same policy
+  // as the invoice-first wizard.
 
   // ── Compute per-line tax and document totals up front ─────────
   const supplierStateCode = branch.stateCode;
@@ -207,6 +194,11 @@ export async function createQuickQuote(
       for (let i = 0; i < d.lines.length; i++) {
         const line = d.lines[i]!;
         if (!line.colourwayId) continue;   // free-text lines need no measurement item
+        // Owner redesign (2026-08-26): the Quick Quote no longer captures
+        // width/height. Without dimensions we can't run the calc engine,
+        // so we skip the measurement item entirely — the line is a
+        // straight qty-based estimate, same as a hardware/service line.
+        if (line.widthMm == null || line.heightMm == null) continue;
         const cw   = cwMap.get(line.colourwayId)!;
         const family = cw.design.family;
         const roomId = roomIdByName.get(line.roomName.trim())!;

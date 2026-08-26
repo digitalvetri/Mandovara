@@ -12,6 +12,21 @@ interface LineRowProps {
 
 const GST_RATES = [0, 5, 12, 18, 28] as const;
 
+// Owner redesign (2026-08-26): the Quick Quote line matches the
+// hand-crafted sample now — no width/height in millimetres, just
+// Qty + Unit like "MTR 25", "ROLLS 8", "NOS 2". Site-measurement
+// dimensions are captured elsewhere when they're actually needed.
+const UNITS: { value: string; label: string }[] = [
+  { value: "METRE",       label: "MTR (Metres)" },
+  { value: "ROLL",        label: "ROLLS" },
+  { value: "RUNNING_FT",  label: "RFT (Running feet)" },
+  { value: "PIECE",       label: "NOS / Pieces" },
+  { value: "SET",         label: "SET" },
+  { value: "BOX",         label: "BOX" },
+  { value: "SQFT",        label: "SQFT" },
+  { value: "SQM",         label: "SQM" },
+];
+
 export function LineRow({ line, onChange, onRemove }: LineRowProps) {
   return (
     <div className="rounded-[10px] border border-rule bg-surface overflow-hidden">
@@ -21,7 +36,7 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
             label="Description"
             value={line.label}
             onChange={(v) => onChange({ label: v })}
-            placeholder="e.g. Curtains — Master Bedroom"
+            placeholder="e.g. MBR Main, Track, Stitching charge"
             className="flex-1"
           />
           {onRemove && (
@@ -37,19 +52,29 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          <Input label="Room"         value={line.roomName} onChange={(v) => onChange({ roomName: v })} />
-          <Input label="Width (mm)"   value={line.widthMm}  onChange={(v) => onChange({ widthMm: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
-          <Input label="Height (mm)"  value={line.heightMm} onChange={(v) => onChange({ heightMm: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
-          <Input label="Qty"          value={line.quantity}  onChange={(v) => onChange({ quantity: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
-        </div>
-
-        <div className="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <Input label="Room / Section" value={line.roomName} onChange={(v) => onChange({ roomName: v })} />
+          <label className="block">
+            <div className="text-[10px] uppercase tracking-[0.06em] text-text-dim mb-1">Unit</div>
+            <select
+              value={line.sellUnit ?? "METRE"}
+              onChange={(e) => onChange({ sellUnit: e.target.value })}
+              className="w-full h-[36px] rounded-[6px] border border-rule bg-transparent px-2 text-[12.5px] text-text"
+            >
+              {UNITS.map((u) => (
+                <option key={u.value} value={u.value}>{u.label}</option>
+              ))}
+            </select>
+          </label>
+          <Input label="Qty" value={line.quantity} onChange={(v) => onChange({ quantity: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
           <Input
             label="Rate (₹)"
             value={line.rateEditable ?? ""}
             onChange={(v) => onChange({ rateEditable: v.replace(/[^0-9.]/g, "") })}
             inputMode="decimal"
           />
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-2">
           <label className="block">
             <div className="text-[10px] uppercase tracking-[0.06em] text-text-dim mb-1">GST %</div>
             <select
@@ -63,7 +88,7 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
             </select>
           </label>
           <Input label="Disc %" value={line.discountPct} onChange={(v) => onChange({ discountPct: v.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
-          <div className="flex items-end justify-end text-[10.5px]">
+          <div className="col-span-2 flex items-end justify-end text-[10.5px]">
             <span className="tabular text-text font-medium">{formatINR(lineAmount(line))}</span>
           </div>
         </div>

@@ -9,8 +9,6 @@ export interface LineDraft {
   key:          string;
   roomName:     string;
   label:        string;
-  widthMm:      string;
-  heightMm:     string;
   quantity:     string;
   discountPct:  string;
   colourwayId?: string;
@@ -28,12 +26,10 @@ export function emptyLine(): LineDraft {
     key:         Math.random().toString(36).slice(2),
     roomName:    "Living",
     label:       "",
-    widthMm:     "",
-    heightMm:    "",
     quantity:    "1",
     discountPct: "0",
     gstRate:     18,
-    sellUnit:    "PIECE",
+    sellUnit:    "METRE",
   };
 }
 

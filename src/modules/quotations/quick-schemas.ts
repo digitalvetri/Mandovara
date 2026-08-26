@@ -11,12 +11,16 @@ const mm      = z.number().positive().max(20_000);
 export const quickLineSchema = z.object({
   roomName:    z.string().trim().min(1).max(80),
   label:       z.string().trim().min(1).max(120),
-  widthMm:     mm,
-  heightMm:    mm,
+  // Owner redesign (2026-08-26): width/height are no longer captured
+  // in the Quick Quote — the sample estimates just say "MTR 25". When
+  // they're absent, the server skips MeasurementItem creation and the
+  // line becomes a straight qty-based estimate.
+  widthMm:     mm.optional(),
+  heightMm:    mm.optional(),
   quantity:    z.number().positive().max(999),
   colourwayId: idField.optional(),
   gstRate:     z.number().min(0).max(28).default(18),
-  unit:        z.enum(["METRE","ROLL","SQFT","SQM","PIECE","SET","BOX","RUNNING_FT"]).default("PIECE"),
+  unit:        z.enum(["METRE","ROLL","SQFT","SQM","PIECE","SET","BOX","RUNNING_FT"]).default("METRE"),
   ratePaise:   z.string().min(1),
   discountPct: z.number().min(0).max(100).default(0),
   description: z.string().trim().max(240).optional(),
