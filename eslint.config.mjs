@@ -162,6 +162,7 @@ export default tseslint.config(
       "src/app/api/admin/bootstrap/route.ts",     // one-time org bootstrap — runs before any tenant exists
       "src/app/api/admin/test-user/route.ts",     // create / delete disposable OWNER for QA
       "src/app/api/admin/reset-password/route.ts", // admin password reset — runs before any tenant context
+      "src/app/api/admin/link-employee/route.ts",  // one-shot employee↔user link — runs before tenant context
       "src/modules/admin/wipe-transactional.ts",  // destructive: TRUNCATE needs owner-level DB access
       "src/modules/quotations/public-query.ts",   // token IS the credential — no org context exists
     ],
