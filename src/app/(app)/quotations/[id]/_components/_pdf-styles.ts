@@ -124,6 +124,9 @@ export const pdfStyles = StyleSheet.create({
   policyWrap: { paddingHorizontal: 28, paddingTop: 14, paddingBottom: 4 },
   policyLine: { fontSize: 9, color: INK, lineHeight: 1.55, marginBottom: 2 },
   policyLineRed:  { fontSize: 9, color: RED, fontWeight: "bold", lineHeight: 1.55, marginBottom: 2 },
-  policyHeading:  { fontSize: 10, color: RED, fontWeight: "bold", fontStyle: "italic",
-                    letterSpacing: 0.4, marginTop: 10, marginBottom: 6 },
+  // Emphasis via bold + red + uppercase letter-spacing instead of
+  // italic — the Geist font we registered has no italic variant and
+  // react-pdf would fall back or throw depending on version.
+  policyHeading:  { fontSize: 10, color: RED, fontWeight: "bold",
+                    letterSpacing: 0.6, marginTop: 10, marginBottom: 6 },
 });

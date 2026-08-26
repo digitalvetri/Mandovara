@@ -105,7 +105,7 @@ export function InvoicePdf({ invoice: i, logoSrc }: { invoice: InvoiceDetail; lo
       <Page size="A4" style={s.page}>
 
         {/* ── Branded header banner ────────────────────────────── */}
-        <View style={s.banner} fixed>
+        <View style={s.banner}>
           <View style={s.bannerLogoWrap}>
             {logoSrc && <Image src={logoSrc} style={s.bannerLogoImg} />}
           </View>
