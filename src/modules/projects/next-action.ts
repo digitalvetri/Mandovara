@@ -10,8 +10,6 @@
 import type { RequestContext } from "@/kernel/auth/context";
 
 export type NextActionKind =
-  | "SCHEDULE_VISIT"
-  | "START_MEASUREMENT"
   | "AWAITING_APPROVAL"
   | "BUILD_QUOTATION"
   | "SEND_QUOTATION"
@@ -56,9 +54,6 @@ export interface ProjectSnapshot {
   };
 }
 
-const PERM_START_MEASUREMENT = [
-  "measurement.create.any", "measurement.create.own", "measurement.create",
-] as const;
 const PERM_BUILD_QUOTATION = ["quotation.create"] as const;
 const PERM_SEND_QUOTATION  = ["quotation.send"]   as const;
 const PERM_CREATE_INVOICE  = ["invoice.create"] as const;
@@ -76,46 +71,25 @@ export function resolveNextAction(
   const { stage, id, clientId } = project;
 
   switch (stage) {
+    // Owner redesign (2026-08-26): the four pre-order internal stages
+    // all show the same primary CTA — Prepare firm quote. Firm-quote
+    // acceptance produces the invoiceable order (and deducts stock at
+    // product-pick, per the canonical flow). Site-visit + measurement
+    // are anytime side-actions on the project page, not primary CTAs.
     case "ENQUIRY":
-      // href is set to the project itself but the click is intercepted
-      // by NextActionCard via onScheduleVisit — it opens an inline sheet
-      // that pre-fills the projectId, so no navigation is required.
-      return {
-        kind:  "SCHEDULE_VISIT",
-        label: "Schedule a site visit",
-        cta:   "Schedule visit",
-        enabled: hasAny(ctx, ["project.update", "sitelog.create"]),
-        disabledReason: hasAny(ctx, ["project.update", "sitelog.create"]) ? null :
-          "Site visits are scheduled by the sales team.",
-        href: null,
-      };
-
     case "SITE_VISIT":
-    case "MEASUREMENT": {
-      const enabled = hasAny(ctx, PERM_START_MEASUREMENT);
-      return {
-        kind:  "START_MEASUREMENT",
-        label: "Take measurements",
-        cta:   "Start measurement",
-        enabled,
-        disabledReason: enabled ? null :
-          "Measurement is captured on site by the measurement team.",
-        // The button routes via a server action; a fallback href goes to
-        // the measurement list so a mid-permission user can still browse.
-        href: `/projects/${id}/measurements`,
-      };
-    }
-
+    case "MEASUREMENT":
     case "QUOTATION": {
       const enabled = hasAny(ctx, PERM_BUILD_QUOTATION) || hasAny(ctx, PERM_SEND_QUOTATION);
       return {
         kind:  "BUILD_QUOTATION",
-        label: "Build the quotation",
+        label: "Prepare firm quote",
         cta:   "Open quotations",
         enabled,
         disabledReason: enabled ? null :
           "Quotations are prepared by sales / designers.",
         href: `/quotations?project=${id}`,
+        subLine: "Firm quote becomes the invoice.",
       };
     }
 
@@ -261,6 +235,7 @@ export function resolveNextAction(
 
 export {
   PROJECT_STAGES, STAGE_SHORT_LABEL,
-  PROJECT_PHASES, PHASE_LABEL, PHASE_TARGET_STAGE, phaseForStage,
+  PROJECT_PHASES, PHASE_LABEL, PHASE_TARGET_STAGE,
+  phaseForStage, phaseForStageWithMoney,
 } from "./stage-phases";
-export type { ProjectPhase } from "./stage-phases";
+export type { ProjectPhase, PhaseMoneySnapshot } from "./stage-phases";

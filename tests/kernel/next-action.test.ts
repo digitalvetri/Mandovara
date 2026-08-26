@@ -1,10 +1,15 @@
 // Unit tests for the "next action" resolver. Pure function — no DB.
 // Covers the spec's UI-contract tests: the CTA the user sees, and whether
 // it's enabled or disabled with the expected explanatory line.
+//
+// Owner redesign (2026-08-26): the pre-order internal stages (ENQUIRY,
+// SITE_VISIT, MEASUREMENT, QUOTATION) all share a single primary CTA
+// "Prepare firm quote". Site visit + measurement are anytime side-actions
+// on the project page and are covered by UI tests, not this resolver.
 
 import { describe, expect, it } from "vitest";
 import type { RequestContext } from "@/kernel/auth/context";
-import { resolveNextAction } from "@/modules/projects/next-action";
+import { resolveNextAction, phaseForStageWithMoney } from "@/modules/projects/next-action";
 
 function ctxWith(perms: readonly string[]): RequestContext {
   return {
@@ -18,47 +23,39 @@ function ctxWith(perms: readonly string[]): RequestContext {
   };
 }
 
-const PROJECT = { id: "p1", clientId: "c1", stage: "SITE_VISIT" };
+describe("resolveNextAction — pre-order stages collapse to Prepare firm quote", () => {
+  it.each(["ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION"])(
+    "stage=%s → BUILD_QUOTATION with 'Prepare firm quote'",
+    (stage) => {
+      const ctx = ctxWith(["project.view", "quotation.create"]);
+      const a = resolveNextAction(ctx, { id: "p1", clientId: "c1", stage });
+      expect(a.kind).toBe("BUILD_QUOTATION");
+      expect(a.label).toBe("Prepare firm quote");
+      expect(a.href).toBe("/quotations?project=p1");
+      expect(a.enabled).toBe(true);
+    },
+  );
 
-describe("resolveNextAction — measurement stages", () => {
-  it("Owner at SITE_VISIT is DISABLED with the segregation-of-duties reason", () => {
-    // Owner explicitly has no measurement.create.* keys (seed §5 carveouts).
-    const ctx = ctxWith(["project.view", "measurement.approve.any"]);
-    const a = resolveNextAction(ctx, PROJECT);
-    expect(a.kind).toBe("START_MEASUREMENT");
+  it("is disabled with the sales/designers reason when quotation.create is missing", () => {
+    const ctx = ctxWith(["project.view"]);
+    const a = resolveNextAction(ctx, { id: "p1", stage: "QUOTATION" });
     expect(a.enabled).toBe(false);
-    expect(a.disabledReason).toContain("measurement team");
+    expect(a.disabledReason).toContain("sales / designers");
   });
 
-  it("Measurement executive at SITE_VISIT is ENABLED (has create.any)", () => {
-    const ctx = ctxWith(["project.view", "measurement.create.any"]);
-    const a = resolveNextAction(ctx, PROJECT);
-    expect(a.enabled).toBe(true);
-    expect(a.disabledReason).toBeNull();
-    expect(a.cta).toBe("Start measurement");
-  });
-
-  it("Sales exec at SITE_VISIT with create.own is ENABLED", () => {
-    const ctx = ctxWith(["project.view", "measurement.create.own"]);
-    const a = resolveNextAction(ctx, PROJECT);
-    expect(a.enabled).toBe(true);
-  });
-
-  it("legacy flat measurement.create still enables (backwards compat)", () => {
-    const ctx = ctxWith(["project.view", "measurement.create"]);
-    const a = resolveNextAction(ctx, PROJECT);
+  it("quotation.send alone (no create) still enables the CTA — sender can nudge", () => {
+    const ctx = ctxWith(["project.view", "quotation.send"]);
+    const a = resolveNextAction(ctx, { id: "p1", stage: "ENQUIRY" });
     expect(a.enabled).toBe(true);
   });
 });
 
-describe("resolveNextAction — stage → CTA mapping", () => {
+describe("resolveNextAction — post-order stages", () => {
   const perms = new Set(["project.update", "quotation.create", "po.create",
     "allocation.create"]);
   const ctx = ctxWith([...perms]);
 
   it.each([
-    ["ENQUIRY",      "SCHEDULE_VISIT",     "Schedule a site visit"],
-    ["QUOTATION",    "BUILD_QUOTATION",    "Build the quotation"],
     // Owner canonical flow post-acceptance: invoice → advance → install.
     // With no money snapshot (test defaults), the ORDERED CTA is "Create
     // invoice" not the retired "Prepare material" pointing to procurement.
@@ -110,13 +107,6 @@ describe("resolveNextAction — stage → CTA mapping", () => {
 });
 
 describe("resolveNextAction — disabled fallbacks", () => {
-  it("QUOTATION without quotation.create is disabled with the right reason", () => {
-    const ctx = ctxWith(["project.view"]);
-    const a = resolveNextAction(ctx, { id: "p1", stage: "QUOTATION" });
-    expect(a.enabled).toBe(false);
-    expect(a.disabledReason).toContain("sales / designers");
-  });
-
   it("PROCUREMENT without install perms is disabled with a sales-team reason", () => {
     const ctx = ctxWith(["project.view"]);
     const a = resolveNextAction(ctx, { id: "p1", stage: "PROCUREMENT" });
@@ -128,5 +118,31 @@ describe("resolveNextAction — disabled fallbacks", () => {
     const ctx = ctxWith(["project.update", "quotation.create", "measurement.create.any"]);
     const a = resolveNextAction(ctx, { id: "p1", stage: "CANCELLED" });
     expect(a.enabled).toBe(false);
+  });
+});
+
+describe("phaseForStageWithMoney — INVOICE vs ADVANCE split", () => {
+  it("ORDERED with no money snapshot → INVOICE", () => {
+    expect(phaseForStageWithMoney("ORDERED", null)).toBe("INVOICE");
+  });
+
+  it("ORDERED with invoiceTotal 0 → INVOICE", () => {
+    expect(phaseForStageWithMoney("ORDERED", {
+      invoiceTotal: 0n, advanceReceived: 0n, advanceRequired: 500_00n,
+    })).toBe("INVOICE");
+  });
+
+  it("ORDERED with invoiceTotal > 0 → ADVANCE", () => {
+    expect(phaseForStageWithMoney("ORDERED", {
+      invoiceTotal: 10_000_00n, advanceReceived: 0n, advanceRequired: 500_00n,
+    })).toBe("ADVANCE");
+  });
+
+  it("non-ORDERED stages ignore money and delegate to phaseForStage", () => {
+    const m = { invoiceTotal: 10_000_00n, advanceReceived: 0n, advanceRequired: 500_00n };
+    expect(phaseForStageWithMoney("ENQUIRY", m)).toBe("PROJECT");
+    expect(phaseForStageWithMoney("PROCUREMENT", m)).toBe("INSTALLATION");
+    expect(phaseForStageWithMoney("COMPLETED", m)).toBe("COMPLETED");
+    expect(phaseForStageWithMoney("CANCELLED", m)).toBe("CANCELLED");
   });
 });

@@ -11,16 +11,28 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PROJECT_PHASES, PHASE_LABEL, PHASE_TARGET_STAGE, phaseForStage } from "@/modules/projects/next-action";
+import {
+  PROJECT_PHASES, PHASE_LABEL, PHASE_TARGET_STAGE,
+  phaseForStage, phaseForStageWithMoney,
+  type PhaseMoneySnapshot,
+} from "@/modules/projects/next-action";
 import { setProjectStatus } from "@/modules/projects/actions";
 
 interface Props {
   stage: string;
   projectId?: string;
   canEdit?: boolean;
+  /** Optional money snapshot so the stepper can split ORDERED into
+   *  INVOICE (nothing raised yet) vs ADVANCE (invoice out, waiting). */
+  money?: PhaseMoneySnapshot | null;
+  /** True when the project already has an invoiceable Order row (i.e.
+   *  a firm quote was accepted). Forward jumps past PROJECT are
+   *  disabled without one — otherwise the user lands at internal
+   *  ORDERED and the invoice page shows the empty state. */
+  hasOrder?: boolean;
 }
 
-export function StageStepper({ stage, projectId, canEdit = false }: Props) {
+export function StageStepper({ stage, projectId, canEdit = false, money, hasOrder = false }: Props) {
   const router = useRouter();
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [error, setError]     = useState<string | null>(null);
@@ -28,7 +40,7 @@ export function StageStepper({ stage, projectId, canEdit = false }: Props) {
   const rootRef               = useRef<HTMLOListElement>(null);
 
   const cancelled       = stage === "CANCELLED";
-  const currentPhase    = phaseForStage(stage);
+  const currentPhase    = money !== undefined ? phaseForStageWithMoney(stage, money) : phaseForStage(stage);
   const currentIndex    = cancelled ? -1 : PROJECT_PHASES.indexOf(currentPhase as never);
 
   useEffect(() => {
@@ -64,7 +76,12 @@ export function StageStepper({ stage, projectId, canEdit = false }: Props) {
           const current = !cancelled && i === currentIndex;
           const label   = PHASE_LABEL[phase];
           const isOpen  = openIdx === i;
-          const editable = canEdit && !cancelled && !current;
+          // Forward jumps past PROJECT need an accepted firm quote —
+          // otherwise setProjectStatus would land the project at
+          // internal ORDERED with no invoiceable Order row, and the
+          // "Create invoice" CTA would dead-end.
+          const forwardBlocked = !hasOrder && i > currentIndex && phase !== "PROJECT";
+          const editable = canEdit && !cancelled && !current && !forwardBlocked;
           const targetStage = PHASE_TARGET_STAGE[phase];
 
           const inner = (
@@ -150,6 +167,9 @@ export function StageStepper({ stage, projectId, canEdit = false }: Props) {
       {canEdit && !cancelled && (
         <div className="mt-1.5 text-[10.5px] text-text-subtle">
           Stages advance automatically as work happens. Click a stage to override manually.
+          {!hasOrder && currentPhase === "PROJECT" && (
+            <span className="ml-1">Prepare a firm quote first to unlock Invoice and later stages.</span>
+          )}
         </div>
       )}
     </>

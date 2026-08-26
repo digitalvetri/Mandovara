@@ -132,6 +132,12 @@ export default async function ProjectDetailPage({
             stage={p.stage}
             projectId={p.id}
             canEdit={ctx.permissions.has("project.update")}
+            money={money ? {
+              invoiceTotal:    money.invoiceTotal,
+              advanceReceived: money.advanceReceived,
+              advanceRequired: money.advanceRequired,
+            } : null}
+            hasOrder={Boolean(payments?.latestOrderId)}
           />
         </div>
 
@@ -145,7 +151,23 @@ export default async function ProjectDetailPage({
       {/* ── Body — 2-column grid ────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
-          <StartMeasurementFlow projectId={p.id} action={action} currentUserId={ctx.userId} />
+          <StartMeasurementFlow
+            projectId={p.id}
+            action={action}
+            currentUserId={ctx.userId}
+            canScheduleVisit={
+              ctx.permissions.has("project.update") ||
+              ctx.permissions.has("sitelog.create")
+            }
+            canMeasure={
+              ctx.permissions.has("measurement.create.any") ||
+              ctx.permissions.has("measurement.create.own") ||
+              ctx.permissions.has("measurement.create")
+            }
+            quickActionsVisible={
+              p.stage !== "COMPLETED" && p.stage !== "CANCELLED"
+            }
+          />
           <UpcomingVisitsCard visits={visits} />
           <MilestonesPanel milestones={milestones} orderValue={p.orderValue} />
           <ChosenItemsPanel projectId={p.id} items={chosen} />

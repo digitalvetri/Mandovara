@@ -38,6 +38,23 @@ export function MeasurementsSection({ projectId, rounds }: Props) {
     }
   }
 
+  // Owner redesign (2026-08-26): keep this section compact so the
+  // project page reads as a short scroll. Empty state is a one-liner,
+  // not a big dashed box — measurement rounds are optional now.
+  if (rounds.length === 0) {
+    return (
+      <div className="flex items-center justify-between rounded-[12px] border border-rule bg-surface-2/40 px-4 py-2 text-[11.5px] text-text-dim">
+        <span>No measurements yet.</span>
+        <Link
+          href={`/projects/${projectId}/measurements` as Route}
+          className="text-text-dim hover:text-text"
+        >
+          Open measurements →
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-[14px] border border-rule bg-surface p-5">
       <div className="mb-3 flex items-baseline justify-between">
@@ -50,24 +67,18 @@ export function MeasurementsSection({ projectId, rounds }: Props) {
         </Link>
       </div>
 
-      {rounds.length === 0 ? (
-        <div className="rounded-[10px] border border-dashed border-rule px-4 py-6 text-center text-[11.5px] text-text-dim">
-          No measurement rounds yet. The "Start measurement" action creates the first one.
-        </div>
-      ) : (
-        <ul className="space-y-1.5">
-          {roots.map((r) => (
-            <li key={r.id}>
-              <RoundRow projectId={projectId} r={r} />
-              {(supersededBy.get(r.id) ?? []).map((child) => (
-                <div key={child.id} className="ml-6 border-l border-rule pl-3">
-                  <RoundRow projectId={projectId} r={child} superseded />
-                </div>
-              ))}
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="space-y-1.5">
+        {roots.map((r) => (
+          <li key={r.id}>
+            <RoundRow projectId={projectId} r={r} />
+            {(supersededBy.get(r.id) ?? []).map((child) => (
+              <div key={child.id} className="ml-6 border-l border-rule pl-3">
+                <RoundRow projectId={projectId} r={child} superseded />
+              </div>
+            ))}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

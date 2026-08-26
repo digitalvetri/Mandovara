@@ -18,9 +18,10 @@ import {
 import { setProjectStatus } from "@/modules/projects/actions";
 
 const PHASE_TONE: Record<string, { color: string; bg: string }> = {
-  SITE_VISIT:   { color: "text-info",  bg: "bg-info/12"  },
-  MEASUREMENT:  { color: "text-heat",  bg: "bg-heat/12"  },
-  MAKE:         { color: "text-solid", bg: "bg-solid/12" },
+  PROJECT:      { color: "text-info",  bg: "bg-info/12"  },
+  INVOICE:      { color: "text-heat",  bg: "bg-heat/12"  },
+  ADVANCE:      { color: "text-heat",  bg: "bg-heat/12"  },
+  INSTALLATION: { color: "text-solid", bg: "bg-solid/12" },
   COMPLETED:    { color: "text-solid", bg: "bg-solid/12" },
   CANCELLED:    { color: "text-fault", bg: "bg-fault/12" },
 };
@@ -41,7 +42,7 @@ export function InteractiveStagePill({ projectId, stage, canEdit }: Props) {
   const phase = phaseForStage(stage);
   const isCancelled = phase === "CANCELLED";
   const activePhase = isCancelled ? null : (phase as ProjectPhase);
-  const tone = PHASE_TONE[phase] ?? PHASE_TONE.SITE_VISIT!;
+  const tone = PHASE_TONE[phase] ?? PHASE_TONE.PROJECT!;
   const label = phase === "CANCELLED" ? "Cancelled" : PHASE_LABEL[activePhase!];
 
   useEffect(() => {

@@ -4,6 +4,10 @@
 //   - the "Start measurement" button (via NextActionCard)
 //   - the "Schedule visit" sheet (ENQUIRY-stage action)
 //   - the room-setup sheet that appears when the project has no rooms
+//   - the always-visible "Quick actions" strip (2026-08-26 owner
+//     redesign): Schedule visit + Add measurement are available at
+//     every pre-installation phase, not just when the stepper is on
+//     the matching gate.
 //
 // Kept as one client component so the server page.tsx can stay a plain
 // Server Component and pass a fully-resolved NextAction down as data.
@@ -16,6 +20,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { Route } from "next";
+import { CalendarPlus, Ruler, Loader2 } from "lucide-react";
 import { NextActionCard } from "./NextActionCard";
 import { RoomSetupSheet } from "./RoomSetupSheet";
 import { ScheduleVisitSheet } from "./ScheduleVisitSheet";
@@ -26,14 +31,25 @@ interface Props {
   projectId: string;
   action: NextAction;
   currentUserId: string;
+  /** Show/hide the quick-action buttons per role. Both default to false
+   *  so a permission-less viewer sees only the primary NextActionCard. */
+  canScheduleVisit?: boolean;
+  canMeasure?: boolean;
+  /** Hide the whole quick-actions strip once install is done. */
+  quickActionsVisible?: boolean;
 }
 
-export function StartMeasurementFlow({ projectId, action, currentUserId }: Props) {
+export function StartMeasurementFlow({
+  projectId, action, currentUserId,
+  canScheduleVisit = false, canMeasure = false, quickActionsVisible = true,
+}: Props) {
   const router     = useRouter();
   const pathname   = usePathname();
   const params     = useSearchParams();
   const [needsRoomsOpen, setNeedsRoomsOpen] = useState(false);
   const [scheduleVisitOpen, setScheduleVisitOpen] = useState(false);
+  const [measurePending, startMeasure] = useTransition();
+  const [measureError, setMeasureError] = useState<string | null>(null);
   const [, startNav] = useTransition();
 
   // Post-conversion wizard entry: land here from ConvertLeadModal with
@@ -52,14 +68,59 @@ export function StartMeasurementFlow({ projectId, action, currentUserId }: Props
     router.replace(`${pathname}${sp.toString() ? `?${sp}` : ""}` as Route);
   }, [params, pathname, router]);
 
+  function beginMeasurement(): void {
+    setMeasureError(null);
+    startMeasure(async () => {
+      try {
+        const res = await startMeasurementAndRedirect({ projectId });
+        if (res?.needsRooms) setNeedsRoomsOpen(true);
+      } catch (e: unknown) {
+        const err = e as { digest?: string; message?: string };
+        if (err?.digest?.startsWith("NEXT_REDIRECT")) throw e;
+        setMeasureError(err?.message ?? "Could not start measurement");
+      }
+    });
+  }
+
+  const showQuickActions = quickActionsVisible && (canScheduleVisit || canMeasure);
+
   return (
     <>
-      <NextActionCard
-        projectId={projectId}
-        action={action}
-        onNeedsRooms={() => setNeedsRoomsOpen(true)}
-        onScheduleVisit={() => setScheduleVisitOpen(true)}
-      />
+      <NextActionCard projectId={projectId} action={action} />
+
+      {showQuickActions && (
+        <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-rule bg-surface-2/40 px-3 py-2">
+          <span className="mr-1 text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
+            Quick actions
+          </span>
+          {canScheduleVisit && (
+            <button
+              type="button"
+              onClick={() => setScheduleVisitOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-[6px] border border-rule bg-surface px-2.5 py-1 text-[12px] text-text-dim hover:border-gold hover:text-text transition-colors"
+            >
+              <CalendarPlus size={13} strokeWidth={1.8} />
+              Schedule visit
+            </button>
+          )}
+          {canMeasure && (
+            <button
+              type="button"
+              onClick={beginMeasurement}
+              disabled={measurePending}
+              className="inline-flex items-center gap-1.5 rounded-[6px] border border-rule bg-surface px-2.5 py-1 text-[12px] text-text-dim hover:border-gold hover:text-text transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {measurePending
+                ? <Loader2 size={13} className="animate-spin" />
+                : <Ruler size={13} strokeWidth={1.8} />}
+              Add measurement
+            </button>
+          )}
+          {measureError && (
+            <span className="text-[11px] text-fault">{measureError}</span>
+          )}
+        </div>
+      )}
 
       <RoomSetupSheet
         projectId={projectId}
