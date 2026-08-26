@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { CalendarDays, FileText, TrendingUp } from "lucide-react";
+import { ListTodo, Briefcase, FileText, TrendingUp } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { Topbar } from "@/components/layout/Topbar";
@@ -105,7 +105,8 @@ export default async function EmployeeDashboardPage() {
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [todayAttendance, monthRows, leaveRows] = await Promise.all([
+  const tomorrow = new Date(today.getTime() + 86_400_000);
+  const [todayAttendance, monthRows, leaveRows, taskCount, siteVisitCount, followUpCount] = await Promise.all([
     db.attendance.findUnique({
       where:  { employeeId_date: { employeeId: employee.id, date: today } },
       select: { status: true, inAt: true, outAt: true, lockedAt: true },
@@ -120,6 +121,9 @@ export default async function EmployeeDashboardPage() {
       take:    8,
       select:  { id: true, type: true, fromDate: true, toDate: true, days: true, state: true, reason: true },
     }),
+    db.task.count({ where: { assignedToId: ctx.userId, status: { notIn: ["DONE", "CANCELLED"] } } }),
+    db.siteVisit.count({ where: { assignedToId: ctx.userId, status: { notIn: ["COMPLETED", "CANCELLED", "NO_SHOW"] }, scheduledAt: { gte: today, lt: tomorrow } } }),
+    db.followUp.count({ where: { ownerId: ctx.userId, completedAt: null } }),
   ]);
 
   const presentDays  = monthRows.filter((r) => r.status === "PRESENT").length;
@@ -132,6 +136,7 @@ export default async function EmployeeDashboardPage() {
   const pendingLeaves  = leaveRows.filter((l) => l.state === "PENDING");
   const leavesTaken    = approvedLeaves.reduce((s, l) => s + Number(l.days), 0);
 
+  const workParts = [taskCount > 0 && `${taskCount} Task${taskCount !== 1 ? "s" : ""}`, siteVisitCount > 0 && `${siteVisitCount} Site Visit${siteVisitCount !== 1 ? "s" : ""}`, followUpCount > 0 && `${followUpCount} Follow-up${followUpCount !== 1 ? "s" : ""}`].filter(Boolean).join(" · ");
   const initials = employee.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const monthLabel = `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
 
@@ -168,7 +173,10 @@ export default async function EmployeeDashboardPage() {
               </p>
             </div>
           </div>
-
+          <div className="mt-3">
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.10em] text-sidebar-dim/50 mb-1">Today's Focus</p>
+            {workParts ? <p className="text-[12px] text-sidebar-dim/80">{workParts}</p> : <><p className="text-[12px] font-medium text-sidebar-text/60">You're all caught up today.</p><p className="text-[11px] text-sidebar-dim/50 mt-0.5">No tasks, site visits or follow-ups need your attention.</p></>}
+          </div>
           {/* Attendance CTA — GPS-aware, stays on this page */}
           <AttendanceCTA
             initialInAt={todayAttendance?.inAt?.toISOString() ?? null}
@@ -177,11 +185,10 @@ export default async function EmployeeDashboardPage() {
             isLocked={!!todayAttendance?.lockedAt}
           />
 
-          {/* Quick chips */}
           <div className="mt-5 flex flex-wrap gap-2">
             {[
-              { href: "/attendance", label: "Attendance",  icon: <CalendarDays size={13} strokeWidth={2} /> },
-              { href: "/payroll",    label: "My Payslips", icon: <FileText size={13} strokeWidth={2} /> },
+              { href: "/tasks",    label: "My Tasks",    icon: <ListTodo  size={13} strokeWidth={2} /> },
+              { href: "/projects", label: "My Projects", icon: <Briefcase size={13} strokeWidth={2} /> },
             ].map(({ href, label, icon }) => (
               <Link
                 key={href}

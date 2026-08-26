@@ -42,7 +42,6 @@ export const TENANT_SCOPED = new Set<string>([
 
 /** Subset of TENANT_SCOPED that also has a branchId column. */
 export const BRANCH_SCOPED = new Set<string>([
-  "Branch",
   "Project",
   "Quotation",
   "Order",

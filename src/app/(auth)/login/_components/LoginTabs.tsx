@@ -44,7 +44,10 @@ export function LoginCard() {
       const res = await devLoginByCredential(credential.trim(), password);
       if (!res.ok) { setError(res.error ?? "Login failed"); return; }
       if (res.mustChangePassword) { navigate("/change-password?forced=1"); return; }
-      navigate(params.get("from") ?? (res.role === "OWNER" ? "/" : "/employee"));
+      const from = params.get("from");
+      const authPaths = ["/login", "/forgot-password", "/reset-password", "/change-password"];
+      const safe = from && !authPaths.some(p => from.startsWith(p)) ? from : null;
+      navigate(safe ?? (res.role === "OWNER" ? "/" : "/employee"));
     });
   }
 
