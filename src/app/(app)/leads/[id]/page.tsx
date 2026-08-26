@@ -248,10 +248,7 @@ export default async function LeadDetailPage({
               <Row k="Owner" v={lead.ownerName} />
               <Row k="Created" v={createdDate} />
               {lead.siteAddress && (
-                <div>
-                  <dt className="text-text-dim mb-1">Site address</dt>
-                  <dd className="text-text whitespace-pre-wrap leading-snug">{lead.siteAddress}</dd>
-                </div>
+                <Row k="Site address" v={lead.siteAddress} />
               )}
             </dl>
           </div>
