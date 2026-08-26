@@ -23,7 +23,7 @@ export type NextActionKind =
   | "MAKE_IN_PROGRESS"
   | "SCHEDULE_INSTALL"
   | "RESOLVE_SNAGS"
-  | "REQUEST_REVIEW"
+  | "PROJECT_COMPLETED"
   | "PROJECT_CANCELLED"
   | "COMPLETED";
 
@@ -229,12 +229,12 @@ export function resolveNextAction(
 
     case "COMPLETED":
       return {
-        kind:  "REQUEST_REVIEW",
-        label: "Request a client review",
-        cta:   "Send review request",
-        enabled: hasAny(ctx, ["client.viewOthers"]),
+        kind:  "PROJECT_COMPLETED",
+        label: "Project completed",
+        cta:   "",
+        enabled: false,
         disabledReason: null,
-        href: clientId ? `/clients/${clientId}` : `/projects/${id}`,
+        href: null,
       };
 
     case "CANCELLED":
