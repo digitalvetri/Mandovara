@@ -59,7 +59,10 @@ export async function addMeasurementItem(
       data:   itemCreateData(ctx.orgId, d),
       select: { id: true },
     });
-    await writeCalc(tx, ctx.orgId, item.id, calc);
+    // Skip when width/height weren't provided — the office-side form
+    // now accepts qty-only entries and there's no meaningful calc to
+    // persist. The item still exists; it just carries no CalcResult.
+    if (calc) await writeCalc(tx, ctx.orgId, item.id, calc);
     return item;
   }, { orgId: ctx.orgId });
 
@@ -101,9 +104,10 @@ export async function updateMeasurementItem(
     });
     // §6.2 supersede — delete the old row, insert a fresh one carrying
     // the current engineVersion. Unique index on measurementItemId keeps
-    // "at most one live CalcResult per item" as an invariant.
+    // "at most one live CalcResult per item" as an invariant. When the
+    // updated form has no dimensions we just delete the old calc row.
     await tx.calcResult.deleteMany({ where: { measurementItemId: d.id } });
-    await writeCalc(tx, ctx.orgId, d.id, calc);
+    if (calc) await writeCalc(tx, ctx.orgId, d.id, calc);
   }, { orgId: ctx.orgId });
 
   revalidatePath(`/projects/${existing.measurement.projectId}/measurements/${existing.measurementId}`);

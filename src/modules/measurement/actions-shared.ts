@@ -55,8 +55,8 @@ export function itemCreateData(
     label:              d.label,
     surface:            d.surface,
     openingType:        d.openingType ?? null,
-    widthMm:            new Prisma.Decimal(d.widthMm),
-    heightMm:           new Prisma.Decimal(d.heightMm),
+    widthMm:            new Prisma.Decimal(d.widthMm ?? 0),
+    heightMm:           new Prisma.Decimal(d.heightMm ?? 0),
     depthMm:            d.depthMm !== undefined ? new Prisma.Decimal(d.depthMm) : null,
     quantity:           d.quantity ?? 1,
     deductions:         (d.deductions ?? null) as Prisma.InputJsonValue,
@@ -81,8 +81,8 @@ export function itemUpdateData(d: AddItemInput): Prisma.MeasurementItemUnchecked
     label:              d.label,
     surface:            d.surface,
     openingType:        d.openingType ?? null,
-    widthMm:            new Prisma.Decimal(d.widthMm),
-    heightMm:           new Prisma.Decimal(d.heightMm),
+    widthMm:            new Prisma.Decimal(d.widthMm ?? 0),
+    heightMm:           new Prisma.Decimal(d.heightMm ?? 0),
     depthMm:            d.depthMm !== undefined ? new Prisma.Decimal(d.depthMm) : null,
     quantity:           d.quantity ?? 1,
     deductions:         (d.deductions ?? null) as Prisma.InputJsonValue,
@@ -129,9 +129,17 @@ export async function writeCalc(
   });
 }
 
-/** Recompute + persist. Used by both add + update paths. */
-export function computeCalcRow(d: AddItemInput): CalcResultRow {
-  return computeCalcResult(d);
+/** Recompute + persist. Used by both add + update paths.
+ *  Returns null when width or height is absent — the office-side form
+ *  accepts qty-only entries (owner redesign, 2026-08-26) and there's
+ *  nothing meaningful for the calc engine to produce without both. */
+export function computeCalcRow(d: AddItemInput): CalcResultRow | null {
+  if (d.widthMm === undefined || d.heightMm === undefined) return null;
+  return computeCalcResult({
+    ...d,
+    widthMm:  d.widthMm,
+    heightMm: d.heightMm,
+  });
 }
 
 /** A colourway as offered in the measurement item picker. Lives here rather

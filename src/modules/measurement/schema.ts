@@ -78,8 +78,12 @@ const itemCoreShape = {
   label:        z.string().trim().min(1).max(120),
   surface:      z.enum(SURFACE_TYPES),
   openingType:  z.enum(OPENING_TYPES).optional(),
-  widthMm:      mm,
-  heightMm:     mm,
+  // Owner redesign (2026-08-26): dimensions no longer required from the
+  // office-side add/edit form. When absent, the item is treated as a
+  // qty-based label — no CalcResult is written, and the DB stores 0
+  // for widthMm/heightMm (the columns are Decimal, not-null).
+  widthMm:      mmOpt,
+  heightMm:     mmOpt,
   depthMm:      mmOpt,
   quantity:     z.number().int().positive().max(200).default(1),
   deductions:   z.array(deductionSchema).max(20).optional(),

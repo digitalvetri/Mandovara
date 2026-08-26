@@ -31,8 +31,6 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
   const [label,  setLabel]  = useState("");
   const [surface, setSurface] = useState<(typeof SURFACE_TYPES)[number]>("WINDOW");
   const [family, setFamily]  = useState<Family>("CURTAIN_FABRIC");
-  const [widthMm,  setWidthMm]  = useState("");
-  const [heightMm, setHeightMm] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [headingType, setHeadingType] = useState<(typeof HEADING_TYPES)[number]>("EYELET");
   const fullness = "2.5";
@@ -52,7 +50,7 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
   const showDeducts = useMemo(() => WALLPAPER_LIKE.has(family), [family]);
 
   function reset(): void {
-    setLabel(""); setWidthMm(""); setHeightMm(""); setQuantity("1"); setNotes("");
+    setLabel(""); setQuantity("1"); setNotes("");
   }
 
   async function addRoom(): Promise<void> {
@@ -71,13 +69,9 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
 
   function save(): void {
     setError(null);
-    const w = parseFloat(widthMm);
-    const h = parseFloat(heightMm);
     const q = parseInt(quantity, 10);
     if (!roomId) { setError("Pick or add a room first"); return; }
     if (!label.trim()) { setError("Label required"); return; }
-    if (!Number.isFinite(w) || w <= 0) { setError("Width in millimetres required"); return; }
-    if (!Number.isFinite(h) || h <= 0) { setError("Height in millimetres required"); return; }
 
     start(async () => {
       const payload = {
@@ -85,8 +79,6 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
         roomId,
         label: label.trim(),
         surface,
-        widthMm: w,
-        heightMm: h,
         quantity: Number.isFinite(q) && q > 0 ? q : 1,
         family,
         notes: notes.trim() || undefined,
@@ -162,9 +154,6 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
         <FieldSelect label="Family"  value={family}  onChange={(v) => setFamily(v as Family)}          options={PRODUCT_FAMILIES} />
         <FieldInput label="Quantity" value={quantity} onChange={setQuantity} inputMode="numeric" width="w-full" />
 
-        <FieldInput label="Width (mm)"  value={widthMm}  onChange={setWidthMm}  inputMode="decimal" />
-        <FieldInput label="Height (mm)" value={heightMm} onChange={setHeightMm} inputMode="decimal" />
-
         {showHeading && (
           <FieldSelect label="Heading" value={headingType} onChange={(v) => setHeadingType(v as typeof headingType)} options={HEADING_TYPES} />
         )}
@@ -183,7 +172,7 @@ export function AddItemPanel({ measurementId, projectId, rooms }: AddItemPanelPr
           <span className="text-[11px] text-fault">{error}</span>
         ) : (
           <span className="text-[11px] text-text-dim">
-            Dimensions in millimetres. Live calc runs on save.
+            Quick capture: label, room, family, qty. Full dimensions are captured in the mobile round.
           </span>
         )}
         <div className="flex items-center gap-2">

@@ -13,11 +13,14 @@
 import type { AddItemInput } from "./schema";
 import { fromBlind, fromCarpetRoll, fromCarpetTile, fromCurtain, fromFilm, fromFlooring, fromVerticalGarden, fromWallpaper, noEngineFallback } from "./engine-part2";
 
-export type EngineItemInput = Pick<
-  AddItemInput,
-  "family" | "widthMm" | "heightMm" | "quantity" | "deductions"
-  | "headingType" | "fullness" | "layPattern" | "mountType"
->;
+// Engine input requires dimensions; the schema-side widthMm/heightMm are
+// now optional (owner redesign 2026-08-26 — office quick-add captures
+// qty only), but `computeCalcResult` is only invoked when both are set
+// so the engine surface can safely narrow them back to required.
+export type EngineItemInput =
+  Pick<AddItemInput, "family" | "quantity" | "deductions"
+    | "headingType" | "fullness" | "layPattern" | "mountType">
+  & { widthMm: number; heightMm: number };
 
 // The CalcResult column shape as we write it to the DB. Numbers are
 // plain JS; the caller converts to Prisma.Decimal at persistence time.

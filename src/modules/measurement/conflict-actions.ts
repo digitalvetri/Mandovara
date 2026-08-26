@@ -80,7 +80,7 @@ export async function promoteLocalItem(input: unknown): Promise<ActionResult<{ i
     } else {
       await tx.measurementItem.create({ data: itemCreateData(ctx.orgId, payload) });
     }
-    await writeCalc(tx, ctx.orgId, payload.clientCuid!, calc);
+    if (calc) await writeCalc(tx, ctx.orgId, payload.clientCuid!, calc);
 
     // Purpose-built audit row so history captures WHY the override
     // happened. The auto-audit already records the mutation; this

@@ -28,8 +28,6 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
   const [label,       setLabel]       = useState(item.label);
   const [surface,     setSurface]     = useState<(typeof SURFACE_TYPES)[number]>(item.surface as (typeof SURFACE_TYPES)[number]);
   const [family,      setFamily]      = useState<Family>(item.family as Family);
-  const [widthMm,     setWidthMm]     = useState(String(item.widthMm));
-  const [heightMm,    setHeightMm]    = useState(String(item.heightMm));
   const [quantity,    setQuantity]    = useState(String(item.quantity));
   const [headingType, setHeadingType] = useState<(typeof HEADING_TYPES)[number]>(
     (item.headingType ?? "EYELET") as (typeof HEADING_TYPES)[number],
@@ -50,8 +48,6 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
     setLabel(item.label);
     setSurface(item.surface as (typeof SURFACE_TYPES)[number]);
     setFamily(item.family as Family);
-    setWidthMm(String(item.widthMm));
-    setHeightMm(String(item.heightMm));
     setQuantity(String(item.quantity));
     setHeadingType((item.headingType ?? "EYELET") as (typeof HEADING_TYPES)[number]);
     setLayPattern((item.layPattern ?? "STRAIGHT") as (typeof LAY_PATTERNS)[number]);
@@ -63,12 +59,8 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
 
   function saveEdit() {
     setError(null);
-    const w = parseFloat(widthMm);
-    const h = parseFloat(heightMm);
     const q = parseInt(quantity, 10);
-    if (!label.trim())                    { setError("Label required"); return; }
-    if (!Number.isFinite(w) || w <= 0)   { setError("Width required"); return; }
-    if (!Number.isFinite(h) || h <= 0)   { setError("Height required"); return; }
+    if (!label.trim()) { setError("Label required"); return; }
     start(async () => {
       const r = await updateMeasurementItem({
         id:            item.id,
@@ -77,8 +69,6 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
         label:         label.trim(),
         surface,
         family,
-        widthMm:  w,
-        heightMm: h,
         quantity:  Number.isFinite(q) && q > 0 ? q : 1,
         notes:     notes.trim() || undefined,
         ...(showHeading && { headingType, fullness: 2.5 }),
@@ -109,8 +99,6 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
           <ESelect label="Surface"    value={surface}   onChange={(v) => setSurface(v as typeof surface)}   options={SURFACE_TYPES} />
           <ESelect label="Family"     value={family}    onChange={(v) => setFamily(v as Family)}            options={PRODUCT_FAMILIES} />
           <EField label="Quantity"    value={quantity}  onChange={setQuantity}  inputMode="numeric" />
-          <EField label="Width (mm)"  value={widthMm}   onChange={setWidthMm}   inputMode="decimal" />
-          <EField label="Height (mm)" value={heightMm}  onChange={setHeightMm}  inputMode="decimal" />
           {showHeading && (
             <ESelect label="Heading"  value={headingType} onChange={(v) => setHeadingType(v as typeof headingType)} options={HEADING_TYPES} />
           )}
@@ -126,7 +114,7 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
           {error ? (
             <span className="text-[11px] text-fault">{error}</span>
           ) : (
-            <span className="text-[11px] text-text-dim">Dimensions in millimetres.</span>
+            <span className="text-[11px] text-text-dim">Label + qty is enough. Full dimensions live in the mobile round.</span>
           )}
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setEditing(false)}
@@ -161,8 +149,14 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
           </div>
 
           <div className="tabular text-[12.5px] text-text-dim mb-1">
-            {formatMm(item.widthMm)} mm × {formatMm(item.heightMm)} mm
-            {item.quantity > 1 && <> × <span className="text-text">{item.quantity}</span></>}
+            {parseFloat(item.widthMm) > 0 && parseFloat(item.heightMm) > 0 && (
+              <>{formatMm(item.widthMm)} mm × {formatMm(item.heightMm)} mm{" "}</>
+            )}
+            {item.quantity > 0 && (
+              parseFloat(item.widthMm) > 0
+                ? <>× <span className="text-text">{item.quantity}</span></>
+                : <><span className="text-text">Qty {item.quantity}</span></>
+            )}
           </div>
 
           {(item.headingType || item.fullness || item.layPattern || item.mountType) && (
