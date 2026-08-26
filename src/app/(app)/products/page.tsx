@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { BookOpen, CheckCircle2, AlertCircle, ChevronRight } from "lucide-react";
+import { BookOpen, CheckCircle2, AlertCircle, ChevronRight, Upload } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
@@ -27,7 +27,18 @@ export default async function ProductCatalogPage() {
       <Topbar
         title="Product Catalog"
         eyebrow={`${brands.length} brands · ${withPdf} of ${totalCollections} PDFs uploaded`}
-        actions={canWrite ? <NewBrandModal /> : undefined}
+        actions={canWrite ? (
+          <div className="flex items-center gap-2">
+            <Link
+              href={"/products/import" as Route}
+              className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[7px] text-[12px] font-medium text-text-dim border border-rule hover:text-accent hover:border-accent/50 transition-colors"
+            >
+              <Upload size={13} strokeWidth={1.75} />
+              Import from Excel
+            </Link>
+            <NewBrandModal />
+          </div>
+        ) : undefined}
       />
 
       {/* Summary strip */}
