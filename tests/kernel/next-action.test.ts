@@ -23,30 +23,24 @@ function ctxWith(perms: readonly string[]): RequestContext {
   };
 }
 
-describe("resolveNextAction — pre-order stages collapse to Create invoice", () => {
+describe("resolveNextAction — pre-order stages route to /invoicing/new", () => {
   it.each(["ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION"])(
-    "stage=%s → BUILD_QUOTATION with 'Create invoice' label",
+    "stage=%s → CREATE_INVOICE routing to /invoicing/new?project=…",
     (stage) => {
-      const ctx = ctxWith(["project.view", "quotation.create"]);
+      const ctx = ctxWith(["project.view", "invoice.create"]);
       const a = resolveNextAction(ctx, { id: "p1", clientId: "c1", stage });
-      expect(a.kind).toBe("BUILD_QUOTATION");
+      expect(a.kind).toBe("CREATE_INVOICE");
       expect(a.label).toBe("Create invoice");
-      expect(a.href).toBe("/quotations?project=p1");
+      expect(a.href).toBe("/invoicing/new?project=p1");
       expect(a.enabled).toBe(true);
     },
   );
 
-  it("is disabled with the sales/designers reason when the perm is missing", () => {
+  it("is disabled with the accounts-team reason when invoice.create is missing", () => {
     const ctx = ctxWith(["project.view"]);
     const a = resolveNextAction(ctx, { id: "p1", stage: "QUOTATION" });
     expect(a.enabled).toBe(false);
-    expect(a.disabledReason).toContain("sales / designers");
-  });
-
-  it("quotation.send alone (no create) still enables the CTA — sender can nudge", () => {
-    const ctx = ctxWith(["project.view", "quotation.send"]);
-    const a = resolveNextAction(ctx, { id: "p1", stage: "ENQUIRY" });
-    expect(a.enabled).toBe(true);
+    expect(a.disabledReason).toContain("accounts team");
   });
 });
 

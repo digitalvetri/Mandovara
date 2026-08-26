@@ -24,7 +24,6 @@ import { CalendarPlus, Ruler, Loader2 } from "lucide-react";
 import { NextActionCard } from "./NextActionCard";
 import { RoomSetupSheet } from "./RoomSetupSheet";
 import { ScheduleVisitSheet } from "./ScheduleVisitSheet";
-import { InvoiceFirstWizard } from "./InvoiceFirstWizard";
 import type { NextAction } from "@/modules/projects/next-action";
 import { startMeasurementAndRedirect } from "@/modules/measurement/start-and-redirect";
 
@@ -49,7 +48,6 @@ export function StartMeasurementFlow({
   const params     = useSearchParams();
   const [needsRoomsOpen, setNeedsRoomsOpen] = useState(false);
   const [scheduleVisitOpen, setScheduleVisitOpen] = useState(false);
-  const [invoiceWizardOpen, setInvoiceWizardOpen] = useState(false);
   const [measurePending, startMeasure] = useTransition();
   const [measureError, setMeasureError] = useState<string | null>(null);
   const [, startNav] = useTransition();
@@ -88,11 +86,7 @@ export function StartMeasurementFlow({
 
   return (
     <>
-      <NextActionCard
-        projectId={projectId}
-        action={action}
-        onCreateInvoice={() => setInvoiceWizardOpen(true)}
-      />
+      <NextActionCard projectId={projectId} action={action} />
 
       {showQuickActions && (
         <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-rule bg-surface-2/40 px-3 py-2">
@@ -154,12 +148,6 @@ export function StartMeasurementFlow({
         defaultAssigneeId={currentUserId}
         open={scheduleVisitOpen}
         onClose={() => setScheduleVisitOpen(false)}
-      />
-
-      <InvoiceFirstWizard
-        projectId={projectId}
-        open={invoiceWizardOpen}
-        onClose={() => setInvoiceWizardOpen(false)}
       />
     </>
   );

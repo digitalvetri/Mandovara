@@ -54,8 +54,6 @@ export interface ProjectSnapshot {
   };
 }
 
-const PERM_BUILD_QUOTATION = ["quotation.create"] as const;
-const PERM_SEND_QUOTATION  = ["quotation.send"]   as const;
 const PERM_CREATE_INVOICE  = ["invoice.create"] as const;
 const PERM_RECORD_ADVANCE  = ["receipt.create"] as const;
 const PERM_BOOK_INSTALL    = ["sitelog.create", "project.update"] as const;
@@ -71,24 +69,25 @@ export function resolveNextAction(
   const { stage, id, clientId } = project;
 
   switch (stage) {
-    // Owner redesign (2026-08-26): pre-order internal stages all show
-    // "Create invoice" as the primary CTA. Under the hood the invoice
-    // still needs an order, which is produced by the quotation module
-    // — but that word never appears on the project page. Site-visit
-    // and measurement live in the quick-actions strip, not here.
+    // Owner redesign (2026-08-26): pre-order internal stages route
+    // straight to the normal invoice-creation page. No modal wizard,
+    // no product picker inline — the owner asked for the simplest
+    // flow: click "Create invoice" → land on /invoicing/new. If the
+    // project has no invoiceable order yet, that page shows its
+    // standard empty state.
     case "ENQUIRY":
     case "SITE_VISIT":
     case "MEASUREMENT":
     case "QUOTATION": {
-      const enabled = hasAny(ctx, PERM_BUILD_QUOTATION) || hasAny(ctx, PERM_SEND_QUOTATION);
+      const enabled = hasAny(ctx, PERM_CREATE_INVOICE);
       return {
-        kind:  "BUILD_QUOTATION",
+        kind:  "CREATE_INVOICE",
         label: "Create invoice",
-        cta:   "Add products & price",
+        cta:   "Create invoice",
         enabled,
         disabledReason: enabled ? null :
-          "Invoices are set up by sales / designers.",
-        href: `/quotations?project=${id}`,
+          "Invoices are raised by the accounts team.",
+        href: `/invoicing/new?project=${id}`,
       };
     }
 
