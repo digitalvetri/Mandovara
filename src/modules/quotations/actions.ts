@@ -102,7 +102,12 @@ export async function createQuotation(
       };
     }
   }
-  {
+  // Owner-facing invoice-first flow (2026-08-26) opts out of the gate
+  // by passing bypassMeasurementGate:true — the owner enters quantity
+  // directly from the wizard and accepts the "quote before measure"
+  // risk §0.10 was written to prevent. Every other caller defaults to
+  // the safety net.
+  if (!d.bypassMeasurementGate) {
     const violation = findMeasurementGateViolation(
       d.lines,
       (id) => cwMap.get(id)?.design.family as ProductFamily | undefined,

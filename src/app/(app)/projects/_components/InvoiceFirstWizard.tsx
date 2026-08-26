@@ -102,16 +102,8 @@ export function InvoiceFirstWizard({ projectId, open, onClose }: Props) {
         })),
       });
       if (!res.ok || !res.data) {
-        // The gate for measurement-required families (curtains, blinds,
-        // wallpaper, flooring) fires from createQuotation and comes back
-        // as a fieldError. Surface a concrete hint so the owner knows
-        // to add a measurement round via the Quick Actions strip first.
-        if (res.errorCode === "MEASUREMENT_REQUIRED") {
-          setError("One or more products need a measurement round first. Close this and use Add measurement in Quick Actions.");
-        } else {
-          const firstField = res.fieldErrors ? Object.values(res.fieldErrors)[0] : undefined;
-          setError(firstField ?? res.error ?? "Could not create the invoice");
-        }
+        const firstField = res.fieldErrors ? Object.values(res.fieldErrors)[0] : undefined;
+        setError(firstField ?? res.error ?? "Could not create the invoice");
         return;
       }
       router.push(`/invoicing/${res.data.invoiceId}` as Route);

@@ -42,6 +42,12 @@ export const createQuotationSchema = z.object({
   placeOfSupplyCode: z.string().length(2, "2-digit state code required"),
   termsText:         z.string().max(2000).optional().or(z.literal("")),
   lines:             z.array(quotationLineInput).min(1, "At least one line is required"),
+  // Owner redesign (2026-08-26): the invoice-first wizard captures
+  // quantity directly from the owner, bypassing the site-measurement
+  // gate that §0.10 / §15.1 imposes on the traditional quotation flow.
+  // Default false preserves the original safety net for every other
+  // caller; the wizard opts in explicitly.
+  bypassMeasurementGate: z.boolean().optional().default(false),
 }).refine(
   (d) => (d.leadId ? 1 : 0) + (d.clientId || d.projectId ? 1 : 0) === 1,
   { message: "Provide either leadId OR (clientId/projectId), not both.", path: ["leadId"] },

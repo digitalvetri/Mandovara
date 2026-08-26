@@ -78,13 +78,16 @@ export async function createInvoiceFromProducts(
   const validUntil = new Date(today);
   validUntil.setDate(validUntil.getDate() + 30);
 
-  // Step 1: create the firm quote as DRAFT.
+  // Step 1: create the firm quote as DRAFT. Bypass the measurement
+  // gate — the owner entered quantity directly in the wizard and
+  // doesn't want site-measurement forced as a prerequisite here.
   const quoteRes = await createQuotation({
     projectId:         project.id,
     branchId:          project.branchId,
     date:              today.toISOString().slice(0, 10),
     validUntil:        validUntil.toISOString().slice(0, 10),
     placeOfSupplyCode,
+    bypassMeasurementGate: true,
     lines: d.lines.map((l) => ({
       colourwayId:       l.colourwayId,
       serviceRateId:     l.serviceRateId,
