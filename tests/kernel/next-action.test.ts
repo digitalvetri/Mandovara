@@ -23,20 +23,20 @@ function ctxWith(perms: readonly string[]): RequestContext {
   };
 }
 
-describe("resolveNextAction — pre-order stages collapse to Prepare firm quote", () => {
+describe("resolveNextAction — pre-order stages collapse to Create invoice", () => {
   it.each(["ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION"])(
-    "stage=%s → BUILD_QUOTATION with 'Prepare firm quote'",
+    "stage=%s → BUILD_QUOTATION with 'Create invoice' label",
     (stage) => {
       const ctx = ctxWith(["project.view", "quotation.create"]);
       const a = resolveNextAction(ctx, { id: "p1", clientId: "c1", stage });
       expect(a.kind).toBe("BUILD_QUOTATION");
-      expect(a.label).toBe("Prepare firm quote");
+      expect(a.label).toBe("Create invoice");
       expect(a.href).toBe("/quotations?project=p1");
       expect(a.enabled).toBe(true);
     },
   );
 
-  it("is disabled with the sales/designers reason when quotation.create is missing", () => {
+  it("is disabled with the sales/designers reason when the perm is missing", () => {
     const ctx = ctxWith(["project.view"]);
     const a = resolveNextAction(ctx, { id: "p1", stage: "QUOTATION" });
     expect(a.enabled).toBe(false);

@@ -168,7 +168,7 @@ export function StageStepper({ stage, projectId, canEdit = false, money, hasOrde
         <div className="mt-1.5 text-[10.5px] text-text-subtle">
           Stages advance automatically as work happens. Click a stage to override manually.
           {!hasOrder && currentPhase === "PROJECT" && (
-            <span className="ml-1">Prepare a firm quote first to unlock Invoice and later stages.</span>
+            <span className="ml-1">Create the invoice to unlock later stages.</span>
           )}
         </div>
       )}

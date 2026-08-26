@@ -21,7 +21,6 @@ import {
   getProject, getProjectMilestones, getProjectTasks,
   getProjectMeasurements, getProjectMoney,
   getProjectPayments, getProjectChosenItems,
-  getProjectQuotationsAndOrder,
 } from "@/modules/projects/queries";
 import { listSiteVisits } from "@/modules/site-visits/queries";
 import { resolveNextAction } from "@/modules/projects/next-action";
@@ -37,7 +36,6 @@ import { PaymentsPanel } from "../_components/PaymentsPanel";
 import { ChosenItemsPanel } from "../_components/ChosenItemsPanel";
 import { ProfitabilityPanel } from "../_components/ProfitabilityPanel";
 import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
-import { QuotationPanel } from "../_components/QuotationPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +49,7 @@ export default async function ProjectDetailPage({
 
   const canViewProfitability = ctx.permissions.has("report.view.projects");
 
-  const [milestones, tasks, rounds, money, visits, payments, chosen, profitability, quotesData] =
+  const [milestones, tasks, rounds, money, visits, payments, chosen, profitability] =
     await Promise.all([
       getProjectMilestones(ctx, id),
       getProjectTasks(ctx, id),
@@ -61,7 +59,6 @@ export default async function ProjectDetailPage({
       getProjectPayments(ctx, id),
       getProjectChosenItems(ctx, id),
       canViewProfitability ? getProjectProfitability(ctx, id) : null,
-      getProjectQuotationsAndOrder(ctx, id),
     ]);
 
   const action = resolveNextAction(ctx, {
@@ -172,12 +169,6 @@ export default async function ProjectDetailPage({
           <MilestonesPanel milestones={milestones} orderValue={p.orderValue} />
           <ChosenItemsPanel projectId={p.id} items={chosen} />
           <MeasurementsSection projectId={p.id} rounds={rounds} />
-          <QuotationPanel
-            projectId={p.id}
-            data={quotesData}
-            canCreate={ctx.permissions.has("quotation.create")}
-            stage={p.stage}
-          />
           {payments && (
             <PaymentsPanel
               payments={payments}

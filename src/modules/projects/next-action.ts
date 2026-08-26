@@ -71,11 +71,11 @@ export function resolveNextAction(
   const { stage, id, clientId } = project;
 
   switch (stage) {
-    // Owner redesign (2026-08-26): the four pre-order internal stages
-    // all show the same primary CTA — Prepare firm quote. Firm-quote
-    // acceptance produces the invoiceable order (and deducts stock at
-    // product-pick, per the canonical flow). Site-visit + measurement
-    // are anytime side-actions on the project page, not primary CTAs.
+    // Owner redesign (2026-08-26): pre-order internal stages all show
+    // "Create invoice" as the primary CTA. Under the hood the invoice
+    // still needs an order, which is produced by the quotation module
+    // — but that word never appears on the project page. Site-visit
+    // and measurement live in the quick-actions strip, not here.
     case "ENQUIRY":
     case "SITE_VISIT":
     case "MEASUREMENT":
@@ -83,13 +83,12 @@ export function resolveNextAction(
       const enabled = hasAny(ctx, PERM_BUILD_QUOTATION) || hasAny(ctx, PERM_SEND_QUOTATION);
       return {
         kind:  "BUILD_QUOTATION",
-        label: "Prepare firm quote",
-        cta:   "Open quotations",
+        label: "Create invoice",
+        cta:   "Add products & price",
         enabled,
         disabledReason: enabled ? null :
-          "Quotations are prepared by sales / designers.",
+          "Invoices are set up by sales / designers.",
         href: `/quotations?project=${id}`,
-        subLine: "Firm quote becomes the invoice.",
       };
     }
 
