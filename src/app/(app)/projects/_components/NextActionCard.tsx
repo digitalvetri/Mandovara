@@ -21,13 +21,21 @@ import type { NextAction } from "@/modules/projects/next-action";
 interface Props {
   action: NextAction;
   projectId: string;
+  /** Intercept BUILD_QUOTATION clicks (owner-redesign: pre-order stages
+   *  should open the inline invoice wizard, not navigate to the
+   *  quotation module). When present, called instead of routing. */
+  onCreateInvoice?: () => void;
 }
 
-export function NextActionCard({ action }: Props) {
+export function NextActionCard({ action, onCreateInvoice }: Props) {
   const router = useRouter();
 
   function fire(): void {
     if (!action.enabled) return;
+    if (action.kind === "BUILD_QUOTATION" && onCreateInvoice) {
+      onCreateInvoice();
+      return;
+    }
     if (action.href) router.push(action.href as Route);
   }
 
