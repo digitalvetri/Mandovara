@@ -11,6 +11,7 @@ import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { listBrandsWithPdf } from "@/modules/catalog/queries";
 import { NewBrandModal } from "./_components/NewBrandModal";
+import { ImportBaselineCatalogButton } from "./_components/ImportBaselineCatalogButton";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function ProductCatalogPage() {
         eyebrow={`${brands.length} brands · ${withPdf} of ${totalCollections} PDFs uploaded`}
         actions={canWrite ? (
           <div className="flex items-center gap-2">
+            <ImportBaselineCatalogButton />
             <Link
               href={"/products/import" as Route}
               className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[7px] text-[12px] font-medium text-text-dim border border-rule hover:text-accent hover:border-accent/50 transition-colors"

@@ -16,6 +16,7 @@ import { InventoryTabs } from "./_components/InventoryTabs";
 import { InventoryKpiCards } from "./_components/InventoryKpiCards";
 import { InventoryToolbar } from "./_components/InventoryToolbar";
 import { StockList } from "./_components/StockList";
+import { ImportBaselineStockButton } from "./_components/ImportBaselineStockButton";
 
 export const dynamic = "force-dynamic";
 
@@ -45,14 +46,19 @@ export default async function InventoryPage({
     getInventoryKpis(ctx),
   ]);
 
+  const canImportStock = ctx.permissions.has("inventory.adjust");
+
   return (
     <>
       <Topbar title="" />
 
       {/* Header */}
-      <div className="mb-4">
-        <h1 className="font-display text-[28px] font-semibold leading-none text-text">Materials</h1>
-        <div className="mt-1 text-[12px] text-text-dim">Stock on hand across every location</div>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-[28px] font-semibold leading-none text-text">Materials</h1>
+          <div className="mt-1 text-[12px] text-text-dim">Stock on hand across every location</div>
+        </div>
+        {canImportStock && <ImportBaselineStockButton />}
       </div>
 
       <InventoryTabs active="stock" />

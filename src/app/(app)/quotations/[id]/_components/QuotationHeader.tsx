@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import {
-  Mail, MessageCircle, Copy, Check,
   ExternalLink, ArrowLeft, CalendarDays, Clock4,
 } from "lucide-react";
 import { StatusPill } from "../../_components/StatusPill";
 import { StatusChanger } from "../../_components/StatusChanger";
 import type { SerializedQuotation } from "../_types";
-import { pToINR, fmtDate, digitsOnly, shortNum, effectiveGstRate } from "./quote-header-utils";
+import { pToINR, fmtDate, effectiveGstRate } from "./quote-header-utils";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 
 // ── avatar ─────────────────────────────────────────────────────────────────
@@ -41,17 +39,7 @@ interface Props {
   canApprove: boolean;
 }
 
-export function QuotationHeader({ quotation, canApprove }: Props) {
-  const [copied, setCopied] = useState(false);
-  const [link, setLink]     = useState(
-    quotation.shareToken ? `/q/${quotation.shareToken}` : `/quotations/${quotation.id}`,
-  );
-
-  useEffect(() => {
-    const base = window.location.origin;
-    setLink(quotation.shareToken ? `${base}/q/${quotation.shareToken}` : `${base}/quotations/${quotation.id}`);
-  }, [quotation.id, quotation.shareToken]);
-
+export function QuotationHeader({ quotation }: Props) {
   const isIntraState = BigInt(quotation.igstStr) === 0n;
   const total     = pToINR(quotation.totalStr);
   const taxable   = pToINR(quotation.taxableAmountStr);
@@ -61,34 +49,6 @@ export function QuotationHeader({ quotation, canApprove }: Props) {
   const validDate = fmtDate(quotation.validUntil);
   const quoteDate = fmtDate(quotation.date);
   const gstRate   = effectiveGstRate(quotation.cgstStr, quotation.taxableAmountStr);
-  const num       = shortNum(quotation.number);
-
-  const msgBody =
-    `Namaste ${quotation.clientName},\n\n` +
-    `Please find our quotation ${num} at the link below.\n\n` +
-    `  Total: ${total}\n` +
-    `  Valid until: ${validDate}\n\n` +
-    `${link}\n\n` +
-    `Reply to accept or request changes.\n\n` +
-    `— Team Mandovara\n+91 89404 30051 · mandovara.com`;
-
-  const subject  = `Quotation ${num} from Mandovara`;
-  const mailHref = quotation.clientEmail
-    ? `mailto:${encodeURIComponent(quotation.clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msgBody)}`
-    : null;
-  const waHref = `https://wa.me/${digitsOnly(quotation.clientMobile)}?text=${encodeURIComponent(msgBody)}`;
-
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch { /* clipboard denied */ }
-  }
-
-  const shareBtn =
-    "inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[7px] text-[12px] font-medium " +
-    "text-text-dim border border-rule hover:text-text hover:bg-ink/30 hover:border-rule transition-colors";
 
   return (
     <div className="mb-5">
@@ -121,11 +81,14 @@ export function QuotationHeader({ quotation, canApprove }: Props) {
           <StatusChanger
             id={quotation.id}
             current={quotation.status}
-            canApprove={canApprove}
             leadId={quotation.leadId}
-            leadName={quotation.clientName}
-            leadMobile={quotation.clientMobile}
-            leadEmail={quotation.clientEmail}
+            quotationNumber={quotation.number}
+            clientName={quotation.clientName}
+            clientMobile={quotation.clientMobile}
+            clientEmail={quotation.clientEmail}
+            totalStr={quotation.totalStr}
+            validUntilIso={quotation.validUntil}
+            shareToken={quotation.shareToken}
           />
           <PdfPreviewModal
             quotationId={quotation.id}
@@ -196,30 +159,6 @@ export function QuotationHeader({ quotation, canApprove }: Props) {
                 </div>
               </div>
 
-              {/* Share actions */}
-              <div className="flex flex-wrap gap-2 pt-1">
-                {mailHref ? (
-                  <a href={mailHref} className={shareBtn}>
-                    <Mail size={13} strokeWidth={1.75} />
-                    Send Email
-                  </a>
-                ) : (
-                  <span className={`${shareBtn} opacity-35 cursor-not-allowed`} title="No email on file">
-                    <Mail size={13} strokeWidth={1.75} />
-                    Send Email
-                  </span>
-                )}
-                <a href={waHref} target="_blank" rel="noopener noreferrer" className={shareBtn}>
-                  <MessageCircle size={13} strokeWidth={1.75} />
-                  WhatsApp
-                </a>
-                <button type="button" onClick={copyLink} className={shareBtn}>
-                  {copied
-                    ? <><Check size={13} className="text-solid" /> Copied!</>
-                    : <><Copy size={13} strokeWidth={1.75} /> Copy Link</>
-                  }
-                </button>
-              </div>
             </div>
 
             {/* ── RIGHT: Amount box ───────────────────────────────── */}

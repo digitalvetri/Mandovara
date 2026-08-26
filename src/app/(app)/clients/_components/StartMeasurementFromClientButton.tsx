@@ -5,12 +5,19 @@
 // Uses the same server action (startMeasurementAndRedirect) that powers
 // the project-detail NextActionCard, so all the device-aware redirect
 // and room-guard logic is shared.
+//
+// 0-projects behaviour (2026-08-26 owner UX pass): rather than kicking
+// the operator over to /projects/new, silently auto-create a stub
+// project on the client and start the measurement on it. The stub can
+// be filled in later; the point is the operator doesn't lose their
+// measurement flow.
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import type { Route } from "next";
 import { Ruler, Loader2, X } from "lucide-react";
-import { startMeasurementAndRedirect } from "@/modules/measurement/start-and-redirect";
+import {
+  startMeasurementAndRedirect,
+  createStubProjectForClient,
+} from "@/modules/measurement/start-and-redirect";
 import { RoomSetupSheet } from "@/app/(app)/projects/_components/RoomSetupSheet";
 
 interface ProjectOption {
@@ -26,7 +33,6 @@ interface Props {
 }
 
 export function StartMeasurementFromClientButton({ clientId, projects, canMeasure }: Props) {
-  const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -51,7 +57,12 @@ export function StartMeasurementFromClientButton({ clientId, projects, canMeasur
   function fire(): void {
     if (!canMeasure) return;
     if (projects.length === 0) {
-      router.push(`/projects/new?client=${clientId}` as Route);
+      setError(null);
+      start(async () => {
+        const res = await createStubProjectForClient({ clientId });
+        if (!res.ok) { setError(res.error); return; }
+        handleStart(res.data.projectId);
+      });
       return;
     }
     if (projects.length === 1) {
@@ -61,9 +72,7 @@ export function StartMeasurementFromClientButton({ clientId, projects, canMeasur
     setPickerOpen(true);
   }
 
-  const buttonLabel = projects.length === 0
-    ? "Create project first"
-    : "Start measurement";
+  const buttonLabel = "Start measurement";
 
   if (!canMeasure) {
     return (

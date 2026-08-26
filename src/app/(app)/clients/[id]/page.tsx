@@ -10,10 +10,12 @@ import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { getClient } from "@/modules/clients/queries";
 import { listQuotationsForClient } from "@/modules/quotations/queries";
+import { listRoundsForClient, type ClientRoundRow } from "@/modules/measurement/queries-client";
 import { listOutstandingInvoicesForClient, listReceipts, type OutstandingInvoice, type ReceiptRow } from "@/modules/receipts/queries";
 import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 import { BillingAddressCard } from "../_components/BillingAddressCard";
 import { StartMeasurementFromClientButton } from "../_components/StartMeasurementFromClientButton";
+import { ClientMeasurementsCard } from "../_components/ClientMeasurementsCard";
 import { ClientLedgerPanel, type InvoiceLedgerRow, type ReceiptLedgerRow } from "../_components/ClientLedgerPanel";
 import { DeleteClientAction } from "../_components/DeleteClientAction";
 
@@ -37,7 +39,18 @@ export default async function ClientDetailPage({
   const ctx = await devContext();
   const client = await getClient(ctx, id);
   if (!client) notFound();
-  const quotations = await listQuotationsForClient(ctx, client.id);
+  const canMeasure =
+    ctx.permissions.has("measurement.create.any") ||
+    ctx.permissions.has("measurement.create.own") ||
+    ctx.permissions.has("measurement.create");
+  const canViewMeasurement = ctx.permissions.has("measurement.view");
+
+  const [quotations, measurementRounds] = await Promise.all([
+    listQuotationsForClient(ctx, client.id),
+    canViewMeasurement
+      ? listRoundsForClient(ctx, client.id, 10).catch((): ClientRoundRow[] => [])
+      : Promise.resolve<ClientRoundRow[]>([]),
+  ]);
 
   const canCreateReceipt = ctx.permissions.has("receipt.create");
   const canViewReceipt   = ctx.permissions.has("receipt.view");
@@ -104,11 +117,7 @@ export default async function ClientDetailPage({
         <StartMeasurementFromClientButton
           clientId={client.id}
           projects={client.projects.map((p) => ({ id: p.id, name: p.name, stage: p.stage }))}
-          canMeasure={
-            ctx.permissions.has("measurement.create.any") ||
-            ctx.permissions.has("measurement.create.own") ||
-            ctx.permissions.has("measurement.create")
-          }
+          canMeasure={canMeasure}
         />
         {ctx.permissions.has("client.delete") && (
           <DeleteClientAction
@@ -166,6 +175,15 @@ export default async function ClientDetailPage({
               </div>
             )}
           </div>
+
+          {canViewMeasurement && (
+            <ClientMeasurementsCard
+              clientId={client.id}
+              projects={client.projects.map((p) => ({ id: p.id, name: p.name, stage: p.stage }))}
+              rounds={measurementRounds}
+              canMeasure={canMeasure}
+            />
+          )}
 
           <QuotationsInlineTable
             rows={quotations}
