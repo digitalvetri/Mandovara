@@ -45,8 +45,11 @@ export default async function EmployeeDashboardPage() {
   if (!employee) {
     const user = await db.user.findUnique({ where: { id: ctx.userId }, select: { mobile: true, organizationId: true } });
     if (user) {
+      // Try both "+91 9XXXXXXXXX" (seed format) and "+919XXXXXXXXX" (no-space format)
+      const mobileNoSpace = user.mobile.replace(/\s+/g, "");
+      const mobileVariants = [...new Set([user.mobile, mobileNoSpace])];
       employee = await db.employee.findFirst({
-        where:  { mobile: user.mobile, organizationId: user.organizationId },
+        where:  { mobile: { in: mobileVariants }, organizationId: user.organizationId },
         select: { id: true, name: true, designation: true, department: true, code: true },
       });
       if (employee) await db.employee.update({ where: { id: employee.id }, data: { userId: ctx.userId } });
