@@ -51,11 +51,12 @@ export const setMilestoneStatusSchema = z.object({
 });
 
 export const addTaskSchema = z.object({
-  projectId:   z.string().min(1),
-  title:       z.string().trim().min(1).max(200),
-  description: z.string().trim().max(1000).optional().or(z.literal("")),
-  priority:    z.enum(TASK_PRIORITIES),
-  dueDate:     isoDate.optional().or(z.literal("")),
+  projectId:          z.string().min(1),
+  title:              z.string().trim().min(1).max(200),
+  description:        z.string().trim().max(1000).optional().or(z.literal("")),
+  priority:           z.enum(TASK_PRIORITIES),
+  dueDate:            isoDate.optional().or(z.literal("")),
+  assignedToUserId:   z.string().min(1).optional(),
 });
 
 export const setTaskStatusSchema = z.object({

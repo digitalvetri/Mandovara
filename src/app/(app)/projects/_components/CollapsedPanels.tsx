@@ -9,15 +9,16 @@
 
 import { useState } from "react";
 import { ChevronRight, ChevronDown, ListChecks } from "lucide-react";
-import type { ProjectTask } from "@/modules/projects/queries";
+import type { ProjectTask, ProjectMember } from "@/modules/projects/queries";
 import { ProjectPanels } from "./ProjectPanels";
 
 interface Props {
   projectId: string;
   tasks: ProjectTask[];
+  members: ProjectMember[];
 }
 
-export function CollapsedPanels({ projectId, tasks }: Props) {
+export function CollapsedPanels({ projectId, tasks, members }: Props) {
   const hasAnyContent = tasks.length > 0;
   const [open, setOpen] = useState(hasAnyContent);
 
@@ -52,6 +53,7 @@ export function CollapsedPanels({ projectId, tasks }: Props) {
         projectId={projectId}
         milestones={[]}
         tasks={tasks}
+        members={members}
         hideMilestones
       />
     </div>

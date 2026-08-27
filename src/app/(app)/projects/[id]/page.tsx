@@ -21,6 +21,7 @@ import {
   getProject, getProjectMilestones, getProjectTasks,
   getProjectMeasurements, getProjectMoney,
   getProjectPayments, getProjectChosenItems,
+  getProjectAssignableUsers,
 } from "@/modules/projects/queries";
 import { listSiteVisits } from "@/modules/site-visits/queries";
 import { resolveNextAction } from "@/modules/projects/next-action";
@@ -49,7 +50,7 @@ export default async function ProjectDetailPage({
 
   const canViewProfitability = ctx.permissions.has("report.view.projects");
 
-  const [milestones, tasks, rounds, money, visits, payments, chosen, profitability] =
+  const [milestones, tasks, rounds, money, visits, payments, chosen, profitability, members] =
     await Promise.all([
       getProjectMilestones(ctx, id),
       getProjectTasks(ctx, id),
@@ -59,6 +60,7 @@ export default async function ProjectDetailPage({
       getProjectPayments(ctx, id),
       getProjectChosenItems(ctx, id),
       canViewProfitability ? getProjectProfitability(ctx, id) : null,
+      getProjectAssignableUsers(ctx),
     ]);
 
   const action = resolveNextAction(ctx, {
@@ -188,7 +190,7 @@ export default async function ProjectDetailPage({
             />
           )}
           {profitability && <ProfitabilityPanel data={profitability} />}
-          <CollapsedPanels projectId={p.id} tasks={tasks} />
+          <CollapsedPanels projectId={p.id} tasks={tasks} members={members} />
         </div>
 
         <RightRail project={p} money={money} />

@@ -35,7 +35,11 @@ export type ProjectTask = {
   priority: string;
   dueDate: Date | null;
   completedAt: Date | null;
+  assignedToId: string;
+  assignedToName: string;
 };
+
+export type ProjectMember = { id: string; name: string };
 
 export type ProjectSiteLog = {
   id: string;
@@ -96,9 +100,28 @@ export async function getProjectTasks(
     select: {
       id: true, title: true, description: true,
       status: true, priority: true, dueAt: true, completedAt: true,
+      assignedToId: true,
     },
   });
-  return rows.map((r) => ({ ...r, dueDate: r.dueAt }));
+  const assigneeIds = Array.from(new Set(rows.map((r) => r.assignedToId)));
+  const assignees = assigneeIds.length === 0 ? [] :
+    await db.user.findMany({ where: { id: { in: assigneeIds } }, select: { id: true, name: true } });
+  const nameById = new Map(assignees.map((u) => [u.id, u.name]));
+  return rows.map((r) => ({
+    ...r,
+    dueDate: r.dueAt,
+    assignedToName: nameById.get(r.assignedToId) ?? "—",
+  }));
+}
+
+export async function getProjectAssignableUsers(ctx: RequestContext): Promise<ProjectMember[]> {
+  requirePermission(ctx, "project.view");
+  const db = scoped(ctx);
+  return db.user.findMany({
+    where: { status: "ACTIVE" },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 }
 
 export async function getProjectSiteLogs(

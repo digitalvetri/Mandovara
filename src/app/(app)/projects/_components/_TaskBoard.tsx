@@ -5,29 +5,34 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { addTask, setTaskStatus } from "@/modules/projects/actions";
 import { TASK_PRIORITIES, TASK_STATUSES } from "@/modules/projects/schema";
-import type { ProjectTask } from "@/modules/projects/queries";
+import type { ProjectTask, ProjectMember } from "@/modules/projects/queries";
 
 const COLUMNS = ["TODO", "IN_PROGRESS", "DONE", "BLOCKED"] as const;
 const COLUMN_LABEL: Record<string, string> = {
   TODO: "To do", IN_PROGRESS: "In progress", DONE: "Done", BLOCKED: "Blocked",
 };
 
-export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: ProjectTask[] }) {
+export function TaskBoard({ projectId, tasks, members }: { projectId: string; tasks: ProjectTask[]; members: ProjectMember[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<(typeof TASK_PRIORITIES)[number]>("NORMAL");
   const [dueDate, setDueDate] = useState("");
+  const [assignedToUserId, setAssignedToUserId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function addOne(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const res = await addTask({ projectId, title, priority, dueDate: dueDate || undefined });
+      const res = await addTask({
+        projectId, title, priority,
+        dueDate: dueDate || undefined,
+        assignedToUserId: assignedToUserId || undefined,
+      });
       if (!res.ok) { setError(res.error ?? "Could not add task"); return; }
-      setTitle(""); setDueDate(""); setOpen(false);
+      setTitle(""); setDueDate(""); setAssignedToUserId(""); setOpen(false);
       router.refresh();
     });
   }
@@ -75,6 +80,16 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Proj
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
                    className="h-[30px] px-2 bg-white/60 border border-rule rounded-[6px] text-[12.5px] tabular outline-none focus:border-accent" />
           </div>
+          {members.length > 0 && (
+            <div>
+              <div className="mb-1 text-[10.5px] uppercase tracking-[0.06em] text-text-dim">Assign to</div>
+              <select value={assignedToUserId} onChange={(e) => setAssignedToUserId(e.target.value)}
+                      className="h-[30px] px-2 bg-white/60 border border-rule rounded-[6px] text-[12.5px] outline-none focus:border-accent">
+                <option value="">Me</option>
+                {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+          )}
           <button type="submit" disabled={pending || !title}
                   className="h-[30px] px-3 rounded-[6px] bg-accent text-white text-[11.5px] font-medium disabled:opacity-60">
             Add
@@ -95,6 +110,7 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Proj
               {groups.get(col)!.map((t) => (
                 <li key={t.id} className="bg-surface border border-rule rounded-[6px] p-2 text-[11.5px]">
                   <div className="text-text">{t.title}</div>
+                  <div className="mt-0.5 text-[10px] text-text-dim truncate">{t.assignedToName}</div>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <PriorityDot p={t.priority} />
                     <select value={t.status} onChange={(e) => moveTo(t.id, e.target.value as never)}

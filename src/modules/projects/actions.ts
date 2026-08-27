@@ -232,7 +232,7 @@ export async function addTask(input: unknown): Promise<ActionResult<{ id: string
         description:    emptyToNull(d.description),
         priority:       d.priority,
         status:         "TODO",
-        assignedToId:   ctx.userId,
+        assignedToId:   d.assignedToUserId ?? ctx.userId,
         createdById:    ctx.userId,
         ...(d.dueDate && d.dueDate !== "" && { dueAt: new Date(d.dueDate) }),
       },

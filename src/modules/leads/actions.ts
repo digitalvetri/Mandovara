@@ -84,6 +84,26 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
       select: { id: true, source: true, mobile: true },
     });
 
+    if (data.ownerId && data.ownerId !== ctx.userId) {
+      const taskNum = await allocateNumber(tx, { orgId: ctx.orgId, series: "TASK", yymm, prefix: "MDV" });
+      const dueAt = new Date();
+      dueAt.setDate(dueAt.getDate() + 2);
+      await tx.task.create({
+        data: {
+          organizationId: ctx.orgId,
+          number:      taskNum,
+          title:       `Follow up with ${data.name}`,
+          priority:    "NORMAL",
+          status:      "TODO",
+          assignedToId: data.ownerId,
+          createdById:  ctx.userId,
+          dueAt,
+          refType: "LEAD",
+          refId:   lead.id,
+        },
+      });
+    }
+
     publish({
       type: "lead.created",
       orgId: ctx.orgId,
@@ -113,10 +133,10 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
 
   const db = scoped(ctx);
   try {
-  // Read existing siteAddress so we can merge partial updates
+  // Read existing siteAddress + owner so we can merge partial updates and detect reassignment
   const existing = await db.lead.findUnique({
     where: { id },
-    select: { siteAddress: true },
+    select: { siteAddress: true, ownerId: true, name: true },
   });
   const existingAddr = (existing?.siteAddress ?? {}) as Record<string, unknown>;
 
@@ -138,22 +158,48 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
     ? parseRupeesInput(rest.estimatedBudget)
     : undefined;
 
-  await db.lead.update({
-    where: { id },
-    data: {
-      ...(rest.name        != null && { name:        rest.name }),
-      ...(rest.mobile      != null && { mobile:      normaliseMobile(rest.mobile) }),
-      ...(rest.email       != null && { email:       emptyToNull(rest.email) }),
-      ...(rest.source      != null && { source:      rest.source }),
-      ...(rest.ownerId     != null && { ownerId:     rest.ownerId }),
-      ...(rest.requirement != null && { requirement: emptyToNull(rest.requirement) }),
-      ...(budgetPaise      !== undefined && { budgetMin: null, budgetMax: budgetPaise }),
-      ...(mergedAddr       != null && { siteAddress: mergedAddr }),
-    },
-  });
+  const isReassignment = rest.ownerId != null && rest.ownerId !== existing?.ownerId;
+
+  await withTransaction(async (tx: TxClient) => {
+    await tx.lead.update({
+      where: { id },
+      data: {
+        ...(rest.name        != null && { name:        rest.name }),
+        ...(rest.mobile      != null && { mobile:      normaliseMobile(rest.mobile) }),
+        ...(rest.email       != null && { email:       emptyToNull(rest.email) }),
+        ...(rest.source      != null && { source:      rest.source }),
+        ...(rest.ownerId     != null && { ownerId:     rest.ownerId }),
+        ...(rest.requirement != null && { requirement: emptyToNull(rest.requirement) }),
+        ...(budgetPaise      !== undefined && { budgetMin: null, budgetMax: budgetPaise }),
+        ...(mergedAddr       != null && { siteAddress: mergedAddr }),
+      },
+    });
+
+    if (isReassignment && rest.ownerId) {
+      const yymm = yymmFromDate(new Date());
+      const taskNum = await allocateNumber(tx, { orgId: ctx.orgId, series: "TASK", yymm, prefix: "MDV" });
+      const dueAt = new Date();
+      dueAt.setDate(dueAt.getDate() + 2);
+      await tx.task.create({
+        data: {
+          organizationId: ctx.orgId,
+          number:      taskNum,
+          title:       `Follow up with ${existing?.name ?? "client"}`,
+          priority:    "NORMAL",
+          status:      "TODO",
+          assignedToId: rest.ownerId,
+          createdById:  ctx.userId,
+          dueAt,
+          refType: "LEAD",
+          refId:   id,
+        },
+      });
+    }
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
+  revalidatePath("/employee");
   return { ok: true, data: { id } };
   } catch (e) { return dbError(e); }
 }
