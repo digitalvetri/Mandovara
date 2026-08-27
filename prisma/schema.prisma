@@ -301,6 +301,13 @@ enum PayDirection {
   OUTBOUND
 }
 
+enum PendingStockStatus {
+  PENDING
+  VERIFIED
+  /// Item could not be identified, or does not exist — closed without import.
+  DISCARDED
+}
+
 enum SampleStatus {
   IN_LIBRARY
   ISSUED
@@ -1407,6 +1414,50 @@ model VendorBillLine {
   amount         BigInt
 
   bill VendorBill @relation(fields: [vendorBillId], references: [id], onDelete: Cascade)
+}
+
+/// Stock physically in the showroom whose brand/collection could not be
+/// matched to the catalogue at import time.
+///
+/// Deliberately NOT part of StockBalance and never counted in a stock KPI:
+/// these are items nobody has confirmed the identity of, and a quantity you
+/// cannot name is worse than a quantity you know you are missing.
+///
+/// Was a static JSON file until 2026-08-28. It became a table when the owner
+/// asked for a queue people can tick off — a checklist you cannot check is a
+/// report, and the verification it records (what the label actually said) is
+/// the thing that lets someone create the catalogue entry afterwards.
+model PendingStockItem {
+  id             String             @id @default(cuid())
+  organizationId String
+  /// Stable id from the origin dataset. The natural key — three bespoke
+  /// rolls share the placeholder code "— (no code)", so keying on code
+  /// would silently merge distinct physical rolls.
+  sourceId       String
+  /// Why it is pending — the grouping shown on the page.
+  groupKey       String
+  groupLabel     String
+  /// Which sheet it arrived on: MANDOVARA STOCK / TRACK STOCK.
+  source         String
+  /// What the import sheet called it. Null when the sheet had no name.
+  catalogueName  String?
+  code           String
+  qty            Decimal            @db.Decimal(12, 3)
+  unit           String
+  lengthInches   Decimal?           @db.Decimal(8, 2)
+  /// What the person must read off the physical label.
+  confirmNeeded  String
+  status         PendingStockStatus @default(PENDING)
+  /// What the label actually said — the whole point of the exercise.
+  foundBrand      String?
+  foundCollection String?
+  note            String?
+  verifiedById    String?
+  verifiedAt      DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, status])
 }
 
 model StockBalance {

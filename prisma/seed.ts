@@ -6,6 +6,7 @@ import { seedCatalog } from "./seed/catalog";
 import { seedCustomers } from "./seed/customers";
 import { seedMasters } from "./seed/masters";
 import { seedMilestoneTemplates } from "./seed/milestone-templates";
+import { seedPendingStock } from "./seed/pending-stock";
 import { printRowCounts } from "./seed/report";
 import { seedTransactions } from "./seed/transactions";
 import { seedDownstream } from "./seed/downstream";
@@ -33,6 +34,12 @@ async function main(): Promise<void> {
 
   process.stdout.write("Seed: catalog (brands → collections → designs → colourways)...\n");
   const catalog = await seedCatalog(db, masters.orgId);
+
+  // Not demo data: these are real unmatched showroom items, and the page
+  // that lists them is a working queue. wipe() truncates the table, so
+  // without this a reseed leaves /inventory/pending empty.
+  process.stdout.write("Seed: pending stock verification queue...\n");
+  await seedPendingStock(db, masters.orgId);
 
   // Demo customers + transactions are gated behind SEED_DEMO_DATA.
   // Fresh deploys land clean by default — no fake leads, clients,
