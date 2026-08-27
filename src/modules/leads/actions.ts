@@ -85,21 +85,16 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
     });
 
     if (data.ownerId && data.ownerId !== ctx.userId) {
-      const taskNum = await allocateNumber(tx, { orgId: ctx.orgId, series: "TASK", yymm, prefix: "MDV" });
       const dueAt = new Date();
       dueAt.setDate(dueAt.getDate() + 2);
-      await tx.task.create({
+      await tx.followUp.create({
         data: {
           organizationId: ctx.orgId,
-          number:      taskNum,
-          title:       `Follow up with ${data.name}`,
-          priority:    "NORMAL",
-          status:      "TODO",
-          assignedToId: data.ownerId,
-          createdById:  ctx.userId,
+          ownerId:  data.ownerId,
           dueAt,
-          refType: "LEAD",
-          refId:   lead.id,
+          note:     `Follow up with ${data.name}`,
+          refType:  "LEAD",
+          refId:    lead.id,
         },
       });
     }
@@ -160,42 +155,34 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
 
   const isReassignment = rest.ownerId != null && rest.ownerId !== existing?.ownerId;
 
-  await withTransaction(async (tx: TxClient) => {
-    await tx.lead.update({
-      where: { id },
+  await db.lead.update({
+    where: { id },
+    data: {
+      ...(rest.name        != null && { name:        rest.name }),
+      ...(rest.mobile      != null && { mobile:      normaliseMobile(rest.mobile) }),
+      ...(rest.email       != null && { email:       emptyToNull(rest.email) }),
+      ...(rest.source      != null && { source:      rest.source }),
+      ...(rest.ownerId     != null && { ownerId:     rest.ownerId }),
+      ...(rest.requirement != null && { requirement: emptyToNull(rest.requirement) }),
+      ...(budgetPaise      !== undefined && { budgetMin: null, budgetMax: budgetPaise }),
+      ...(mergedAddr       != null && { siteAddress: mergedAddr }),
+    },
+  });
+
+  if (isReassignment && rest.ownerId) {
+    const dueAt = new Date();
+    dueAt.setDate(dueAt.getDate() + 2);
+    await db.followUp.create({
       data: {
-        ...(rest.name        != null && { name:        rest.name }),
-        ...(rest.mobile      != null && { mobile:      normaliseMobile(rest.mobile) }),
-        ...(rest.email       != null && { email:       emptyToNull(rest.email) }),
-        ...(rest.source      != null && { source:      rest.source }),
-        ...(rest.ownerId     != null && { ownerId:     rest.ownerId }),
-        ...(rest.requirement != null && { requirement: emptyToNull(rest.requirement) }),
-        ...(budgetPaise      !== undefined && { budgetMin: null, budgetMax: budgetPaise }),
-        ...(mergedAddr       != null && { siteAddress: mergedAddr }),
+        organizationId: ctx.orgId,
+        ownerId:  rest.ownerId,
+        dueAt,
+        note:     `Follow up with ${existing?.name ?? "client"}`,
+        refType:  "LEAD",
+        refId:    id,
       },
     });
-
-    if (isReassignment && rest.ownerId) {
-      const yymm = yymmFromDate(new Date());
-      const taskNum = await allocateNumber(tx, { orgId: ctx.orgId, series: "TASK", yymm, prefix: "MDV" });
-      const dueAt = new Date();
-      dueAt.setDate(dueAt.getDate() + 2);
-      await tx.task.create({
-        data: {
-          organizationId: ctx.orgId,
-          number:      taskNum,
-          title:       `Follow up with ${existing?.name ?? "client"}`,
-          priority:    "NORMAL",
-          status:      "TODO",
-          assignedToId: rest.ownerId,
-          createdById:  ctx.userId,
-          dueAt,
-          refType: "LEAD",
-          refId:   id,
-        },
-      });
-    }
-  }, { orgId: ctx.orgId });
+  }
 
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
