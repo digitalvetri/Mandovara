@@ -64,9 +64,16 @@ export default defineConfig({
     // `./node_modules/.bin/next` breaks on Windows cmd/PowerShell.
     command: `pnpm exec next dev --port ${PORT}`,
     url: BASE_URL,
-    // Never reuse: a stale server on this port may be a different build, or the
-    // same build without APP_DATABASE_URL, which would quietly skip RLS.
-    reuseExistingServer: false,
+    // Never reuse by default: a stale server on this port may be a different
+    // build, or the same build without APP_DATABASE_URL, which would quietly
+    // skip RLS.
+    //
+    // E2E_REUSE_SERVER=1 opts out, and exists for exactly one case — the
+    // catalog perf gate, which requires a PRODUCTION build (`next start`)
+    // while this command starts `next dev`. Without the escape hatch that
+    // gate could never run at all, which is why it had never been measured.
+    // You are responsible for what is on the port when you set it.
+    reuseExistingServer: process.env["E2E_REUSE_SERVER"] === "1",
     timeout: 180_000,
     env: { ...process.env, APP_DATABASE_URL } as Record<string, string>,
   },
