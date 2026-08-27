@@ -211,7 +211,7 @@ export default async function LeadDetailPage({
             <dl className="space-y-3 text-[13px]">
               <Row k="Estimated budget" v={budgetDisplayStr || "—"} />
               <Row k="Source" v={SOURCE_LABEL[lead.source] ?? lead.source} />
-              <Row k="Owner" v={lead.ownerName} />
+              <Row k="Assigned to" v={lead.ownerName} />
               <Row k="Created" v={createdDate} />
               {lead.siteAddress && (
                 <Row k="Site address" v={lead.siteAddress} />

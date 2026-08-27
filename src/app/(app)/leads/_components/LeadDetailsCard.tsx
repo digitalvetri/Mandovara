@@ -98,9 +98,9 @@ export function LeadDetailsCard({
               </button>
             </div>
           ) : (
-            <button type="button" onClick={startEdit}
-                    className="flex items-center gap-1.5 h-7 px-3 rounded-[6px] text-[12px] text-text-dim border border-rule hover:text-text hover:bg-surface-hover transition-colors">
-              <Pencil size={12} strokeWidth={1.75} /> Edit
+            <button type="button" onClick={startEdit} title="Edit details"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-[6px] text-text-dim border border-rule hover:text-text hover:bg-surface-hover transition-colors">
+              <Pencil size={13} strokeWidth={1.75} />
             </button>
           )}
         </div>
