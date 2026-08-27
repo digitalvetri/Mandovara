@@ -803,3 +803,126 @@ it was always standing in for.
 `/lib/calc` was not touched. The engine takes per-item inputs and never sees
 the parent, which is the main reason a change this wide across three modules is
 safe.
+
+---
+
+## Ten owner asks, worked in dependency order
+
+*2026-08-27 — owner instruction*
+
+The list arrived as ten changes with "deliver tomorrow" attached. Reading the
+code for each one first changed the picture: four were already built or nearly
+so, two were blocked outside the repository, and the rest were real work. What
+follows is what the code said, not what the list assumed.
+
+### The PDF was never the problem; the pipe was
+
+The quotation PDF already existed and was good — `QuotePdf.tsx` rendering
+server-side, served at `/q/[token]/pdf`. The ask ("the client should receive a
+PDF, not a link") was blocked on something no amount of code fixes: **a `wa.me`
+deep link is a URL scheme and carries text only.** A true document message needs
+the WhatsApp Cloud API and a Meta-verified, INR-billed WABA — spec §13's
+week-one lead-time item, at 1–3 weeks, which nobody had started.
+
+So the message now leads with a URL that resolves straight to `application/pdf`.
+One tap, the phone opens it in a viewer, ready to save or forward. For most
+clients that is indistinguishable from an attachment, and it shipped the same
+day instead of in three weeks. The accept page follows as a second, labelled
+link.
+
+### "Nothing in the attendance module" was one missing row
+
+The owner reported attendance as empty. It was not: `selfCheckIn`,
+`selfCheckOut`, branch geofencing and a distance check all existed. What did not
+exist was an **Employee record for anyone added through Admin** — and check-in
+requires one. Real staff hit *"No employee profile is linked to your account"*
+and reasonably concluded the module did nothing.
+
+`/api/admin/link-employee` existed as a one-shot repair, which is the tell that
+this had already bitten someone and been patched rather than fixed. User and
+Employee are now created in one transaction, with a backfill sweep for older
+accounts. That single change unblocked attendance *and* payroll, which is why it
+went first despite being fourth on the list.
+
+The tables are still not merged. `Employee` carries payroll and HR data that has
+no business on a login record, and a tailor on the floor may be an Employee with
+no User at all. The fix was the link, not a merge.
+
+### The geofence was pointing the wrong way
+
+It blocked off-site punches. For a house whose measurement executives spend
+their days at client villas, that is backwards: refusing the punch does not stop
+them working, it means the day is never recorded and payroll under-counts them.
+The fence now labels instead of blocking — it asks where they are, records the
+answer, and flags the row. A denied GPS permission is treated as off-site rather
+than as failure, because a refused location and an absent employee are different
+facts.
+
+### "Outstanding" on the PO page was measuring nothing
+
+The owner was right that the word was wrong — it means money owed *to* us on the
+sales side. It was worse than that: the number summed the **total value of open
+POs**, so a fully-paid order awaiting delivery counted toward it and a
+delivered-but-unpaid one dropped off the moment its status changed. It measured
+neither debt nor exposure.
+
+Money owed is billed minus paid. Purchase orders are *intent*, which is a
+different number and now carries its own label. The `VendorBill` and
+`PaymentAllocation` models were already in the schema; what was missing was the
+vendor-facing view on top.
+
+### The project page was a wizard pretending to be a workspace
+
+It led with one "next action" and assumed an order: quote, advance, install,
+complete. Real projects refuse to behave — the advance lands before the final
+quote is approved, one room is installed while another is still being measured.
+The sequence hid whatever you actually needed behind a step you had not done.
+
+Every part of the job is now a section that states its state when closed
+(*"₹2,40,000 of ₹6,50,000 received"*) and opens into detail. Nothing gated. The
+components mostly existed already; they were simply arranged behind a flow.
+
+The payment ledger is deliberately a running statement rather than four totals,
+because *"why do I owe this?"* is the question clients actually ask, and four
+totals cannot answer it.
+
+### Five-day audit retention, implemented narrowly
+
+This relaxes spec §15 non-negotiable #5. The concern was raised — five days
+means a dispute about last week has no evidence, in a trade where dye-lot
+arguments surface weeks later — and the instruction was reaffirmed, so it was
+built.
+
+But narrowly. `AuditLog_no_update` is untouched: a row can still never be
+**altered**, which is the property that makes the log evidence rather than
+commentary. The blanket delete ban became an age gate — older than the window,
+deletable; inside it, not by anyone through any path. The purge works and
+someone covering their tracks an hour later still cannot. The window is a
+`Setting`, so it can be raised without a deploy. `StockMove` stays fully
+append-only; it is what `StockBalance` is materialised from, and deleting any
+part of it corrupts quantities on hand rather than merely losing history.
+
+### A cross-lead data leak, found by the compiler
+
+Making `Measurement.projectId` nullable turned an existing guard into a hole.
+`addMeasurementItem` checked `room.projectId !== round.projectId` — sound while
+every round had a project, but with the party XOR two lead-scoped rows both hold
+`null`, `null !== null` is false, and the guard would have waved **any lead's
+room onto any other lead's round**. Every cross-row ownership check now goes
+through `sameParty`, which compares both sides.
+
+### Tables were clipping, not overflowing
+
+27 tables sat inside `overflow-hidden` wrappers. On a phone their right-hand
+columns were not merely off-screen — they were *unreachable*. Recent history
+shows these being fixed one bug report at a time; this was the systematic pass,
+with each table given a minimum width scaled to its column count so it scrolls
+in its own container rather than pushing the page sideways.
+
+### Still outstanding, and larger than any of the above
+
+The production database is nearly empty, there are no backups configured, and
+there is no import path for the roughly 1,200 projects and 1,000 clients living
+in the client's current books. A dashboard showing ₹0 reads as broken software
+regardless of how well it is built, and software staff must retype a year of
+history into is software they will quietly stop using.
