@@ -19,6 +19,7 @@ import { LeadQuotationsSidebar } from "../_components/LeadQuotationsSidebar";
 import { LeadSiteVisitsSidebar } from "../_components/LeadSiteVisitsSidebar";
 import { LeadMeasurementsPanel } from "../_components/LeadMeasurementsPanel";
 import { listRoundsForLead, leadHasApprovedMeasurement } from "@/modules/measurement/queries-lead";
+import { LeadFollowUpList } from "../_components/LeadFollowUpList";
 
 export const dynamic = "force-dynamic";
 
@@ -196,52 +197,7 @@ export default async function LeadDetailPage({
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
               Follow-ups ({followUps.length})
             </div>
-            {followUps.length === 0 ? (
-              <div className="text-[12.5px] text-text-faint">
-                No follow-ups yet. Schedule one above to keep this lead warm.
-              </div>
-            ) : (
-              <ul className="space-y-0">
-                {followUps.map((f) => (
-                  <li
-                    key={f.id}
-                    className="flex items-baseline gap-3 border-b border-rule/60 last:border-0 py-3"
-                  >
-                    <span
-                      className={
-                        "mt-[6px] h-[8px] w-[8px] rounded-full shrink-0 " +
-                        (f.status === "COMPLETED"
-                          ? "bg-good"
-                          : f.status === "OVERDUE"
-                            ? "bg-bad"
-                            : "bg-accent")
-                      }
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[13.5px] text-text">{f.note ?? "Untitled follow-up"}</div>
-                      <div className="text-[11.5px] text-text-dim mt-0.5 tabular">
-                        Due {f.dueAt.toLocaleDateString("en-IN", {
-                          day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
-                        })}
-                        {f.outcome ? ` · ${f.outcome.toLowerCase()}` : ""}
-                      </div>
-                    </div>
-                    <span
-                      className={
-                        "text-[10.5px] uppercase tracking-[0.14em] shrink-0 " +
-                        (f.status === "COMPLETED"
-                          ? "text-good"
-                          : f.status === "OVERDUE"
-                            ? "text-bad"
-                            : "text-text-dim")
-                      }
-                    >
-                      {f.status.toLowerCase()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <LeadFollowUpList followUps={followUps} />
           </div>
 
         </div>
