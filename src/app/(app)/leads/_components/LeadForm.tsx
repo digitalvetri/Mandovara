@@ -66,6 +66,7 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
   }
 
   const fc = EntityForm.fieldCls;
+  const sc = EntityForm.selectCls;
 
   return (
     <EntityForm
@@ -119,7 +120,7 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
       </EntityForm.Field>
 
       <EntityForm.Field label="Lead Source" error={errors.source?.message} required>
-        <select {...register("source")} className={fc} defaultValue="">
+        <select {...register("source")} className={sc} defaultValue="">
           <option value="" disabled>Select source</option>
           {LEAD_SOURCE_OPTIONS.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
@@ -129,7 +130,7 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
 
       {/* Row 4 — Priority | Budget */}
       <EntityForm.Field label="Lead Priority" error={errors.priority?.message}>
-        <select {...register("priority")} className={fc}>
+        <select {...register("priority")} className={sc}>
           {LEAD_PRIORITY_OPTIONS.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
           ))}
@@ -152,7 +153,7 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
       {/* Row 5 — Assigned To | Site Address */}
       <EntityForm.Field label="Assigned To" error={errors.ownerId?.message}
         hint="Leave blank to assign to yourself">
-        <select {...register("ownerId")} className={fc} defaultValue="">
+        <select {...register("ownerId")} className={sc} defaultValue="">
           <option value="">Unassigned (defaults to you)</option>
           {salesUsers.map((u) => (
             <option key={u.id} value={u.id}>{u.name}</option>

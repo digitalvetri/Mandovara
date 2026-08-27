@@ -117,5 +117,10 @@ function Field(props: FieldProps) {
 const fieldCls =
   "w-full h-[34px] px-3 bg-surface-2 border border-rule rounded-[6px] text-[12.5px] text-text placeholder:text-text-muted outline-none focus:border-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed read-only:opacity-70";
 
+// Selects: white background (matches text inputs) so the selected value
+// reads as clearly "filled" rather than muted against a grey surface.
+const selectCls =
+  "w-full h-[34px] px-3 bg-surface border border-rule rounded-[6px] text-[12.5px] text-text outline-none focus:border-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+
 // Namespace the ergonomics — one import per module.
-export const EntityForm = Object.assign(EntityFormImpl, { Field, fieldCls });
+export const EntityForm = Object.assign(EntityFormImpl, { Field, fieldCls, selectCls });

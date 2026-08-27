@@ -458,6 +458,12 @@ html, body {
   :root.dark select option { background-color: var(--color-surface-2); }
 }
 
+/* ── Select placeholder vs filled colour ────────────────────────────────
+   When the empty placeholder option (value="") is selected the select
+   looks like an unfilled field; when a real value is chosen it reads as
+   fully filled. Unlayered — beats @layer utilities so it always applies. */
+select:has(option[value=""]:checked) { color: var(--color-text-muted); }
+
 /* Disabled / read-only visual cues */
 input:disabled,
 select:disabled,

@@ -37,14 +37,14 @@ export function AttendanceCTA({
   const [status,      setStatus]      = useState<string | null>(initialStatus);
   const [gps,         setGps]         = useState<GpsState>("idle");
   const [locRecorded, setLocRecorded] = useState(false);
-  const [elapsed,     setElapsed]     = useState<string | null>(
-    initialInAt && !initialOutAt ? elapsedStr(initialInAt) : null,
-  );
+  const [elapsed,     setElapsed]     = useState<string | null>(null);
   const [banner, setBanner] = useState<Banner>(null);
 
-  // Live working timer — ticks every 30 s while checked in, stops after checkout
+  // Live working timer — ticks every 30 s while checked in, stops after checkout.
+  // Initialised in useEffect (not useState) to avoid SSR/client hydration mismatch.
   useEffect(() => {
-    if (!inAt || outAt) return;
+    if (!inAt || outAt) { setElapsed(null); return; }
+    setElapsed(elapsedStr(inAt));
     const id = setInterval(() => setElapsed(elapsedStr(inAt)), 30_000);
     return () => clearInterval(id);
   }, [inAt, outAt]);
