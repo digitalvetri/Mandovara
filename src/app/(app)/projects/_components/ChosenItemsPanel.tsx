@@ -1,12 +1,7 @@
 // Chosen items panel — one card per measurement item on the project's
-// latest round, with fixed site dimensions and the picked product. The
-// "Change" button on each card will (next session) open the catalog
-// picker and swap the colourway on the underlying CalcResult. For now
-// it links to the measurement round detail where the swap can be done.
+// latest round, with fixed site dimensions and the picked product.
 
-import Link from "next/link";
-import type { Route } from "next";
-import { Image as ImageIcon, ArrowRight } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
 import type { ProjectChosenItem } from "@/modules/projects/queries";
 
 const FAMILY_LABEL: Record<string, string> = {
@@ -25,11 +20,10 @@ const FAMILY_LABEL: Record<string, string> = {
 };
 
 interface Props {
-  projectId: string;
   items: ProjectChosenItem[];
 }
 
-export function ChosenItemsPanel({ projectId, items }: Props) {
+export function ChosenItemsPanel({ items }: Props) {
   if (items.length === 0) return null;
 
   return (
@@ -44,13 +38,13 @@ export function ChosenItemsPanel({ projectId, items }: Props) {
       </div>
 
       <ul className="grid gap-3 sm:grid-cols-2">
-        {items.map((it) => <ItemCard key={it.id} projectId={projectId} it={it} />)}
+        {items.map((it) => <ItemCard key={it.id} it={it} />)}
       </ul>
     </section>
   );
 }
 
-function ItemCard({ projectId, it }: { projectId: string; it: ProjectChosenItem }) {
+function ItemCard({ it }: { it: ProjectChosenItem }) {
   const family = FAMILY_LABEL[it.family] ?? it.family;
   const hasProduct = it.colourwayId !== null;
 
@@ -109,39 +103,19 @@ function ItemCard({ projectId, it }: { projectId: string; it: ProjectChosenItem 
           )}
         </div>
 
-        {/* Product picked */}
-        <div className="mt-2 min-h-[24px]">
-          {hasProduct ? (
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 text-[11.5px] leading-tight">
-                <div className="truncate text-text">
-                  {it.designName} · <span className="text-text-dim">{it.colourName}</span>
-                </div>
-                {it.brandName && (
-                  <div className="text-[10.5px] text-text-subtle truncate">
-                    {it.brandName}
-                  </div>
-                )}
-              </div>
-              <Link
-                href={`/projects/${projectId}/measurements` as Route}
-                className="inline-flex shrink-0 items-center gap-1 rounded-[6px] border border-rule px-2 py-0.5 text-[10.5px] text-text-dim hover:border-gold/40 hover:text-text"
-                title="Change chosen product"
-              >
-                Change
-                <ArrowRight size={10} />
-              </Link>
+        {/* Product info — only shown when a colourway is linked */}
+        {hasProduct && (
+          <div className="mt-2 text-[11.5px] leading-tight">
+            <div className="truncate text-text">
+              {it.designName} · <span className="text-text-dim">{it.colourName}</span>
             </div>
-          ) : (
-            <Link
-              href={`/projects/${projectId}/measurements` as Route}
-              className="inline-flex items-center gap-1 text-[11px] text-heat hover:underline"
-            >
-              Pick a product from the catalog
-              <ArrowRight size={10} />
-            </Link>
-          )}
-        </div>
+            {it.brandName && (
+              <div className="text-[10.5px] text-text-subtle truncate">
+                {it.brandName}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </li>
   );

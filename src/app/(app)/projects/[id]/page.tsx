@@ -179,7 +179,7 @@ export default async function ProjectDetailPage({
           />
           <UpcomingVisitsCard visits={visits} />
           <MilestonesPanel milestones={milestones} orderValue={p.orderValue} />
-          <ChosenItemsPanel projectId={p.id} items={chosen} />
+          <ChosenItemsPanel items={chosen} />
           <MeasurementsSection projectId={p.id} rounds={rounds} />
           {payments && (
             <PaymentsPanel
