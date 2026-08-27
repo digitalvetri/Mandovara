@@ -11,7 +11,11 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
 // signed-out visitor — and with no service worker there is no install prompt.
 // The worker itself caches nothing sensitive; see public/sw.js.
 const PUBLIC_PATHS = [
-  "/login", "/change-password", "/api/health", "/sw.js", "/offline",
+  // /forgot-password must be public for the obvious reason: someone who
+  // cannot sign in is exactly who needs it. Omitting it meant the login
+  // page's "Forgot password?" link redirected straight back to login —
+  // a loop, at the one moment a user is already stuck (fixed 2026-08-28).
+  "/login", "/forgot-password", "/change-password", "/api/health", "/sw.js", "/offline",
 ];
 // Path prefixes always allowed (webhooks use their own HMAC; /api/admin/
 // endpoints use a token header; the rest are static assets).
