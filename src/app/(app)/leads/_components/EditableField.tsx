@@ -166,6 +166,30 @@ export function EditableField({
     );
   }
 
+  // lg variant: heading + compact pencil button beside it (avoid full-width hover zone)
+  if (size === "lg") {
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        {icon && <span className="text-text-dim shrink-0">{icon}</span>}
+        <div
+          className={`${titleCls} truncate flex-1 min-w-0 ${isEmpty ? "text-text-faint" : ""}`}
+          role="heading"
+          aria-level={1}
+        >
+          {isEmpty ? placeholder : displayText}
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          title="Edit"
+          className="shrink-0 h-7 w-7 inline-flex items-center justify-center rounded-[6px] text-text-faint border border-transparent hover:border-rule hover:text-text hover:bg-surface-hover transition-colors"
+        >
+          <Pencil size={13} strokeWidth={1.75} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -182,7 +206,6 @@ export function EditableField({
         )}
         <div
           className={`${titleCls} truncate ${isEmpty ? "text-text-faint" : ""}`}
-          {...(size === "lg" ? { role: "heading", "aria-level": 1 } : {})}
         >
           {isEmpty ? placeholder : displayText}
         </div>
