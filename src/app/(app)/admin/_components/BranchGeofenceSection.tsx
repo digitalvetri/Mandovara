@@ -113,7 +113,7 @@ function BranchRowEditor({ initial }: { initial: BranchRow }) {
 
   return (
     <div className="rounded-[10px] border border-rule bg-surface-2/40 p-4">
-      <div className="flex items-baseline justify-between mb-3 gap-3">
+      <div className="flex flex-wrap items-start justify-between mb-3 gap-3">
         <div>
           <div className="text-[13px] font-medium text-text">{initial.name}</div>
           <div className="text-[10.5px] text-text-dim mt-0.5">
@@ -132,7 +132,7 @@ function BranchRowEditor({ initial }: { initial: BranchRow }) {
           Use my location
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_140px_auto] gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-[1fr_1fr_140px_auto] gap-2">
         <input
           value={lat}
           onChange={(e) => setLat(e.target.value)}
@@ -150,9 +150,9 @@ function BranchRowEditor({ initial }: { initial: BranchRow }) {
           onChange={(e) => setRadius(e.target.value)}
           placeholder="Radius (m)"
           inputMode="numeric"
-          className="h-[30px] px-2 bg-surface border border-rule rounded-[5px] text-[12px] text-text tabular outline-none focus:border-accent"
+          className="h-[30px] px-2 bg-surface border border-rule rounded-[5px] text-[12px] text-text tabular outline-none focus:border-accent lg:col-auto col-span-1"
         />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 col-span-1">
           <button
             type="button"
             onClick={save}
