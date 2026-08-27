@@ -44,9 +44,9 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "quotation.view", "quotation.create", "quotation.update", "quotation.revise", "quotation.send", "quotation.viewOthers",
     "order.view", "order.viewMargin",
     "project.view", "project.create", "project.update", "project.materialIssue",
-    // Measurement: FULL create · OWN edit · FULL submit · NONE approve · FULL view
-    "measurement.view", "measurement.create", "measurement.update", "measurement.submit", "measurement.revise",
-    "measurement.view.any", "measurement.create.any", "measurement.edit.own", "measurement.submit.any",
+    // Measurement: FULL create · OWN edit · FULL submit · FULL approve · FULL view
+    "measurement.view", "measurement.create", "measurement.update", "measurement.submit", "measurement.approve", "measurement.revise",
+    "measurement.view.any", "measurement.create.any", "measurement.edit.own", "measurement.submit.any", "measurement.approve.any",
     "sitelog.view", "sitelog.create",
     "make.view", "make.printCutList",
     "invoice.view",
