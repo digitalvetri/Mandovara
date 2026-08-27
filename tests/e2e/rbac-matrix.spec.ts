@@ -75,10 +75,20 @@ test.describe("RBAC matrix — every role × every top-level route", () => {
   const contexts = new Map<SeedRole, BrowserContext>();
 
   // 9 UI logins run in parallel below — bump the hook budget.
-  test.beforeAll(async ({ browser }, testInfo) => {
-    // Pin to chromium: identical response bodies across viewports, no need
-    // to double the runtime on mobile-android.
-    test.skip(testInfo.project.name !== "chromium", "chromium-only");
+  test.beforeAll(async ({ browser }) => {
+    // NO project guard here.
+    //
+    // There used to be `test.skip(testInfo.project.name !== "chromium")`,
+    // meant to keep this off mobile-android. But this spec only ever runs
+    // under the dedicated `rbac-matrix` project — the chromium and
+    // mobile-android projects both `testIgnore` it in playwright.config.
+    // So the guard was comparing "rbac-matrix" against "chromium", always
+    // skipping, and the entire 225-test permission matrix silently
+    // reported green without executing a single assertion.
+    //
+    // Found 2026-08-28. The viewport pinning the guard was after is
+    // already handled by the project's own `use: devices["Desktop
+    // Chrome"]`, so nothing replaces it.
     const pairs = await Promise.all(
       ROLES.map(async (role) => [role, await loginAs(browser, role)] as const),
     );
