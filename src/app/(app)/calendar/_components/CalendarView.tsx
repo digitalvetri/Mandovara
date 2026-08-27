@@ -169,6 +169,7 @@ export function CalendarView() {
                       <div key={it.id} className={["text-[10px] truncate rounded-[3px] px-1 py-0.5 leading-tight",
                         it.status==="OVERDUE"   ? "bg-fault/15 text-fault" :
                         it.status==="COMPLETED" ? "bg-good/12 text-good" :
+                        it.kind==="sitevisit"   ? "bg-heat/12 text-heat" :
                                                   "bg-accent/12 text-accent",
                       ].join(" ")}>{it.refLabel}</div>
                     ))}
@@ -204,7 +205,7 @@ export function CalendarView() {
                     {d.toLocaleDateString("en-IN",{day:"numeric",month:"short"})}
                   </span>
                   <span className="text-[11px] text-text-faint">
-                    {dayItems.length === 0 ? "No follow-ups" : `${dayItems.length} follow-up${dayItems.length===1?"":"s"}`}
+                    {dayItems.length === 0 ? "Nothing scheduled" : `${dayItems.length} item${dayItems.length===1?"":"s"}`}
                   </span>
                 </div>
                 {dayItems.length > 0 && dayItems.map(it => (

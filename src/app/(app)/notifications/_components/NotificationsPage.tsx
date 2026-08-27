@@ -4,7 +4,7 @@ import { useTransition, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { CheckCheck } from "lucide-react";
+import { CheckCheck, MapPin } from "lucide-react";
 import {
   markNotificationRead, markAllNotificationsRead,
 } from "@/modules/notifications/actions";
@@ -18,6 +18,7 @@ const LEVEL_TONE: Record<string, string> = {
   WARN:    "bg-warn/12 text-warn",
   WARNING: "bg-warn/12 text-warn",
   ERROR:   "bg-bad/12 text-bad",
+  VISIT:   "bg-heat/12 text-heat",
 };
 
 const ENTITY_ROUTES: Record<string, (id: string) => string> = {
@@ -45,7 +46,8 @@ export function NotificationsPage({ rows, counts, activeFilter }: Props) {
   const [localUnread, setLocalUnread] = useState(counts.unread);
 
   function clickRow(n: NotificationRow) {
-    if (!n.readAt) {
+    // Site visit rows have no FollowUp record to mark read — just navigate
+    if (!n.readAt && n.kind !== "sitevisit") {
       setLocalRows((prev) => prev.map((x) => (x.id === n.id ? { ...x, readAt: new Date() } : x)));
       setLocalUnread((c) => Math.max(0, c - 1));
       startTransition(async () => {
@@ -61,8 +63,12 @@ export function NotificationsPage({ rows, counts, activeFilter }: Props) {
 
   function markAll() {
     if (localUnread === 0) return;
-    setLocalRows((prev) => prev.map((x) => (x.readAt ? x : { ...x, readAt: new Date() })));
-    setLocalUnread(0);
+    // Only follow-up rows can be marked read server-side
+    setLocalRows((prev) => prev.map((x) => (x.readAt || x.kind === "sitevisit" ? x : { ...x, readAt: new Date() })));
+    setLocalUnread((c) => {
+      const svCount = localRows.filter(r => r.kind === "sitevisit" && !r.readAt).length;
+      return svCount; // site visit "unread" count remains
+    });
     startTransition(async () => {
       await markAllNotificationsRead();
       router.refresh();
@@ -125,8 +131,9 @@ export function NotificationsPage({ rows, counts, activeFilter }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`px-2 py-0.5 rounded-[6px] text-[10px] uppercase tracking-[0.06em] ${LEVEL_TONE[n.level] ?? "bg-white/8 text-text-dim"}`}>
-                        {n.level.toLowerCase()}
+                        {n.kind === "sitevisit" ? "site visit" : n.level.toLowerCase()}
                       </span>
+                      {n.kind === "sitevisit" && <MapPin size={11} strokeWidth={2} className="text-heat shrink-0" />}
                       <span className="text-[13.5px] text-text">{n.title}</span>
                       {hasLink && (
                         <span className="text-[11px] text-accent uppercase tracking-[0.08em]">

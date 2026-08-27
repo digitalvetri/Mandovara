@@ -3,12 +3,13 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { RotateCcw, ExternalLink } from "lucide-react";
+import { RotateCcw, ExternalLink, MapPin } from "lucide-react";
 import { rescheduleFollowUp } from "@/modules/followups/actions";
 
 export interface CalendarItem {
   id:        string;
   dueAt:     string;
+  kind:      "followup" | "sitevisit";
   note:      string;
   refType:   string;
   refId:     string;
@@ -17,10 +18,18 @@ export interface CalendarItem {
   status:    "OPEN" | "OVERDUE" | "COMPLETED";
 }
 
-const STATUS_CLS: Record<string, string> = {
-  OPEN:      "bg-accent/12 text-accent",
-  OVERDUE:   "bg-fault/12 text-fault",
-  COMPLETED: "bg-good/12 text-good",
+// Follow-ups use accent (teal); site visits use heat (amber) to distinguish
+const STATUS_CLS: Record<string, Record<string, string>> = {
+  followup: {
+    OPEN:      "bg-accent/12 text-accent",
+    OVERDUE:   "bg-fault/12 text-fault",
+    COMPLETED: "bg-good/12 text-good",
+  },
+  sitevisit: {
+    OPEN:      "bg-heat/12 text-heat",
+    OVERDUE:   "bg-fault/12 text-fault",
+    COMPLETED: "bg-good/12 text-good",
+  },
 };
 const STATUS_LABEL: Record<string, string> = {
   OPEN: "Open", OVERDUE: "Overdue", COMPLETED: "Done",
@@ -29,6 +38,7 @@ const REF_HREF: Record<string, (id: string) => Route> = {
   LEAD:      (id) => `/leads/${id}` as Route,
   CLIENT:    (id) => `/clients/${id}` as Route,
   QUOTATION: (id) => `/quotations/${id}` as Route,
+  PROJECT:   (id) => `/projects/${id}` as Route,
 };
 
 function fmtTime(iso: string): string {
@@ -48,8 +58,10 @@ export function FollowUpItem({ item, onRescheduled }: { item: CalendarItem; onRe
   });
   const [note, setNote] = useState("");
 
-  const href = REF_HREF[item.refType]?.(item.refId);
-  const tone = STATUS_CLS[item.status] ?? "bg-surface-2 text-text-dim";
+  const href      = REF_HREF[item.refType]?.(item.refId);
+  const kindMap   = STATUS_CLS[item.kind] ?? STATUS_CLS.followup!;
+  const tone      = (kindMap ?? STATUS_CLS.followup!)[item.status] ?? "bg-surface-2 text-text-dim";
+  const isSiteVisit = item.kind === "sitevisit";
 
   function submitReschedule(e: React.FormEvent) {
     e.preventDefault();
@@ -67,14 +79,17 @@ export function FollowUpItem({ item, onRescheduled }: { item: CalendarItem; onRe
           {/* Name row */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-[0.07em] px-1.5 py-0.5 rounded-[4px] ${tone}`}>
-              {STATUS_LABEL[item.status] ?? item.status}
+              {isSiteVisit ? "Site Visit" : (STATUS_LABEL[item.status] ?? item.status)}
             </span>
+            {isSiteVisit && <MapPin size={11} strokeWidth={2} className="text-heat shrink-0" />}
             <span className="text-[13.5px] font-semibold text-text">{item.refLabel}</span>
             <span className="text-[11.5px] text-text-dim tabular font-data">{fmtTime(item.dueAt)}</span>
           </div>
           {/* Note */}
           {item.note && (
-            <div className="mt-0.5 text-[12px] text-text-dim truncate">{item.note}</div>
+            <div className="mt-0.5 text-[12px] text-text-dim truncate">
+              {isSiteVisit ? item.note : item.note}
+            </div>
           )}
           {/* Owner + ref type */}
           <div className="mt-1 flex items-center gap-1.5 text-[11px] text-text-faint">
@@ -87,12 +102,14 @@ export function FollowUpItem({ item, onRescheduled }: { item: CalendarItem; onRe
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions — site visits have their own reschedule flow, so only show the link */}
         <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-          <button type="button" onClick={() => setOpen(v => !v)} title="Reschedule"
-                  className="h-7 w-7 grid place-items-center rounded-[6px] text-text-dim hover:text-text hover:bg-surface-2 transition-colors">
-            <RotateCcw size={12} strokeWidth={2} />
-          </button>
+          {!isSiteVisit && (
+            <button type="button" onClick={() => setOpen(v => !v)} title="Reschedule"
+                    className="h-7 w-7 grid place-items-center rounded-[6px] text-text-dim hover:text-text hover:bg-surface-2 transition-colors">
+              <RotateCcw size={12} strokeWidth={2} />
+            </button>
+          )}
           {href && (
             <Link href={href} title="Open" onClick={e => e.stopPropagation()}
                   className="h-7 w-7 grid place-items-center rounded-[6px] text-text-dim hover:text-accent hover:bg-surface-2 transition-colors">
@@ -102,8 +119,8 @@ export function FollowUpItem({ item, onRescheduled }: { item: CalendarItem; onRe
         </div>
       </div>
 
-      {/* Reschedule form */}
-      {open && (
+      {/* Reschedule form — follow-ups only */}
+      {open && !isSiteVisit && (
         <form onSubmit={submitReschedule} className="mt-3 p-3 bg-surface-2 rounded-[8px] space-y-2">
           <div className="flex gap-2">
             <input type="date" value={date} onChange={e => setDate(e.target.value)}

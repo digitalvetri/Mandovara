@@ -14,7 +14,7 @@ export function DayDetail({ day, items, loading, onRefresh }: {
           {day.toLocaleDateString("en-IN",{ weekday:"long", day:"numeric", month:"long" })}
         </div>
         <span className="text-[11px] text-text-faint">
-          {loading ? "Loading…" : `${items.length} follow-up${items.length===1?"":"s"}`}
+          {loading ? "Loading…" : `${items.length} item${items.length===1?"":"s"}`}
         </span>
       </div>
       {!loading && items.length === 0 && (
