@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { Route } from "next";
+import { Upload } from "lucide-react";
 import { PrimaryButton, Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
@@ -38,7 +41,21 @@ export default async function ClientsPage({
       <Topbar
         title="Client 360"
         eyebrow={`${total} client${total === 1 ? "" : "s"} · ${eyebrowFor(type, q)}`}
-        actions={<PrimaryButton href="/clients/new">New Client</PrimaryButton>}
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Import sits beside New Client because the first thing a new
+                deployment needs is the existing book, not one client typed
+                by hand. */}
+            <Link
+              href={"/clients/import" as Route}
+              className="inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-rule px-3.5 text-[12.5px] font-medium text-text-dim transition-colors hover:border-accent hover:text-text"
+            >
+              <Upload size={13} strokeWidth={1.9} />
+              Import
+            </Link>
+            <PrimaryButton href="/clients/new">New Client</PrimaryButton>
+          </div>
+        }
       />
       <ClientFilters />
       <ClientsTable rows={rows} />

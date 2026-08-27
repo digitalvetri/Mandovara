@@ -122,6 +122,19 @@ export default tseslint.config(
   // max-lines is off — seed files are inherently long data-generation scripts.
   {
     files: ["prisma/seed.ts", "prisma/seed/**/*.{ts,mjs,js}", "scripts/**/*.{ts,mjs,js}"],
+    languageOptions: {
+      globals: {
+        // Node scripts run outside the browser and outside Next's
+        // ambient types. URL, process, console and Buffer are all real
+        // Node globals here; without declaring them, no-undef flags
+        // ordinary Node code as an error.
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+      },
+    },
     rules: {
       "no-console": "off",
       "no-restricted-imports": "off",

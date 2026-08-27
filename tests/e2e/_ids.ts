@@ -11,7 +11,15 @@
 import type { Page } from "@playwright/test";
 
 // Route segments that live alongside :id and must never be mistaken for one.
-const NOT_AN_ID = new Set(["new", "edit", "quick", "estimate", "requests", "vendors", "dispatch", "conflicts"]);
+// Route segments that sit under a list path but are not record ids.
+// Any new sibling route added above a list table lands here — the
+// "import" entry was added 2026-08-28 when the Import button on
+// /clients started being picked up as the first client id, sending
+// every downstream test to /clients/import instead of a real client.
+const NOT_AN_ID = new Set([
+  "new", "edit", "quick", "estimate", "requests", "vendors",
+  "dispatch", "conflicts", "import",
+]);
 
 async function firstIdFrom(page: Page, listPath: string, hrefPrefix: string): Promise<string | null> {
   await page.goto(listPath);
