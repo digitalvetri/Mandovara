@@ -30,12 +30,6 @@ const config: NextConfig = {
   // typedRoutes disabled — friction outweighs value while modules are still
   // landing in placeholder form. Re-enable in Session 20+ when routes stabilise.
   typedRoutes: false,
-  // TypeScript check runs in-container during `next build` — the 4 GB heap
-  // set on the build stage in Dockerfile (`NODE_OPTIONS=--max-old-space-size=4096`)
-  // is enough to avoid the OOM that previously forced us to skip it.
-  turbopack: {
-    root: path.resolve("."),
-  },
   // Server actions default to a 1 MB request body — that's a hard block on
   // catalogue PDF uploads (typical brand catalogues are 5–100 MB). The
   // uploadCollectionPdf action itself refuses anything over 200 MB, so

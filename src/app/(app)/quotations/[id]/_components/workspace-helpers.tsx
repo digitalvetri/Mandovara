@@ -71,6 +71,10 @@ export function initLines(sLines: SerializedQuotation["lines"]): EditLine[] {
 
 export const INPUT = "w-full h-10 px-3 rounded-[7px] bg-ink/30 border border-rule text-text text-[13.5px] tabular outline-none focus:border-accent transition-colors";
 export const INPUT_SM = "w-full h-8 px-2.5 rounded-[6px] bg-ink/30 border border-rule text-text text-[12.5px] outline-none focus:border-accent transition-colors";
+// Number input without browser spinner arrows — spinners take ~17px and serve no purpose here
+export const INPUT_NUM = `${INPUT} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
+
+export const GST_SLABS = [0, 5, 12, 18, 28] as const;
 
 export function TRow({ k, v }: { k: string; v: number }) {
   return (

@@ -122,11 +122,11 @@ export function QuotationWorkspace({
               <th className="text-left py-2.5 px-4 w-[36px]">#</th>
               <th className="text-left py-2.5 px-3">Item</th>
               {isDraft && <>
-                <th className="text-right py-2.5 px-3 w-[80px]">Qty</th>
-                <th className="text-left py-2.5 px-3 w-[72px]">Unit</th>
-                <th className="text-right py-2.5 px-3 w-[110px]">Rate (₹)</th>
-                <th className="text-right py-2.5 px-3 w-[62px]">GST %</th>
-                {showDiscCol && <th className="text-right py-2.5 px-3 w-[70px]">Disc %</th>}
+                <th className="text-right py-2.5 px-3 w-[90px]">Qty</th>
+                <th className="text-left py-2.5 px-3 w-[90px]">Unit</th>
+                <th className="text-right py-2.5 px-3 w-[120px]">Rate (₹)</th>
+                <th className="text-right py-2.5 px-3 w-[82px]">GST %</th>
+                {showDiscCol && <th className="text-right py-2.5 px-3 w-[82px]">Disc %</th>}
               </>}
               {!isDraft && <>
                 <th className="text-right py-2.5 px-3 w-[70px]">Qty</th>

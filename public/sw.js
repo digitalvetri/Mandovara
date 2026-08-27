@@ -19,7 +19,7 @@
 // deploy that touches server code). New VERSION → browser installs the new
 // SW → activate handler pings all controlled tabs to reload → users pick
 // up the new client bundle without a manual hard refresh.
-const VERSION      = "mandovara-v3-20260825";
+const VERSION      = "mandovara-v3-20260827";
 const SHELL_CACHE  = `${VERSION}-shell`;
 const ASSET_CACHE  = `${VERSION}-assets`;
 const OFFLINE_URL  = "/offline";

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, LogOut, Loader2, MapPin, MapPinOff, CheckCircle2, AlertCircle } from "lucide-react";
+import { LogIn, LogOut, Loader2, MapPin, MapPinOff, AlertCircle } from "lucide-react";
 import { selfCheckIn, selfCheckOut } from "../../attendance/_actions";
 import {
   type GpsState, type Banner,
@@ -148,17 +148,10 @@ export function AttendanceCTA({
         </div>
       )}
 
-      {/* Banner */}
-      {banner && (
-        <div className={[
-          "flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-[12px] leading-snug",
-          banner.variant === "success"
-            ? "border-solid-chrome/20 bg-solid-chrome/10 text-solid-chrome"
-            : "border-fault-chrome/25 bg-fault-chrome/10 text-fault-chrome",
-        ].join(" ")}>
-          {banner.variant === "success"
-            ? <CheckCircle2 size={13} strokeWidth={2} className="mt-0.5 shrink-0" />
-            : <AlertCircle  size={13} strokeWidth={2} className="mt-0.5 shrink-0" />}
+      {/* Banner — errors only; success is conveyed by the status row */}
+      {banner?.variant === "error" && (
+        <div className="flex items-start gap-2 rounded-xl border border-fault-chrome/25 bg-fault-chrome/10 px-3.5 py-2.5 text-[12px] leading-snug text-fault-chrome">
+          <AlertCircle size={13} strokeWidth={2} className="mt-0.5 shrink-0" />
           <span className="font-medium">{banner.message}</span>
         </div>
       )}

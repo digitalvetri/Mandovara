@@ -2,7 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import type { EditLine } from "./QuotePreviewA4";
-import { SELL_UNITS, UNIT_SHORT, INPUT, INPUT_SM, fmtRupee, lineAmt } from "./workspace-helpers";
+import { SELL_UNITS, UNIT_SHORT, INPUT, INPUT_SM, INPUT_NUM, GST_SLABS, fmtRupee, lineAmt } from "./workspace-helpers";
 
 interface Props {
   line: EditLine;
@@ -71,32 +71,40 @@ export function QuoteItemRow({
 
       {isDraft ? (
         <>
+          {/* QTY — spinner-free so 4-digit values aren't clipped */}
           <td className="py-3 px-3 align-top">
             <input type="number" min="0" step="any" value={l.quantity}
               onChange={(e) => onUpdate(l._key, { quantity: e.target.value })}
-              className={`${INPUT} text-right`} />
+              className={`${INPUT_NUM} text-right`} />
           </td>
+          {/* UNIT — pr-8 leaves room for the native dropdown arrow */}
           <td className="py-3 px-3 align-top">
             <select value={l.unit} onChange={(e) => onUpdate(l._key, { unit: e.target.value })}
-              className={`${INPUT} px-2`}>
+              className={`${INPUT} pl-2 pr-8`}>
               {SELL_UNITS.map((u) => <option key={u} value={u}>{UNIT_SHORT[u]}</option>)}
             </select>
           </td>
+          {/* RATE — spinner-free */}
           <td className="py-3 px-3 align-top">
             <input type="number" min="0" step="any" value={l.rate}
               onChange={(e) => onUpdate(l._key, { rate: e.target.value })}
-              className={`${INPUT} text-right`} />
+              className={`${INPUT_NUM} text-right`} />
           </td>
+          {/* GST — fixed Indian slabs; no free-form input needed */}
           <td className="py-3 px-3 align-top">
-            <input type="number" min="0" max="28" step="0.5" value={l.gstRate}
-              onChange={(e) => onUpdate(l._key, { gstRate: e.target.value })}
-              className={`${INPUT} text-right`} />
+            <select value={l.gstRate} onChange={(e) => onUpdate(l._key, { gstRate: e.target.value })}
+              className={`${INPUT} pl-2 pr-8`}>
+              {GST_SLABS.map((s) => (
+                <option key={s} value={s}>{s}%</option>
+              ))}
+            </select>
           </td>
+          {/* DISC — spinner-free */}
           {showDiscCol && (
             <td className="py-3 px-3 align-top">
               <input type="number" min="0" max="100" step="any" value={l.discountPct}
                 onChange={(e) => onUpdate(l._key, { discountPct: e.target.value })}
-                className={`${INPUT} text-right`} />
+                className={`${INPUT_NUM} text-right`} />
             </td>
           )}
         </>
