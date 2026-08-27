@@ -171,7 +171,7 @@ export function EditableField({
       type="button"
       onClick={() => setEditing(true)}
       className="group flex items-start gap-2 min-w-0 text-left w-full py-1 px-1 -mx-1 rounded-[6px] hover:bg-surface-hover transition-colors"
-      title={`Edit ${label.toLowerCase()}`}
+      title="Edit"
     >
       {icon && <span className="mt-0.5 text-text-dim shrink-0">{icon}</span>}
       <div className="flex-1 min-w-0">
