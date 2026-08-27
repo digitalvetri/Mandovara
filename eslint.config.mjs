@@ -51,6 +51,7 @@ export default tseslint.config(
       "prisma/migrations/**",
       "install*.log",
       "dev.log",
+      "*.cjs",
     ],
   },
 
