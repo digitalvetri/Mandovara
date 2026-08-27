@@ -81,6 +81,6 @@ test.describe("New Lead Form — PDF spec", () => {
 
     // Should navigate directly to the lead detail page (no success animation)
     await expect(page).toHaveURL(/\/leads\/[a-z0-9]+$/, { timeout: 8000 });
-    await expect(page.getByText("Playwright Test Lead")).toBeVisible({ timeout: 4000 });
+    await expect(page.getByRole("heading", { name: "Playwright Test Lead" })).toBeVisible({ timeout: 4000 });
   });
 });
