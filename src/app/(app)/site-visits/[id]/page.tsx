@@ -3,11 +3,12 @@ import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
-import { getSiteVisit } from "@/modules/site-visits/queries";
+import { getSiteVisit, listRoundsForSiteVisit } from "@/modules/site-visits/queries";
 import { formatDate } from "@/kernel/datetime";
 import { Calendar, MapPin, User, FileText, Camera, ArrowLeft } from "lucide-react";
 import { VisitStatusActions } from "./_components/VisitStatusActions";
 import { StockStatusPanel } from "./_components/StockStatusPanel";
+import { VisitMeasurementPanel } from "./_components/VisitMeasurementPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ export default async function SiteVisitDetailPage({
   const ctx = await devContext();
   const visit = await getSiteVisit(ctx, id);
   if (!visit) notFound();
+
+  const rounds = await listRoundsForSiteVisit(ctx, id);
 
   const hasPhotos     = visit.photoKeys.length > 0;
   const hasCheckIn    = visit.checkInLat != null && visit.checkInLng != null;
@@ -102,6 +105,16 @@ export default async function SiteVisitDetailPage({
         </section>
 
         <VisitStatusActions visitId={visit.id} status={visit.status} />
+
+        {/* The visit ↔ measurement bridge (2026-08-27). Sits directly
+            under the status actions because on a MEASUREMENT visit,
+            starting the round IS the work of the visit. */}
+        <VisitMeasurementPanel
+          visitId={visit.id}
+          projectId={visit.projectId}
+          purposeRaw={visit.purposeRaw}
+          rounds={rounds}
+        />
 
         {/* Batch C (25 Aug 2026): HANDOVER visits show per-line stock
             status so the owner sees at a glance what needs a PO before

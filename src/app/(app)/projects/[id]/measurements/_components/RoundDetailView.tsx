@@ -122,7 +122,7 @@ export function RoundDetailView({ round, rooms }: RoundDetailViewProps) {
 
       {/* Add item */}
       {status === "DRAFT" && (
-        <AddItemPanel measurementId={round.id} projectId={round.project.id} rooms={rooms} />
+        <AddItemPanel measurementId={round.id} projectId={round.subject.id} rooms={rooms} />
       )}
 
       {round.notes && (

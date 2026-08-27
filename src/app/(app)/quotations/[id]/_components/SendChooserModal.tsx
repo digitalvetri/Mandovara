@@ -4,14 +4,22 @@
 // Email / Copy-link strip. The owner clicks one Send button; this
 // modal is what asks which pipe to fire the deep link into. Selecting
 // a channel fires the link inline and then calls onSelected() so the
-// parent (StatusChanger) can transition the quote to SENT and open
-// the Convert-lead-to-client modal.
+// parent can transition the quote to SENT.
+//
+// It no longer opens the Convert-lead-to-client modal (2026-08-27,
+// owner instruction). Sending a quote and converting a lead are
+// separate events: the lead becomes a client only once the CLIENT has
+// accepted, which is now recorded on the lead page.
+//
+// The message body itself lives in modules/quotations/share-message so
+// the lead page's Send action renders the identical text.
 
 import { useMemo, useState } from "react";
 import { X, Mail, MessageCircle, Copy, Check } from "lucide-react";
-import { pToINR, fmtDate, digitsOnly, shortNum } from "./quote-header-utils";
+import { buildShareMessage } from "@/modules/quotations/share-message";
 
-export type SendChannel = "whatsapp" | "email" | "copy_link";
+export type { SendChannel } from "@/modules/quotations/share-message";
+import type { SendChannel } from "@/modules/quotations/share-message";
 
 interface Props {
   open:            boolean;
@@ -35,32 +43,14 @@ export function SendChooserModal({
 }: Props) {
   const [copied, setCopied] = useState(false);
 
-  const link = useMemo(() => {
-    if (typeof window === "undefined") {
-      return shareToken ? `/q/${shareToken}` : `/quotations/${quotationId}`;
-    }
-    const base = window.location.origin;
-    return shareToken ? `${base}/q/${shareToken}` : `${base}/quotations/${quotationId}`;
-  }, [quotationId, shareToken]);
+  const msg = useMemo(() => buildShareMessage({
+    quotationId, quotationNumber, clientName, totalStr, validUntilIso, shareToken,
+    origin: typeof window === "undefined" ? null : window.location.origin,
+  }), [quotationId, quotationNumber, clientName, totalStr, validUntilIso, shareToken]);
 
-  const num       = shortNum(quotationNumber);
-  const total     = pToINR(totalStr);
-  const validDate = fmtDate(validUntilIso);
-
-  const body =
-    `Namaste ${clientName},\n\n` +
-    `Please find our quotation ${num} at the link below.\n\n` +
-    `  Total: ${total}\n` +
-    `  Valid until: ${validDate}\n\n` +
-    `${link}\n\n` +
-    `Reply to accept or request changes.\n\n` +
-    `— Team Mandovara\n+91 89404 30051 · mandovara.com`;
-
-  const subject   = `Quotation ${num} from Mandovara`;
-  const mailHref  = clientEmail
-    ? `mailto:${encodeURIComponent(clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    : null;
-  const waHref    = `https://wa.me/${digitsOnly(clientMobile)}?text=${encodeURIComponent(body)}`;
+  const link     = msg.link;
+  const mailHref = msg.mailHref(clientEmail);
+  const waHref   = msg.waHref(clientMobile);
 
   if (!open) return null;
 

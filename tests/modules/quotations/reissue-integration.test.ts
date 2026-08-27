@@ -19,7 +19,9 @@ beforeAll(async () => {
     where: { measurement: { status: "APPROVED" }, calc: { isNot: null } },
     select: { room: { select: { projectId: true } } },
   });
-  if (!item) return;
+  // room.projectId is nullable since leads became measurable (2026-08-27);
+  // this fixture only ever builds project-scoped rooms.
+  if (!item || !item.room.projectId) return;
   projectId = item.room.projectId;
 
   const project = await db.project.findUniqueOrThrow({

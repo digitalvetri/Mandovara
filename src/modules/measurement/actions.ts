@@ -1,7 +1,8 @@
 "use server";
 
 // Measurement ROUND lifecycle — start / submit / approve / revise +
-// createRoom helper.  Item lifecycle (add / update / delete / sync) is
+// Room creation lives in actions-room.ts. Item lifecycle (add / update /
+// delete / sync) is
 // in actions-item.ts, shared helpers in actions-shared.ts. Split so
 // every file stays under CLAUDE.md §10's 300-line ceiling.
 //
@@ -24,9 +25,11 @@ import { bus } from "@/kernel/events/bus";
 import "@/kernel/events/register";
 import {
   startRoundSchema, submitRoundSchema, approveRoundSchema, reviseRoundSchema,
-  createRoomSchema,
 } from "./schema";
-import { type ActionResult, zodError, canEditRound } from "./actions-shared";
+import {
+  type ActionResult, zodError, canEditRound, linkRoundToVisit,
+  revalidateRound, branchPrefixForParty,
+} from "./actions-shared";
 
 // Result shape:
 //   - ok + data + resumed  → caller may navigate to the round
@@ -63,54 +66,66 @@ export async function startMeasurementRound(
   const d = parsed.data;
 
   const db = scoped(ctx);
-  const project = await db.project.findUnique({
-    where:  { id: d.projectId },
-    select: {
-      id: true, branchId: true,
-      rooms: { select: { id: true }, take: 1 },
-    },
-  });
-  if (!project) return { ok: false, error: "Project not found" };
+  // The party filter every query below shares — a round is scoped to a
+  // project or to a lead, never both (startRoundSchema enforces it, the
+  // DB CHECK backs it up).
+  const party = d.projectId
+    ? { projectId: d.projectId, leadId: null }
+    : { projectId: null, leadId: d.leadId ?? null };
+
+  if (d.projectId) {
+    const project = await db.project.findUnique({
+      where: { id: d.projectId }, select: { id: true },
+    });
+    if (!project) return { ok: false, error: "Project not found" };
+  } else {
+    const lead = await db.lead.findUnique({
+      where: { id: d.leadId ?? "" }, select: { id: true, convertedClientId: true },
+    });
+    if (!lead) return { ok: false, error: "Lead not found" };
+    // A converted lead's rooms and rounds now live on its project. Sending
+    // a new round to the dead lead record would strand it there.
+    if (lead.convertedClientId) {
+      return { ok: false, error: "This lead is now a client — measure from its project instead." };
+    }
+  }
 
   // Rooms guard — you cannot measure without at least one room. Signal
   // needsRooms and let the UI open the room-setup sheet before navigating
   // (spec §4).
-  if (project.rooms.length === 0) {
-    return { ok: true, needsRooms: true };
-  }
+  const room = await db.room.findFirst({ where: party, select: { id: true } });
+  if (!room) return { ok: true, needsRooms: true };
 
   // Resume existing DRAFT by the same user — never create a second one.
   // Prevents "I clicked start twice" from splitting the round in two
   // separate numbered documents (spec §4 rule 3).
   const existingDraft = await db.measurement.findFirst({
-    where:  { projectId: d.projectId, measuredById: ctx.userId, status: "DRAFT" },
+    where:  { ...party, measuredById: ctx.userId, status: "DRAFT" },
     orderBy: { visitedAt: "desc" },
     select: { id: true, number: true },
   });
   if (existingDraft) {
+    if (d.siteVisitId) await linkRoundToVisit(db, existingDraft.id, d.siteVisitId);
     return {
       ok: true,
       data: { id: existingDraft.id, number: existingDraft.number, resumed: true },
     };
   }
 
-  const branch = await db.branch.findUnique({
-    where:  { id: project.branchId },
-    select: { invoicePrefix: true },
-  });
-  if (!branch) return { ok: false, error: "Project branch not found" };
+  const prefix = await branchPrefixForParty(db, party);
+  if (!prefix) return { ok: false, error: "No branch is configured — add one in Settings before measuring." };
 
   const round = await withTransaction(async (tx: TxClient) => {
     const number = await allocateNumber(tx, {
       orgId:  ctx.orgId,
       series: "MEA",
       yymm:   yymmFromDate(d.visitedAt),
-      prefix: branch.invoicePrefix,
+      prefix,
     });
     return tx.measurement.create({
       data: {
         organizationId: ctx.orgId,
-        projectId:      d.projectId,
+        ...party,
         number,
         siteVisitId:    d.siteVisitId ?? null,
         visitedAt:      d.visitedAt,
@@ -122,7 +137,7 @@ export async function startMeasurementRound(
     });
   }, { orgId: ctx.orgId });
 
-  revalidatePath(`/projects/${d.projectId}/measurements`);
+  revalidateRound(revalidatePath, party);
   return { ok: true, data: { ...round, resumed: false } };
 }
 
@@ -172,7 +187,7 @@ export async function approveMeasurementRound(
   const db = scoped(ctx);
   const round = await db.measurement.findUnique({
     where:  { id: measurementId },
-    select: { id: true, status: true, projectId: true },
+    select: { id: true, status: true, projectId: true, leadId: true },
   });
   if (!round) return { ok: false, error: "Measurement round not found" };
   if (round.status !== "SUBMITTED") {
@@ -187,18 +202,23 @@ export async function approveMeasurementRound(
   // Fires kernel/milestones/listeners:onMeasurementApproved which ticks
   // the MEASUREMENT milestone AND advances the project stage MEASUREMENT
   // → QUOTATION (guarded — won't regress a project past QUOTATION).
-  await bus.publish({
-    type:       "measurement.approved",
-    orgId:      ctx.orgId,
-    actorId:    ctx.userId,
-    occurredAt: new Date(),
-    measurementId,
-    projectId:  round.projectId,
-  });
+  // Only project rounds publish. The listener ticks a MEASUREMENT
+  // milestone and advances a ProjectStage — a lead has neither, so
+  // firing it with an empty projectId would be a no-op at best and a
+  // wrong-project tick at worst. A lead round's approval matters at
+  // conversion, when its rounds are reparented onto the new project.
+  if (round.projectId) {
+    await bus.publish({
+      type:       "measurement.approved",
+      orgId:      ctx.orgId,
+      actorId:    ctx.userId,
+      occurredAt: new Date(),
+      measurementId,
+      projectId:  round.projectId,
+    });
+  }
 
-  revalidatePath(`/projects/${round.projectId}`);
-  revalidatePath(`/projects/${round.projectId}/measurements`);
-  revalidatePath(`/projects/${round.projectId}/measurements/${measurementId}`);
+  revalidateRound(revalidatePath, round, measurementId);
   return { ok: true, data: { id: measurementId } };
 }
 
@@ -214,33 +234,29 @@ export async function reviseMeasurementRound(
   const db = scoped(ctx);
   const parent = await db.measurement.findUnique({
     where:  { id: d.parentMeasurementId },
-    select: { id: true, projectId: true, revision: true, status: true },
+    select: { id: true, projectId: true, leadId: true, revision: true, status: true },
   });
   if (!parent) return { ok: false, error: "Parent measurement round not found" };
   if (parent.status !== "APPROVED") {
     return { ok: false, error: "Only APPROVED rounds can be revised — draft or submitted rounds should be edited directly." };
   }
 
-  const project = await db.project.findUnique({
-    where:  { id: parent.projectId },
-    select: { branchId: true },
-  });
-  const branch = project
-    ? await db.branch.findUnique({ where: { id: project.branchId }, select: { invoicePrefix: true } })
-    : null;
-  if (!branch) return { ok: false, error: "Project branch not found" };
+  const prefix = await branchPrefixForParty(db, parent);
+  if (!prefix) return { ok: false, error: "No branch is configured — add one in Settings before revising a round." };
 
   const next = await withTransaction(async (tx: TxClient) => {
     const number = await allocateNumber(tx, {
       orgId:  ctx.orgId,
       series: "MEA",
       yymm:   yymmFromDate(d.visitedAt),
-      prefix: branch.invoicePrefix,
+      prefix,
     });
     return tx.measurement.create({
       data: {
         organizationId: ctx.orgId,
+        // A revision stays with whichever party the parent belonged to.
         projectId:      parent.projectId,
+        leadId:         parent.leadId,
         number,
         supersedesId:   parent.id,
         revision:       parent.revision + 1,
@@ -253,41 +269,6 @@ export async function reviseMeasurementRound(
     });
   }, { orgId: ctx.orgId });
 
-  revalidatePath(`/projects/${parent.projectId}/measurements`);
+  revalidateRound(revalidatePath, parent);
   return { ok: true, data: next };
-}
-
-export async function createRoom(
-  input: unknown,
-): Promise<ActionResult<{ id: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "measurement.create");
-  const parsed = createRoomSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
-  const d = parsed.data;
-
-  const db = scoped(ctx);
-  const project = await db.project.findUnique({
-    where:  { id: d.projectId },
-    select: { id: true },
-  });
-  if (!project) return { ok: false, error: "Project not found" };
-
-  const last = await db.room.findFirst({
-    where:   { projectId: d.projectId },
-    orderBy: { sortOrder: "desc" },
-    select:  { sortOrder: true },
-  });
-  const room = await db.room.create({
-    data: {
-      organizationId: ctx.orgId,
-      projectId:      d.projectId,
-      name:           d.name,
-      floorLabel:     d.floorLabel ?? null,
-      sortOrder:      (last?.sortOrder ?? 0) + 10,
-    },
-    select: { id: true },
-  });
-  revalidatePath(`/projects/${d.projectId}/measurements`);
-  return { ok: true, data: room };
 }

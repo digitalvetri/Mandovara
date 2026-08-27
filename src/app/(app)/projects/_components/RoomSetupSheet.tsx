@@ -11,7 +11,7 @@
 
 import { useState, useTransition } from "react";
 import { X, Plus, Loader2, Check } from "lucide-react";
-import { createRoom } from "@/modules/measurement/actions";
+import { createRoom } from "@/modules/measurement/actions-room";
 
 interface Props {
   projectId: string;

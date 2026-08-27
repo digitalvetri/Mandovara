@@ -227,3 +227,4 @@ export async function listQuotations(
 }
 
 export * from "./queries-part2";
+export * from "./queries-inline";

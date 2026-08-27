@@ -10,10 +10,15 @@ export type Lay        = (typeof LAY_PATTERNS)[number];
 export type MountKind  = (typeof MOUNT_TYPES)[number];
 export type Unit       = "mm" | "in" | "ft";
 
-export interface FieldProject {
+// What the field PWA is measuring. A project, or — since 2026-08-27 —
+// a lead that hasn't converted yet. Same four fields either way, so
+// nothing below this type has to care which it got.
+export interface FieldSubject {
+  kind:       "PROJECT" | "LEAD";
   id:         string;
   number:     string;
   name:       string;
+  /** Client name for a project; for a lead, that there isn't one yet. */
   clientName: string;
 }
 

@@ -181,3 +181,44 @@ export async function getSiteVisit(
     projectId:    v.projectId ?? null,
   };
 }
+
+// ── Visit ↔ measurement join ────────────────────────────────────────
+//
+// The join that makes the two modules one. `Measurement.siteVisitId` was
+// in the schema from the start and no code wrote it until 2026-08-27,
+// which is why a visit page could never show what was measured on it.
+
+export interface VisitMeasurementRound {
+  id:        string;
+  number:    string;
+  revision:  number;
+  status:    string;
+  itemCount: number;
+  visitedAt: Date;
+}
+
+export async function listRoundsForSiteVisit(
+  ctx:         RequestContext,
+  siteVisitId: string,
+): Promise<VisitMeasurementRound[]> {
+  requirePermission(ctx, "sitelog.view");
+  const db = scoped(ctx);
+
+  const rounds = await db.measurement.findMany({
+    where:   { siteVisitId },
+    orderBy: [{ visitedAt: "desc" }, { revision: "desc" }],
+    select: {
+      id: true, number: true, revision: true, status: true, visitedAt: true,
+      _count: { select: { items: true } },
+    },
+  });
+
+  return rounds.map((r) => ({
+    id:        r.id,
+    number:    r.number,
+    revision:  r.revision,
+    status:    r.status,
+    itemCount: r._count.items,
+    visitedAt: r.visitedAt,
+  }));
+}

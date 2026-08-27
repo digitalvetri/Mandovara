@@ -6,6 +6,7 @@ import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
 import { listQuotationsForClient, listLeadScopedQuotations } from "@/modules/quotations/queries";
 import { listSiteVisitsForLead } from "@/modules/site-visits/queries";
+import { ensureShareTokensForSending } from "@/modules/quotations/share-token";
 import { LEAD_SOURCES } from "@/modules/leads/schema";
 import { StatusPill } from "../_components/StatusPill";
 import { StatusChanger } from "../_components/StatusChanger";
@@ -16,6 +17,8 @@ import { LeadActionBar } from "../_components/LeadActionBar";
 import { ConversionApprovalCard, type LeadScopedQuote } from "../_components/ConversionApprovalCard";
 import { LeadQuotationsSidebar } from "../_components/LeadQuotationsSidebar";
 import { LeadSiteVisitsSidebar } from "../_components/LeadSiteVisitsSidebar";
+import { LeadMeasurementsPanel } from "../_components/LeadMeasurementsPanel";
+import { listRoundsForLead, leadHasApprovedMeasurement } from "@/modules/measurement/queries-lead";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +41,12 @@ export default async function LeadDetailPage({
   const ctx = await devContext();
 
   const db = scoped(ctx);
-  const [lead, followUps, siteVisits] = await Promise.all([
+  const [lead, followUps, siteVisits, rounds, isMeasured] = await Promise.all([
     getLead(ctx, id),
     listFollowUpsForLead(ctx, id),
     listSiteVisitsForLead(ctx, id),
+    listRoundsForLead(ctx, id),
+    leadHasApprovedMeasurement(ctx, id),
   ]);
   if (!lead) notFound();
 
@@ -73,6 +78,10 @@ export default async function LeadDetailPage({
           },
         }),
   ]);
+  // Every still-sendable quote needs a live share token before render —
+  // the lead page's inline Send builds the client's link from it.
+  if (!lead.convertedClientId) await ensureShareTokensForSending(ctx, quotations);
+
   const leadScopedQuotes: LeadScopedQuote[] = leadScopedQuoteRows.map((q) => ({
     id:     q.id,
     number: q.number,
@@ -139,6 +148,7 @@ export default async function LeadDetailPage({
         email={lead.email ?? null}
         hasQuotes={leadScopedQuotes.length > 0}
         canDelete={ctx.permissions.has("lead.delete")}
+        isMeasured={isMeasured}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
@@ -256,6 +266,18 @@ export default async function LeadDetailPage({
           <LeadQuotationsSidebar
             quotations={quotations}
             leadId={lead.id}
+            isConverted={isConverted}
+            leadName={lead.name}
+            mobile={lead.mobile}
+            email={lead.email ?? null}
+          />
+
+          {/* Measurements taken on this lead's site. These rows are
+              re-pointed at the new Project by convertLead, so nothing
+              measured here is re-typed after conversion. */}
+          <LeadMeasurementsPanel
+            leadId={lead.id}
+            rounds={rounds}
             isConverted={isConverted}
           />
 

@@ -685,3 +685,121 @@ and `--color-fault-chrome` join `--color-accent-chrome`, all declared in both
 themes because the chrome is dark in both — 5.8:1 to 9.6:1. The rule is now
 general and belongs in review: **any token used on chrome needs its chrome
 variant, because every canvas token in this system was solved against white.**
+
+---
+
+## Site visits and measurements are one module; a lead can be measured; sending a quote is not converting a lead
+
+*2026-08-27 — owner instruction*
+
+Three asks, one theme: the product was making staff hold a mental model that
+the business does not have.
+
+### The two modules were always one, and the schema knew it
+
+"Site Visit Management" and "Measurements" sat as separate top-level nav items
+describing two halves of a single act — someone drives to the site, and while
+they are there they measure. Nothing on either screen linked to the other.
+
+The tell was in the schema: `Measurement.siteVisitId` has existed since the
+initial migration and **no code in the repository had ever written it**. Two
+tables designed to join, never joined. That one unwritten column is the whole
+reason the modules read as unrelated.
+
+They are *not* merged in Prisma, and shouldn't be. `SiteVisit` covers six
+purposes — survey, sample showing, supervision, snag fix, handover, and
+measurement — and `updateSiteVisitStatus` hangs the handover auto-invoice,
+auto-stock-deduct and project-completion logic off that enum. Measurement is
+one *purpose* of a visit, not a peer of it. What changed is the surface: one
+nav entry, a `FieldworkTabs` strip switching between the two views, a
+"measurements on this visit" panel on the visit page that starts a round and
+stamps `siteVisitId` on it, and both routes kept so existing links survive.
+
+`LeadStage` carried the same duplication — `MEASUREMENT_SCHEDULED` *and*
+`VISIT_SCHEDULED`. Backfilled onto the latter. The enum value stays as a
+tombstone: dropping a Postgres enum value rewrites every dependent column, and
+`normalizeLeadStage` has collapsed all pre-quote stages to "NEW" in the UI
+since 25 Aug, so no user could see either label anyway.
+
+### Leads can now be measured, and the measurement follows them
+
+`Measurement.projectId` and `Room.projectId` were required, and `Project`
+requires a `Client` — so measuring a prospect meant converting them first, or
+fabricating a throwaway project. Someone had already hit this: 
+`createStubProjectForClient` exists for exactly that reason. Meanwhile a lead
+could already own a `SiteVisit` and a `Quotation`. The measurement was the odd
+one out.
+
+Both now follow the party XOR `Quotation` has carried since FIXES-01 §5.1 —
+exactly one of `projectId` / `leadId`, enforced by a DB CHECK, not by the form.
+`convertLead` re-points rooms, rounds **and** site visits at the new Project
+inside the transaction that creates the Client. The rows are the same rows, so
+every item, CalcResult, photo and note follows for free. Nothing is re-typed.
+
+Rooms and rounds must move *together*. Reparent one without the other and you
+get a `MeasurementItem` whose room belongs to a project its measurement does
+not — nothing throws, the firm-quote query returns nothing, and the first
+person to find out is a tailor holding an empty job card. That is what
+`tests/modules/leads/convert-reparents-measurement.test.ts` pins.
+
+**A real bug this surfaced.** `addMeasurementItem` guarded room ownership with
+`room.projectId !== round.projectId`. Sound while every round had a project;
+with the XOR, two lead-scoped rows both have `projectId === null`, `null !==
+null` is false, and the guard would wave any lead's room onto any other lead's
+round. Every cross-row ownership check now goes through `sameParty`, which
+compares both sides.
+
+The field PWA was not forked. `/m/measure/[projectId]` has twelve components
+under it; the segment is now read as a *subject* id — a bare cuid is still a
+project, a `lead-` prefix is a lead. One resolver in the page. The offline
+IndexedDB queue keys off `measurementId` / `roomId` and never carried a
+project id, so queued work from before this change still drains unchanged.
+
+`createStubProjectForClient` is **kept**, scope narrowed. It covered two cases;
+leads no longer need it, but a Client with no project still does — a client is
+neither a project nor a lead, so a round has nothing to hang off until a
+Project exists.
+
+### Sending a quotation is not the client accepting it
+
+The old flow fused two events into one button: Send fired a WhatsApp deep link,
+flipped the quote to SENT, then immediately opened the Convert-lead-to-client
+modal and set the quote to **ACCEPTED on the operator's behalf**. The lead
+became a client the moment the quote was *sent*, and the client's actual
+acceptance was never recorded — it was fabricated. This also contradicted
+`ConversionApprovalCard`, which already implemented the correct gate (client
+accepted → owner approves → convert) and was unreachable in practice.
+
+Removing the fake path left ACCEPTED with no producer at all — the public
+`/q/[token]` page was read-only. So the trigger had to be built, not just
+rewired: the client taps Accept on the share link, or staff record a
+phone/in-person acceptance on the lead page. Both land on the same status.
+
+"Request changes" deliberately does **not** set REJECTED. That status has no
+outgoing transitions, so one tap from a client who merely wanted a different
+fabric would strand the quotation. It records an inbound note and a follow-up
+and leaves the quote SENT and revisable.
+
+Lead-scoped quotes now return the operator to the **lead** after creation, and
+the lead page is where they are sent from. The message body moved to
+`share-message.ts` so the two send surfaces cannot drift into sending clients
+different text.
+
+**A bug found in review of this same change:** the lead page minted share
+tokens only for quotes where `shareToken === null`. An *expired* token is
+non-null but dead — `getQuotationByShareToken` rejects it — so a quote with a
+stale token was skipped, and the client received a link that 404s.
+`ensureShareToken` decides liveness from the expiry; the null filter is gone.
+
+### The two-quote model now turns on measurement, not on paperwork
+
+`LeadActionBar` distinguished a pre-measurement "rough estimate" from a firm
+quotation raised after conversion. With leads measurable, that split stops
+meaning anything if left alone. A lead with an APPROVED round now builds a
+**firm** quotation from its own measured items; an unmeasured lead still gets
+the ballpark. The distinction is now "have we measured?", which is the question
+it was always standing in for.
+
+`/lib/calc` was not touched. The engine takes per-item inputs and never sees
+the parent, which is the main reason a change this wide across three modules is
+safe.

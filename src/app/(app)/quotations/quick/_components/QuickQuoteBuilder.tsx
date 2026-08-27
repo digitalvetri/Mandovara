@@ -82,7 +82,16 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
         setError(res.error ?? "Could not create quotation");
         return;
       }
-      router.push(`/quotations/${res.data.quotationId}` as Route);
+      // A lead-scoped quote belongs to the lead's workflow: hand the
+      // operator back to the lead page, where the quotation now appears
+      // in the sidebar with its own Send / "client accepted" actions
+      // (2026-08-27, owner instruction). Client-scoped quotes still open
+      // the quotation itself — there is no lead to return to.
+      router.push(
+        (isLeadScoped
+          ? `/leads/${leadId}`
+          : `/quotations/${res.data.quotationId}`) as Route,
+      );
     });
   }
 
@@ -92,8 +101,9 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
         {isLeadScoped ? (
           <div className="rounded-[14px] bg-gold-tint border border-gold/40 p-4 text-[12px] text-text">
             <span className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mr-2">Lead quote</span>
-            Drafting a preliminary quotation for <span className="font-medium">{clientName}</span> —
-            no client or project is created. Convert the lead separately when it's accepted.
+            Drafting a quotation for <span className="font-medium">{clientName}</span> —
+            no client or project is created yet. You'll return to the lead to send it,
+            and the lead becomes a client only once this quotation is accepted.
           </div>
         ) : (
           <div className="rounded-[14px] bg-surface border border-rule p-4">

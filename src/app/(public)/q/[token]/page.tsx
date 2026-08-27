@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Download, FileText } from "lucide-react";
 import { getQuotationByShareToken } from "@/modules/quotations/public-query";
+import { QuoteDecision } from "./_components/QuoteDecision";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,15 @@ export default async function PublicQuotationPage({
                   )}
                 </div>
               </div>
+
+              {/* Accept / request changes — the client's own decision.
+                  Sits above the PDF links because deciding, not
+                  downloading, is what this page is for. */}
+              <QuoteDecision
+                token={token}
+                status={q.status}
+                validUntilIso={q.validUntil.toISOString()}
+              />
 
               {/* Download PDF */}
               <a

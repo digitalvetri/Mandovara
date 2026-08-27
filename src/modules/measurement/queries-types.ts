@@ -4,6 +4,8 @@
 // Decimal columns arrive as strings (Prisma default toString) — the
 // client formats via Intl / /lib/units at the render boundary.
 
+import type { RoundSubject } from "./subject";
+
 export type MeasurementStatusStr = "DRAFT" | "SUBMITTED" | "APPROVED" | "SUPERSEDED";
 
 export interface RoundListRow {
@@ -88,11 +90,7 @@ export interface RoundDetail {
   approvedByName: string | null;
   approvedAt:     Date | null;
   supersedesId:   string | null;
-  project: {
-    id:         string;
-    name:       string;
-    number:     string;
-    clientName: string;
-  };
+  /** The project OR lead this round belongs to — see ./subject. */
+  subject:        RoundSubject;
   itemsByRoom: RoomItemsBucket[];
 }

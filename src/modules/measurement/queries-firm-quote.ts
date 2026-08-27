@@ -32,7 +32,7 @@ export interface FirmQuoteItem {
 }
 
 /**
- * Every APPROVED measurement item for the project, hydrated with the
+ * Every APPROVED measurement item for the project OR lead, hydrated with the
  * currently-picked colourway (if any) and a suggested retail rate. The
  * quote builder uses these to prefill lines — one line per measurement.
  *
@@ -42,14 +42,24 @@ export interface FirmQuoteItem {
  * state prompting the owner to take measurements first.
  */
 export async function listItemsForFirmQuote(
-  ctx:       RequestContext,
-  projectId: string,
+  ctx:     RequestContext,
+  subject: string | { kind: "PROJECT" | "LEAD"; id: string },
 ): Promise<FirmQuoteItem[]> {
   requirePermission(ctx, "quotation.create");
   const db = scoped(ctx);
 
+  // A bare string is a project id — the signature every existing caller
+  // uses. Leads pass the tagged form: since 2026-08-27 a lead can be
+  // measured, and a measured lead gets a FIRM quotation rather than a
+  // ballpark estimate (owner decision, same date). The rest of this
+  // function never learns which it got — the round is the unit of work,
+  // and rounds no longer imply a project.
+  const party = typeof subject === "string"
+    ? { projectId: subject }
+    : subject.kind === "PROJECT" ? { projectId: subject.id } : { leadId: subject.id };
+
   const rounds = await db.measurement.findMany({
-    where: { projectId, status: "APPROVED" },
+    where: { ...party, status: "APPROVED" },
     select: {
       id: true, number: true, revision: true, supersedesId: true,
     },

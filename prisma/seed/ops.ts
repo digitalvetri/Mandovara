@@ -195,7 +195,10 @@ export async function seedOps(
   const SOURCES = ["WALK_IN", "PHONE", "WHATSAPP", "WEBSITE", "INSTAGRAM", "FACEBOOK",
                    "GOOGLE", "ARCHITECT_REFERRAL", "CLIENT_REFERRAL", "EXHIBITION",
                    "ADVERTISEMENT", "OTHER"] as const;
-  const STAGES = ["NEW", "CONTACTED", "QUALIFIED", "MEASUREMENT_SCHEDULED", "VISIT_SCHEDULED",
+  // MEASUREMENT_SCHEDULED deliberately absent — deprecated 2026-08-27 as a
+  // duplicate of VISIT_SCHEDULED. Seeding it would re-create the split the
+  // unify migration just backfilled away.
+  const STAGES = ["NEW", "CONTACTED", "QUALIFIED", "VISIT_SCHEDULED",
                   "MEASURED", "QUOTED", "NEGOTIATION", "WON", "LOST"] as const;
   const FAMILIES = ["CURTAIN_FABRIC", "BLIND", "WALLPAPER", "FLOORING", "CARPET_TILE",
                     "UPHOLSTERY_FABRIC", "INTERIOR_FILM"] as const;

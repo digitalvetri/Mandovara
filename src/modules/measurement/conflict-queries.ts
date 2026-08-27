@@ -48,7 +48,7 @@ export async function fetchServerItemsForConflict(
       room: { select: { name: true } },
       measurement: {
         select: {
-          number: true, status: true, projectId: true,
+          number: true, status: true, projectId: true, leadId: true,
           project: {
             select: {
               name: true, client: { select: { name: true } },
@@ -68,9 +68,12 @@ export async function fetchServerItemsForConflict(
       exists:       true,
       roundStatus:  it.measurement.status,
       roundNumber:  it.measurement.number,
-      projectId:    it.measurement.projectId,
-      projectName:  it.measurement.project.name,
-      clientName:   it.measurement.project.client.name,
+      // A conflicting item can now belong to a lead-scoped round, which
+      // has no project and no client. The offline PWA renders these as
+      // context lines above the diff, so a placeholder beats a crash.
+      projectId:    it.measurement.projectId ?? undefined,
+      projectName:  it.measurement.project?.name ?? "Lead measurement",
+      clientName:   it.measurement.project?.client.name ?? "Not yet a client",
       roomName:     it.room.name,
       label:        it.label,
       surface:      it.surface,

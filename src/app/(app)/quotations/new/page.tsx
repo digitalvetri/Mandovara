@@ -47,12 +47,18 @@ export default async function NewQuotationPage({
     if (!project) notFound();
     projectName = `${project.number} · ${project.name}`;
     preloadedItems = await listItemsForFirmQuote(ctx, projectId);
+  } else if (leadId) {
+    // A measured lead builds a FIRM quote from its own approved rounds
+    // (owner decision, 2026-08-27). An unmeasured lead preloads nothing
+    // and the builder falls back to blank lines — which is exactly the
+    // rough estimate it always was.
+    preloadedItems = await listItemsForFirmQuote(ctx, { kind: "LEAD", id: leadId });
   }
 
   const branches = await listBranches(ctx);
 
   const eyebrow = leadId
-    ? `For lead: ${leadName}`
+    ? `For lead: ${leadName}${preloadedItems.length > 0 ? ` · ${preloadedItems.length} measured item${preloadedItems.length === 1 ? "" : "s"}` : ""}`
     : projectId
       ? projectName
       : "Select a project first";

@@ -20,6 +20,7 @@ import {
 import {
   type ActionResult, zodError, canEditRound,
   itemCreateData, itemUpdateData, writeCalc, computeCalcRow,
+  revalidateRound, sameParty,
 } from "./actions-shared";
 
 export async function addMeasurementItem(
@@ -34,7 +35,7 @@ export async function addMeasurementItem(
   const db = scoped(ctx);
   const round = await db.measurement.findUnique({
     where:  { id: d.measurementId },
-    select: { id: true, status: true, projectId: true, measuredById: true },
+    select: { id: true, status: true, projectId: true, leadId: true, measuredById: true },
   });
   if (!round) return { ok: false, error: "Measurement round not found" };
   if (round.status !== "DRAFT") {
@@ -46,10 +47,15 @@ export async function addMeasurementItem(
 
   const room = await db.room.findUnique({
     where:  { id: d.roomId },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, leadId: true },
   });
-  if (!room || room.projectId !== round.projectId) {
-    return { ok: false, error: "Room does not belong to this round's project." };
+  // Compare BOTH sides of the party XOR. Comparing projectId alone was
+  // correct while every round had a project; once leads became
+  // measurable (2026-08-27) two lead-scoped rows both have
+  // projectId === null, so `!==` is false and the guard would wave
+  // through any lead's room onto any other lead's round.
+  if (!room || !sameParty(room, round)) {
+    return { ok: false, error: "Room does not belong to this round's project or lead." };
   }
 
   const calc = computeCalcRow(d);
@@ -150,7 +156,7 @@ export async function deleteMeasurementItem(
 // Returns measurementId + projectId so the caller can navigate back.
 export async function pickProductForMeasurementItem(
   input: unknown,
-): Promise<ActionResult<{ measurementId: string; projectId: string }>> {
+): Promise<ActionResult<{ measurementId: string; projectId: string | null }>> {
   const ctx = await devContext();
   requirePermission(ctx, "measurement.update");
   const parsed = pickProductSchema.safeParse(input);
@@ -163,7 +169,7 @@ export async function pickProductForMeasurementItem(
     select: {
       id: true, measurementId: true, family: true,
       widthMm: true, heightMm: true, quantity: true,
-      measurement: { select: { projectId: true } },
+      measurement: { select: { projectId: true, leadId: true } },
       calc: { select: { id: true } },
     },
   });
@@ -197,11 +203,12 @@ export async function pickProductForMeasurementItem(
     });
   }
 
-  revalidatePath(`/projects/${item.measurement.projectId}`);
-  revalidatePath(`/projects/${item.measurement.projectId}/measurements/${item.measurementId}`);
+  revalidateRound(revalidatePath, item.measurement, item.measurementId);
   return {
     ok:   true,
-    data: { measurementId: item.measurementId, projectId: item.measurement.projectId },
+    // null for a lead-scoped round — callers use it only to build a
+    // project href, and the lead paths don't need one.
+    data: { measurementId: item.measurementId, projectId: item.measurement.projectId ?? null },
   };
 }
 

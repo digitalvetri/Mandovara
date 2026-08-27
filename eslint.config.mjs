@@ -165,6 +165,10 @@ export default tseslint.config(
       "src/app/api/admin/link-employee/route.ts",  // one-shot employee↔user link — runs before tenant context
       "src/modules/admin/wipe-transactional.ts",  // destructive: TRUNCATE needs owner-level DB access
       "src/modules/quotations/public-query.ts",   // token IS the credential — no org context exists
+      // Same credential model as public-query, but it writes. Every function
+      // re-resolves the quotation FROM the token and never trusts a caller-supplied
+      // id; the only reachable state change is SENT → ACCEPTED.
+      "src/modules/quotations/public-actions.ts",
     ],
     rules: {
       "no-restricted-imports": "off",

@@ -27,9 +27,20 @@ import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { generateMilestonesForProject } from "@/kernel/milestones/generate";
 import { startMeasurementRound } from "./actions";
+import { encodeSubjectParam } from "./subject";
 
 export interface StartAndRedirectInput {
-  projectId: string;
+  /** Exactly one of projectId / leadId — leads are measurable since 2026-08-27. */
+  projectId?: string;
+  leadId?:    string;
+  /**
+   * The visit this measurement is being taken on. Stamped onto the round
+   * so "which trip produced these dimensions" is answerable from the
+   * data. `Measurement.siteVisitId` has existed since the schema was
+   * written and nothing had ever populated it — which is exactly why
+   * site visits and measurements read as two unrelated modules.
+   */
+  siteVisitId?: string;
 }
 
 export interface StartAndRedirectResult {
@@ -41,8 +52,9 @@ export async function startMeasurementAndRedirect(
   input: StartAndRedirectInput,
 ): Promise<StartAndRedirectResult> {
   const res = await startMeasurementRound({
-    projectId: input.projectId,
+    ...(input.projectId ? { projectId: input.projectId } : { leadId: input.leadId }),
     visitedAt: new Date(),
+    ...(input.siteVisitId ? { siteVisitId: input.siteVisitId } : {}),
   });
 
   if (!res.ok) {
@@ -57,10 +69,14 @@ export async function startMeasurementAndRedirect(
     return { ok: true, needsRooms: true };
   }
 
+  const subject = input.projectId
+    ? ({ kind: "PROJECT", id: input.projectId } as const)
+    : ({ kind: "LEAD",    id: input.leadId ?? "" } as const);
+
   const mobile = await isMobileUserAgent();
   const target: Route = mobile
-    ? (`/m/measure/${input.projectId}` as Route)
-    : (`/projects/${input.projectId}/measurements/${res.data.id}` as Route);
+    ? (`/m/measure/${encodeSubjectParam(subject)}` as Route)
+    : (`${subject.kind === "PROJECT" ? "/projects" : "/leads"}/${subject.id}/measurements/${res.data.id}` as Route);
 
   redirect(target);
 }
@@ -69,10 +85,19 @@ export async function startMeasurementAndRedirect(
 //
 // Owner ask: capture a measurement directly from the Client 360, without
 // forcing the operator to bounce through /projects/new first. This
-// creates a minimal Project so the existing measurement pipeline (which
-// keys off Project, not Client) has something to attach to. Once the
-// operator returns to fill in real project details (site address,
-// order value, etc.) they edit this row rather than creating a new one.
+// creates a minimal Project so the measurement pipeline has something to
+// attach to. Once the operator returns to fill in real project details
+// (site address, order value, etc.) they edit this row rather than
+// creating a new one.
+//
+// SCOPE NARROWED 2026-08-27. This used to cover two cases: an unconverted
+// LEAD, and a CLIENT with no project yet. Leads no longer need it —
+// Measurement and Room now carry a leadId, so a prospect's site is
+// measured directly and convertLead reparents the rows. The remaining
+// case is the second one, and it still needs this: a Client is neither a
+// project nor a lead, so there is nothing for a round to hang off until
+// a Project exists. Do not delete this while /clients can start a
+// measurement.
 export interface CreateStubProjectResult {
   ok: true;
   data: { projectId: string };

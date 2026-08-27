@@ -7,19 +7,21 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Ruler } from "lucide-react";
-import { startMeasurementRound, createRoom } from "@/modules/measurement/actions";
+import { startMeasurementRound } from "@/modules/measurement/actions";
+import { createRoom } from "@/modules/measurement/actions-room";
 import { attachDrainListeners, type DrainSummary } from "@/lib/measure-drain";
-import type { FieldProject, FieldRoom, ResumableRound } from "./types";
+import type { Route } from "next";
+import type { FieldSubject, FieldRoom, ResumableRound } from "./types";
 import { QueueBanner } from "./QueueBanner";
 import { ItemScreen } from "./ItemScreen";
 
 interface FieldShellProps {
-  project:        FieldProject;
+  subject:        FieldSubject;
   rooms:          FieldRoom[];
   resumableRound: ResumableRound | null;
 }
 
-export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShellProps) {
+export function FieldShell({ subject, rooms: roomsIn, resumableRound }: FieldShellProps) {
   const router = useRouter();
   const [round, setRound]   = useState<ResumableRound | null>(resumableRound);
   const [rooms, setRooms]   = useState<FieldRoom[]>(roomsIn);
@@ -30,7 +32,7 @@ export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShe
   // Wire outbox drain — reruns on visibility change and when the
   // device reports online again. The drain also runs once on mount.
   useEffect(() => {
-    const dispose = attachDrainListeners(project.id, (s) => {
+    const dispose = attachDrainListeners(subject.id, (s) => {
       setDrain(s);
       if (s.sent > 0) {
         // A successful sync means the server saw new items; refresh
@@ -40,13 +42,13 @@ export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShe
       }
     });
     return dispose;
-  }, [project.id, router]);
+  }, [subject.id, router]);
 
   function beginRound(): void {
     setError(null);
     startStarting(async () => {
       const res = await startMeasurementRound({
-        projectId: project.id,
+        ...(subject.kind === "PROJECT" ? { projectId: subject.id } : { leadId: subject.id }),
         visitedAt: new Date(),
       });
       if (!res.ok) {
@@ -67,7 +69,9 @@ export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShe
   }
 
   async function addRoom(name: string): Promise<FieldRoom | null> {
-    const res = await createRoom({ projectId: project.id, name });
+    const res = await createRoom(
+      subject.kind === "PROJECT" ? { projectId: subject.id, name } : { leadId: subject.id, name },
+    );
     if (!res.ok || !res.data) {
       setError(res.error ?? "Could not create room");
       return null;
@@ -88,18 +92,22 @@ export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShe
       <header className="sticky top-0 z-20 flex items-center justify-between bg-surface border-b border-rule px-3 py-2.5">
         <button
           type="button"
-          onClick={() => router.push(`/projects/${project.id}/measurements` as `/projects/${string}/measurements`)}
+          onClick={() => router.push(
+            (subject.kind === "PROJECT"
+              ? `/projects/${subject.id}/measurements`
+              : `/leads/${subject.id}`) as Route,
+          )}
           className="h-11 w-11 grid place-items-center rounded-[8px] hover:bg-surface-hover"
-          aria-label="Back to project"
+          aria-label={subject.kind === "PROJECT" ? "Back to project" : "Back to lead"}
         >
           <ArrowLeft size={20} />
         </button>
         <div className="text-center leading-tight">
           <div className="text-[11px] uppercase tracking-[0.08em] text-text-dim">
-            {project.number}
+            {subject.number}
           </div>
           <div className="text-[13px] font-medium truncate max-w-[220px]">
-            {project.clientName}
+            {subject.clientName}
           </div>
         </div>
         <div className="w-11" aria-hidden />
@@ -113,24 +121,24 @@ export function FieldShell({ project, rooms: roomsIn, resumableRound }: FieldShe
 
       {round ? (
         <ItemScreen
-          projectId={project.id}
+          projectId={subject.id}
           measurementId={round.id}
           rooms={rooms}
           initialItemCount={round.itemCount}
           onRoomAdded={addRoom}
         />
       ) : (
-        <StartCard project={project} pending={starting} onStart={beginRound} />
+        <StartCard subject={subject} pending={starting} onStart={beginRound} />
       )}
 
-      <QueueBanner projectId={project.id} drain={drain} />
+      <QueueBanner projectId={subject.id} drain={drain} />
     </div>
   );
 }
 
 function StartCard({
-  project, pending, onStart,
-}: { project: FieldProject; pending: boolean; onStart: () => void }) {
+  subject, pending, onStart,
+}: { subject: FieldSubject; pending: boolean; onStart: () => void }) {
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 pb-24 pt-16 text-center">
       <div className="h-14 w-14 rounded-full bg-gold-tint grid place-items-center mb-4">
@@ -140,7 +148,7 @@ function StartCard({
         Ready to measure
       </h1>
       <p className="text-[13px] text-text-dim max-w-[260px] mb-8">
-        {project.name}. A round captures everything from this visit;
+        {subject.name}. A round captures everything from this visit;
         add items one at a time. Works offline.
       </p>
       <button

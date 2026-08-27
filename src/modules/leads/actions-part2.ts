@@ -155,6 +155,35 @@ export async function convertLead(
       data:  { leadId: null, clientId: client.id, projectId: project.id },
     });
 
+    // 5. Same treatment for the site measurement taken while this was
+    //    still a lead (2026-08-27). This is what "the measurement
+    //    carries forward" means concretely: the rooms and the rounds are
+    //    the SAME rows, re-pointed at the project — not copies. Every
+    //    MeasurementItem, CalcResult, photo and dye-lot note follows for
+    //    free because they hang off the round and the room by id.
+    //
+    //    Rooms MUST move in the same transaction as the rounds. A
+    //    MeasurementItem points at a room AND (via its round) at a
+    //    party; if only one side reparented, an item's room would belong
+    //    to a project its measurement did not, and both the firm-quote
+    //    query and the cut list would silently read the wrong set.
+    await tx.room.updateMany({
+      where: { leadId: lead.id },
+      data:  { leadId: null, projectId: project.id },
+    });
+    await tx.measurement.updateMany({
+      where: { leadId: lead.id },
+      data:  { leadId: null, projectId: project.id },
+    });
+
+    // 6. Any site visit booked against the lead now belongs to the
+    //    project too, so the project's visit list is complete from day
+    //    one rather than starting empty after conversion.
+    await tx.siteVisit.updateMany({
+      where: { leadId: lead.id },
+      data:  { leadId: null, projectId: project.id },
+    });
+
     return { clientId: client.id, projectId: project.id };
   }, { orgId: ctx.orgId });
 

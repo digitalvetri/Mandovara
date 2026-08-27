@@ -37,14 +37,20 @@ export async function listRoundsForClient(
     },
   });
 
-  return rounds.map((r) => ({
-    id:            r.id,
-    number:        r.number,
-    visitedAt:     r.visitedAt,
-    status:        r.status,
-    projectId:     r.project.id,
-    projectName:   r.project.name,
-    projectNumber: r.project.number,
-    itemCount:     r.items.length,
-  }));
+  // `where: { project: { clientId } }` cannot match a lead-scoped round
+  // — a lead has no client — so every row here has a project. The filter
+  // is for the type checker, which can't see that, and is a genuine
+  // guard if the where clause is ever loosened.
+  return rounds
+    .filter((r): r is typeof r & { project: NonNullable<typeof r.project> } => r.project !== null)
+    .map((r) => ({
+      id:            r.id,
+      number:        r.number,
+      visitedAt:     r.visitedAt,
+      status:        r.status,
+      projectId:     r.project.id,
+      projectName:   r.project.name,
+      projectNumber: r.project.number,
+      itemCount:     r.items.length,
+    }));
 }

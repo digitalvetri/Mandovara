@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { FileText, Plus } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import type { QuotationInlineRow } from "@/modules/quotations/queries";
+import { LeadQuoteActions } from "./LeadQuoteActions";
 
 const QT_STATUS_TONE: Record<string, string> = {
   DRAFT:            "bg-text-dim/12 text-text-dim",
@@ -33,10 +34,19 @@ export function LeadQuotationsSidebar({
   quotations,
   leadId,
   isConverted,
+  leadName,
+  mobile,
+  email,
 }: {
   quotations: QuotationInlineRow[];
   leadId: string;
   isConverted: boolean;
+  // Recipient details for the inline Send action. Absent once the lead
+  // has converted — the client record owns the contact details then, and
+  // sending happens from the quotation page.
+  leadName?: string;
+  mobile?: string;
+  email?: string | null;
 }) {
   return (
     <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
@@ -96,6 +106,19 @@ export function LeadQuotationsSidebar({
                 </div>
                 <QuoteSidebarPill status={q.status} />
               </Link>
+              {!isConverted && leadName && mobile && (
+                <LeadQuoteActions
+                  quotationId={q.id}
+                  quotationNumber={shortQtNumber(q.number)}
+                  status={q.status}
+                  totalStr={q.total.toString()}
+                  validUntilIso={q.validUntil.toISOString()}
+                  shareToken={q.shareToken}
+                  leadName={leadName}
+                  mobile={mobile}
+                  email={email ?? null}
+                />
+              )}
             </li>
           ))}
         </ul>

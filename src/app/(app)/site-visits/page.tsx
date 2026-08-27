@@ -7,6 +7,7 @@ import { listSiteVisits } from "@/modules/site-visits/queries";
 import { listProjectsForSelect } from "@/modules/projects/queries";
 import { formatDate } from "@/kernel/datetime";
 import { NewVisitButton } from "./_components/NewVisitButton";
+import { FieldworkTabs } from "@/components/layout/FieldworkTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,12 @@ export default async function SiteVisitsPage() {
   return (
     <>
       <Topbar
-        title="Site Visits"
+        title="Site Visits & Measurements"
         eyebrow="Scheduled field visits — surveys, measurements, supervision and handovers"
         actions={<NewVisitButton projects={projects} />}
       />
+
+      <FieldworkTabs />
 
       <div className="overflow-hidden rounded-[12px] border border-rule bg-surface">
         {visits.length === 0 ? (

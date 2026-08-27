@@ -10,6 +10,8 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import { resolveSubject } from "./subject";
+export * from "./queries-rooms";
 import type {
   RoundListRow, RoundListGroup, RoundDetail, ItemDetail, RoomItemsBucket,
 } from "./queries-types";
@@ -103,6 +105,7 @@ export async function getRoundDetail(
       id: true, number: true, revision: true, visitedAt: true,
       status: true, notes: true, measuredById: true,
       approvedById: true, approvedAt: true, supersedesId: true,
+      leadId: true,
       project: {
         select: {
           id: true, name: true, number: true,
@@ -156,6 +159,14 @@ export async function getRoundDetail(
 
   const itemsByRoom = groupItemsByRoom(round.items, cwById);
 
+  // Leads carry no Prisma relation (see ./subject) — one extra read, and
+  // only when the round is actually lead-scoped.
+  const lead = round.leadId
+    ? await db.lead.findUnique({
+        where: { id: round.leadId }, select: { id: true, name: true, number: true },
+      })
+    : null;
+
   return {
     id:             round.id,
     number:         round.number,
@@ -168,12 +179,7 @@ export async function getRoundDetail(
     approvedByName: round.approvedById ? (nameOf.get(round.approvedById) ?? "—") : null,
     approvedAt:     round.approvedAt,
     supersedesId:   round.supersedesId,
-    project: {
-      id:         round.project.id,
-      name:       round.project.name,
-      number:     round.project.number,
-      clientName: round.project.client.name,
-    },
+    subject:        resolveSubject(round.project, lead),
     itemsByRoom,
   };
 }
@@ -263,30 +269,22 @@ function toItemDetail(
   };
 }
 
-export async function listRoomsForProject(
-  ctx:       RequestContext,
-  projectId: string,
-): Promise<{ id: string; name: string; floorLabel: string | null; sortOrder: number }[]> {
-  requirePermission(ctx, "measurement.view");
-  const db = scoped(ctx);
-  return db.room.findMany({
-    where:   { projectId },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select:  { id: true, name: true, floorLabel: true, sortOrder: true },
-  });
-}
-
 /** Find the caller's most recent DRAFT round on this project — the
  *  field PWA uses this to resume rather than start a fresh round on
  *  every reload (§5.3 must survive tab close and reopen). */
 export async function findResumableRound(
-  ctx:       RequestContext,
-  projectId: string,
+  ctx:     RequestContext,
+  subject: string | { kind: "PROJECT" | "LEAD"; id: string },
 ): Promise<{ id: string; number: string; visitedAt: Date; itemCount: number } | null> {
   requirePermission(ctx, "measurement.view");
   const db = scoped(ctx);
+  // A bare string is a project id — the signature every existing caller
+  // uses. Leads pass the tagged form.
+  const party = typeof subject === "string"
+    ? { projectId: subject }
+    : subject.kind === "PROJECT" ? { projectId: subject.id } : { leadId: subject.id };
   const round = await db.measurement.findFirst({
-    where:   { projectId, status: "DRAFT", measuredById: ctx.userId },
+    where:   { ...party, status: "DRAFT", measuredById: ctx.userId },
     orderBy: { visitedAt: "desc" },
     select:  {
       id: true, number: true, visitedAt: true,

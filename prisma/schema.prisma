@@ -137,6 +137,11 @@ enum LeadStage {
   NEW
   CONTACTED
   QUALIFIED
+  /// DEPRECATED 2026-08-27 — a duplicate of VISIT_SCHEDULED. Measurement
+  /// is a *purpose* of a site visit, not a peer stage. Existing rows were
+  /// backfilled onto VISIT_SCHEDULED; nothing writes this any more. Kept
+  /// only because dropping a Postgres enum value rewrites every dependent
+  /// column for a label no user can see.
   MEASUREMENT_SCHEDULED
   VISIT_SCHEDULED
   MEASURED
@@ -966,15 +971,25 @@ model ProjectMember {
 model Room {
   id             String   @id @default(cuid())
   organizationId String
-  projectId      String
+  // A room belongs to EITHER a project (post-conversion) or a lead
+  // (pre-conversion), never both — the same XOR the Quotation model
+  // uses, enforced by a DB CHECK in the accompanying migration.
+  //
+  // Leads became measurable on 2026-08-27: a site visit to a prospect
+  // now records real rooms and dimensions without forcing a Client and
+  // Project into existence first. convertLead reparents both Room and
+  // Measurement onto the new Project in one transaction.
+  projectId      String?
+  leadId         String?
   name           String
   floorLabel     String?
   sortOrder      Int      @default(0)
 
-  project Project           @relation(fields: [projectId], references: [id])
+  project Project?          @relation(fields: [projectId], references: [id])
   items   MeasurementItem[]
 
   @@index([projectId])
+  @@index([leadId])
 }
 
 model SiteVisit {
@@ -1006,7 +1021,10 @@ model SiteVisit {
 model Measurement {
   id             String            @id @default(cuid())
   organizationId String
-  projectId      String
+  // Project XOR lead — see the note on Room. Nullable since 2026-08-27
+  // so a measurement can be taken during a lead's site visit.
+  projectId      String?
+  leadId         String?
   number         String
   siteVisitId    String?
   revision       Int               @default(0)
@@ -1018,11 +1036,16 @@ model Measurement {
   supersedesId   String?
   notes          String?
 
-  project Project           @relation(fields: [projectId], references: [id])
+  project Project?          @relation(fields: [projectId], references: [id])
   items   MeasurementItem[]
 
   @@unique([organizationId, number])
   @@index([projectId, status])
+  @@index([leadId, status])
+  // Populated from 2026-08-27 — the join that makes a site visit and the
+  // measurements taken on it one record set (site-visits/queries.ts
+  // listRoundsForSiteVisit).
+  @@index([siteVisitId])
 }
 
 model MeasurementItem {

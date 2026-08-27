@@ -47,12 +47,19 @@ const deductionSchema = z.object({
 export type DeductionInput = z.infer<typeof deductionSchema>;
 
 // ── Round lifecycle inputs ──────────────────────────────────────────
+// Exactly one of projectId / leadId — the same party XOR the DB
+// enforces on Measurement (see the 20260827000002 migration). Leads
+// became measurable 2026-08-27; before that projectId was required.
 export const startRoundSchema = z.object({
-  projectId:   idField,
+  projectId:   idField.optional(),
+  leadId:      idField.optional(),
   visitedAt:   z.coerce.date(),
   siteVisitId: idField.optional(),
   notes:       z.string().trim().max(500).optional(),
-});
+}).refine(
+  (v) => (v.projectId != null) !== (v.leadId != null),
+  { message: "A measurement round belongs to exactly one project or lead." },
+);
 export type StartRoundInput = z.infer<typeof startRoundSchema>;
 
 export const submitRoundSchema  = z.object({ measurementId: idField });
@@ -153,9 +160,15 @@ export const syncItemSchema = addItemSchema.and(
 export type SyncItemInput    = z.infer<typeof syncItemSchema>;
 
 // Room creation (a measurer often creates a new room name on site).
+// Same party XOR as startRoundSchema — a room hangs off whichever of
+// project / lead is being measured.
 export const createRoomSchema = z.object({
-  projectId:  idField,
+  projectId:  idField.optional(),
+  leadId:     idField.optional(),
   name:       z.string().trim().min(1).max(80),
   floorLabel: z.string().trim().max(40).optional(),
-});
+}).refine(
+  (v) => (v.projectId != null) !== (v.leadId != null),
+  { message: "A room belongs to exactly one project or lead." },
+);
 export type CreateRoomInput   = z.infer<typeof createRoomSchema>;

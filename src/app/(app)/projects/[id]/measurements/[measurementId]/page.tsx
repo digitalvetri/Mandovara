@@ -22,7 +22,9 @@ export default async function MeasurementDetailPage({
   const ctx = await devContext();
   const round = await getRoundDetail(ctx, measurementId);
   if (!round) notFound();
-  if (round.project.id !== id) notFound();
+  // Guard the URL against a round belonging to a different subject —
+  // and against a lead-scoped round reached through a project path.
+  if (round.subject.kind !== "PROJECT" || round.subject.id !== id) notFound();
 
   // Rooms list feeds the add-item form dropdown; measurers often
   // capture on-site with a room already picked from the parent screen.
@@ -32,7 +34,7 @@ export default async function MeasurementDetailPage({
     <>
       <Topbar
         title={`Round ${round.number.split("/").slice(-1)[0] ?? round.number}`}
-        eyebrow={`${round.project.number} · ${round.project.clientName} · ${round.project.name}`}
+        eyebrow={`${round.subject.number} · ${round.subject.partyName} · ${round.subject.name}`}
       />
 
       <div className="pb-4">

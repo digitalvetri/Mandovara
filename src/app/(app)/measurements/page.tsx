@@ -6,9 +6,11 @@ import { Ruler } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { listOrgRounds } from "@/modules/measurement/org-queries";
+import { roundHref } from "@/modules/measurement/subject";
 import type { MeasurementStatusStr } from "@/modules/measurement/queries-types";
 import { listProjectsForSelect } from "@/modules/projects/queries";
 import { NewMeasurementSheet } from "./_components/NewMeasurementSheet";
+import { FieldworkTabs } from "@/components/layout/FieldworkTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -51,10 +53,12 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
   return (
     <>
       <Topbar
-        title="Measurements"
+        title="Site Visits & Measurements"
         eyebrow={`${totalActive.toLocaleString("en-IN")} active rounds across the studio`}
         actions={<NewMeasurementSheet projects={projects} />}
       />
+
+      <FieldworkTabs />
 
       {/* Filters + search */}
       <div className="flex flex-wrap items-center gap-2 pb-5">
@@ -119,7 +123,7 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
                   {/* Round number */}
                   <td className="px-4 py-4">
                     <Link
-                      href={`/projects/${r.project.id}/measurements/${r.id}` as Route}
+                      href={roundHref(r.subject, r.id) as Route}
                       className="block tabular text-[13.5px] font-semibold text-accent hover:underline"
                     >
                       {shortNumber(r.number)}
@@ -127,15 +131,22 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
                     <div className="tabular text-[10.5px] text-text-faint mt-0.5">v{r.revision}</div>
                   </td>
 
-                  {/* Project */}
+                  {/* Project or lead — a round no longer implies a project */}
                   <td className="px-4 py-4 max-w-[200px]">
-                    <div className="text-[13px] font-medium text-text truncate">{r.project.name}</div>
-                    <div className="text-[11px] text-text-dim mt-0.5 truncate md:hidden">{r.project.clientName}</div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[13px] font-medium text-text truncate">{r.subject.name}</span>
+                      {r.subject.kind === "LEAD" && (
+                        <span className="shrink-0 text-[9.5px] font-medium uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-[3px] bg-heat/12 text-heat">
+                          Lead
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-text-dim mt-0.5 truncate md:hidden">{r.subject.partyName}</div>
                   </td>
 
                   {/* Client */}
                   <td className="px-4 py-4 text-[12.5px] text-text-dim hidden md:table-cell max-w-[160px]">
-                    <span className="truncate block">{r.project.clientName}</span>
+                    <span className="truncate block">{r.subject.partyName}</span>
                   </td>
 
                   {/* Visited */}

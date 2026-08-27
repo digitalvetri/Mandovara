@@ -7,7 +7,7 @@
 
 import { useState, useTransition, useMemo } from "react";
 import { Loader2, Plus, Save } from "lucide-react";
-import { createRoom } from "@/modules/measurement/actions";
+import { createRoom } from "@/modules/measurement/actions-room";
 import { addMeasurementItem } from "@/modules/measurement/actions-item";
 import {
   PRODUCT_FAMILIES, SURFACE_TYPES, HEADING_TYPES, LAY_PATTERNS, MOUNT_TYPES,

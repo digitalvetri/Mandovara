@@ -25,9 +25,17 @@ interface Props {
   // Hide the free-form Convert button here to remove the duplicate CTA.
   hasQuotes?: boolean;
   canDelete?: boolean;
+  /**
+   * True when the lead has an APPROVED, non-superseded measurement round.
+   * A measured lead gets a FIRM quotation built from its own measured
+   * items; an unmeasured one still gets the rough ballpark estimate
+   * (owner decision, 2026-08-27 — the two-quote model now turns on
+   * whether we've measured, not on whether a client record exists).
+   */
+  isMeasured?: boolean;
 }
 
-export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email, hasQuotes, canDelete }: Props) {
+export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email, hasQuotes, canDelete, isMeasured }: Props) {
   const router = useRouter();
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showVisitModal, setShowVisitModal] = useState(false);
@@ -43,9 +51,15 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
     }
     // Not-yet-converted lead → open the builder in LEAD-SCOPED mode.
     // FIXES-01 §5.1: no more silent conversion on quote. The lead stays
-    // a lead until the client accepts + owner approves via the explicit
-    // Convert-to-Client action. The quotation carries leadId only.
-    router.push(`/quotations/quick?leadId=${leadId}` as Route);
+    // a lead until the CLIENT accepts and the owner approves, via the
+    // explicit Convert-to-Client action. The quotation carries leadId only.
+    //
+    // Measured leads go to the firm builder, which preloads a line per
+    // approved measurement item with its computed quantity. Unmeasured
+    // leads get the quick builder — there is nothing to price precisely.
+    router.push((isMeasured
+      ? `/quotations/new?lead=${leadId}`
+      : `/quotations/quick?leadId=${leadId}`) as Route);
   }
 
   return (
@@ -81,10 +95,12 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
             className={btn("accent")}
             title={isConverted
               ? "Send a rough (pre-measurement) estimate for this client"
-              : "Send a rough estimate — no measurement yet, no client/project created"}
+              : isMeasured
+                ? "Build a firm quotation from this lead's approved measurements"
+                : "Send a rough estimate — no measurement yet, no client/project created"}
           >
             <FileText size={14} strokeWidth={1.75} />
-            Send Rough Estimate
+            {!isConverted && isMeasured ? "Build Firm Quotation" : "Send Rough Estimate"}
           </button>
         )}
 

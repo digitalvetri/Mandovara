@@ -1,6 +1,12 @@
-// §5.3 Field capture PWA — /m/measure/[projectId]
+// §5.3 Field capture PWA — /m/measure/[subject]
 //
-// Server component. Resolves the project, rooms and the caller's
+// The route segment is still named [projectId] for continuity: every
+// existing link, bookmark and queued offline item keeps working, because
+// a bare cuid still means a project. A "lead-" prefix means a lead
+// (2026-08-27) — decodeSubjectParam is the whole difference, and the
+// twelve components below this page never learn which they got.
+//
+// Server component. Resolves the subject, rooms and the caller's
 // most-recent DRAFT round (if any) so the PWA can resume mid-visit
 // without starting over. The client shell (FieldCapture) drives the
 // actual one-item-per-screen flow.
@@ -12,8 +18,11 @@
 
 import { notFound } from "next/navigation";
 import { devContext } from "@/lib/dev-context";
+import { scoped } from "@/kernel/db/scoped";
 import { getProject } from "@/modules/projects/queries";
-import { listRoomsForProject, findResumableRound } from "@/modules/measurement/queries";
+import { listRoomsForSubject, findResumableRound } from "@/modules/measurement/queries";
+import { decodeSubjectParam } from "@/modules/measurement/subject";
+import type { FieldSubject } from "./_components/types";
 import { FieldShell } from "./_components/FieldShell";
 
 export const dynamic = "force-dynamic";
@@ -32,22 +41,29 @@ export default async function FieldMeasurePage({
 }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const ctx = await devContext();
-  const project = await getProject(ctx, projectId);
-  if (!project) notFound();
+  const ref = decodeSubjectParam(projectId);
 
-  const rooms  = await listRoomsForProject(ctx, projectId);
-  const resume = await findResumableRound(ctx, projectId);
+  let subject: FieldSubject;
+  if (ref.kind === "PROJECT") {
+    const project = await getProject(ctx, ref.id);
+    if (!project) notFound();
+    subject = {
+      kind: "PROJECT", id: project.id, number: project.number,
+      name: project.name, clientName: project.clientName,
+    };
+  } else {
+    const lead = await scoped(ctx).lead.findUnique({
+      where: { id: ref.id }, select: { id: true, number: true, name: true },
+    });
+    if (!lead) notFound();
+    subject = {
+      kind: "LEAD", id: lead.id, number: lead.number,
+      name: lead.name, clientName: "Lead — not yet a client",
+    };
+  }
 
-  return (
-    <FieldShell
-      project={{
-        id:         project.id,
-        number:     project.number,
-        name:       project.name,
-        clientName: project.clientName,
-      }}
-      rooms={rooms}
-      resumableRound={resume}
-    />
-  );
+  const rooms  = await listRoomsForSubject(ctx, ref);
+  const resume = await findResumableRound(ctx, ref);
+
+  return <FieldShell subject={subject} rooms={rooms} resumableRound={resume} />;
 }

@@ -8,7 +8,7 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, MapPin, Briefcase, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
-  Ruler, BarChart2, CheckSquare, FolderOpen, UserCircle,
+  BarChart2, CheckSquare, FolderOpen, UserCircle,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -49,8 +49,10 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   {
     section: "Delivery",
     items: [
-      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin  },
-      { label: "Measurements",          href: "/measurements", icon: Ruler   },
+      // One entry, not two. A site visit and the measurement taken on it
+      // are the same trip; FieldworkTabs switches between the two views
+      // once you're inside. (2026-08-27, owner instruction.)
+      { label: "Site Visits & Measurements", href: "/site-visits", icon: MapPin },
     ],
   },
   {
@@ -106,8 +108,7 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   {
     section: "Field Operations",
     items: [
-      { label: "Site Visit Management", href: "/site-visits",  icon: MapPin, perm: "sitelog.view"     },
-      { label: "Measurements",          href: "/measurements", icon: Ruler,  perm: "measurement.view" },
+      { label: "Site Visits & Measurements", href: "/site-visits", icon: MapPin, perm: "sitelog.view" },
     ],
   },
   {

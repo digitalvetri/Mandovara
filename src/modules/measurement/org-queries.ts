@@ -1,11 +1,17 @@
 // Org-wide read-side for the top-level /measurements page.
-// Feeds one row per round (across every project the user can see),
-// filterable by status and searchable by project or round number.
+// Feeds one row per round — across every project AND every lead the user
+// can see (leads became measurable 2026-08-27) — filterable by status and
+// searchable by project or round number.
+//
+// Note the search still only matches project fields. A lead-scoped round
+// is findable by its own MEA number; matching lead names would need a
+// second query since leadId carries no relation, and no one has asked.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { MeasurementStatusStr } from "./queries-types";
+import { resolveSubject, type RoundSubject } from "./subject";
 
 export interface OrgRoundRow {
   id:             string;
@@ -18,12 +24,8 @@ export interface OrgRoundRow {
   itemCount:      number;
   roomCount:      number;
   supersedesId:   string | null;
-  project: {
-    id:         string;
-    name:       string;
-    number:     string;
-    clientName: string;
-  };
+  /** The project OR lead this round belongs to — see ./subject. */
+  subject:        RoundSubject;
 }
 
 export interface ListOrgRoundsQuery {
@@ -71,6 +73,7 @@ export async function listOrgRounds(
     select: {
       id: true, number: true, revision: true, visitedAt: true,
       status: true, measuredById: true, supersedesId: true,
+      leadId: true,
       project: {
         select: {
           id: true, name: true, number: true,
@@ -91,6 +94,14 @@ export async function listOrgRounds(
   });
   const nameOf = new Map(users.map((u) => [u.id, u.name] as const));
 
+  // Leads carry no Prisma relation (see ./subject) — fetch the ones this
+  // page references in a single round-trip.
+  const leadIds = [...new Set(window.map((r) => r.leadId).filter((v): v is string => !!v))];
+  const leads = leadIds.length
+    ? await db.lead.findMany({ where: { id: { in: leadIds } }, select: { id: true, name: true, number: true } })
+    : [];
+  const leadById = new Map(leads.map((l) => [l.id, l] as const));
+
   const rows: OrgRoundRow[] = window.map((r) => ({
     id:             r.id,
     number:         r.number,
@@ -102,12 +113,7 @@ export async function listOrgRounds(
     itemCount:      r.items.length,
     roomCount:      new Set(r.items.map((i) => i.roomId)).size,
     supersedesId:   r.supersedesId,
-    project: {
-      id:         r.project.id,
-      name:       r.project.name,
-      number:     r.project.number,
-      clientName: r.project.client.name,
-    },
+    subject:        resolveSubject(r.project, r.leadId ? leadById.get(r.leadId) : null),
   }));
 
   // Header pills — one groupBy per status.  Cheap enough at this scale
