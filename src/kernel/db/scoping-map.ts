@@ -48,7 +48,6 @@ export const BRANCH_SCOPED = new Set<string>([
   "PurchaseOrder",
   "GRN",
   "Invoice",
-  "Receipt",
   "Advance",
   "Expense",
 ]);
