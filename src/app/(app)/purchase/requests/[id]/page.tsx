@@ -62,10 +62,10 @@ export default async function PurchaseRequestDetailPage({
 
         {/* ── Lines ───────────────────────────────────────────────────────── */}
         <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-          <div className="px-4 h-[38px] flex items-center border-b border-rule text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+          <div className="overflow-x-auto px-4 h-[38px] flex items-center border-b border-rule text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
             Lines ({r.lines.length})
           </div>
-          <table className="w-full text-[12.5px]">
+          <table className="min-w-[480px] w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
                 <Th>Item</Th>

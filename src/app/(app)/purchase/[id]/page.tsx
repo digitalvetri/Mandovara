@@ -107,8 +107,8 @@ export default async function PODetailPage({
         </div>
 
         {/* ── Lines table ─────────────────────────────────────────────────── */}
-        <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-          <table className="w-full text-[13.5px]">
+        <div className="rounded-[14px] bg-surface border border-rule overflow-x-auto">
+          <table className="min-w-[480px] w-full text-[13.5px]">
             <thead>
               <tr className="border-b border-rule text-[11px] uppercase tracking-[0.12em] text-text-dim">
                 <Th>Colourway</Th>

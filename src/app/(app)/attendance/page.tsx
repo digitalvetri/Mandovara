@@ -53,11 +53,11 @@ async function ManagerView({ ctx }: { ctx: Awaited<ReturnType<typeof devContext>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 rounded-[14px] bg-surface border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <div className="text-[13px] text-text">
+            <div className="overflow-x-auto text-[13px] text-text">
               Today <span className="text-text-muted">· mobile punch (GPS + selfie)</span>
             </div>
           </div>
-          <table className="w-full text-[12.5px]">
+          <table className="min-w-[480px] w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-border text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
                 <Th>Employee</Th><Th>In</Th><Th>Out</Th><Th>Hrs</Th><Th>Status</Th>

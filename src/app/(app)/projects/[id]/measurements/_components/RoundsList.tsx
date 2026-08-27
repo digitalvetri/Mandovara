@@ -35,8 +35,8 @@ export function RoundsList({ projectId, groups }: RoundsListProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-rule bg-surface">
-      <table className="w-full text-[12.5px]">
+    <div className="overflow-x-auto rounded-[10px] border border-rule bg-surface">
+      <table className="min-w-[720px] w-full text-[12.5px]">
         <thead className="bg-surface-2 text-[10.5px] uppercase tracking-[0.06em] text-text-dim">
           <tr>
             <th className="px-3 py-2 text-left font-medium">Number</th>

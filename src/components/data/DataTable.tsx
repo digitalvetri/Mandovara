@@ -99,7 +99,7 @@ function RowsTable<T>(props: DataTableProps<T>) {
   }
 
   return (
-    <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
+    <div className="rounded-[14px] bg-surface border border-rule overflow-x-auto">
       <table
         className="w-full text-[12.5px] table-fixed"
         role="grid"
@@ -184,8 +184,8 @@ function SkeletonTable<T>({
   columns, rows, hasSwatch,
 }: { columns: readonly Column<T>[]; rows: number; hasSwatch: boolean }) {
   return (
-    <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-      <table className="w-full text-[12.5px] table-fixed">
+    <div className="rounded-[14px] bg-surface border border-rule overflow-x-auto">
+      <table className="min-w-[540px] w-full text-[12.5px] table-fixed">
         <thead>
           <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
             {hasSwatch && <th aria-hidden />}

@@ -11,6 +11,7 @@ import type { MeasurementStatusStr } from "@/modules/measurement/queries-types";
 import { listProjectsForSelect } from "@/modules/projects/queries";
 import { NewMeasurementSheet } from "./_components/NewMeasurementSheet";
 import { FieldworkTabs } from "@/components/layout/FieldworkTabs";
+import { ClientFilterBanner } from "./_components/ClientFilterBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ const STATUS_CHIP: Record<string, string> = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; search?: string; page?: string; client?: string }>;
 }
 
 export default async function MeasurementsIndexPage({ searchParams }: PageProps) {
@@ -41,10 +42,17 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
     : undefined;
   const search = sp.search?.trim() || undefined;
   const page   = sp.page ? Math.max(1, parseInt(sp.page, 10) || 1) : 1;
+  // Owner instruction 2026-08-27 — reach a client's measurement history
+  // from the combined visits/measurements page, without hunting through
+  // their projects one at a time.
+  const clientId = sp.client?.trim() || undefined;
 
   const ctx = await devContext();
   const [{ rows, hasNext, totalCounts }, projects] = await Promise.all([
-    listOrgRounds(ctx, { ...(status && { status }), ...(search && { search }), page }),
+    listOrgRounds(ctx, {
+      ...(status && { status }), ...(search && { search }),
+      ...(clientId && { clientId }), page,
+    }),
     listProjectsForSelect(ctx),
   ]);
 
@@ -59,6 +67,8 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
       />
 
       <FieldworkTabs />
+
+      {clientId && <ClientFilterBanner clientName={rows[0]?.clientName ?? null} />}
 
       {/* Filters + search */}
       <div className="flex flex-wrap items-center gap-2 pb-5">
@@ -88,8 +98,8 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
       {rows.length === 0 ? (
         <EmptyRounds status={status ?? null} search={search ?? null} />
       ) : (
-        <div className="overflow-hidden rounded-[12px] border border-rule bg-surface">
-          <table className="w-full border-collapse">
+        <div className="overflow-x-auto rounded-[12px] border border-rule bg-surface">
+          <table className="min-w-[900px] w-full border-collapse">
             {/* Column headers */}
             <thead>
               <tr className="bg-surface-2 border-b border-rule">
@@ -144,9 +154,19 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
                     <div className="text-[11px] text-text-dim mt-0.5 truncate md:hidden">{r.subject.partyName}</div>
                   </td>
 
-                  {/* Client */}
+                  {/* Client — clicking narrows to their whole history */}
                   <td className="px-4 py-4 text-[12.5px] text-text-dim hidden md:table-cell max-w-[160px]">
-                    <span className="truncate block">{r.subject.partyName}</span>
+                    {r.clientId ? (
+                      <Link
+                        href={`/measurements?client=${r.clientId}` as Route}
+                        className="truncate block text-accent hover:underline"
+                        title={`All measurements for ${r.clientName}`}
+                      >
+                        {r.clientName}
+                      </Link>
+                    ) : (
+                      <span className="truncate block">{r.subject.partyName}</span>
+                    )}
                   </td>
 
                   {/* Visited */}

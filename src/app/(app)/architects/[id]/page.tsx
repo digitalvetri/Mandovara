@@ -39,11 +39,11 @@ export default async function ArchitectDetailPage({ params }: Props) {
             </div>
           </div>
           {a.commissions.length === 0 ? (
-            <div className="py-10 text-center text-[12px] text-text-faint">
+            <div className="overflow-x-auto py-10 text-center text-[12px] text-text-faint">
               No commissions yet. Orders from linked clients will stamp them automatically.
             </div>
           ) : (
-            <table className="w-full text-[12px]">
+            <table className="min-w-[480px] w-full text-[12px]">
               <thead>
                 <tr className="border-b border-rule text-[10px] uppercase tracking-[0.14em] text-text-dim">
                   <Th>Project</Th>

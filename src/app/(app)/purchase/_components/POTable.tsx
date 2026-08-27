@@ -29,8 +29,8 @@ export function POTable({ rows }: { rows: PORow[] }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[12px] border border-rule bg-surface">
-      <table className="w-full border-collapse">
+    <div className="overflow-x-auto rounded-[12px] border border-rule bg-surface">
+      <table className="min-w-[720px] w-full border-collapse">
         <thead>
           <tr className="bg-surface-2 border-b border-rule">
             <th className="w-[5px] p-0" aria-hidden />

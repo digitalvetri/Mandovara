@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
 import { MandovaraLeafIcon } from "./GlobalTopbar";
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 
 interface NavItem {
   label: string;
@@ -248,6 +249,14 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
             <LogOut size={15} strokeWidth={1.7} />
           </button>
         </div>
+
+        {/* Install the app. It used to live only on the profile page,
+            which nobody visits — so nobody knew this was installable
+            (2026-08-27, owner instruction). The button hides itself once
+            installed, and on iOS it shows the Share → Add to Home Screen
+            instructions instead, since Safari never fires the install
+            event. */}
+        <InstallAppButton className="mt-2 w-full justify-center" />
       </div>
     </aside>
   );

@@ -18,7 +18,10 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import type { ActionResult } from "./actions";
 
-export const AUDIT_RETENTION_KEY = "audit.retentionDays";
+// Not exported: a "use server" module may only export async functions,
+// and Next fails the build otherwise. The key is also written by the
+// 20260827000003_audit_retention migration — keep the two in step.
+const AUDIT_RETENTION_KEY = "audit.retentionDays";
 const DEFAULT_RETENTION_DAYS = 5;
 
 export async function getAuditRetentionDays(): Promise<number> {

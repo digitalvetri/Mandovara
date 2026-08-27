@@ -164,11 +164,11 @@ export function SizePriceTable({
   if (rows.length === 0) return null;
   return (
     <div className="rounded-[10px] border border-rule bg-surface/60 overflow-hidden">
-      <div className="px-4 py-2 border-b border-rule text-[10.5px] uppercase tracking-[0.16em] text-text-dim flex items-baseline justify-between">
+      <div className="overflow-x-auto px-4 py-2 border-b border-rule text-[10.5px] uppercase tracking-[0.16em] text-text-dim flex items-baseline justify-between">
         <span>Prices per size</span>
         <span className="text-text-faint text-[10px]">₹ / {uomShort}</span>
       </div>
-      <table className="w-full text-[12.5px]">
+      <table className="min-w-[480px] w-full text-[12.5px]">
         <tbody>
           {rows.map((r) => (
             <tr key={r.label} className="border-b border-rule/60 last:border-b-0">

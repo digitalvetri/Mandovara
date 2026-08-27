@@ -84,11 +84,11 @@ export async function GstTab({ ctx, year, month }: Props) {
       {/* Output — invoices */}
       <Section title="Output Tax — Invoices issued">
         {summary.outputLines.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[12px] text-text-dim">
+          <div className="overflow-x-auto px-4 py-8 text-center text-[12px] text-text-dim">
             No invoices issued in {formatPeriod(period)}.
           </div>
         ) : (
-          <table className="w-full text-[12px]">
+          <table className="min-w-[480px] w-full text-[12px]">
             <thead>
               <tr className="border-b border-rule text-[10px] uppercase tracking-[0.14em] text-text-dim">
                 <Th>Invoice</Th><Th>Date</Th><Th>Client</Th>
@@ -127,7 +127,7 @@ export async function GstTab({ ctx, year, month }: Props) {
       {/* HSN summary for GSTR-1 */}
       {summary.hsnRows.length > 0 && (
         <Section title="HSN Summary (for GSTR-1)">
-          <table className="w-full text-[12px]">
+          <table className="min-w-[480px] w-full text-[12px]">
             <thead>
               <tr className="border-b border-rule text-[10px] uppercase tracking-[0.14em] text-text-dim">
                 <Th>HSN / SAC</Th><Th align="right">Rate</Th>
@@ -162,7 +162,7 @@ export async function GstTab({ ctx, year, month }: Props) {
             </p>
           </div>
         ) : (
-          <table className="w-full text-[12px]">
+          <table className="min-w-[480px] w-full text-[12px]">
             <thead>
               <tr className="border-b border-rule text-[10px] uppercase tracking-[0.14em] text-text-dim">
                 <Th>Date</Th><Th>Category</Th><Th>Description</Th>

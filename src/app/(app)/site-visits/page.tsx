@@ -50,10 +50,10 @@ export default async function SiteVisitsPage() {
         {visits.length === 0 ? (
           <div className="py-16 text-center">
             <div className="text-[13px] font-medium text-text mb-1.5">No site visits yet.</div>
-            <div className="text-[11.5px] text-text-dim mt-1">Schedule the first visit using the button above.</div>
+            <div className="overflow-x-auto text-[11.5px] text-text-dim mt-1">Schedule the first visit using the button above.</div>
           </div>
         ) : (
-          <table className="w-full border-collapse">
+          <table className="min-w-[810px] w-full border-collapse">
             <thead>
               <tr className="bg-surface-2 border-b border-rule">
                 <th className="w-[5px] p-0" aria-hidden />

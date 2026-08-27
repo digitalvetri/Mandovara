@@ -47,11 +47,11 @@ export default async function ReceiptDetailPage({
               Allocations ({r.allocations.length})
             </div>
             {r.allocations.length === 0 ? (
-              <div className="py-8 text-center text-[12px] text-text-faint">
+              <div className="overflow-x-auto py-8 text-center text-[12px] text-text-faint">
                 Nothing allocated yet. All ₹{Number(r.amount) / 100} sits on account.
               </div>
             ) : (
-              <table className="w-full text-[12.5px]">
+              <table className="min-w-[480px] w-full text-[12.5px]">
                 <thead>
                   <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
                     <Th>Invoice</Th>

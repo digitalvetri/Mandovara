@@ -62,7 +62,11 @@ export function QuotationsInlineTable({ rows, newHref, emptyHint }: QuotationsIn
           )}
         </div>
       ) : (
-        <table className="w-full text-[12.5px]">
+        // Its own scroller: this table is embedded in narrow cards on the
+        // client and project pages, where it would otherwise push the
+        // whole page sideways on a phone.
+        <div className="overflow-x-auto">
+        <table className="min-w-[630px] w-full text-[12.5px]">
           <thead className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim">
             <tr>
               <th className="px-6 py-2 text-left font-medium">Number</th>
@@ -98,6 +102,7 @@ export function QuotationsInlineTable({ rows, newHref, emptyHint }: QuotationsIn
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

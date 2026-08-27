@@ -6,14 +6,17 @@ import { AddUserForm } from "./_components/AddUserForm";
 import { CompanySettingsForm } from "./_components/CompanySettingsForm";
 import { EmployeesSection } from "./_components/EmployeesSection";
 import { BranchGeofenceSection } from "./_components/BranchGeofenceSection";
+import { PeopleAndAuditSection } from "./_components/PeopleAndAuditSection";
+import { getAuditRetentionDays } from "@/modules/admin/audit-retention";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const ctx = await devContext();
-  const [a, employees] = await Promise.all([
+  const [a, employees, retentionDays] = await Promise.all([
     loadAdmin(ctx),
     listEmployees(ctx, { includeTerminated: true }),
+    getAuditRetentionDays(),
   ]);
 
   return (
@@ -65,6 +68,8 @@ export default async function AdminPage() {
           />
 
           <BranchGeofenceSection branches={a.branches} />
+
+          <PeopleAndAuditSection retentionDays={retentionDays} />
 
         </div>
 

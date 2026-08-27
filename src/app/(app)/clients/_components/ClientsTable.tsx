@@ -87,8 +87,8 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
   }
 
   return (
-    <div className="rounded-[12px] border border-rule bg-surface overflow-hidden">
-      <table className="w-full text-left border-collapse">
+    <div className="rounded-[12px] border border-rule bg-surface overflow-x-auto">
+      <table className="min-w-[720px] w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-rule bg-surface-2">
             <th className="w-[5px] p-0" aria-hidden />

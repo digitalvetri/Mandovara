@@ -137,8 +137,8 @@ export default async function InvoiceDetailPage({
             </div>
           )}
 
-          <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-            <table className="w-full text-[12.5px]">
+          <div className="rounded-[14px] bg-surface border border-rule overflow-x-auto">
+            <table className="min-w-[480px] w-full text-[12.5px]">
               <thead>
                 <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
                   <Th align="right">#</Th>

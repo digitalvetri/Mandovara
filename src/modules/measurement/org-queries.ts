@@ -26,9 +26,20 @@ export interface OrgRoundRow {
   supersedesId:   string | null;
   /** The project OR lead this round belongs to — see ./subject. */
   subject:        RoundSubject;
+  /**
+   * The client, when the round belongs to a project that has one.
+   * Owner instruction 2026-08-27: "on the combined page of site visit
+   * management and measurements we also need to access the client's
+   * measurement details" — so the client is a first-class, filterable
+   * column here, not something you find by opening each round.
+   */
+  clientId:       string | null;
+  clientName:     string | null;
 }
 
 export interface ListOrgRoundsQuery {
+  /** Narrow to one client's rounds across all their projects. */
+  clientId?: string;
   status?: MeasurementStatusStr;
   search?: string;   // matches round number or project name/client name
   page?:   number;   // 1-indexed
@@ -53,6 +64,7 @@ export async function listOrgRounds(
 
   const where: Record<string, unknown> = {};
   if (query.status) where.status = query.status;
+  if (query.clientId) where.project = { clientId: query.clientId };
   if (query.search) {
     const s = query.search.trim();
     if (s.length > 0) {
@@ -77,7 +89,7 @@ export async function listOrgRounds(
       project: {
         select: {
           id: true, name: true, number: true,
-          client: { select: { name: true } },
+          client: { select: { id: true, name: true } },
         },
       },
       items: { select: { id: true, roomId: true } },
@@ -114,6 +126,8 @@ export async function listOrgRounds(
     roomCount:      new Set(r.items.map((i) => i.roomId)).size,
     supersedesId:   r.supersedesId,
     subject:        resolveSubject(r.project, r.leadId ? leadById.get(r.leadId) : null),
+    clientId:       r.project?.client?.id   ?? null,
+    clientName:     r.project?.client?.name ?? null,
   }));
 
   // Header pills — one groupBy per status.  Cheap enough at this scale
