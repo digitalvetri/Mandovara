@@ -25,6 +25,8 @@ export interface ShareMessageInput {
 
 export interface ShareMessage {
   link:     string;
+  /** Direct application/pdf URL — null until a share token is minted. */
+  pdf:      string | null;
   body:     string;
   subject:  string;
   /** null when the client has no email on file. */
@@ -65,27 +67,59 @@ export function shareLink(
   return origin ? `${origin}${path}` : path;
 }
 
+/**
+ * Direct link to the rendered PDF.
+ *
+ * This is what goes in the WhatsApp message (2026-08-27, owner
+ * instruction: "the client should receive a PDF, not a link to a page").
+ *
+ * A wa.me deep link is a URL scheme — it carries text and nothing else,
+ * so a true file attachment is impossible without the WhatsApp Cloud API
+ * and a Meta-verified INR-billed WABA. What IS possible, and what this
+ * does, is hand the client a URL that resolves straight to
+ * application/pdf: one tap and their phone opens it in a PDF viewer,
+ * ready to save or forward. No page, no buttons, no explanation needed.
+ */
+export function pdfLink(shareToken: string | null, origin?: string | null): string | null {
+  if (!shareToken) return null;
+  const path = `/q/${shareToken}/pdf`;
+  return origin ? `${origin}${path}` : path;
+}
+
 export function buildShareMessage(input: ShareMessageInput): ShareMessage {
   const link  = shareLink(input.quotationId, input.shareToken, input.origin);
+  const pdf   = pdfLink(input.shareToken, input.origin);
   const num   = shortNum(input.quotationNumber);
   const total = pToINR(input.totalStr);
   const valid = fmtDate(input.validUntilIso);
 
-  // The share page now carries Accept / Request-changes buttons, so the
-  // closing line points the client at them rather than asking for a reply.
-  const body =
-    `Namaste ${input.clientName},\n\n` +
-    `Please find our quotation ${num} at the link below.\n\n` +
-    `  Total: ${total}\n` +
-    `  Valid until: ${valid}\n\n` +
-    `${link}\n\n` +
-    `You can accept it or request changes directly on that page.\n\n` +
-    `— Team Mandovara\n+91 89404 30051 · mandovara.com`;
+  // The PDF is the primary link — that is the document the client wants
+  // and the one they will forward to their architect or spouse. The
+  // second link is only for accepting, and is labelled so it is obvious
+  // which does what. When no token has been minted yet there is no PDF
+  // to point at, so the message falls back to the page alone rather than
+  // showing a dead line.
+  const body = pdf
+    ? `Namaste ${input.clientName},\n\n` +
+      `Your quotation ${num} is ready. Tap to open the PDF:\n\n` +
+      `${pdf}\n\n` +
+      `  Total: ${total}\n` +
+      `  Valid until: ${valid}\n\n` +
+      `To accept it or ask for changes: ${link}\n\n` +
+      `— Team Mandovara\n+91 89404 30051 · mandovara.com`
+    : `Namaste ${input.clientName},\n\n` +
+      `Please find our quotation ${num} at the link below.\n\n` +
+      `  Total: ${total}\n` +
+      `  Valid until: ${valid}\n\n` +
+      `${link}\n\n` +
+      `You can accept it or request changes directly on that page.\n\n` +
+      `— Team Mandovara\n+91 89404 30051 · mandovara.com`;
 
   const subject = `Quotation ${num} from Mandovara`;
 
   return {
     link,
+    pdf,
     body,
     subject,
     mailHref: (email) =>

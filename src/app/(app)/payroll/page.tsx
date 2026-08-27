@@ -4,6 +4,8 @@ import { devContext } from "@/lib/dev-context";
 import { loadPayroll, loadMyPayslips } from "@/modules/payroll/queries";
 import { ApproveButton, SendPayslipButton } from "./_components/PayrollActions";
 import { MyPayslipsView } from "./_components/MyPayslipsView";
+import { MonthHoursGrid } from "./_components/MonthHoursGrid";
+import { getPayrollMonthGrid } from "@/modules/payroll/month-grid";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,13 @@ export default async function PayrollPage() {
     return <MyPayslipsView data={data} />;
   }
 
-  const p = await loadPayroll(ctx);
+  // The month grid is the working behind the pay figures — the sheet an
+  // owner checks before approving a run (2026-08-27, owner instruction).
+  const now = new Date();
+  const [p, grid] = await Promise.all([
+    loadPayroll(ctx),
+    getPayrollMonthGrid(ctx, now.getFullYear(), now.getMonth() + 1),
+  ]);
 
   return (
     <>
@@ -41,8 +49,12 @@ export default async function PayrollPage() {
         <BandCard label="Headcount"     value={String(p.headcount)} tone="accent" />
       </section>
 
-      <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-        <table className="w-full text-[12.5px]">
+      <div className="mb-4">
+        <MonthHoursGrid grid={grid} />
+      </div>
+
+      <div className="rounded-[14px] bg-surface border border-rule overflow-x-auto">
+        <table className="w-full min-w-[560px] text-[12.5px]">
           <thead>
             <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
               <Th>Employee</Th>

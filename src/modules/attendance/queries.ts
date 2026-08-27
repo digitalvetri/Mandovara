@@ -156,3 +156,34 @@ function leaveWhen(from: Date, to: Date): string {
   const t = to.toLocaleDateString("en-IN",   { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" });
   return f === t ? f : `${f}–${t}`;
 }
+
+/**
+ * Today's punch state for the signed-in user, for the dashboard band.
+ *
+ * Returns null when the login has no staff record — the band then omits
+ * the control entirely rather than rendering a button that errors on
+ * click. Admin's "Link staff records" repairs that case.
+ */
+export async function getTodayPunch(
+  ctx: RequestContext,
+): Promise<{ inAt: string | null; outAt: string | null; isLocked: boolean } | null> {
+  const db = scoped(ctx);
+  const employee = await db.employee.findUnique({
+    where:  { userId: ctx.userId },
+    select: { id: true },
+  });
+  if (!employee) return null;
+
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const row = await db.attendance.findUnique({
+    where:  { employeeId_date: { employeeId: employee.id, date: today } },
+    select: { inAt: true, outAt: true, lockedAt: true },
+  });
+
+  return {
+    inAt:     row?.inAt?.toISOString() ?? null,
+    outAt:    row?.outAt?.toISOString() ?? null,
+    isLocked: row?.lockedAt != null,
+  };
+}

@@ -85,8 +85,27 @@ describe("buildShareMessage", () => {
     expect(msg.body).toContain("https://app.mandovara.com/q/" + "a".repeat(64));
   });
 
-  it("points at the accept buttons rather than asking for a reply", () => {
-    expect(msg.body).toContain("accept it or request changes");
+  it("leads with the PDF, because that is the document the client wants", () => {
+    // Owner instruction 2026-08-27: the client should receive a PDF, not
+    // a link to a page. wa.me cannot attach a file, so the next best
+    // thing is a URL that resolves straight to application/pdf.
+    const pdfUrl = `https://app.mandovara.com/q/${"a".repeat(64)}/pdf`;
+    expect(msg.pdf).toBe(pdfUrl);
+    // The PDF line comes before the accept line in the message body.
+    expect(msg.body.indexOf(pdfUrl)).toBeLessThan(msg.body.indexOf("To accept it"));
+  });
+
+  it("still offers the accept page as a clearly-labelled second link", () => {
+    expect(msg.body).toContain("To accept it or ask for changes:");
+    expect(msg.body).toContain(msg.link);
+  });
+
+  it("falls back to the page alone when no token has been minted", () => {
+    // Never print a dead PDF line — /q/null/pdf would 404 at the client.
+    const noToken = buildShareMessage({ ...BASE, shareToken: null, origin: "https://app.mandovara.com" });
+    expect(noToken.pdf).toBeNull();
+    expect(noToken.body).not.toContain("/pdf");
+    expect(noToken.body).toContain("accept it or request changes");
   });
 
   it("URL-encodes the body into the wa.me deep link", () => {

@@ -18,6 +18,10 @@ export interface ProductDetail {
   colourName:    string;
   brand:         string;
   brandId:       string;
+  // The design this colourway belongs to. Samples, brochures and room
+  // shots attach at design level — every colourway of "Serene Silks 04"
+  // shares the brand's brochure and the shots of it installed.
+  designId:      string;
   collection:    string;
   family:        string;
   familyLabel:   string;
@@ -147,6 +151,7 @@ export async function getProduct(ctx: RequestContext, id: string): Promise<Produ
     colourName:    cw.colourName,
     brand:         cw.design.collection.brand.name,
     brandId:       cw.design.collection.brand.id,
+    designId:      cw.design.id,
     collection:    cw.design.collection.name,
     family:        cw.design.family,
     familyLabel,

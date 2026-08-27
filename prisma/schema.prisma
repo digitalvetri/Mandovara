@@ -1228,6 +1228,9 @@ model OrderLine {
   amount            BigInt
   procuredQty       Decimal  @db.Decimal(12, 3) @default(0)
   madeQty           Decimal  @db.Decimal(12, 3) @default(0)
+  // Restored 2026-08-27 for the project page's installation checklist.
+  // Sibling of procuredQty / madeQty; not a revival of the install module.
+  installedQty      Decimal  @db.Decimal(12, 3) @default(0)
 
   order     Order        @relation(fields: [orderId], references: [id])
   colourway Colourway?   @relation("OrderLineColourway", fields: [colourwayId], references: [id])
@@ -1746,9 +1749,18 @@ model Attendance {
   projectId      String?
   otHours        Decimal?         @db.Decimal(5, 2)
   lockedAt       DateTime?
+  // Off-site punches (2026-08-27). The geofence labels rather than
+  // blocks: staff at a client site are working, and refusing the punch
+  // only loses the day. `inPlace` is what the employee typed when asked
+  // where they were.
+  inOffSite      Boolean          @default(false)
+  inPlace        String?
+  outOffSite     Boolean          @default(false)
+  outPlace       String?
 
   @@unique([employeeId, date])
   @@index([organizationId, date])
+  @@index([organizationId, date, inOffSite])
 }
 
 model Holiday {

@@ -150,10 +150,40 @@ describe("DB-level immutability", () => {
     ).rejects.toThrow(/append-only|not permitted/i);
   });
 
-  it("AuditLog rejects DELETE at the DB level", async () => {
+  // Retention replaced the blanket delete ban on 2026-08-27 (owner
+  // instruction: keep the last five days). The guarantee narrowed from
+  // "never deletable" to "not deletable while inside the window", and
+  // these two tests pin both halves — the second exists so nobody
+  // "fixes" the trigger back into a blanket ban and silently breaks the
+  // purge, and the first so nobody widens it into a free-for-all.
+  it("AuditLog rejects DELETE of a row inside the retention window", async () => {
     const row = await db.auditLog.findFirstOrThrow({ where: { organizationId: A.orgId } });
     await expect(
       db.$executeRawUnsafe(`DELETE FROM "AuditLog" WHERE id = '${row.id}'`),
-    ).rejects.toThrow(/append-only|not permitted/i);
+    ).rejects.toThrow(/retention window|append-only|not permitted/i);
+  });
+
+  it("AuditLog permits DELETE of a row older than the retention window", async () => {
+    // Insert a row already outside the window rather than ageing an
+    // existing one — UPDATE is banned outright, and consuming the shared
+    // fixture row would leave the tests order-dependent.
+    const id = `aged-${Date.now()}`;
+    await db.$executeRawUnsafe(
+      `INSERT INTO "AuditLog" ("id","organizationId","actorId","entityType","entityId","action","createdAt")
+       VALUES ('${id}', '${A.orgId}', 'test-actor', 'Test', 'x', 'CREATE', now() - interval '400 days')`,
+    );
+
+    const deleted = await db.$executeRawUnsafe(`DELETE FROM "AuditLog" WHERE id = '${id}'`);
+    expect(deleted).toBe(1);
+  });
+
+  it("AuditLog still rejects every UPDATE, regardless of age", async () => {
+    // The property that makes the log evidence rather than commentary.
+    // Retention shortened how long rows live; it did not make them
+    // editable while they do.
+    const row = await db.auditLog.findFirstOrThrow({ where: { organizationId: A.orgId } });
+    await expect(
+      db.$executeRawUnsafe(`UPDATE "AuditLog" SET action = 'HIJACKED' WHERE id = '${row.id}'`),
+    ).rejects.toThrow(/append-only/i);
   });
 });

@@ -4,6 +4,7 @@ import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { loadDashboard } from "@/modules/dashboard/queries";
 import { loadDaySummary } from "@/modules/dashboard/day-summary";
+import { getTodayPunch } from "@/modules/attendance/queries";
 import type { DashboardData } from "./_dashboard/types";
 import type { RequestContext } from "@/kernel/auth/context";
 
@@ -57,9 +58,10 @@ export default async function DashboardPage() {
     redirect("/employee");
   }
 
-  const [userName, daySummary] = await Promise.all([
+  const [userName, daySummary, punch] = await Promise.all([
     getUserName(ctx),
     safeLoadDaySummary(ctx),
+    getTodayPunch(ctx),
   ]);
 
   const istNow = new Date();
@@ -78,6 +80,7 @@ export default async function DashboardPage() {
       userName={userName}
       hour={istHour}
       dateLabel={istDate}
+      punch={punch}
     />
   );
 

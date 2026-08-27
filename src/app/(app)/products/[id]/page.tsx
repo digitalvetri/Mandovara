@@ -6,6 +6,8 @@ import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { getProduct } from "@/modules/products/queries";
+import { listDesignDocuments } from "@/modules/products/design-documents";
+import { DesignGallery } from "../_components/DesignGallery";
 import { StatusPill } from "../_components/StatusPill";
 import { CatalogueViewer } from "./_components/CatalogueViewer";
 import { MiniSpec, PriceBlock, SizePriceTable, VariantStrip, shortUom } from "./_components/ProductDetailParts";
@@ -61,6 +63,8 @@ export default async function ProductDetailPage({
       : product.catalogPdfKey
         ? "Browse every pattern in the supplier's book, then pick and quote."
         : "Picks a client, adds this SKU as a preliminary line.";
+
+  const documents = await listDesignDocuments(ctx, product.designId);
 
   return (
     <>
@@ -174,18 +178,15 @@ export default async function ProductDetailPage({
 
           <div className="border-t border-rule" />
 
-          {/* Stock + dye lot */}
+          {/* Dye lot only.
+              The "In stock" badge is gone (2026-08-27, owner
+              instruction: "I don't need to include the product catalog
+              with the stock module"). The catalog exists to present what
+              Mandovara can supply — including designs sourced to order,
+              which a stock badge wrongly makes look unavailable.
+              Warehouse figures live in Stocks, for the people who act on
+              them. */}
           <div className="flex flex-wrap gap-2">
-            {product.inStock ? (
-              <span className="inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-full bg-good/12 text-[11px] uppercase tracking-[0.1em] text-good">
-                <span className="h-1.5 w-1.5 rounded-full bg-good" />
-                In stock
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-full bg-surface border border-rule text-[11px] uppercase tracking-[0.1em] text-text-dim">
-                Stock not tracked
-              </span>
-            )}
             {product.dyeLotHint && (
               <span
                 className="inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-full bg-gold/15 text-[11px] uppercase tracking-[0.1em] text-accent"
@@ -235,6 +236,17 @@ export default async function ProductDetailPage({
           </div>
         </div>
 
+      </div>
+
+      {/* Samples, room shots and brand PDFs — full width under the fold,
+          because this is what a designer scrolls to with a client beside
+          them (2026-08-27, owner instruction). */}
+      <div className="mt-4 pb-10">
+        <DesignGallery
+          designId={product.designId}
+          documents={documents}
+          canEdit={can(ctx, "catalog.attachDocument")}
+        />
       </div>
     </>
   );

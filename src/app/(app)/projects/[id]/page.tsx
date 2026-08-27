@@ -1,10 +1,23 @@
-// Project detail — redesigned per docs/BUILD-SPEC.md project-detail.
+// Project detail — the project workspace.
 //
-// Layout (§1):
+// Restructured 2026-08-27 on the owner's instruction. It used to lead
+// with a single "next action" and read as a wizard: quote, then advance,
+// then installation, then completion, each waiting on the last. Real
+// projects don't behave — the advance lands before the final quote is
+// approved, one room is installed while another is still being measured
+// — so the sequence hid whatever you actually needed behind a step you
+// hadn't done.
+//
+// Now every part of the job is a section in a list. Closed, a section
+// states where it stands ("₹2,40,000 of ₹6,50,000 received"); open, it
+// shows the detail. Nothing is gated, several can be open at once, and
+// the page reads top-to-bottom as a status board.
+//
+// Layout:
 //   ┌ header: project number · name · stage stepper · figures
 //   │
 //   ├ 2-col grid
-//   │   left  : Next Action · Milestones · Measurements · Quote/Order · Collapsed tasks + logs
+//   │   left  : quick actions, then one section per part of the job
 //   │   right : Client · Site · Money (permission-gated) · Team  (sticky)
 //
 // Data (§7 — money block gate): getProjectMoney() returns null when the
@@ -27,16 +40,13 @@ import { listSiteVisits } from "@/modules/site-visits/queries";
 import { resolveNextAction } from "@/modules/projects/next-action";
 import { getProjectProfitability } from "@/modules/reports/profitability";
 import { StageStepper } from "../_components/StageStepper";
-import { MilestonesPanel } from "../_components/MilestonesPanel";
-import { MeasurementsSection } from "../_components/MeasurementsSection";
 import { RightRail } from "../_components/RightRail";
-import { CollapsedPanels } from "../_components/CollapsedPanels";
 import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
 import { UpcomingVisitsCard } from "../_components/UpcomingVisitsCard";
-import { PaymentsPanel } from "../_components/PaymentsPanel";
-import { ChosenItemsPanel } from "../_components/ChosenItemsPanel";
-import { ProfitabilityPanel } from "../_components/ProfitabilityPanel";
 import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
+import { ProjectWorkSections } from "../_components/ProjectWorkSections";
+import { getProjectLedger } from "@/modules/projects/queries-ledger";
+import { getProjectInstallation } from "@/modules/projects/queries-installation";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +60,7 @@ export default async function ProjectDetailPage({
 
   const canViewProfitability = ctx.permissions.has("report.view.projects");
 
-  const [milestones, tasks, rounds, money, visits, payments, chosen, profitability, members] =
+  const [milestones, tasks, rounds, money, visits, payments, chosen, profitability, members, ledger, installation] =
     await Promise.all([
       getProjectMilestones(ctx, id),
       getProjectTasks(ctx, id),
@@ -61,6 +71,8 @@ export default async function ProjectDetailPage({
       getProjectChosenItems(ctx, id),
       canViewProfitability ? getProjectProfitability(ctx, id) : null,
       getProjectAssignableUsers(ctx),
+      getProjectLedger(ctx, id),
+      getProjectInstallation(ctx, id),
     ]);
 
   const action = resolveNextAction(ctx, {
@@ -180,17 +192,23 @@ export default async function ProjectDetailPage({
             }
           />
           <UpcomingVisitsCard visits={visits} />
-          <MilestonesPanel milestones={milestones} orderValue={p.orderValue} />
-          <ChosenItemsPanel items={chosen} />
-          <MeasurementsSection projectId={p.id} rounds={rounds} />
-          {payments && (
-            <PaymentsPanel
-              payments={payments}
-              canCreate={ctx.permissions.has("invoice.create")}
-            />
-          )}
-          {profitability && <ProfitabilityPanel data={profitability} />}
-          <CollapsedPanels projectId={p.id} tasks={tasks} members={members} />
+
+          <ProjectWorkSections
+            projectId={p.id}
+            orderValue={p.orderValue}
+            rounds={rounds}
+            chosen={chosen}
+            ledger={ledger}
+            payments={payments}
+            installation={installation}
+            milestones={milestones}
+            visits={visits}
+            tasks={tasks}
+            members={members}
+            profitability={profitability}
+            canCreateInvoice={ctx.permissions.has("invoice.create")}
+            canUpdate={ctx.permissions.has("project.update")}
+          />
         </div>
 
         <RightRail project={p} money={money} />

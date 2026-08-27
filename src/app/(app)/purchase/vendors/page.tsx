@@ -5,6 +5,8 @@ import { Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
 import { listVendors } from "@/modules/vendors/queries";
+import { getVendorPayables, type VendorPayableRow } from "@/modules/purchase/vendor-ledger";
+import { formatINR } from "@/kernel/money/format";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,11 @@ export default async function VendorsPage({
   const ctx = await devContext();
   const q = params.q?.trim();
   const page = parsePositiveInt(params.page) ?? 1;
+  // Balances alongside the list so "who do I pay next" is answerable
+  // without opening every vendor in turn (2026-08-27, owner instruction).
+  const payables = await getVendorPayables(ctx);
+  const payableBy = new Map(payables.rows.map((r) => [r.vendorId, r] as const));
+
   const { rows, total, pageSize } = await listVendors(ctx, {
     ...(q != null && { search: q }), page,
   });
@@ -75,6 +82,7 @@ export default async function VendorsPage({
                 <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">GSTIN</th>
                 <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Terms</th>
                 <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Lead time</th>
+                <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">To pay</th>
                 <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Rating</th>
               </tr>
             </thead>
@@ -116,6 +124,10 @@ export default async function VendorsPage({
 
                   <td className="px-4 py-4">
                     <LeadTimeBadge days={v.leadTimeDays} />
+                  </td>
+
+                  <td className="px-4 py-4 text-right whitespace-nowrap">
+                    <VendorPayable row={payableBy.get(v.id) ?? null} />
                   </td>
 
                   <td className="px-4 py-4 hidden sm:table-cell">
@@ -186,4 +198,32 @@ function parsePositiveInt(v: string | undefined): number | null {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 1) return null;
   return Math.floor(n);
+}
+
+/**
+ * What we owe this vendor, with ageing when they have been waiting.
+ *
+ * A vendor we owe nothing shows a dash rather than ₹0 — zero and
+ * "nothing has ever been billed" look identical as a number, and the
+ * dash reads correctly for both without claiming a settled account.
+ */
+function VendorPayable({ row }: { row: VendorPayableRow | null }) {
+  if (!row || row.payable === 0n) {
+    return <span className="text-[12px] text-text-faint">—</span>;
+  }
+  if (row.payable < 0n) {
+    return (
+      <span className="tabular text-[12.5px] text-good" title="We are in advance with this vendor">
+        {formatINR(-row.payable)} adv
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex flex-col items-end">
+      <span className="tabular text-[12.5px] font-medium text-warn">{formatINR(row.payable)}</span>
+      {row.oldestDays !== null && row.oldestDays > 0 && (
+        <span className="tabular text-[10.5px] text-text-faint">{row.oldestDays}d old</span>
+      )}
+    </span>
+  );
 }

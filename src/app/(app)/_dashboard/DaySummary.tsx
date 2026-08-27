@@ -5,6 +5,7 @@ import {
   CheckCircle2, type LucideIcon,
 } from "lucide-react";
 import type { DaySummaryItem } from "@/modules/dashboard/day-summary";
+import { PunchCard } from "@/components/attendance/PunchCard";
 
 // The dashboard's hero band.
 //
@@ -49,9 +50,15 @@ interface Props {
   /** IST hour, resolved on the server so the copy does not flicker on hydrate. */
   hour: number;
   dateLabel: string;
+  /**
+   * Today's punch state for the signed-in person. Null when their login
+   * has no staff record yet — the band then simply omits the control
+   * rather than showing a button that errors.
+   */
+  punch: { inAt: string | null; outAt: string | null; isLocked: boolean } | null;
 }
 
-export function DaySummary({ items, userName, hour, dateLabel }: Props) {
+export function DaySummary({ items, userName, hour, dateLabel, punch }: Props) {
   const active    = items.filter((i) => i.count > 0);
   const allClear  = active.length === 0;
   const firstName = userName.split(" ")[0] || "there";
@@ -77,6 +84,21 @@ export function DaySummary({ items, userName, hour, dateLabel }: Props) {
         <p className="mt-5 text-[12.5px] text-sidebar-dim">
           {greet(hour)}, {firstName}
         </p>
+
+        {/* Check in / out lives in the band (2026-08-27, owner
+            instruction) — it is the first thing a member of staff does
+            each morning, so it belongs above everything they might read.
+            `.on-chrome` styling: this band is dark in both themes. */}
+        {punch && (
+          <div className="mt-3">
+            <PunchCard
+              inAt={punch.inAt}
+              outAt={punch.outAt}
+              isLocked={punch.isLocked}
+              onChrome
+            />
+          </div>
+        )}
 
         {/* The day itself, at display scale — this is the sentence the owner
             came to read, so it gets the size the clock used to have. */}

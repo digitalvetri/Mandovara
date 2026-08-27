@@ -5,6 +5,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { devContext } from "@/lib/dev-context";
 import { listPOs, getPOKPIs } from "@/modules/purchase/queries";
+import { getVendorPayables } from "@/modules/purchase/vendor-ledger";
 import { PO_STATUSES, type POStatus } from "@/modules/purchase/schema";
 import { formatINR } from "@/kernel/money/format";
 
@@ -32,9 +33,10 @@ export default async function PurchasePage({
   const status = normaliseStatus(params.status);
   const page = parsePositiveInt(params.page) ?? 1;
 
-  const [{ rows, total, pageSize }, kpis] = await Promise.all([
+  const [{ rows, total, pageSize }, kpis, payables] = await Promise.all([
     listPOs(ctx, { ...(q != null && { search: q }), status, page }),
     getPOKPIs(ctx),
+    getVendorPayables(ctx),
   ]);
 
   const { POTable } = await import("./_components/POTable");
@@ -54,11 +56,22 @@ export default async function PurchasePage({
         }
       />
 
-      {/* ── Compact KPI bar ─────────────────────────────────────────────── */}
-      <div className="flex items-stretch rounded-[10px] border border-rule bg-surface divide-x divide-rule mb-5">
-        <StatCell label="Open POs"    value={kpis.openCount.toLocaleString("en-IN")} />
-        <StatCell label="Outstanding" value={formatINR(kpis.outstandingValue)} />
-        <StatCell label="Overdue"     value={kpis.overdueCount.toLocaleString("en-IN")} warn={kpis.overdueCount > 0} />
+      {/* ── Compact KPI bar ─────────────────────────────────────────────
+          "Outstanding" is gone (2026-08-27, owner instruction). On the
+          sales side that word means money owed TO us; here it meant the
+          total value of open POs, which is neither money owed nor money
+          at risk — a fully-paid PO awaiting delivery counted toward it.
+          The two numbers it was conflating are now separate and named
+          for what they are: what we owe, and what we've committed to. */}
+      <div className="grid grid-cols-2 sm:flex sm:items-stretch rounded-[10px] border border-rule bg-surface divide-x divide-rule mb-5 overflow-hidden">
+        <StatCell label="Open POs" value={kpis.openCount.toLocaleString("en-IN")} />
+        <StatCell
+          label="To pay vendors"
+          value={formatINR(payables.totalPayable)}
+          warn={payables.totalPayable > 0n}
+        />
+        <StatCell label="Committed on open POs" value={formatINR(payables.committed)} />
+        <StatCell label="Overdue" value={kpis.overdueCount.toLocaleString("en-IN")} warn={kpis.overdueCount > 0} />
       </div>
 
       {/* ── Tabs + filters row ──────────────────────────────────────────── */}

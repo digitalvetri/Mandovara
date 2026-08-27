@@ -11,6 +11,12 @@ import type { SiteVisitRow } from "@/modules/site-visits/queries";
 
 interface Props {
   visits: SiteVisitRow[];
+  /**
+   * Show every visit, completed ones included, without the card chrome.
+   * Used inside the project page's "Site visits" section, which supplies
+   * its own heading — there the history matters as much as what is next.
+   */
+  showAll?: boolean;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -21,27 +27,26 @@ const STATUS_TONE: Record<string, string> = {
   CANCELLED:   "text-text-dim",
 };
 
-export function UpcomingVisitsCard({ visits }: Props) {
-  const upcoming = visits.filter(
-    (v) => v.status === "SCHEDULED" || v.status === "IN_PROGRESS" || v.status === "RESCHEDULED",
-  );
-  if (upcoming.length === 0) return null;
+export function UpcomingVisitsCard({ visits, showAll = false }: Props) {
+  const shown = showAll
+    ? visits
+    : visits.filter(
+        (v) => v.status === "SCHEDULED" || v.status === "IN_PROGRESS" || v.status === "RESCHEDULED",
+      );
 
-  return (
-    <section className="rounded-[14px] border border-rule bg-surface p-5">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
-          Upcoming visits
-        </div>
-        <Link
-          href={"/site-visits" as Route}
-          className="text-[11px] text-text-dim hover:text-text"
-        >
-          All visits →
-        </Link>
-      </div>
+  if (shown.length === 0) {
+    // Inside a section the empty state has to say something — the
+    // section header is already on screen and a null render would leave
+    // an open panel with nothing in it.
+    return showAll
+      ? <div className="py-4 text-center text-[12.5px] text-text-dim">No site visits recorded yet.</div>
+      : null;
+  }
+
+  const Body = (
+    <>
       <ul className="space-y-2">
-        {upcoming.slice(0, 5).map((v) => (
+        {(showAll ? shown : shown.slice(0, 5)).map((v) => (
           <li key={v.id}>
             <Link
               href={`/site-visits/${v.id}` as Route}
@@ -64,6 +69,25 @@ export function UpcomingVisitsCard({ visits }: Props) {
           </li>
         ))}
       </ul>
+    </>
+  );
+
+  if (showAll) return Body;
+
+  return (
+    <section className="rounded-[14px] border border-rule bg-surface p-5">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+          Upcoming visits
+        </div>
+        <Link
+          href={"/site-visits" as Route}
+          className="text-[11px] text-text-dim hover:text-text"
+        >
+          All visits →
+        </Link>
+      </div>
+      {Body}
     </section>
   );
 }
