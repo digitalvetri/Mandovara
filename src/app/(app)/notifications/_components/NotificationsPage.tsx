@@ -65,10 +65,12 @@ export function NotificationsPage({ rows, counts, activeFilter }: Props) {
     if (localUnread === 0) return;
     // Only follow-up rows can be marked read server-side
     setLocalRows((prev) => prev.map((x) => (x.readAt || x.kind === "sitevisit" ? x : { ...x, readAt: new Date() })));
-    setLocalUnread((c) => {
-      const svCount = localRows.filter(r => r.kind === "sitevisit" && !r.readAt).length;
-      return svCount; // site visit "unread" count remains
-    });
+    // Site-visit rows cannot be marked read server-side, so the unread
+    // count drops to however many of those remain rather than to zero.
+    // The previous count is irrelevant here — hence no argument.
+    setLocalUnread(
+      localRows.filter((r) => r.kind === "sitevisit" && !r.readAt).length,
+    );
     startTransition(async () => {
       await markAllNotificationsRead();
       router.refresh();
