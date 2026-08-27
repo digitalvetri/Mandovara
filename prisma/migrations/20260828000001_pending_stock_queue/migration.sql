@@ -105,6 +105,19 @@ CREATE POLICY org_isolation ON "PendingStockItem"
   USING       ("organizationId" = current_org_id())
   WITH CHECK  ("organizationId" = current_org_id());
 
--- The restricted app role needs table grants; setup-app-role.mjs covers
--- existing tables but runs before this migration on a fresh deploy.
-GRANT SELECT, INSERT, UPDATE, DELETE ON "PendingStockItem" TO mandovara_app;
+-- The restricted app role needs table grants, but it may not exist yet:
+-- on a fresh database, scripts/setup-app-role.mjs runs AFTER
+-- `migrate deploy` (see .github/workflows/ci.yml — the grants have to
+-- cover tables the migrations just created). An unconditional GRANT here
+-- therefore fails the whole migration step on any clean install, which
+-- is exactly what CI caught.
+--
+-- Guarded, so it is a no-op on a fresh database and correct on an
+-- existing one where the role is already present. setup-app-role.mjs
+-- grants it either way afterwards.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mandovara_app') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON "PendingStockItem" TO mandovara_app;
+  END IF;
+END $$;
