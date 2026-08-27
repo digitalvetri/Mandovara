@@ -122,6 +122,20 @@ jobs:
       - name: E2E tests
         run: pnpm test:e2e --project=chromium
 
+      # The permission matrix — 9 roles x 25 routes, including the §12.2/6
+      # gate that an INSTALLER can reach neither cost nor margin.
+      #
+      # It is a SEPARATE Playwright project (chromium and mobile-android
+      # both testIgnore the spec), so `--project=chromium` above never
+      # touched it. Between that and a self-skipping guard inside the spec,
+      # these 225 tests had never executed a single assertion — they were
+      # reported green for months. Guard fixed 2026-08-28; this step is
+      # what stops it going quiet again.
+      #
+      # ~45s on a hosted runner, single worker by config.
+      - name: E2E — RBAC permission matrix
+        run: pnpm test:e2e --project=rbac-matrix
+
       # Actions logs need auth to download, so a red E2E run is otherwise
       # opaque from outside the repo. The report and traces make it readable.
       - name: Upload Playwright report
