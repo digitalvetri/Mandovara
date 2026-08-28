@@ -9,45 +9,11 @@ import { orgPrisma } from "@/kernel/db/rls";
 import { Topbar } from "@/components/layout/Topbar";
 import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 import { Card, FieldRow } from "./_components/ProfileParts";
+import { fmtDate, fmtDateShort, ROLE_LABEL, DEPT_LABEL } from "./_components/profile-labels";
+import { EditProfileSheet } from "./_components/EditProfileSheet";
+import { AccountSettings } from "./_components/AccountSettings";
 
 export const dynamic = "force-dynamic";
-
-// ── Formatters ────────────────────────────────────────────────────────────────
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString("en-IN", {
-    day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata",
-  });
-}
-function fmtDateShort(d: Date) {
-  return d.toLocaleDateString("en-IN", {
-    month: "short", year: "numeric", timeZone: "Asia/Kolkata",
-  });
-}
-
-// ── Label maps ────────────────────────────────────────────────────────────────
-
-const ROLE_LABEL: Record<string, string> = {
-  OWNER:           "Studio Owner",
-  DESIGNER:        "Interior Designer",
-  SALES:           "Sales Executive",
-  MEASURE_EXEC:    "Measurement Exec",
-  STORE:           "Store Keeper",
-  MAKE_SUPERVISOR: "Make Supervisor",
-  ACCOUNTS:        "Accounts",
-  HR:              "HR Manager",
-};
-
-const DEPT_LABEL: Record<string, string> = {
-  SALES:    "Sales",
-  DESIGN:   "Design",
-  MEASURE:  "Measurement",
-  STORE:    "Store",
-  MAKE:     "Make / Stitching",
-  INSTALL:  "Installation",
-  ACCOUNTS: "Accounts",
-  HR:       "HR & Admin",
-};
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -58,13 +24,17 @@ export default async function ProfilePage() {
   const [user, employee] = await Promise.all([
     orgPrisma(ctx.orgId).user.findUnique({
       where:  { id: ctx.userId },
-      select: { name: true, mobile: true, email: true, role: true, createdAt: true },
+      select: {
+        name: true, mobile: true, email: true, role: true, createdAt: true,
+        avatarKey: true, notifyPrefs: true, lastLoginAt: true,
+      },
     }),
     db.employee.findUnique({
       where:  { userId: ctx.userId },
       select: {
         id: true, code: true, name: true, mobile: true,
         designation: true, department: true, doj: true, status: true,
+        emergencyContact: true,
       },
     }),
   ]);
@@ -80,6 +50,25 @@ export default async function ProfilePage() {
     .toUpperCase();
 
   const isActive    = employee?.status === "ACTIVE";
+
+  // ── One number, one joining date ──────────────────────────────────
+  //
+  // The page showed the same mobile twice — "Mobile" under Contact and
+  // "Work Mobile" under Employment — and three dates that read as
+  // contradictions: "Joined Apr 2025", "Member since Aug 2026" in the
+  // hero, and "15 August 2026" under Account. Two of those are the same
+  // fact (the account's creation date) shown at two precisions, and the
+  // third is a different fact entirely (the HR joining date).
+  //
+  // Resolved by naming the single source for each: the joining date is
+  // Employee.doj and appears once, in Employment Details. The account
+  // creation date is not a joining date and no longer competes with one
+  // in the hero. The mobile is the employee's where there is an employee
+  // record, and it appears once.
+  const mobile = employee?.mobile ?? user.mobile;
+  const emergency = (employee?.emergencyContact ?? null) as
+    { name?: string; mobile?: string; relation?: string } | null;
+  const prefs = (user.notifyPrefs ?? null) as { email?: boolean; app?: boolean } | null;
   const roleLabel   = ROLE_LABEL[user.role] ?? user.role;
   const deptLabel   = employee ? (DEPT_LABEL[employee.department] ?? employee.department) : null;
 
@@ -96,10 +85,14 @@ export default async function ProfilePage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
 
             {/* Avatar */}
-            <div className="h-[72px] w-[72px] rounded-full bg-gold/15 border-2 border-gold/30 flex items-center justify-center shrink-0">
-              <span className="font-display text-[26px] font-semibold text-gold leading-none">
-                {initials}
-              </span>
+            <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full border-2 border-gold/30 bg-gold/15">
+              {user.avatarKey ? (
+                  <img src={user.avatarKey} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full w-full place-items-center font-display text-[26px] font-semibold leading-none text-gold">
+                  {initials}
+                </span>
+              )}
             </div>
 
             {/* Identity — grows to fill */}
@@ -143,18 +136,25 @@ export default async function ProfilePage() {
               </div>
             </div>
 
-            {/* Right meta — desktop only */}
-            <div className="hidden md:flex flex-col items-end gap-1.5 shrink-0 text-right">
+            {/* Right meta + Edit. One date here, not two competing ones. */}
+            <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+              <EditProfileSheet
+                initial={{
+                  mobile,
+                  email: user.email ?? "",
+                  emergencyName:     emergency?.name ?? "",
+                  emergencyMobile:   emergency?.mobile ?? "",
+                  emergencyRelation: emergency?.relation ?? "",
+                  avatarKey: user.avatarKey,
+                  hasEmployee: !!employee,
+                }}
+              />
               {employee && (
-                <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
+                <div className="hidden items-center gap-1.5 text-[12px] text-text-muted md:flex">
                   <Calendar size={12} strokeWidth={1.8} className="text-gold" />
                   Joined {fmtDateShort(employee.doj)}
                 </div>
               )}
-              <div className="flex items-center gap-1.5 text-[12px] text-text-subtle">
-                <Clock size={12} strokeWidth={1.8} />
-                Member since {fmtDateShort(user.createdAt)}
-              </div>
             </div>
           </div>
         </div>
@@ -171,7 +171,7 @@ export default async function ProfilePage() {
             <FieldRow
               icon={<Phone size={13} strokeWidth={1.8} />}
               label="Mobile"
-              value={employee?.mobile ?? user.mobile}
+              value={mobile}
             />
             {user.email ? (
               <FieldRow
@@ -204,7 +204,7 @@ export default async function ProfilePage() {
             />
             <FieldRow
               icon={<Clock size={13} strokeWidth={1.8} />}
-              label="Member since"
+              label="Account created"
               value={fmtDate(user.createdAt)}
             />
           </Card>
@@ -237,15 +237,21 @@ export default async function ProfilePage() {
               value={fmtDate(employee.doj)}
             />
             <FieldRow
-              icon={<Phone size={13} strokeWidth={1.8} />}
-              label="Work Mobile"
-              value={employee.mobile}
-            />
-            <FieldRow
               icon={<ShieldCheck size={13} strokeWidth={1.8} />}
               label="Status"
               value={isActive ? "Active" : "Suspended"}
               valueClass={isActive ? "text-solid font-semibold" : "text-fault font-semibold"}
+            />
+            <FieldRow
+              icon={<Phone size={13} strokeWidth={1.8} />}
+              label="Emergency contact"
+              value={
+                emergency?.name || emergency?.mobile
+                  ? [emergency.name, emergency.relation ? `(${emergency.relation})` : null, emergency.mobile]
+                      .filter(Boolean).join(" ")
+                  : "Not set"
+              }
+              muted={!emergency?.name && !emergency?.mobile}
             />
           </Card>
         ) : (
@@ -255,6 +261,16 @@ export default async function ProfilePage() {
             </div>
           </Card>
         )}
+      </div>
+
+      {/* ── ACCOUNT SETTINGS ──────────────────────────────────────────────── */}
+      <div className="pb-8">
+        <AccountSettings
+          notifyEmail={prefs?.email ?? false}
+          notifyApp={prefs?.app ?? true}
+          lastLoginAt={user.lastLoginAt ? user.lastLoginAt.toISOString() : null}
+          hasEmail={!!user.email}
+        />
       </div>
     </>
   );
