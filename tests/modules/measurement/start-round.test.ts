@@ -82,8 +82,17 @@ beforeEach(async () => {
   await db.project.deleteMany({});
 });
 
-describe("startMeasurementRound — zero rooms guard (spec test #7)", () => {
-  it("returns needsRooms=true and does not create a round", async () => {
+// Was "zero rooms guard (spec test #7)": starting a measurement on a
+// project with no rooms returned needsRooms=true, created nothing, and
+// the UI opened a room-setup sheet. The owner reported that
+// interruption from both the measurement page and Client 360
+// (2026-08-28) — "it is asking me for add a room but I dont want like
+// that" — so the room is now created rather than demanded.
+//
+// The invariant the guard protected still holds and is asserted below:
+// a round always has a room to hang items on.
+describe("startMeasurementRound — a project with no rooms", () => {
+  it("starts the round anyway, creating a default room", async () => {
     const projectId = await makeProject(A);
     const res = await startMeasurementRound({
       projectId,
@@ -91,9 +100,39 @@ describe("startMeasurementRound — zero rooms guard (spec test #7)", () => {
     });
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error("expected ok");
-    expect(res.needsRooms).toBe(true);
+    // No longer interrupts.
+    expect(res.needsRooms).toBeUndefined();
+
+    // The round exists...
     const rounds = await db.measurement.count({ where: { projectId } });
-    expect(rounds).toBe(0);
+    expect(rounds).toBe(1);
+
+    // ...and so does exactly one room for it to hang items on.
+    const rooms = await db.room.findMany({ where: { projectId } });
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0]?.name).toBe("General");
+  });
+
+  it("uses the existing room instead of adding a second one", async () => {
+    const projectId = await makeProject(A);
+    await db.room.create({
+      data: {
+        organizationId: A.ctx.orgId,
+        projectId,
+        leadId:     null,
+        name:       "Master bedroom",
+        sortOrder:  0,
+      },
+    });
+
+    const res = await startMeasurementRound({ projectId, visitedAt: new Date() });
+    expect(res.ok).toBe(true);
+
+    // A named room always wins — nobody's layout gets a stray "General"
+    // appended to it.
+    const rooms = await db.room.findMany({ where: { projectId } });
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0]?.name).toBe("Master bedroom");
   });
 });
 

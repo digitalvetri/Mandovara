@@ -245,3 +245,47 @@ export async function branchPrefixForParty(
 export function sameParty(a: RoundParty, b: RoundParty): boolean {
   return a.projectId === b.projectId && a.leadId === b.leadId;
 }
+
+// ── Default room ──────────────────────────────────────────────────────
+
+/** Name of the room created when a measurement starts without one. */
+export const DEFAULT_ROOM_NAME = "General";
+
+/**
+ * Return the party's first room, creating a "General" one if it has none.
+ *
+ * Replaces the old "you cannot measure without at least one room" gate.
+ * The invariant it protected is still true — a round always has a room
+ * to hang items on — but it is now satisfied by making one rather than
+ * by stopping the operator at a setup sheet. The owner reported that
+ * interruption from both directions (2026-08-28): "it is asking me for
+ * add a room but I dont want like that".
+ *
+ * Named rooms are unaffected: an existing room always wins, and the
+ * room-setup sheet still exists for people who want to lay a job out
+ * room by room before measuring.
+ */
+export async function ensureRoomForParty(
+  db: ReturnType<typeof scoped>,
+  orgId: string,
+  party: { projectId: string | null; leadId: string | null },
+): Promise<string> {
+  const existing = await db.room.findFirst({
+    where:   party,
+    orderBy: { sortOrder: "asc" },
+    select:  { id: true },
+  });
+  if (existing) return existing.id;
+
+  const room = await db.room.create({
+    data: {
+      organizationId: orgId,
+      ...party,
+      name:           DEFAULT_ROOM_NAME,
+      floorLabel:     null,
+      sortOrder:      0,
+    },
+    select: { id: true },
+  });
+  return room.id;
+}

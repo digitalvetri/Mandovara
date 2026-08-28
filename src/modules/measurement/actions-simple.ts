@@ -33,13 +33,8 @@ import { z } from "zod";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
-import type { RequestContext } from "@/kernel/auth/context";
 import { addMeasurementItem } from "./actions-item";
-import { type ActionResult, zodError } from "./actions-shared";
-
-// Name of the room auto-created when the user never picked one. NOT
-// exported: a "use server" module may only export async functions.
-const DEFAULT_ROOM_NAME = "General";
+import { type ActionResult, zodError, ensureRoomForParty } from "./actions-shared";
 
 const simpleItemSchema = z.object({
   measurementId: z.string().trim().min(1),
@@ -51,47 +46,6 @@ const simpleItemSchema = z.object({
   widthMm:       z.number().positive().max(100_000).optional(),
   heightMm:      z.number().positive().max(100_000).optional(),
 });
-
-/**
- * Find the round's default room, creating it on first use.
- *
- * Rooms are still real — the office-side page groups by them and the
- * field PWA relies on them. This only means the person entering four
- * numbers is not stopped at a modal to name one first.
- */
-async function ensureDefaultRoom(
-  ctx: RequestContext,
-  round: { projectId: string | null; leadId: string | null },
-): Promise<string | null> {
-  const db = scoped(ctx);
-  // Party XOR, same shape createRoom uses: a room hangs off exactly one
-  // of project / lead.
-  const party = round.projectId
-    ? { projectId: round.projectId, leadId: null }
-    : { projectId: null, leadId: round.leadId };
-  if (!party.projectId && !party.leadId) return null;
-
-  // Reuse whatever room already exists rather than adding "General"
-  // beside the rooms someone has already set up.
-  const existing = await db.room.findFirst({
-    where:   party,
-    orderBy: { sortOrder: "asc" },
-    select:  { id: true },
-  });
-  if (existing) return existing.id;
-
-  const room = await db.room.create({
-    data: {
-      organizationId: ctx.orgId,
-      ...party,
-      name:           DEFAULT_ROOM_NAME,
-      floorLabel:     null,
-      sortOrder:      0,
-    },
-    select: { id: true },
-  });
-  return room.id;
-}
 
 export async function addSimpleMeasurementItem(
   input: unknown,
@@ -110,10 +64,15 @@ export async function addSimpleMeasurementItem(
   });
   if (!round) return { ok: false, error: "Measurement round not found" };
 
-  const roomId = await ensureDefaultRoom(ctx, round);
-  if (!roomId) {
+  const party = round.projectId
+    ? { projectId: round.projectId, leadId: null }
+    : { projectId: null, leadId: round.leadId };
+  if (!party.projectId && !party.leadId) {
     return { ok: false, error: "This round is not linked to a project or lead." };
   }
+  // Same helper the round-start path uses, so "which room did this go
+  // into?" has exactly one answer in the codebase.
+  const roomId = await ensureRoomForParty(db, ctx.orgId, party);
 
   // Hand off. Every guard that protects the full form protects this one.
   return addMeasurementItem({

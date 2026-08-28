@@ -28,12 +28,15 @@ import {
 } from "./schema";
 import {
   type ActionResult, zodError, canEditRound, linkRoundToVisit,
-  revalidateRound, branchPrefixForParty,
+  revalidateRound, branchPrefixForParty, ensureRoomForParty,
 } from "./actions-shared";
 
 // Result shape:
 //   - ok + data + resumed  → caller may navigate to the round
-//   - ok + needsRooms       → caller opens the room-setup sheet first
+//   - ok + needsRooms       → vestigial. startMeasurementRound no longer
+//                             returns it (a room is created instead of
+//                             demanded, 2026-08-28); kept so existing
+//                             callers that branch on it still compile.
 //   - !ok                   → error string, caller shows it
 // The discriminant lets callers exhaust cases explicitly instead of
 // juggling empty strings.
@@ -90,11 +93,15 @@ export async function startMeasurementRound(
     }
   }
 
-  // Rooms guard — you cannot measure without at least one room. Signal
-  // needsRooms and let the UI open the room-setup sheet before navigating
-  // (spec §4).
-  const room = await db.room.findFirst({ where: party, select: { id: true } });
-  if (!room) return { ok: true, needsRooms: true };
+  // Rooms: make one rather than demand one.
+  //
+  // This used to return { needsRooms: true } and the caller opened the
+  // room-setup sheet — which is the "it is asking me for add a room"
+  // the owner hit when starting a measurement from Client 360. The
+  // round still gets a room; the operator is just no longer stopped to
+  // name it. The setup sheet remains for laying a job out room by room
+  // on purpose.
+  await ensureRoomForParty(db, ctx.orgId, party);
 
   // Resume existing DRAFT by the same user — never create a second one.
   // Prevents "I clicked start twice" from splitting the round in two
