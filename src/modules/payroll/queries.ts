@@ -135,13 +135,25 @@ export interface PayrollView {
   structuredCount: number;
 }
 
-export async function loadPayroll(ctx: RequestContext): Promise<PayrollView> {
+/**
+ * @param period  Month to load. Omitted = the most recent run, which is
+ *   what the page did before it grew a month selector (owner,
+ *   2026-08-29). With a period, an empty month returns the same
+ *   "no run" shape rather than silently showing a different month's pay.
+ */
+export async function loadPayroll(
+  ctx: RequestContext,
+  period?: { year: number; month: number },
+): Promise<PayrollView> {
   requirePermission(ctx, "payroll.view");
   const db = scoped(ctx);
 
   const [run, employeeCount] = await Promise.all([
     db.payrollRun.findFirst({
-      where:   { organizationId: ctx.orgId },
+      where:   {
+        organizationId: ctx.orgId,
+        ...(period ? { year: period.year, month: period.month } : {}),
+      },
       orderBy: [{ year: "desc" }, { month: "desc" }],
       select:  { id: true, month: true, year: true, status: true },
     }),

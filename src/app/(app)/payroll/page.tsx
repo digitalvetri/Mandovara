@@ -2,14 +2,20 @@ import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { loadPayroll, loadMyPayslips } from "@/modules/payroll/queries";
-import { ApproveButton, SendPayslipButton } from "./_components/PayrollActions";
+import { ApproveButton } from "./_components/PayrollActions";
 import { MyPayslipsView } from "./_components/MyPayslipsView";
 import { MonthHoursGrid } from "./_components/MonthHoursGrid";
+import { PayrollMonthToolbar } from "./_components/PayrollMonthToolbar";
 import { getPayrollMonthGrid } from "@/modules/payroll/month-grid";
 
 export const dynamic = "force-dynamic";
 
-export default async function PayrollPage() {
+interface SearchParams { year?: string; month?: string }
+
+export default async function PayrollPage({
+  searchParams,
+}: { searchParams: Promise<SearchParams> }) {
+  const params = await searchParams;
   const ctx = await devContext();
 
   // Employees without payroll.view see their own payslips only.
@@ -20,15 +26,26 @@ export default async function PayrollPage() {
 
   // The month grid is the working behind the pay figures — the sheet an
   // owner checks before approving a run (2026-08-27, owner instruction).
-  const now = new Date();
+  // Month comes from the URL so a cycle is linkable and survives a
+  // refresh; defaults to the current one.
+  const now   = new Date();
+  const year  = clampInt(params.year,  now.getFullYear(), 2000, 2100);
+  const month = clampInt(params.month, now.getMonth() + 1, 1, 12);
+
   const [p, grid] = await Promise.all([
-    loadPayroll(ctx),
-    getPayrollMonthGrid(ctx, now.getFullYear(), now.getMonth() + 1),
+    loadPayroll(ctx, { year, month }),
+    getPayrollMonthGrid(ctx, year, month),
   ]);
 
   return (
     <>
       <Topbar title="Payroll" eyebrow="Salary computed from locked attendance" />
+
+      <PayrollMonthToolbar
+        year={year}
+        month={month}
+        canProcess={ctx.permissions.has("payroll.run") && ctx.permissions.has("attendance.lock")}
+      />
 
       {(p.runLabel || p.awaitingApproval) && (
         <div className="rounded-[12px] bg-surface border border-rule px-5 py-4 mb-4 flex items-center justify-between">
@@ -62,7 +79,6 @@ export default async function PayrollPage() {
               <Th align="right">Gross</Th>
               <Th align="right">Deductions</Th>
               <Th align="right">Net pay</Th>
-              <Th align="right">Payslip</Th>
             </tr>
           </thead>
           <tbody>
@@ -73,12 +89,6 @@ export default async function PayrollPage() {
                 <Td align="right"><span className="tabular text-text">{formatINR(r.gross)}</span></Td>
                 <Td align="right"><span className="tabular text-bad">−{formatINR(r.deductions)}</span></Td>
                 <Td align="right"><span className="tabular text-text font-medium">{formatINR(r.netPay)}</span></Td>
-                <Td align="right">
-                  {p.hasRun && !p.awaitingApproval
-                    ? <SendPayslipButton payslipId={r.payslipId} employeeName={r.employeeName} />
-                    : <span className="text-text-dim text-[11px]">—</span>
-                  }
-                </Td>
               </tr>
             ))}
           </tbody>
@@ -105,4 +115,11 @@ function Th({ children, align = "left" }: { children: React.ReactNode; align?: "
 }
 function Td({ children, align = "left", className = "" }: { children: React.ReactNode; align?: "left" | "right"; className?: string }) {
   return <td className={`px-4 py-2 ${align === "right" ? "text-right" : "text-left"} ${className}`}>{children}</td>;
+}
+
+/** Read a positive integer from a query param, clamped to a sane range. */
+function clampInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < min || n > max) return fallback;
+  return n;
 }

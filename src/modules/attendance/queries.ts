@@ -22,6 +22,9 @@ export interface LeaveRow {
   days:         number;
   when:         string;
   state:        "APPROVED" | "PENDING" | "REJECTED";
+  /** Why the employee asked. Shown when the request is expanded — an
+   *  admin approving without it is guessing (owner, 2026-08-29). */
+  reason:       string | null;
 }
 
 export interface AttendanceView {
@@ -34,10 +37,17 @@ export interface AttendanceView {
   leaves:        LeaveRow[];
 }
 
-export async function loadAttendance(ctx: RequestContext): Promise<AttendanceView> {
+/**
+ * @param onDate  Day to show. Defaults to today, which is all the page
+ *   could ever show before it grew a date picker (owner, 2026-08-29).
+ */
+export async function loadAttendance(
+  ctx: RequestContext,
+  onDate?: Date,
+): Promise<AttendanceView> {
   requirePermission(ctx, "attendance.view");
   const db    = scoped(ctx);
-  const today = new Date();
+  const today = onDate ? new Date(onDate) : new Date();
   today.setUTCHours(0, 0, 0, 0);
 
   const [rows, employeeCount, leaveRows] = await Promise.all([
@@ -51,7 +61,7 @@ export async function loadAttendance(ctx: RequestContext): Promise<AttendanceVie
       where:   { organizationId: ctx.orgId, state: { in: ["PENDING", "APPROVED"] } },
       orderBy: { fromDate: "desc" },
       take:    20,
-      select:  { id: true, employeeId: true, type: true, state: true, fromDate: true, toDate: true, days: true },
+      select:  { id: true, employeeId: true, type: true, state: true, fromDate: true, toDate: true, days: true, reason: true },
     }),
   ]);
 
@@ -83,6 +93,7 @@ export async function loadAttendance(ctx: RequestContext): Promise<AttendanceVie
     employeeName: empMap.get(l.employeeId)?.name ?? l.employeeId,
     kind:         humaniseKind(l.type),
     days:         Number(l.days),
+    reason:       l.reason,
     when:         leaveWhen(l.fromDate, l.toDate),
     state:        l.state as LeaveRow["state"],
   }));

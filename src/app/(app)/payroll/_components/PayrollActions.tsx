@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { approvePayroll, sendPayslip } from "@/modules/payroll/actions-part2";
+import { approvePayroll } from "@/modules/payroll/actions-part2";
 
 // ── Approve payroll run ────────────────────────────────────────────────────────
 
@@ -57,47 +57,7 @@ export function ApproveButton({ runId, netFormatted }: ApproveButtonProps) {
 
 // ── Send payslip per employee ──────────────────────────────────────────────────
 
-interface SendPayslipButtonProps {
-  payslipId:    string;
-  employeeName: string;
-}
-
-export function SendPayslipButton({ payslipId, employeeName }: SendPayslipButtonProps) {
-  const [pending, start] = useTransition();
-  const [sent,  setSent]  = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function onClick() {
-    setError(null);
-    start(async () => {
-      const res = await sendPayslip({ payslipId });
-      if (!res.ok) { setError(res.error ?? "Failed to send"); return; }
-      setSent(true);
-    });
-  }
-
-  if (sent) {
-    return (
-      <span className="text-[11px] tabular-nums" style={{ color: "oklch(0.78 0.145 165)" }}>
-        Sent ✓
-      </span>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-end gap-0.5">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={pending}
-        title={`Send payslip to ${employeeName}`}
-        className="text-[11.5px] hover:underline disabled:opacity-60 inline-flex items-center gap-1"
-        style={{ color: "var(--color-gold)" }}
-      >
-        {pending && <Loader2 size={11} className="animate-spin" />}
-        Send
-      </button>
-      {error && <div className="text-[10px] max-w-[120px] text-right leading-tight" style={{ color: "var(--color-fault)" }}>{error}</div>}
-    </div>
-  );
-}
+// SendPayslipButton lived here until 2026-08-29. The owner asked for the
+// Payslip column to be removed from the payroll table entirely, which
+// was its only mount. The sendPayslip action itself is untouched —
+// employees still read their own payslips at /payroll.

@@ -3,7 +3,8 @@ import { devContext } from "@/lib/dev-context";
 import { loadAttendance } from "@/modules/attendance/queries";
 import { SelfView } from "./_components/AttendanceSelfView";
 import { BandCard, Td, Th } from "./_components/AttendanceBadges";
-import { LeaveApprovalButtons } from "@/app/(app)/leave/_components/LeaveApprovalButtons";
+import { AttendanceToolbar } from "./_components/AttendanceToolbar";
+import { LeaveRequestList } from "./_components/LeaveRequestList";
 
 export const dynamic = "force-dynamic";
 
@@ -29,20 +30,44 @@ export const LEAVE_TONE: Record<string, string> = {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function AttendancePage() {
+interface SearchParams { date?: string }
+
+export default async function AttendancePage({
+  searchParams,
+}: { searchParams: Promise<SearchParams> }) {
+  const params = await searchParams;
   const ctx = await devContext();
-  if (ctx.permissions.has("attendance.view")) return <ManagerView ctx={ctx} />;
+  if (ctx.permissions.has("attendance.view")) {
+    return <ManagerView ctx={ctx} dateParam={params.date} />;
+  }
   return <SelfView ctx={ctx} />;
+}
+
+/** YYYY-MM-DD from the URL, or today. Rejects anything malformed rather
+ *  than handing `new Date("banana")` to a query. */
+function resolveDate(raw: string | undefined): { iso: string; date: Date } {
+  const today = new Date();
+  if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const d = new Date(`${raw}T00:00:00.000Z`);
+    if (!Number.isNaN(d.getTime())) return { iso: raw, date: d };
+  }
+  return { iso: today.toISOString().slice(0, 10), date: today };
 }
 
 // ── Manager view ──────────────────────────────────────────────────────────────
 
-async function ManagerView({ ctx }: { ctx: Awaited<ReturnType<typeof devContext>> }) {
-  const a = await loadAttendance(ctx);
+async function ManagerView({
+  ctx, dateParam,
+}: { ctx: Awaited<ReturnType<typeof devContext>>; dateParam?: string }) {
+  const { iso, date } = resolveDate(dateParam);
+  const a = await loadAttendance(ctx, date);
+  const isToday = iso === new Date().toISOString().slice(0, 10);
 
   return (
     <>
-      <Topbar title="Attendance & Leave" eyebrow="Team overview · today" />
+      <Topbar title="Attendance & Leave" eyebrow={`Team overview · ${isToday ? "today" : iso}`} />
+
+      <AttendanceToolbar date={iso} />
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
         <BandCard label="Present"  value={a.present}  tone="solid"  />
@@ -55,7 +80,7 @@ async function ManagerView({ ctx }: { ctx: Awaited<ReturnType<typeof devContext>
         <div className="lg:col-span-2 rounded-[14px] bg-surface border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <div className="overflow-x-auto text-[13px] text-text">
-              Today <span className="text-text-muted">· mobile punch (GPS + selfie)</span>
+              {isToday ? "Today" : iso} <span className="text-text-muted">· mobile punch (GPS + selfie)</span>
             </div>
           </div>
           <table className="min-w-[480px] w-full text-[12.5px]">
@@ -87,24 +112,7 @@ async function ManagerView({ ctx }: { ctx: Awaited<ReturnType<typeof devContext>
 
         <div className="rounded-[14px] bg-surface border border-border p-5 h-fit">
           <div className="text-[13px] font-semibold text-text mb-4">Leave requests</div>
-          <ul className="space-y-4">
-            {a.leaves.map((l, i) => (
-              <li key={i} className="pb-4 border-b border-border/60 last:border-0 last:pb-0">
-                <div className="flex items-baseline justify-between mb-1">
-                  <div className="text-[12.5px] text-text">{l.employeeName}</div>
-                  <span className={`text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[4px] ${LEAVE_TONE[l.state] ?? ""}`}>
-                    {l.state.charAt(0) + l.state.slice(1).toLowerCase()}
-                  </span>
-                </div>
-                <div className="text-[11.5px] text-text-muted mb-2">
-                  {l.kind} · {l.days} day{l.days === 1 ? "" : "s"} · {l.when}
-                </div>
-                {l.state === "PENDING" && (
-                  <LeaveApprovalButtons id={l.id} />
-                )}
-              </li>
-            ))}
-          </ul>
+          <LeaveRequestList leaves={a.leaves} />
         </div>
       </div>
     </>
