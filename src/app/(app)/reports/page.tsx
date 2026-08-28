@@ -7,8 +7,10 @@ import { devContext } from "@/lib/dev-context";
 import { shortNumber } from "@/lib/short-number";
 import { can } from "@/kernel/rbac/guard";
 import { getReportKpis } from "@/modules/reports/kpi";
+import { getComparatives } from "@/modules/reports/comparatives";
 import { leadsBySource, invoiceAgeing, topClientsByRevenue, projectMarginTop } from "@/modules/reports/queries";
 import { DateRangeFilter } from "./_components/DateRangeFilter";
+import { ComparativeStrip } from "./_components/ComparativeStrip";
 import { CardDownloadButton } from "./_components/CardDownloadButton";
 import { ReportsExportBar } from "./_components/ReportsExportBar";
 
@@ -33,9 +35,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const from = p.from ? new Date(p.from) : undefined;
   const to   = p.to   ? new Date(`${p.to}T23:59:59`) : undefined;
 
-  const [kpi, leads, ageing, topClients, margins] =
+  const [kpi, comparatives, leads, ageing, topClients, margins] =
     await Promise.all([
       getReportKpis(ctx, { from, to }),
+      // Always month/week-to-date regardless of the range filter above:
+      // "vs last month" has to mean the calendar, not whatever window
+      // the operator happens to be looking at.
+      getComparatives(ctx),
       leadsBySource(ctx),
       invoiceAgeing(ctx),
       topClientsByRevenue(ctx, 10),
@@ -125,6 +131,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <KpiCard label="New Leads"       value={String(kpi.newLeads)}               href="/leads"                                     note={periodLabel} />
         <KpiCard label="Orders in Make"  value={String(kpi.readyToInstall)}         href={"/orders?status=MAKE" as Route} />
       </div>
+
+      <ComparativeStrip data={comparatives} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         {/* ── Leads by source ───────────────────────────────────── */}
