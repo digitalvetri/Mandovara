@@ -17,7 +17,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, LogOut, MapPin, Loader2, Check } from "lucide-react";
+import { diagnoseGeoError, readPosition, type GeoDiagnosis } from "@/lib/geolocation";
+import { LogIn, LogOut, MapPin, Loader2, Check, RefreshCw } from "lucide-react";
 import { selfCheckIn, selfCheckOut, type CheckResult } from "@/app/(app)/attendance/_actions";
 
 type Mode = "in" | "out";
@@ -31,17 +32,23 @@ interface Props {
   onChrome?: boolean;
 }
 
-function getGps(): Promise<{ lat: number; lng: number } | undefined> {
-  return new Promise((resolve) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(undefined);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      // A refusal or a timeout is not a failure any more — the server
-      // treats "no fix" as off-site and asks where they are.
-      () => resolve(undefined),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
-    );
-  });
+/**
+ * Read a position, or explain why not.
+ *
+ * A refusal is still not fatal — the server treats "no fix" as off-site
+ * and asks where the employee is — but the REASON is now carried back so
+ * a failed check-in can say what actually went wrong instead of
+ * "Could not record check-in" (owner, 2026-08-29).
+ */
+async function getGps(): Promise<{
+  geo?: { lat: number; lng: number };
+  problem?: GeoDiagnosis;
+}> {
+  try {
+    return { geo: await readPosition() };
+  } catch (err) {
+    return { problem: diagnoseGeoError(err) };
+  }
 }
 
 function fmt(iso: string): string {
@@ -56,13 +63,19 @@ export function PunchCard({ inAt, outAt, isLocked = false, onChrome = false }: P
   const [asking, setAsking]   = useState<{ mode: Mode; distanceM: number; branchName: string } | null>(null);
   const [place, setPlace]     = useState("");
   const [message, setMessage] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [problem, setProblem] = useState<GeoDiagnosis | null>(null);
+  const [lastRun, setLastRun] = useState<{ mode: Mode; place?: string } | null>(null);
 
   const done = inAt !== null && outAt !== null;
 
   function run(mode: Mode, withPlace?: string): void {
     setMessage(null);
+    setProblem(null);
+    setLastRun(withPlace === undefined ? { mode } : { mode, place: withPlace });
     start(async () => {
-      const geo = await getGps();
+      const { geo, problem: geoProblem } = await getGps();
+      if (geoProblem) setProblem(geoProblem);
+
       const res: CheckResult = mode === "in"
         ? await selfCheckIn(geo, withPlace)
         : await selfCheckOut(geo, withPlace);
@@ -76,9 +89,16 @@ export function PunchCard({ inAt, outAt, isLocked = false, onChrome = false }: P
         return;
       }
       if (!res.ok) {
-        setMessage({ tone: "err", text: res.error ?? "Could not record that." });
+        // Prefer the server's reason (outside the geofence, day locked,
+        // already checked in); fall back to the location diagnosis, which
+        // is the cause when the server never got coordinates at all.
+        setMessage({
+          tone: "err",
+          text: res.error ?? geoProblem?.title ?? "Could not record that.",
+        });
         return;
       }
+      setProblem(null);
       setAsking(null);
       setPlace("");
       setMessage({
@@ -195,6 +215,21 @@ export function PunchCard({ inAt, outAt, isLocked = false, onChrome = false }: P
       {message && (
         <div className={`text-[11.5px] ${message.tone === "ok" ? "text-solid-chrome" : "text-fault-chrome"}`}>
           {message.text}
+          {/* Why it failed, and a way to try again without reloading. */}
+          {message.tone === "err" && problem?.advice && (
+            <div className="mt-1 opacity-80">{problem.advice}</div>
+          )}
+          {message.tone === "err" && (problem === null || problem.retryable) && lastRun && (
+            <button
+              type="button"
+              onClick={() => run(lastRun.mode, lastRun.place)}
+              disabled={pending}
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-current px-2.5 py-1 text-[11px] font-medium transition-opacity hover:opacity-80 disabled:opacity-50"
+            >
+              <RefreshCw size={10} strokeWidth={2} />
+              Retry check-{lastRun.mode}
+            </button>
+          )}
         </div>
       )}
     </div>

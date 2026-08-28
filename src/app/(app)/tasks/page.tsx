@@ -4,6 +4,7 @@ import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { Topbar } from "@/components/layout/Topbar";
 import { StatCard, AllView, FilteredView } from "./_components/TaskViews";
+import { TaskSearch } from "./_components/TaskSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export default async function TasksPage({
 }) {
   const params = await searchParams;
   const tab    = (params["tab"] ?? "all") as Tab;
+  const query  = (params["q"] ?? "").trim().toLowerCase();
 
   const ctx   = await devContext();
   const db    = scoped(ctx);
@@ -126,13 +128,27 @@ export default async function TasksPage({
   const nameMap: Record<string, string> = {};
   for (const r of [...leads, ...projects, ...clients]) nameMap[r.id] = r.name;
 
+  // Search filters the tasks on screen by title or by the name of the
+  // client / lead they are against. Applied after nameMap is built,
+  // because the entity name is exactly what people search by and it
+  // does not live on the task row.
+  const matchesQuery = (t: { note: string; refId: string }) =>
+    !query ||
+    t.note.toLowerCase().includes(query) ||
+    (nameMap[t.refId] ?? "").toLowerCase().includes(query);
+
+  if (query) displayTasks = displayTasks.filter(matchesQuery);
+
   // For "all" tab, split into groups
-  const overdueTasks  = allPending.filter((t) => t.dueAt < today);
+  // The All tab groups its own lists rather than using displayTasks, so
+  // the search has to be applied here too or it would silently do
+  // nothing on the tab people land on first.
+  const overdueTasks  = allPending.filter((t) => t.dueAt < today).filter(matchesQuery);
   const todayTasks    = allPending.filter((t) => {
     const diff = Math.floor((t.dueAt.getTime() - today.getTime()) / 86_400_000);
     return diff === 0;
-  });
-  const upcomingTasks = allPending.filter((t) => t.dueAt > today);
+  }).filter(matchesQuery);
+  const upcomingTasks = allPending.filter((t) => t.dueAt > today).filter(matchesQuery);
 
   const totalPending = allPending.length;
 
@@ -175,8 +191,9 @@ export default async function TasksPage({
         />
       </div>
 
-      {/* ── FILTER TABS ───────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 mb-4 p-1 rounded-[10px] bg-surface-2/60 border border-border/60 w-fit">
+      {/* ── FILTER TABS + SEARCH ──────────────────────────────────────── */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1 p-1 rounded-[10px] bg-surface-2/60 border border-border/60 w-fit">
         {([
           ["all",       `All (${totalPending})`          ],
           ["today",     `Due Today (${todayCount})`      ],
@@ -196,6 +213,8 @@ export default async function TasksPage({
             {label}
           </Link>
         ))}
+      </div>
+        <TaskSearch />
       </div>
 
       {/* ── TASK LIST ─────────────────────────────────────────────────── */}

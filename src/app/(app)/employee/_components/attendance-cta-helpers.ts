@@ -36,16 +36,9 @@ export function elapsedStr(fromISO: string, toISO?: string | null): string {
   return `${h}h ${m.toString().padStart(2, "0")}m`;
 }
 
-export function getGps(): Promise<{ lat: number; lng: number }> {
-  return new Promise((resolve, reject) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      reject(new Error("Geolocation is not supported by this browser."));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => reject(err),
-      { timeout: 8000, enableHighAccuracy: true },
-    );
-  });
-}
+// getGps() lived here. Replaced 2026-08-29 by src/lib/geolocation.ts,
+// which distinguishes an insecure origin from a denied permission from
+// a timeout — a distinction this one could not make, so every failure
+// told the employee to allow location access even when there was
+// nothing to allow.
+

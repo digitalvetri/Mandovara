@@ -1,13 +1,14 @@
 "use client";
 
+import { diagnoseGeoError, readPosition, type GeoDiagnosis } from "@/lib/geolocation";
 import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, LogOut, Loader2, MapPin, MapPinOff, AlertCircle } from "lucide-react";
+import { LogIn, LogOut, Loader2, MapPin, MapPinOff, AlertCircle, RefreshCw } from "lucide-react";
 import { selfCheckIn, selfCheckOut } from "../../attendance/_actions";
 import {
   type GpsState, type Banner,
   STATUS_COLOR, STATUS_LABEL, NON_WORK,
-  fmtISO, elapsedStr, getGps,
+  fmtISO, elapsedStr,
 } from "./attendance-cta-helpers";
 
 export interface AttendanceCTAProps {
@@ -39,6 +40,9 @@ export function AttendanceCTA({
   const [locRecorded, setLocRecorded] = useState(false);
   const [elapsed,     setElapsed]     = useState<string | null>(null);
   const [banner, setBanner] = useState<Banner>(null);
+  // The last location failure, kept so the banner can say WHY and offer
+  // the right next step rather than one generic sentence.
+  const [geoProblem, setGeoProblem] = useState<GeoDiagnosis | null>(null);
 
   // Live working timer — ticks every 30 s while checked in, stops after checkout.
   // Initialised in useEffect (not useState) to avoid SSR/client hydration mismatch.
@@ -64,14 +68,14 @@ export function AttendanceCTA({
 
     let geo: { lat: number; lng: number } | undefined;
     try {
-      geo = await getGps();
+      geo = await readPosition();
       setGps("ok");
-    } catch {
+      setGeoProblem(null);
+    } catch (err) {
+      const d = diagnoseGeoError(err);
       setGps("denied");
-      setBanner({
-        variant: "error",
-        message: "Location access is required to check in. Please allow location access and try again.",
-      });
+      setGeoProblem(d);
+      setBanner({ variant: "error", message: d.title });
       return;
     }
 
@@ -88,6 +92,7 @@ export function AttendanceCTA({
         router.refresh();
       } else {
         setGps("idle");
+        setGeoProblem(null);
         setBanner({ variant: "error", message: res.error ?? "Could not record check-in." });
       }
     });
@@ -102,14 +107,14 @@ export function AttendanceCTA({
 
     let geo: { lat: number; lng: number } | undefined;
     try {
-      geo = await getGps();
+      geo = await readPosition();
       setGps("ok");
-    } catch {
+      setGeoProblem(null);
+    } catch (err) {
+      const d = diagnoseGeoError(err);
       setGps("denied");
-      setBanner({
-        variant: "error",
-        message: "Location access is required to check out. Please allow location access and try again.",
-      });
+      setGeoProblem(d);
+      setBanner({ variant: "error", message: d.title });
       return;
     }
 
@@ -148,11 +153,33 @@ export function AttendanceCTA({
         </div>
       )}
 
-      {/* Banner — errors only; success is conveyed by the status row */}
+      {/* Banner — errors only; success is conveyed by the status row.
+          A location failure carries the reason and, when retrying can
+          actually help, a Retry button so nobody reloads the page. An
+          insecure origin gets no button: it would fail identically every
+          time, and offering one implies the employee can fix it. */}
       {banner?.variant === "error" && (
-        <div className="flex items-start gap-2 rounded-xl border border-fault-chrome/25 bg-fault-chrome/10 px-3.5 py-2.5 text-[12px] leading-snug text-fault-chrome">
-          <AlertCircle size={13} strokeWidth={2} className="mt-0.5 shrink-0" />
-          <span className="font-medium">{banner.message}</span>
+        <div className="rounded-xl border border-fault-chrome/25 bg-fault-chrome/10 px-3.5 py-2.5 text-[12px] leading-snug text-fault-chrome" role="alert">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={13} strokeWidth={2} className="mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">{banner.message}</div>
+              {geoProblem?.advice && (
+                <div className="mt-1 text-sidebar-dim">{geoProblem.advice}</div>
+              )}
+              {(geoProblem === null || geoProblem.retryable) && (
+                <button
+                  type="button"
+                  onClick={() => { setBanner(null); setGeoProblem(null); void (inAt ? handleCheckOut() : handleCheckIn()); }}
+                  disabled={isBusy}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-fault-chrome/40 px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:bg-fault-chrome/15 disabled:opacity-50"
+                >
+                  <RefreshCw size={11} strokeWidth={2} />
+                  {geoProblem ? "Retry location" : (inAt ? "Retry check-out" : "Retry check-in")}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -247,11 +274,18 @@ export function AttendanceCTA({
             </button>
           ) : null}
 
-          {/* Location denied indicator alongside the button */}
+          {/* Location indicator alongside the button. "Location denied"
+              was wrong on the deployment that prompted this: over plain
+              http:// the browser never asked, so nothing was denied. The
+              badge now names what actually happened. */}
           {gps === "denied" && (
             <span className="inline-flex items-center gap-1.5 text-[11.5px] text-fault-chrome">
               <MapPinOff size={12} strokeWidth={2} />
-              Location denied
+              {geoProblem?.kind === "insecure-context" ? "Location blocked (not HTTPS)"
+                : geoProblem?.kind === "timeout"       ? "Location timed out"
+                : geoProblem?.kind === "unavailable"   ? "No location fix"
+                : geoProblem?.kind === "unsupported"   ? "Location unsupported"
+                : "Location denied"}
             </span>
           )}
         </div>

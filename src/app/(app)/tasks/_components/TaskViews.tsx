@@ -186,9 +186,18 @@ export function TaskCard({
             {REF_LABEL[task.refType] ?? task.refType}
           </span>
 
-          {/* Ref name */}
-          {refName && (
-            <span className="text-[11.5px] text-text-muted truncate max-w-[180px]">{refName}</span>
+          {/* Ref name links to its record. It was plain text, so
+              clicking the name did nothing (owner, 2026-08-29). */}
+          {refName && (href
+            ? (
+              <Link
+                href={href as Route}
+                className="max-w-[180px] truncate text-[11.5px] text-accent underline-offset-2 transition-colors hover:underline"
+              >
+                {refName}
+              </Link>
+            )
+            : <span className="max-w-[180px] truncate text-[11.5px] text-text-muted">{refName}</span>
           )}
 
           {/* Urgency pill (pending) */}

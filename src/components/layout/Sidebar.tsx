@@ -8,7 +8,7 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, MapPin, Briefcase, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
-  BarChart2, CheckSquare, FolderOpen, UserCircle, Ruler,
+  BarChart2, CheckSquare, UserCircle, Ruler,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -121,7 +121,11 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
     section: "People",
     items: [
       { label: "Attendance & Leave", href: "/attendance", icon: CalendarCheck },
-      { label: "Documents",          href: "/documents",  icon: FolderOpen    },
+      // Documents was listed here and is hidden until the module is
+      // real (owner, 2026-08-29) — an employee following the link landed
+      // on an empty placeholder, which reads as a broken app rather than
+      // an unfinished one. The route redirects rather than 404s, so an
+      // old bookmark still goes somewhere sensible.
       { label: "My Profile",         href: "/profile",    icon: UserCircle    },
     ],
   },
