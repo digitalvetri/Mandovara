@@ -93,26 +93,32 @@ export function buildShareMessage(input: ShareMessageInput): ShareMessage {
   const total = pToINR(input.totalStr);
   const valid = fmtDate(input.validUntilIso);
 
-  // The PDF is the primary link — that is the document the client wants
-  // and the one they will forward to their architect or spouse. The
-  // second link is only for accepting, and is labelled so it is obvious
-  // which does what. When no token has been minted yet there is no PDF
-  // to point at, so the message falls back to the page alone rather than
-  // showing a dead line.
+  // What goes out, per the owner (2026-08-28): "it just need to send
+  // the PDF only with hi and quote information and their information".
+  //
+  // So: a greeting, the figures, the PDF, and who it is from. The second
+  // link — "to accept it or ask for changes" — is gone along with the
+  // client-side Accept control it pointed at; the studio converts a lead
+  // itself now rather than waiting on a stranger to press a button.
+  //
+  // A true file attachment is still not possible from here. wa.me is a
+  // URL scheme that carries text and nothing else; attaching a document
+  // needs the WhatsApp Cloud API and a Meta-verified WABA, which this
+  // install does not have. The PDF URL is the nearest real thing: it
+  // resolves straight to application/pdf, so one tap opens the document
+  // in the client's PDF viewer, ready to save or forward.
   const body = pdf
-    ? `Namaste ${input.clientName},\n\n` +
-      `Your quotation ${num} is ready. Tap to open the PDF:\n\n` +
-      `${pdf}\n\n` +
+    ? `Hi ${input.clientName},\n\n` +
+      `Here is your quotation ${num}.\n\n` +
       `  Total: ${total}\n` +
       `  Valid until: ${valid}\n\n` +
-      `To accept it or ask for changes: ${link}\n\n` +
+      `${pdf}\n\n` +
       `— Team Mandovara\n+91 89404 30051 · mandovara.com`
-    : `Namaste ${input.clientName},\n\n` +
-      `Please find our quotation ${num} at the link below.\n\n` +
+    : `Hi ${input.clientName},\n\n` +
+      `Here is your quotation ${num}.\n\n` +
       `  Total: ${total}\n` +
       `  Valid until: ${valid}\n\n` +
       `${link}\n\n` +
-      `You can accept it or request changes directly on that page.\n\n` +
       `— Team Mandovara\n+91 89404 30051 · mandovara.com`;
 
   const subject = `Quotation ${num} from Mandovara`;

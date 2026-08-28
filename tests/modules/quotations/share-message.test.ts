@@ -70,7 +70,7 @@ describe("buildShareMessage", () => {
   const msg = buildShareMessage({ ...BASE, origin: "https://app.mandovara.com" });
 
   it("addresses the client by name and names the quotation", () => {
-    expect(msg.body).toContain("Namaste Dr Kannan");
+    expect(msg.body).toContain("Hi Dr Kannan");
     expect(msg.body).toContain("QT-2608-0142");
   });
 
@@ -81,23 +81,39 @@ describe("buildShareMessage", () => {
     expect(msg.body).toContain("26 Sept 2026");
   });
 
-  it("carries the share link the client will actually open", () => {
+  it("carries the PDF link the client will actually open", () => {
     expect(msg.body).toContain("https://app.mandovara.com/q/" + "a".repeat(64));
   });
 
-  it("leads with the PDF, because that is the document the client wants", () => {
+  it("sends the PDF and nothing else to click", () => {
     // Owner instruction 2026-08-27: the client should receive a PDF, not
     // a link to a page. wa.me cannot attach a file, so the next best
     // thing is a URL that resolves straight to application/pdf.
     const pdfUrl = `https://app.mandovara.com/q/${"a".repeat(64)}/pdf`;
     expect(msg.pdf).toBe(pdfUrl);
-    // The PDF line comes before the accept line in the message body.
-    expect(msg.body.indexOf(pdfUrl)).toBeLessThan(msg.body.indexOf("To accept it"));
+    expect(msg.body).toContain(pdfUrl);
   });
 
-  it("still offers the accept page as a clearly-labelled second link", () => {
-    expect(msg.body).toContain("To accept it or ask for changes:");
-    expect(msg.body).toContain(msg.link);
+  it("no longer asks the client to accept anything", () => {
+    // 2026-08-28: the client-side Accept control was removed and the
+    // studio converts leads itself. A message still inviting the client
+    // to "accept" would point at a control that no longer exists.
+    expect(msg.body).not.toContain("To accept it");
+    expect(msg.body).not.toContain("accept");
+    expect(msg.body).not.toContain("request changes");
+  });
+
+  it("says hello, states the figures, and signs off — nothing more", () => {
+    // The whole message, asserted verbatim. This is client-facing copy
+    // going out over WhatsApp; it should not drift silently.
+    expect(msg.body).toBe(
+      "Hi Dr Kannan,\n\n" +
+      "Here is your quotation QT-2608-0142.\n\n" +
+      "  Total: ₹1,65,000\n" +
+      "  Valid until: 26 Sept 2026\n\n" +
+      `https://app.mandovara.com/q/${"a".repeat(64)}/pdf\n\n` +
+      "— Team Mandovara\n+91 89404 30051 · mandovara.com",
+    );
   });
 
   it("falls back to the page alone when no token has been minted", () => {
@@ -105,7 +121,9 @@ describe("buildShareMessage", () => {
     const noToken = buildShareMessage({ ...BASE, shareToken: null, origin: "https://app.mandovara.com" });
     expect(noToken.pdf).toBeNull();
     expect(noToken.body).not.toContain("/pdf");
-    expect(noToken.body).toContain("accept it or request changes");
+    // Falls back to the share page, still without an accept invitation.
+    expect(noToken.body).toContain(noToken.link);
+    expect(noToken.body).not.toContain("accept");
   });
 
   it("URL-encodes the body into the wa.me deep link", () => {

@@ -14,7 +14,6 @@ import { LeadFollowUpForm } from "../_components/LeadFollowUpForm";
 import { EditableField } from "../_components/EditableField";
 import { LeadDetailsCard } from "../_components/LeadDetailsCard";
 import { LeadActionBar } from "../_components/LeadActionBar";
-import { ConversionApprovalCard, type LeadScopedQuote } from "../_components/ConversionApprovalCard";
 import { LeadQuotationsSidebar } from "../_components/LeadQuotationsSidebar";
 import { LeadSiteVisitsSidebar } from "../_components/LeadSiteVisitsSidebar";
 import { LeadMeasurementsPanel } from "../_components/LeadMeasurementsPanel";
@@ -61,35 +60,17 @@ export default async function LeadDetailPage({
     convertedProjectId = proj?.id ?? null;
   }
 
-  // Client-scoped quotations (after conversion) vs lead-scoped (before)
-  const [quotations, leadScopedQuoteRows] = await Promise.all([
-    lead.convertedClientId
-      ? listQuotationsForClient(ctx, lead.convertedClientId)
-      : listLeadScopedQuotations(ctx, id),
-    // FIXES-01 §5.1 — fetch lead-scoped quotes separately for the
-    // two-approval Convert-to-Client card (needs ownerConvertApprovedAt).
-    lead.convertedClientId
-      ? Promise.resolve([] as { id: string; number: string; status: string; total: bigint; ownerConvertApprovedAt: Date | null }[])
-      : db.quotation.findMany({
-          where:   { leadId: id },
-          orderBy: { date: "desc" },
-          select:  {
-            id: true, number: true, status: true, total: true,
-            ownerConvertApprovedAt: true,
-          },
-        }),
-  ]);
+  // Client-scoped quotations (after conversion) vs lead-scoped (before).
+  //
+  // A second query used to run beside this one, pulling
+  // ownerConvertApprovedAt for the two-approval Convert-to-Client card.
+  // That card is gone (2026-08-28) and so is the query.
+  const quotations = lead.convertedClientId
+    ? await listQuotationsForClient(ctx, lead.convertedClientId)
+    : await listLeadScopedQuotations(ctx, id);
   // Every still-sendable quote needs a live share token before render —
   // the lead page's inline Send builds the client's link from it.
   if (!lead.convertedClientId) await ensureShareTokensForSending(ctx, quotations);
-
-  const leadScopedQuotes: LeadScopedQuote[] = leadScopedQuoteRows.map((q) => ({
-    id:     q.id,
-    number: q.number,
-    status: q.status,
-    total:  q.total.toString(),
-    ownerConvertApprovedAt: q.ownerConvertApprovedAt?.toISOString() ?? null,
-  }));
 
   const createdDate = lead.createdAt.toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
@@ -147,7 +128,6 @@ export default async function LeadDetailPage({
         leadName={lead.name}
         mobile={lead.mobile}
         email={lead.email ?? null}
-        hasQuotes={leadScopedQuotes.length > 0}
         canDelete={ctx.permissions.has("lead.delete")}
         isMeasured={isMeasured}
       />
@@ -159,17 +139,6 @@ export default async function LeadDetailPage({
             <div className="rounded-[14px] bg-good/8 border border-good/30 p-4 text-[12.5px] text-text">
               This lead has been converted to a client. Edits here won&apos;t sync — update the client record instead.
             </div>
-          )}
-
-          {/* Two-approval Convert-to-Client card — FIXES-01 §5.1 */}
-          {!isConverted && leadScopedQuotes.length > 0 && (
-            <ConversionApprovalCard
-              leadId={lead.id}
-              leadName={lead.name}
-              mobile={lead.mobile}
-              email={lead.email ?? null}
-              quotes={leadScopedQuotes}
-            />
           )}
 
           {/* Editable info card */}

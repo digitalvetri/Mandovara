@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Download, FileText } from "lucide-react";
 import { getQuotationByShareToken } from "@/modules/quotations/public-query";
-import { QuoteDecision } from "./_components/QuoteDecision";
 
 export const dynamic = "force-dynamic";
 
@@ -122,14 +121,12 @@ export default async function PublicQuotationPage({
                 </div>
               </div>
 
-              {/* Accept / request changes — the client's own decision.
-                  Sits above the PDF links because deciding, not
-                  downloading, is what this page is for. */}
-              <QuoteDecision
-                token={token}
-                status={q.status}
-                validUntilIso={q.validUntil.toISOString()}
-              />
+              {/* The client's Accept / Request-changes control used to
+                  sit here. Removed 2026-08-28 on the owner's
+                  instruction: the studio decides when a lead becomes a
+                  client, and a quotation no longer waits on a stranger
+                  pressing a button before it can be converted. What the
+                  client gets is the document. */}
 
               {/* Download PDF */}
               <a

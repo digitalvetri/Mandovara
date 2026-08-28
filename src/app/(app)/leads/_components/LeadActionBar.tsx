@@ -20,10 +20,10 @@ interface Props {
   leadName: string;
   mobile: string;
   email: string | null;
-  // When quotes exist under the lead, the ConversionApprovalCard is the
-  // sanctioned conversion path (needs client-accepted + owner-approved).
-  // Hide the free-form Convert button here to remove the duplicate CTA.
-  hasQuotes?: boolean;
+  // `hasQuotes` used to live here: once any quote existed the Convert
+  // button hid itself and the two-approval ConversionApprovalCard took
+  // over, which first needed the client to press Accept on a public
+  // link. Removed 2026-08-28 — the studio converts when it decides to.
   canDelete?: boolean;
   /**
    * True when the lead has an APPROVED, non-superseded measurement round.
@@ -35,7 +35,7 @@ interface Props {
   isMeasured?: boolean;
 }
 
-export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email, hasQuotes, canDelete, isMeasured }: Props) {
+export function LeadActionBar({ leadId, stage, convertedClientId, convertedProjectId, leadName, mobile, email, canDelete, isMeasured }: Props) {
   const router = useRouter();
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showVisitModal, setShowVisitModal] = useState(false);
@@ -115,9 +115,10 @@ export function LeadActionBar({ leadId, stage, convertedClientId, convertedProje
             <ArrowUpRight size={14} strokeWidth={1.75} />
             {convertedProjectId ? "Open Project" : "Open Client"}
           </Link>
-        ) : !isLost && !hasQuotes ? (
-          // No quotes yet — allow free-form conversion. Once a quote exists,
-          // ConversionApprovalCard becomes the single sanctioned path.
+        ) : !isLost ? (
+          // One button, always. It used to disappear the moment a quote
+          // existed, handing the job to a two-approval checklist that
+          // first needed the client to press Accept on a public link.
           <button
             type="button"
             onClick={() => setShowConvertModal(true)}
