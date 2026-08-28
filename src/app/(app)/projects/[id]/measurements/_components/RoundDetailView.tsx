@@ -11,6 +11,8 @@ import type { RoundDetail } from "@/modules/measurement/queries";
 import { StatusPill } from "./StatusPill";
 import { ItemCard } from "./ItemCard";
 import { AddItemPanel } from "./AddItemPanel";
+import { SimpleMeasurementEntry } from "@/components/measurement/SimpleMeasurementEntry";
+import { AdvancedEntryDisclosure } from "./AdvancedEntryDisclosure";
 
 interface RoundDetailViewProps {
   round: RoundDetail;
@@ -120,9 +122,19 @@ export function RoundDetailView({ round, rooms }: RoundDetailViewProps) {
         </div>
       )}
 
-      {/* Add item */}
+      {/* Add item.
+          The four-field form leads: place, quantity, width, height, and
+          it invents a room rather than stopping to demand one. The full
+          panel — rooms, surface, family, heading/lay/mount — is still
+          here, one click down, because nothing has been taken away from
+          the people who use it. */}
       {status === "DRAFT" && (
-        <AddItemPanel measurementId={round.id} projectId={round.subject.id} rooms={rooms} />
+        <div className="space-y-2.5">
+          <SimpleMeasurementEntry measurementId={round.id} />
+          <AdvancedEntryDisclosure>
+            <AddItemPanel measurementId={round.id} projectId={round.subject.id} rooms={rooms} />
+          </AdvancedEntryDisclosure>
+        </div>
       )}
 
       {round.notes && (
