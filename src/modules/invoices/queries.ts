@@ -30,6 +30,7 @@ export interface InvoiceRow {
   outstanding: bigint;
   overdueBy:   number;
   orderNumber: string | null;
+  projectName: string | null;
 }
 
 export interface ListInvoicesResult {
@@ -107,7 +108,35 @@ export async function listInvoices(
   const skip     = (page - 1) * pageSize;
   const now      = new Date();
 
-  const where = buildWhere(q, now);
+  // Resolve the search term against client / project / order names first.
+  // Invoice stores those as bare id columns with no Prisma relation, so
+  // the names cannot be reached from a single invoice query.
+  const term = q.search?.trim();
+  const matched = term
+    ? await (async () => {
+        const [cs, ps, os] = await Promise.all([
+          db.client.findMany({
+            where:  { name: { contains: term, mode: "insensitive" } },
+            select: { id: true }, take: 500,
+          }),
+          db.project.findMany({
+            where:  { name: { contains: term, mode: "insensitive" } },
+            select: { id: true }, take: 500,
+          }),
+          db.order.findMany({
+            where:  { number: { contains: term, mode: "insensitive" } },
+            select: { id: true }, take: 500,
+          }),
+        ]);
+        return {
+          clientIds:  cs.map((c) => c.id),
+          projectIds: ps.map((x) => x.id),
+          orderIds:   os.map((o) => o.id),
+        };
+      })()
+    : undefined;
+
+  const where = buildWhere(q, now, matched);
   const orderBy = orderFor(q.sort);
 
   const [invoices, total] = await Promise.all([
@@ -116,7 +145,7 @@ export async function listInvoices(
       select: {
         id: true, number: true, type: true, date: true, dueDate: true,
         status: true, irnStatus: true, total: true, advanceAdjusted: true,
-        clientId: true, orderId: true,
+        clientId: true, orderId: true, projectId: true,
       },
     }),
     db.invoice.count({ where }),
@@ -128,6 +157,7 @@ export async function listInvoices(
 
   const invoiceIds = invoices.map((i) => i.id);
   const orderIds   = invoices.filter((i) => i.orderId).map((i) => i.orderId!);
+  const projectIds = [...new Set(invoices.filter((i) => i.projectId).map((i) => i.projectId!))];
 
   // Batch-fetch clients, orders, allocation sums — no back-relation on Invoice
   const clientIds = [...new Set(invoices.map((i) => i.clientId))];
@@ -146,6 +176,11 @@ export async function listInvoices(
     }),
   ]);
 
+  const projects = projectIds.length > 0
+    ? await db.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } })
+    : [];
+  const projectMap = new Map(projects.map((p) => [p.id, p.name]));
+
   const clientMap     = new Map(clients.map((c) => [c.id, c]));
   const orderMap      = new Map((orders as { id: string; number: string }[]).map((o) => [o.id, o]));
   const allocationMap = new Map(allocationSums.map((a) => [a.invoiceId, a._sum.amount ?? 0n]));
@@ -162,6 +197,7 @@ export async function listInvoices(
       total: inv.total, advanceAdjusted: inv.advanceAdjusted, paidTotal, outstanding,
       overdueBy,
       orderNumber: inv.orderId ? orderMap.get(inv.orderId)?.number ?? null : null,
+      projectName: inv.projectId ? projectMap.get(inv.projectId) ?? null : null,
     };
   });
 

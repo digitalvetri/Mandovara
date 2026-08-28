@@ -135,12 +135,29 @@ export async function getInvoice(
 
 type WhereInput = Record<string, unknown>;
 
-export function buildWhere(q: ListInvoicesQuery, now: Date): WhereInput {
+/**
+ * @param matched  Ids resolved from the search term by name — clients,
+ *   projects and orders. The Invoice model carries clientId / projectId /
+ *   orderId as plain columns with no Prisma relation ("flat schema"), so
+ *   a nested `client: { name: ... }` filter is impossible; the caller
+ *   resolves the names to ids first and passes them in here.
+ */
+export function buildWhere(
+  q: ListInvoicesQuery,
+  now: Date,
+  matched?: { clientIds: string[]; projectIds: string[]; orderIds: string[] },
+): WhereInput {
   const where: WhereInput = {};
   if (q.search?.trim()) {
     const s = q.search.trim();
+    // Searching "Kishore" or "Veerakeralam villa" used to return nothing:
+    // this matched the invoice number and nothing else, while both search
+    // placeholders promised project and client. (owner, 2026-08-29)
     where["OR"] = [
-      { number:   { contains: s, mode: "insensitive" } },
+      { number: { contains: s, mode: "insensitive" } },
+      ...(matched?.clientIds.length  ? [{ clientId:  { in: matched.clientIds  } }] : []),
+      ...(matched?.projectIds.length ? [{ projectId: { in: matched.projectIds } }] : []),
+      ...(matched?.orderIds.length   ? [{ orderId:   { in: matched.orderIds   } }] : []),
     ];
   }
   if (q.clientId) {

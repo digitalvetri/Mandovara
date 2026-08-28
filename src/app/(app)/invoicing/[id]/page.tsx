@@ -6,6 +6,8 @@ import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { getInvoice } from "@/modules/invoices/queries";
+import { listPaymentsForInvoice } from "@/modules/receipts/queries";
+import { PaymentDetailsCard } from "./_components/PaymentDetailsCard";
 import { StatusPill } from "../_components/StatusPill";
 import { CancelInvoiceButton } from "../_components/CancelInvoiceButton";
 import { CreditNoteButton } from "../_components/CreditNoteButton";
@@ -21,6 +23,14 @@ export default async function InvoiceDetailPage({
   const ctx = await devContext();
   const inv = await getInvoice(ctx, id);
   if (!inv) notFound();
+
+  // Payment Details sits under the product table on the left (owner,
+  // 2026-08-29) rather than in the right rail, which was already the
+  // taller column — putting it there left a band of white space beside
+  // a long line list.
+  const payments = ctx.permissions.has("receipt.view")
+    ? await listPaymentsForInvoice(ctx, inv.id)
+    : [];
 
   const isIntra = inv.supplierStateCode === inv.placeOfSupplyCode;
   const overdueDays = Math.floor((Date.now() - inv.dueDate.getTime()) / 86_400_000);
@@ -184,6 +194,8 @@ export default async function InvoiceDetailPage({
               </tbody>
             </table>
           </div>
+
+          <PaymentDetailsCard payments={payments} canView={ctx.permissions.has("receipt.view")} />
         </div>
 
         <aside className="space-y-4 h-fit">
@@ -262,3 +274,4 @@ function trimZero(s: string): string {
   if (!s.includes(".")) return s;
   return s.replace(/0+$/, "").replace(/\.$/, "");
 }
+

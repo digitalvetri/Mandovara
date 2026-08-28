@@ -13,7 +13,6 @@ import {
   loadGstSummary, last12Months, formatPeriod,
   type GstPeriod,
 } from "@/modules/accounts/gst";
-import { NewExpenseButton } from "../_components/NewExpenseForm";
 import { NetCard, ComponentRow, Section, Th, Td } from "./_gst-components";
 
 interface Props {
@@ -67,7 +66,6 @@ export async function GstTab({ ctx, year, month }: Props) {
             );
           })}
         </div>
-        <NewExpenseButton />
       </div>
 
       {/* Net payable hero */}
@@ -153,12 +151,16 @@ export async function GstTab({ ctx, year, month }: Props) {
       )}
 
       {/* Input credit — expenses */}
-      <Section title="Input Credit — Expenses with GST" action={<NewExpenseButton />}>
+      {/* Read-only here by design. Both "+ New Expense" controls were
+          removed from this tab on 2026-08-29 (owner): logging an expense
+          belongs in the Expenses tab, and the GST view stays focused on
+          tax summaries, input credit and GSTR reporting. */}
+      <Section title="Input Credit — Expenses with GST">
         {summary.inputLines.length === 0 ? (
           <div className="px-4 py-8 text-center">
             <div className="text-[13px] text-text mb-1">No GST-captured expenses for {formatPeriod(period)}.</div>
             <p className="text-[11.5px] text-text-dim">
-              Click "New expense" above, expand "Add GST details" and enter the GST rate to capture input credit.
+              Log expenses under the Expenses tab — expand "Add GST details" and enter the GST rate to capture input credit here.
             </p>
           </div>
         ) : (

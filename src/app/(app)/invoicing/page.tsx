@@ -22,7 +22,8 @@ import { getInvoiceKpis, listInvoices } from "@/modules/invoices/queries";
 import { INVOICE_STATUSES, type InvoiceStatus } from "@/modules/invoices/schema";
 import { InvoiceFilters } from "./_components/InvoiceFilters";
 import { InvoiceKpiCards } from "./_components/InvoiceKpiCards";
-import { InvoicesList } from "./_components/InvoicesList";
+import { InvoicesTable } from "./_components/InvoicesTable";
+import { ExportInvoicesButton } from "./_components/ExportInvoicesButton";
 import { InvoiceSearchBar } from "./_components/InvoiceSearchBar";
 
 export const dynamic = "force-dynamic";
@@ -65,34 +66,41 @@ export default async function InvoicingPage({
             {total} {total === 1 ? "shown" : "shown"}
           </div>
         </div>
-        <Link
-          href={"/invoicing/new" as Route}
-          className="inline-flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-[12.5px] font-semibold text-ink transition-colors hover:bg-gold-strong"
-        >
-          <Plus size={13} strokeWidth={2.4} />
-          New Invoice
-        </Link>
+        <div className="flex items-center gap-2">
+          <ExportInvoicesButton />
+          <Link
+            href={"/invoicing/new" as Route}
+            className="inline-flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-[12.5px] font-semibold text-ink transition-colors hover:bg-gold-strong"
+          >
+            <Plus size={13} strokeWidth={2.4} />
+            New Invoice
+          </Link>
+        </div>
       </div>
 
       {/* ── KPI tiles ───────────────────────────────────────── */}
       <InvoiceKpiCards kpis={kpis} />
 
       {/* ── Search + filter row ─────────────────────────────── */}
+      {/* One search field, directly above the status tabs. A second
+          input used to live inside InvoiceFilters (owner, 2026-08-29). */}
       <InvoiceSearchBar />
       <InvoiceFilters />
 
       {/* ── Rows ────────────────────────────────────────────── */}
-      <InvoicesList rows={rows} />
+      <InvoicesTable rows={rows} />
       <Pager page={page} pageSize={pageSize} total={total} />
     </>
   );
 }
 
 function normaliseStatus(v: string | undefined): InvoiceStatus | "OUTSTANDING" | "ALL" {
-  if (v == null || v === "") return "OUTSTANDING";
+  // Owner, 2026-08-29: land on the whole list, not an empty Outstanding
+  // tab. Must stay in step with InvoiceFilters' own default.
+  if (v == null || v === "") return "ALL";
   if (v === "OUTSTANDING" || v === "ALL") return v;
   if ((INVOICE_STATUSES as readonly string[]).includes(v)) return v as InvoiceStatus;
-  return "OUTSTANDING";
+  return "ALL";
 }
 function parsePositiveInt(v: string | undefined): number | null {
   if (v == null) return null;
