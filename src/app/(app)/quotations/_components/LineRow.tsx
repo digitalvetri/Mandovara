@@ -17,12 +17,14 @@ interface Props {
   index:     number;
   line:      LineInput;
   isOnly:    boolean;
+  /** Room, discount and GST columns. Off by default — see QuotationBuilder. */
+  showDetail: boolean;
   onChange:  (i: number, f: keyof LineInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onRemove:  (i: number) => void;
   onPickProduct: (i: number) => void;
 }
 
-export function LineRow({ index, line, isOnly, onChange, onRemove, onPickProduct }: Props) {
+export function LineRow({ index, line, isOnly, showDetail, onChange, onRemove, onPickProduct }: Props) {
   const isMeasurement = !!line.measurementItemId;
   const hasProduct    = !!line.colourwayId;
 
@@ -65,19 +67,14 @@ export function LineRow({ index, line, isOnly, onChange, onRemove, onPickProduct
         )}
       </Td>
 
-      <Td>
-        <input value={line.roomLabel} onChange={onChange(index, "roomLabel")}
-               placeholder="Room"
-               readOnly={isMeasurement}
-               className={`${cel} ${isMeasurement ? "bg-surface-2/50 text-text-muted cursor-default" : ""}`} />
-      </Td>
-
-      <Td>
-        <input value={line.quantity} onChange={onChange(index, "quantity")}
-               inputMode="decimal"
-               readOnly={isMeasurement}
-               className={`${cel} tabular text-right ${isMeasurement ? "bg-surface-2/50 text-text-muted cursor-default" : ""}`} />
-      </Td>
+      {showDetail && (
+        <Td>
+          <input value={line.roomLabel} onChange={onChange(index, "roomLabel")}
+                 placeholder="Room"
+                 readOnly={isMeasurement}
+                 className={`${cel} ${isMeasurement ? "bg-surface-2/50 text-text-muted cursor-default" : ""}`} />
+        </Td>
+      )}
 
       <Td>
         <select value={line.unit} onChange={onChange(index, "unit")}
@@ -88,20 +85,31 @@ export function LineRow({ index, line, isOnly, onChange, onRemove, onPickProduct
       </Td>
 
       <Td>
+        <input value={line.quantity} onChange={onChange(index, "quantity")}
+               inputMode="decimal"
+               readOnly={isMeasurement}
+               className={`${cel} tabular text-right ${isMeasurement ? "bg-surface-2/50 text-text-muted cursor-default" : ""}`} />
+      </Td>
+
+      <Td>
         <input value={line.rate} onChange={onChange(index, "rate")}
                inputMode="decimal" placeholder="0.00" className={`${cel} tabular text-right`} />
       </Td>
 
-      <Td>
-        <input value={line.discountPct} onChange={onChange(index, "discountPct")}
-               inputMode="decimal" className={`${cel} tabular text-right`} />
-      </Td>
+      {showDetail && (
+        <>
+          <Td>
+            <input value={line.discountPct} onChange={onChange(index, "discountPct")}
+                   inputMode="decimal" className={`${cel} tabular text-right`} />
+          </Td>
 
-      <Td>
-        <select value={line.gstRate} onChange={onChange(index, "gstRate")} className={cel}>
-          {["0","5","12","18","28"].map((r) => <option key={r} value={r}>{r}%</option>)}
-        </select>
-      </Td>
+          <Td>
+            <select value={line.gstRate} onChange={onChange(index, "gstRate")} className={cel}>
+              {["0","5","12","18","28"].map((r) => <option key={r} value={r}>{r}%</option>)}
+            </select>
+          </Td>
+        </>
+      )}
 
       <Td align="right">
         <span className="tabular text-text font-medium">{lineAmount(line)}</span>
@@ -119,12 +127,23 @@ export function LineRow({ index, line, isOnly, onChange, onRemove, onPickProduct
   );
 }
 
+// Amount = Qty × Rate (owner, 2026-08-28). It used to add this line's
+// GST on top, which is why a row could read a number nobody had typed
+// and why the column never tallied with the rate beside it. The taxable
+// value is also the conventional thing to print on a GST quotation —
+// tax is stated once, in the summary, where Subtotal and GST already
+// have their own rows.
+//
+// The discount subtraction only bites when someone opens the detail
+// columns and sets one; at the default 0% this is exactly Qty × Rate.
+// Ignoring it entirely would put a figure on screen that contradicts
+// the total underneath.
 function lineAmount(l: LineInput): string {
   const r = Number(l.rate.replace(/,/g, "")) || 0;
   const q = Number(l.quantity) || 0;
   const d = Number(l.discountPct) || 0;
   const taxable = r * q * (1 - d / 100);
-  return formatINR(BigInt(Math.round((taxable + taxable * (Number(l.gstRate) / 100)) * 100)));
+  return formatINR(BigInt(Math.round(taxable * 100)));
 }
 
 const cel = "w-full h-[28px] px-2 bg-surface-2 border border-border rounded-[4px] text-[12.5px] outline-none focus:border-gold transition-colors";

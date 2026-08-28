@@ -11,15 +11,15 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { Plus, Ruler } from "lucide-react";
+import { Ruler } from "lucide-react";
 import { createQuotation } from "@/modules/quotations/actions";
 import { pickProductForMeasurementItem } from "@/modules/measurement/actions-item";
 import type { BranchOption } from "@/modules/branches/queries";
 import type { SELL_UNITS } from "@/modules/quotations/schema";
 import type { FirmQuoteItem } from "@/modules/measurement/queries-firm-quote";
 import type { PickerRow } from "@/modules/quotations/picker-types";
-import { Th, iso } from "./_builder-primitives";
-import { LineRow } from "./LineRow";
+import { iso } from "./_builder-primitives";
+import { QuotationLinesTable } from "./QuotationLinesTable";
 import type { LineInput } from "./quotation-line-types";
 import { ProductPickerDialog } from "./ProductPickerDialog";
 
@@ -93,6 +93,13 @@ export function QuotationBuilder({ projectId, leadId, leadName, branches, preloa
   const isLeadMode    = !!leadId && !projectId;
   const isProjectMode = !!projectId;
   const hasMeasurements = preloadedItems.length > 0;
+
+  // Item · Unit · Qty · Rate · Amount is the whole quotation for most
+  // jobs (owner, 2026-08-28). Room, per-line discount and per-line GST
+  // still exist and still submit — they are simply not five extra
+  // columns to scroll past on every quote. GST defaults to 18% per line
+  // and is stated once in the summary.
+  const [showDetail, setShowDetail] = useState(false);
 
   if (!isLeadMode && !isProjectMode) {
     return (
@@ -231,39 +238,17 @@ export function QuotationBuilder({ projectId, leadId, leadName, branches, preloa
         </div>
       )}
 
-      {/* Lines */}
-      <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-[12.5px]">
-            <thead>
-              <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
-                <Th width={28}>#</Th>
-                <Th>Description & product</Th>
-                <Th width={110}>Room</Th>
-                <Th width={75}>Qty</Th>
-                <Th width={90}>Unit</Th>
-                <Th width={105}>Rate (₹)</Th>
-                <Th width={68}>Disc %</Th>
-                <Th width={65}>GST %</Th>
-                <Th width={105} align="right">Amount</Th>
-                <Th width={36}></Th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l, i) => (
-                <LineRow key={i} index={i} line={l} isOnly={lines.length === 1}
-                         onChange={set} onRemove={removeLine} onPickProduct={openPicker} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="p-3 border-t border-rule/60">
-          <button type="button" onClick={addLine}
-                  className="flex items-center gap-1.5 h-[30px] px-3 rounded-[6px] text-[12px] text-text-muted hover:text-text hover:bg-surface-hover transition-colors">
-            <Plus size={12} /> Add manual line (service, delivery, etc.)
-          </button>
-        </div>
-      </div>
+      {/* Lines — the table itself lives in QuotationLinesTable so this
+          file stays under the §10 line ceiling. */}
+      <QuotationLinesTable
+        lines={lines}
+        showDetail={showDetail}
+        onShowDetail={setShowDetail}
+        onChange={set}
+        onRemove={removeLine}
+        onPickProduct={openPicker}
+        onAddLine={addLine}
+      />
 
       {serverError && (
         <div className="rounded-[8px] bg-fault/10 border border-fault/30 px-4 py-3 text-[12.5px] text-fault">
