@@ -89,3 +89,15 @@ export async function getPendingQueue(ctx: RequestContext): Promise<PendingQueue
     checked: items.filter((i) => i.status !== "PENDING").length,
   };
 }
+
+/**
+ * How many items are still unverified — for the Stocks tab badge.
+ *
+ * A count query rather than reusing getPendingQueue: the stock list page
+ * renders the same tab strip and has no reason to load every row and
+ * resolve every verifier's name just to print one number.
+ */
+export async function countPendingStock(ctx: RequestContext): Promise<number> {
+  requirePermission(ctx, "inventory.view");
+  return scoped(ctx).pendingStockItem.count({ where: { status: "PENDING" } });
+}

@@ -46,7 +46,7 @@ export default async function PendingStockPage() {
         </div>
       </div>
 
-      <InventoryTabs active="pending" />
+      <InventoryTabs active="pending" pendingCount={left} />
 
       <p className="mb-4 rounded-[10px] border-l-2 border-fault bg-fault/8 px-4 py-2.5 text-[12.5px] text-text">
         These do not count in your stock totals. Read the physical label before

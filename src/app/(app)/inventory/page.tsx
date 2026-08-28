@@ -13,6 +13,7 @@ import { getInventoryKpis, listStockItems } from "@/modules/inventory/queries";
 import { Topbar } from "@/components/layout/Topbar";
 import { Pager } from "@/components/data/Pager";
 import { InventoryTabs } from "./_components/InventoryTabs";
+import { countPendingStock } from "@/modules/pending-stock/queries";
 import { InventoryKpiCards } from "./_components/InventoryKpiCards";
 import { InventoryToolbar } from "./_components/InventoryToolbar";
 import { StockList } from "./_components/StockList";
@@ -41,9 +42,10 @@ export default async function InventoryPage({
   const onlyLow = params.onlyLow === "1";
   const hasLot  = params.hasLot === "1";
 
-  const [{ rows, total, pageSize, families }, kpis] = await Promise.all([
+  const [{ rows, total, pageSize, families }, kpis, pendingCount] = await Promise.all([
     listStockItems(ctx, { ...(q && { search: q }), family, page, onlyLow, hasLot }),
     getInventoryKpis(ctx),
+    countPendingStock(ctx),
   ]);
 
   const canImportStock = ctx.permissions.has("inventory.adjust");
@@ -61,7 +63,7 @@ export default async function InventoryPage({
         {canImportStock && <ImportBaselineStockButton />}
       </div>
 
-      <InventoryTabs active="stock" />
+      <InventoryTabs active="stock" pendingCount={pendingCount} />
       <InventoryKpiCards kpis={kpis} />
       <InventoryToolbar families={families} />
       <StockList rows={rows} />
