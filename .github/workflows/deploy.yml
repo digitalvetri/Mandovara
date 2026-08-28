@@ -81,6 +81,40 @@ jobs:
               exit 0
             fi
 
+            # Print WHY it failed, into the Actions log.
+            #
+            # Coolify keeps the build output on the deployment record, and
+            # until now none of it reached here — a red deploy said only
+            # "status=failed", and the logs behind it need a Coolify login
+            # to read. Anyone without server access (including CI itself)
+            # was left guessing between an OOM, a failed migration and a
+            # full disk. The tail is usually enough to tell them apart.
+            echo ""
+            echo "--- Coolify deployment log (tail) -------------------------"
+            curl -sS -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              "$COOLIFY_URL/api/v1/deployments/$DEP" \
+            | python3 -c '
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("(deployment record was not valid JSON)"); raise SystemExit
+raw = d.get("logs")
+if not raw:
+    print("(no logs on the deployment record)")
+    print("status:", d.get("status"), "| exit:", d.get("exitCode"))
+    raise SystemExit
+# Coolify stores logs as a JSON array of {output, type, timestamp}.
+try:
+    entries = json.loads(raw) if isinstance(raw, str) else raw
+    lines = [str(e.get("output", "")).rstrip() for e in entries]
+except Exception:
+    lines = str(raw).splitlines()
+for line in [l for l in lines if l][-60:]:
+    print(line)
+' || echo "(could not fetch the deployment log)"
+            echo "-----------------------------------------------------------"
+            echo ""
             echo "✗ Attempt $attempt ended with status=$STATUS"
             attempt=$((attempt + 1))
             if [ "$attempt" -le "$MAX_ATTEMPTS" ]; then

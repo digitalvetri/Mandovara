@@ -24,6 +24,14 @@ const config: NextConfig = {
       // it lands in /app/node_modules/bcryptjs/ inside the standalone tree.
       "./node_modules/bcryptjs/**/*",
       "./prisma/**/*",
+      // prisma/seed/pending-stock.ts reads the origin dataset from
+      // src/data. Tracing follows the APP's import graph, and the seed
+      // is force-included by the glob above rather than discovered — so
+      // its own out-of-tree import is not followed and the JSON would be
+      // missing inside the container. Harmless today (the seed only runs
+      // on an empty database) and a silent failure the first time it is
+      // not.
+      "./src/data/**/*",
     ],
   },
   // typedRoutes disabled — friction outweighs value while modules are still
