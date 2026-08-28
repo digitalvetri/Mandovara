@@ -78,7 +78,7 @@ export async function selfApplyLeave(
     type:     z.enum(LEAVE_TYPES),
     fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
     toDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}/),
-    reason:   z.string().trim().max(500).optional(),
+    reason:   z.string().trim().min(1, "Reason is required.").max(500),
   });
 
   const parsed = schema.safeParse(input);

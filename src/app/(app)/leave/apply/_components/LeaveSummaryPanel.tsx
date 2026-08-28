@@ -45,14 +45,17 @@ export function LeaveSummaryPanel({ leaveType, fromDate, toDate, days, reason, r
             </SummaryRow>
           )}
           {reason.trim() && (
-            <SummaryRow label="Reason">
-              <span className="text-text-dim text-right max-w-[130px] truncate" title={reason}>{reason.trim()}</span>
-            </SummaryRow>
+            <div className="py-2.5 space-y-1">
+              <span className="text-[11.5px] text-text-dim">Reason</span>
+              <p className="text-[12px] text-text leading-snug line-clamp-3" title={reason}>
+                {reason.trim()}
+              </p>
+            </div>
           )}
           <SummaryRow label="Status">
-            <span className="inline-flex items-center gap-1 rounded-full border border-heat/25 bg-heat/10 px-2 py-0.5 text-[10.5px] font-medium text-heat">
+            <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-surface-2 px-2 py-0.5 text-[10.5px] font-medium text-text-dim">
               <Clock size={9} strokeWidth={2.5} />
-              Awaiting approval
+              Not submitted yet
             </span>
           </SummaryRow>
         </div>

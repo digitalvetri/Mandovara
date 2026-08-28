@@ -25,6 +25,22 @@ function allRegisteredPermissions(): ReadonlySet<PermissionKey> {
   return set;
 }
 
+// Baseline permissions granted to any non-owner employee who has no dynamic
+// role assigned yet. Covers exactly the sidebar modules visible to employees.
+const EMPLOYEE_BASELINE_PERMISSIONS: readonly PermissionKey[] = [
+  "project.view",
+  "lead.view",
+  "client.view",
+  "quotation.view",
+  "catalog.view",
+  "sitelog.view",
+  "measurement.view.own",
+  "measurement.create.own",
+  "measurement.submit.own",
+  "leave.view",
+  "attendance.punch",
+];
+
 async function buildContext(userId: string): Promise<RequestContext | null> {
   try {
     const user = await prisma.user.findUnique({
@@ -54,7 +70,11 @@ async function buildContext(userId: string): Promise<RequestContext | null> {
         permissions = s;
       }
     } else {
-      permissions = allRegisteredPermissions();
+      // No dynamic role assigned — OWNER gets full access, other employees get
+      // the baseline set that covers the modules visible in the employee sidebar.
+      permissions = user.role === "OWNER"
+        ? allRegisteredPermissions()
+        : new Set<PermissionKey>(EMPLOYEE_BASELINE_PERMISSIONS);
     }
 
     const isOwnerRole = user.dynamicRole?.isOwnerRole ?? (user.role === "OWNER");

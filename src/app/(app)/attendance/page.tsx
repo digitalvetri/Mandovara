@@ -3,6 +3,7 @@ import { devContext } from "@/lib/dev-context";
 import { loadAttendance } from "@/modules/attendance/queries";
 import { SelfView } from "./_components/AttendanceSelfView";
 import { BandCard, Td, Th } from "./_components/AttendanceBadges";
+import { LeaveApprovalButtons } from "@/app/(app)/leave/_components/LeaveApprovalButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -95,9 +96,12 @@ async function ManagerView({ ctx }: { ctx: Awaited<ReturnType<typeof devContext>
                     {l.state.charAt(0) + l.state.slice(1).toLowerCase()}
                   </span>
                 </div>
-                <div className="text-[11.5px] text-text-muted">
+                <div className="text-[11.5px] text-text-muted mb-2">
                   {l.kind} · {l.days} day{l.days === 1 ? "" : "s"} · {l.when}
                 </div>
+                {l.state === "PENDING" && (
+                  <LeaveApprovalButtons id={l.id} />
+                )}
               </li>
             ))}
           </ul>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { devLoginByCredential } from "@/lib/dev-auth";
 import { Loader2, Eye, EyeOff, ArrowRight, Info } from "lucide-react";
@@ -28,6 +28,8 @@ export function LoginCard() {
   const [password, setPassword]     = useState("");
   const [showPwd, setShowPwd]       = useState(false);
   const [showCreds, setShowCreds]   = useState(false);
+  const credRef = useRef<HTMLInputElement>(null);
+  const pwdRef  = useRef<HTMLInputElement>(null);
 
   const SHOW_CREDS_HELPER = process.env.NODE_ENV !== "production";
 
@@ -38,10 +40,13 @@ export function LoginCard() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!credential.trim() || !password) return;
+    // Read DOM values so browser autofill is captured even if onChange didn't fire.
+    const cred = (credRef.current?.value ?? credential).trim();
+    const pwd  = pwdRef.current?.value ?? password;
+    if (!cred || !pwd) return;
     setError(null);
     start(async () => {
-      const res = await devLoginByCredential(credential.trim(), password);
+      const res = await devLoginByCredential(cred, pwd);
       if (!res.ok) { setError(res.error ?? "Login failed"); return; }
       if (res.mustChangePassword) { navigate("/change-password?forced=1"); return; }
       const from = params.get("from");
@@ -128,6 +133,7 @@ export function LoginCard() {
 
           <input
             id="cred"
+            ref={credRef}
             type="text"
             inputMode="email"
             value={credential}
@@ -172,6 +178,7 @@ export function LoginCard() {
           <div className="relative">
             <input
               id="pwd"
+              ref={pwdRef}
               type={showPwd ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -225,14 +232,16 @@ export function LoginCard() {
             gradient and its lift, and the arrow steps forward on hover. */}
         <button
           type="submit"
-          disabled={pending || !canSubmit}
+          disabled={pending}
           className={[
             "group/cta w-full h-[56px] mt-1.5 rounded-[14px]",
             "flex items-center justify-center gap-2.5 font-semibold text-[15.5px]",
             "transition-all duration-200 press",
-            pending || !canSubmit
+            pending
               ? "bg-surface-hover text-text-subtle border border-rule cursor-not-allowed"
-              : "bg-accent text-white border border-transparent hover:bg-accent-hover shadow-md hover:shadow-lg",
+              : canSubmit
+                ? "bg-accent text-white border border-transparent hover:bg-accent-hover shadow-md hover:shadow-lg"
+                : "bg-surface-hover text-text-subtle border border-rule",
           ].join(" ")}
         >
           {pending

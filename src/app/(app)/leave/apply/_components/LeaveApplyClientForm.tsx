@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Calendar, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { selfApplyLeave } from "@/modules/hr/actions";
 import {
   LEAVE_TYPES, todayStr, calcDays, fmtDate, fmtDateShort,
   type LeaveTypeValue, type Employee, type RecentLeave,
 } from "../_lib/leave-types";
-import { LeaveSuccessScreen, LeaveNoEmployeeFallback } from "./LeaveScreens";
+import { LeaveNoEmployeeFallback } from "./LeaveScreens";
 import { LeaveSummaryPanel } from "./LeaveSummaryPanel";
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 
 export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
   const [pending, start]   = useTransition();
+  const router             = useRouter();
   const today              = todayStr();
 
   const [leaveType, setLeaveType] = useState<LeaveTypeValue>("CASUAL");
@@ -24,7 +26,6 @@ export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
   const [toDate,    setTo]        = useState(today);
   const [reason,    setReason]    = useState("");
   const [error,     setError]     = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
 
   const days = useMemo(() => calcDays(fromDate, toDate), [fromDate, toDate]);
 
@@ -37,35 +38,19 @@ export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
     if (val > toDate) setTo(val);
   }
 
-  function handleReset() {
-    setSubmitted(false); setReason(""); setFrom(today); setTo(today);
-    setLeaveType("CASUAL"); setError(null);
-  }
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!employee || days === 0) return;
+    if (!reason.trim()) { setError("Please enter a reason for your leave request."); return; }
     setError(null);
     start(async () => {
-      const res = await selfApplyLeave({ type: leaveType, fromDate, toDate, reason: reason.trim() || undefined });
+      const res = await selfApplyLeave({ type: leaveType, fromDate, toDate, reason: reason.trim() });
       if (!res.ok) { setError(res.error ?? "Could not submit. Please try again."); return; }
-      setSubmitted(true);
+      router.push("/leave");
     });
   }
 
   if (!employee) return <LeaveNoEmployeeFallback />;
-
-  if (submitted) {
-    return (
-      <LeaveSuccessScreen
-        leaveType={leaveType}
-        days={days}
-        fromDate={fromDate}
-        toDate={toDate}
-        onReset={handleReset}
-      />
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit} className="pb-6">
@@ -159,7 +144,7 @@ export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
           <section>
             <div className="flex items-center justify-between mb-2">
               <SectionLabel noMargin>
-                Reason <span className="text-text-faint font-normal normal-case tracking-normal ml-0.5">(optional)</span>
+                Reason <span className="text-bad ml-0.5">*</span>
               </SectionLabel>
               <span className="text-[10px] text-text-faint">{reason.length} / 500</span>
             </div>
@@ -194,13 +179,13 @@ export function LeaveApplyClientForm({ employee, recentLeaves }: Props) {
 
       <button
         type="submit"
-        disabled={pending || days === 0}
+        disabled={pending || days === 0 || !reason.trim()}
         className={[
           "mt-5 w-full h-[52px] rounded-[13px] font-semibold text-[15px]",
           "flex items-center justify-center gap-2.5 transition-colors duration-150",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
           "disabled:cursor-not-allowed",
-          days > 0
+          days > 0 && reason.trim()
             ? "bg-accent text-white hover:bg-accent-hover"
             : "bg-surface-hover text-text-subtle",
           pending ? "opacity-70" : "",

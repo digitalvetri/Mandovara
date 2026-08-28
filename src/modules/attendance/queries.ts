@@ -16,6 +16,7 @@ export interface PunchRow {
 }
 
 export interface LeaveRow {
+  id:           string;
   employeeName: string;
   kind:         string;
   days:         number;
@@ -50,7 +51,7 @@ export async function loadAttendance(ctx: RequestContext): Promise<AttendanceVie
       where:   { organizationId: ctx.orgId, state: { in: ["PENDING", "APPROVED"] } },
       orderBy: { fromDate: "desc" },
       take:    20,
-      select:  { employeeId: true, type: true, state: true, fromDate: true, toDate: true, days: true },
+      select:  { id: true, employeeId: true, type: true, state: true, fromDate: true, toDate: true, days: true },
     }),
   ]);
 
@@ -78,6 +79,7 @@ export async function loadAttendance(ctx: RequestContext): Promise<AttendanceVie
   }));
 
   const leaves: LeaveRow[] = leaveRows.map((l) => ({
+    id:           l.id,
     employeeName: empMap.get(l.employeeId)?.name ?? l.employeeId,
     kind:         humaniseKind(l.type),
     days:         Number(l.days),
