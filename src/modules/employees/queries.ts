@@ -40,6 +40,9 @@ export interface EmployeeDetail {
   status:      string;
   joinDate:    Date;
   userId:      string | null;
+  /** Monthly CTC in paise, or null when no salary structure is set.
+   *  Payroll skips employees without one. */
+  ctcPaise:    bigint | null;
 }
 
 export async function getEmployeeById(
@@ -53,12 +56,25 @@ export async function getEmployeeById(
     select: {
       id: true, code: true, name: true, mobile: true,
       designation: true, department: true, status: true,
-      doj: true, userId: true,
+      doj: true, userId: true, salaryStructure: true,
     },
   });
   if (!row) return null;
+
+  // Monthly CTC in paise, or null when no structure is set. Payroll
+  // skips anyone without one, so the detail page has to be able to say
+  // whether this person has been given a salary at all.
+  const struct = row.salaryStructure as Record<string, string> | null;
+  const ctcPaise = (() => {
+    if (!struct) return null;
+    try {
+      return BigInt(struct["basic"] ?? "0") + BigInt(struct["hra"] ?? "0")
+           + BigInt(struct["conveyance"] ?? "0") + BigInt(struct["other"] ?? "0");
+    } catch { return null; }
+  })();
   return {
     id: row.id, code: row.code, name: row.name, mobile: row.mobile,
+    ctcPaise,
     designation: row.designation, department: row.department,
     status: row.status, joinDate: row.doj, userId: row.userId,
   };

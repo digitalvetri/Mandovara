@@ -7,6 +7,7 @@ import { devContext } from "@/lib/dev-context";
 import { getEmployeeById } from "@/modules/employees/queries";
 import { listTasksForUser } from "@/modules/tasks/queries";
 import { AssignTaskButton } from "./_components/AssignTaskButton";
+import { SalaryStructureForm } from "@/app/(app)/payroll/_components/SalaryStructureForm";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,31 @@ export default async function EmployeeDetailPage({
         </aside>
 
         <section className="space-y-4">
+          {/* Salary structure. This form existed but was mounted
+              nowhere, so no employee could be given a salary — and
+              runPayroll only pays people who have one, meaning a payroll
+              run produced zero payslips and never said why. Found and
+              fixed 2026-08-29. */}
+          {ctx.permissions.has("employee.viewSalary") && (
+            <div className="rounded-[14px] border border-rule bg-surface p-6">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+                  Salary
+                </div>
+                <SalaryStructureForm
+                  employeeId={employee.id}
+                  employeeName={employee.name}
+                  currentCtc={employee.ctcPaise}
+                />
+              </div>
+              <p className="text-[13px] text-text-dim">
+                {employee.ctcPaise
+                  ? "Payroll will include this employee."
+                  : "No salary set — payroll skips this employee until one is."}
+              </p>
+            </div>
+          )}
+
           <div className="rounded-[14px] bg-surface border border-rule p-6">
             <div className="flex items-center justify-between mb-3 gap-3">
               <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
