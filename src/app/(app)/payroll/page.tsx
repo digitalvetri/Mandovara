@@ -6,6 +6,7 @@ import { ApproveButton } from "./_components/PayrollActions";
 import { MyPayslipsView } from "./_components/MyPayslipsView";
 import { MonthHoursGrid } from "./_components/MonthHoursGrid";
 import { PayrollMonthToolbar } from "./_components/PayrollMonthToolbar";
+import { PayrollRows } from "./_components/PayrollRows";
 import { getPayrollMonthGrid } from "@/modules/payroll/month-grid";
 
 export const dynamic = "force-dynamic";
@@ -81,17 +82,7 @@ export default async function PayrollPage({
               <Th align="right">Net pay</Th>
             </tr>
           </thead>
-          <tbody>
-            {p.rows.map((r, i) => (
-              <tr key={i} className="border-b border-rule/70 last:border-0 hover:bg-surface-hover transition-colors">
-                <Td>{r.employeeName}</Td>
-                <Td className="text-text-dim">{r.department ?? "—"}</Td>
-                <Td align="right"><span className="tabular text-text">{formatINR(r.gross)}</span></Td>
-                <Td align="right"><span className="tabular text-bad">−{formatINR(r.deductions)}</span></Td>
-                <Td align="right"><span className="tabular text-text font-medium">{formatINR(r.netPay)}</span></Td>
-              </tr>
-            ))}
-          </tbody>
+          <PayrollRows rows={p.rows} />
         </table>
       </div>
     </>
@@ -112,9 +103,6 @@ function BandCard({ label, value, tone }: { label: string; value: string; tone: 
 }
 function Th({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
   return <th className={`px-4 h-[34px] font-medium ${align === "right" ? "text-right" : "text-left"}`}>{children}</th>;
-}
-function Td({ children, align = "left", className = "" }: { children: React.ReactNode; align?: "left" | "right"; className?: string }) {
-  return <td className={`px-4 py-2 ${align === "right" ? "text-right" : "text-left"} ${className}`}>{children}</td>;
 }
 
 /** Read a positive integer from a query param, clamped to a sane range. */

@@ -15,7 +15,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { Route } from "next";
 import { CalendarDays, Download } from "lucide-react";
 
-export function AttendanceToolbar({ date }: { date: string }) {
+export function AttendanceToolbar({ date, view }: { date: string; view: "day" | "month" }) {
   const router   = useRouter();
   const pathname = usePathname();
   const params   = useSearchParams();
@@ -23,6 +23,12 @@ export function AttendanceToolbar({ date }: { date: string }) {
   function setDate(next: string) {
     const sp = new URLSearchParams(params.toString());
     if (next) sp.set("date", next); else sp.delete("date");
+    router.push(`${pathname}${sp.toString() ? `?${sp}` : ""}` as Route);
+  }
+
+  function setView(next: "day" | "month") {
+    const sp = new URLSearchParams(params.toString());
+    if (next === "month") sp.set("view", "month"); else sp.delete("view");
     router.push(`${pathname}${sp.toString() ? `?${sp}` : ""}` as Route);
   }
 
@@ -48,6 +54,24 @@ export function AttendanceToolbar({ date }: { date: string }) {
         >
           Today
         </button>
+
+        {/* Day shows one row per employee; Month shows the whole sheet,
+            day 1 to month end — the log an admin scrolls back through
+            to settle a "was I in that Tuesday?" argument. */}
+        <div className="flex items-center gap-0.5 rounded-[8px] border border-rule bg-surface p-0.5">
+          {(["day", "month"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`h-[30px] rounded-[6px] px-3 text-[12.5px] transition-colors ${
+                view === v ? "bg-accent text-white" : "text-text-dim hover:text-text"
+              }`}
+            >
+              {v === "day" ? "Day" : "Month"}
+            </button>
+          ))}
+        </div>
       </div>
 
       <a

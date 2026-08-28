@@ -12,6 +12,7 @@ import { Plus, Trash2, Archive, ChevronRight, KeyRound } from "lucide-react";
 import { createEmployee, deleteEmployee, setEmployeeStatus } from "@/modules/employees/actions";
 import { setEmployeePassword } from "@/modules/employees/actions-password";
 import type { EmployeeRow } from "@/modules/employees/queries";
+import { EMPLOYEE_TEAMS } from "@/modules/employees/teams";
 import { fieldCls, iso, statusLabel, Field, Th, Td } from "./_employee-fields";
 
 interface Props {
@@ -137,9 +138,13 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
             <input value={designation} onChange={(e) => setDesignation(e.target.value)}
                    placeholder="e.g. Site Engineer" className={fieldCls} />
           </Field>
-          <Field label="Department">
-            <input value={department} onChange={(e) => setDepartment(e.target.value)}
-                   placeholder="e.g. Projects" className={fieldCls} />
+          {/* One of the three teams rather than free text — the same
+              team typed three ways stops grouping in exports. */}
+          <Field label="Team">
+            <select value={department} onChange={(e) => setDepartment(e.target.value)} className={fieldCls}>
+              <option value="">Select a team…</option>
+              {EMPLOYEE_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
           </Field>
           <Field label="Branch" required>
             <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={fieldCls}>

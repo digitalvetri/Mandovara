@@ -95,6 +95,12 @@ export async function loadMyPayslips(ctx: RequestContext): Promise<MyPayslipsVie
   return { employee, payslips };
 }
 
+/** Payslip JSON holds paise as strings; a missing or malformed component
+ *  reads as zero rather than throwing and taking the whole page down. */
+function big(v: string | undefined): bigint {
+  try { return BigInt(v ?? "0"); } catch { return 0n; }
+}
+
 // The earnings / deductions JSON stored on Payslip — all values are BigInt paise as strings.
 interface PayslipEarnings {
   basic:      string;
@@ -118,6 +124,20 @@ export interface PayrollRow {
   deductions:   bigint;
   netPay:       bigint;
   payslipId:    string;
+  /** The working behind gross and deductions, so an owner can audit a
+   *  figure without opening the database (owner, 2026-08-29: "full
+   *  access to view complete breakdown details"). Paise. */
+  breakdown: {
+    basic:       bigint;
+    hra:         bigint;
+    conveyance:  bigint;
+    other:       bigint;
+    pf:          bigint;
+    esi:         bigint;
+    pt:          bigint;
+    daysPresent: number;
+    lopDays:     number;
+  };
 }
 
 export interface PayrollView {
@@ -171,7 +191,10 @@ export async function loadPayroll(
 
   const payslips = await db.payslip.findMany({
     where:   { payrollRunId: run.id },
-    select:  { id: true, employeeId: true, earnings: true, deductions: true, netPay: true },
+    select:  {
+      id: true, employeeId: true, earnings: true, deductions: true, netPay: true,
+      daysPresent: true, lopDays: true,
+    },
     orderBy: { netPay: "desc" },
     take:    100,
   });
@@ -197,6 +220,17 @@ export async function loadPayroll(
       deductions:   dedBig,
       netPay:       p.netPay,
       payslipId:    p.id,
+      breakdown: {
+        basic:       big(earn.basic),
+        hra:         big(earn.hra),
+        conveyance:  big(earn.conveyance),
+        other:       big(earn.other),
+        pf:          big(ded.pf),
+        esi:         big(ded.esi),
+        pt:          big(ded.pt),
+        daysPresent: Number(p.daysPresent ?? 0),
+        lopDays:     Number(p.lopDays ?? 0),
+      },
     };
   });
 

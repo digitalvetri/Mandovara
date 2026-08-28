@@ -63,12 +63,20 @@ function minutesFor(row: {
   return null;
 }
 
-export async function getPayrollMonthGrid(
+/**
+ * The grid itself, with no permission check of its own.
+ *
+ * Two screens need this same sheet through different authorities: the
+ * payroll run (payroll.view) and the attendance month view
+ * (attendance.view, added 2026-08-29). Each exported entry point below
+ * applies its own guard — building the month twice would guarantee the
+ * two drift apart (CLAUDE.md rule 14).
+ */
+async function buildMonthGrid(
   ctx:   RequestContext,
   year:  number,
   month: number,
 ): Promise<PayrollMonthGrid> {
-  requirePermission(ctx, "payroll.view");
   const db = scoped(ctx);
 
   // Month bounds in UTC, matching how Attendance.date is stored (@db.Date
@@ -132,4 +140,23 @@ export async function getPayrollMonthGrid(
     year, month, daysInMonth, rows,
     hasOpenDays: rows.some((r) => r.openDays > 0),
   };
+}
+
+/** The payroll working sheet. */
+export async function getPayrollMonthGrid(
+  ctx: RequestContext, year: number, month: number,
+): Promise<PayrollMonthGrid> {
+  requirePermission(ctx, "payroll.view");
+  return buildMonthGrid(ctx, year, month);
+}
+
+/**
+ * The same sheet for Attendance's month view — an attendance manager
+ * needs to inspect past logs without being able to see payroll.
+ */
+export async function getAttendanceMonthGrid(
+  ctx: RequestContext, year: number, month: number,
+): Promise<PayrollMonthGrid> {
+  requirePermission(ctx, "attendance.view");
+  return buildMonthGrid(ctx, year, month);
 }

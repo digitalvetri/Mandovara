@@ -1,6 +1,8 @@
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { loadAttendance } from "@/modules/attendance/queries";
+import { getAttendanceMonthGrid } from "@/modules/payroll/month-grid";
+import { MonthHoursGrid } from "@/app/(app)/payroll/_components/MonthHoursGrid";
 import { SelfView } from "./_components/AttendanceSelfView";
 import { BandCard, Td, Th } from "./_components/AttendanceBadges";
 import { AttendanceToolbar } from "./_components/AttendanceToolbar";
@@ -30,7 +32,7 @@ export const LEAVE_TONE: Record<string, string> = {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-interface SearchParams { date?: string }
+interface SearchParams { date?: string; view?: string }
 
 export default async function AttendancePage({
   searchParams,
@@ -38,7 +40,7 @@ export default async function AttendancePage({
   const params = await searchParams;
   const ctx = await devContext();
   if (ctx.permissions.has("attendance.view")) {
-    return <ManagerView ctx={ctx} dateParam={params.date} />;
+    return <ManagerView ctx={ctx} dateParam={params.date} viewParam={params.view} />;
   }
   return <SelfView ctx={ctx} />;
 }
@@ -57,17 +59,30 @@ function resolveDate(raw: string | undefined): { iso: string; date: Date } {
 // ── Manager view ──────────────────────────────────────────────────────────────
 
 async function ManagerView({
-  ctx, dateParam,
-}: { ctx: Awaited<ReturnType<typeof devContext>>; dateParam?: string }) {
+  ctx, dateParam, viewParam,
+}: {
+  ctx: Awaited<ReturnType<typeof devContext>>;
+  dateParam?: string;
+  viewParam?: string;
+}) {
   const { iso, date } = resolveDate(dateParam);
-  const a = await loadAttendance(ctx, date);
+  const view = viewParam === "month" ? "month" : "day";
   const isToday = iso === new Date().toISOString().slice(0, 10);
+
+  // The month sheet reuses payroll's grid rather than growing a second
+  // one — same builder, guarded on attendance.view instead.
+  const [a, monthGrid] = await Promise.all([
+    loadAttendance(ctx, date),
+    view === "month"
+      ? getAttendanceMonthGrid(ctx, date.getUTCFullYear(), date.getUTCMonth() + 1)
+      : Promise.resolve(null),
+  ]);
 
   return (
     <>
       <Topbar title="Attendance & Leave" eyebrow={`Team overview · ${isToday ? "today" : iso}`} />
 
-      <AttendanceToolbar date={iso} />
+      <AttendanceToolbar date={iso} view={view} />
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
         <BandCard label="Present"  value={a.present}  tone="solid"  />
@@ -77,6 +92,11 @@ async function ManagerView({
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
+        {view === "month" && monthGrid ? (
+          <div className="lg:col-span-2">
+            <MonthHoursGrid grid={monthGrid} />
+          </div>
+        ) : (
         <div className="lg:col-span-2 rounded-[14px] bg-surface border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <div className="overflow-x-auto text-[13px] text-text">
@@ -109,6 +129,7 @@ async function ManagerView({
             </tbody>
           </table>
         </div>
+        )}
 
         <div className="rounded-[14px] bg-surface border border-border p-5 h-fit">
           <div className="text-[13px] font-semibold text-text mb-4">Leave requests</div>
