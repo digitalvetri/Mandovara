@@ -8,7 +8,7 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, MapPin, Briefcase, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
-  BarChart2, CheckSquare, FolderOpen, UserCircle,
+  BarChart2, CheckSquare, FolderOpen, UserCircle, Ruler,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -109,7 +109,8 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   {
     section: "Field Operations",
     items: [
-      { label: "Site Visits & Measurements", href: "/site-visits", icon: MapPin, perm: "sitelog.view" },
+      { label: "Site Visit Management", href: "/site-visits",   icon: MapPin, perm: "sitelog.view"        },
+      { label: "Measurements",          href: "/measurements",  icon: Ruler,  perm: "measurement.view.own" },
     ],
   },
   {
