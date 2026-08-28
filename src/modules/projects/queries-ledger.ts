@@ -56,7 +56,7 @@ export async function getProjectLedger(
   requirePermission(ctx, "project.view");
   const db = scoped(ctx);
 
-  const [quotations, advances, invoices, receipts] = await Promise.all([
+  const [quotations, advances, invoices] = await Promise.all([
     db.quotation.findMany({
       where:   { projectId, status: { in: ["SENT", "ACCEPTED", "REVISED"] } },
       orderBy: { date: "asc" },
@@ -71,16 +71,44 @@ export async function getProjectLedger(
       where:   { projectId, status: { not: "CANCELLED" } },
       orderBy: { date: "asc" },
       select:  { id: true, number: true, date: true, total: true, status: true, advanceAdjusted: true },
-    }),
-    db.receipt.findMany({
-      where:   { projectId },
-      orderBy: { date: "asc" },
-      select:  {
-        id: true, number: true, date: true, amount: true,
-        mode: true, reference: true, chequeStatus: true,
-      },
-    }),
+    })
   ]);
+
+  // Receipts reach a project by TWO routes and both must be counted.
+  //
+  // Receipt.projectId is optional and often null — the payment sheet does
+  // not set it. The authoritative link is ReceiptAllocation -> Invoice,
+  // which is what getProjectMoney uses for the RECEIVED figure in the
+  // right rail.
+  //
+  // Querying only Receipt.projectId (as this did until 2026-08-28) meant
+  // the ledger reported "₹0 of ₹1,451.40 received" on a project the rail
+  // simultaneously showed as fully paid — two numbers for the same money
+  // on the same screen.
+  //
+  // ReceiptAllocation carries invoiceId but no `invoice` relation, so the
+  // invoice ids are resolved above and matched here.
+  const invoiceIds = invoices.map((i) => i.id);
+  const receipts = await db.receipt.findMany({
+    where: {
+      OR: [
+        { projectId },
+        ...(invoiceIds.length ? [{ allocations: { some: { invoiceId: { in: invoiceIds } } } }] : []),
+      ],
+    },
+    orderBy: { date: "asc" },
+    select: {
+      id: true, number: true, date: true, amount: true,
+      mode: true, reference: true, chequeStatus: true,
+      // Only the portion allocated to THIS project's invoices counts. A
+      // receipt settling two projects must not credit its full value to
+      // whichever page you happen to be looking at.
+      allocations: {
+        where:  { invoiceId: { in: invoiceIds } },
+        select: { amount: true },
+      },
+    },
+  });
 
   const rows: LedgerRow[] = [];
 
@@ -116,13 +144,23 @@ export async function getProjectLedger(
     // A bounced cheque is not money. It stays visible as a row so the
     // history explains the balance, but contributes nothing.
     const bounced = r.chequeStatus === "BOUNCED";
+
+    // Credit only what landed on this project. A receipt allocated
+    // across invoices gets its matching slice; one linked by projectId
+    // with no allocations yet is money on account, so it counts whole.
+    const allocated = r.allocations.reduce((acc: bigint, a: { amount: bigint }) => acc + a.amount, 0n);
+    const credit = bounced ? 0n : (allocated > 0n ? allocated : r.amount);
+
+    const partial = allocated > 0n && allocated !== r.amount;
     rows.push({
       id: r.id, kind: "RECEIPT", date: r.date,
       ref: r.number, label: bounced ? "Receipt — cheque bounced" : "Payment received",
-      debit: 0n, credit: bounced ? 0n : r.amount, balance: 0n,
+      debit: 0n, credit, balance: 0n,
       note: bounced
         ? "bounced — not counted"
-        : (r.reference ? `${r.mode} · ${r.reference}` : r.mode),
+        : partial
+          ? `${r.mode} · part of a larger receipt`
+          : (r.reference ? `${r.mode} · ${r.reference}` : r.mode),
     });
   }
 

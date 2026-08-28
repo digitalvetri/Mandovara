@@ -164,12 +164,15 @@ export function StageStepper({ stage, projectId, canEdit = false, money, hasOrde
         )}
       </ol>
 
-      {canEdit && !cancelled && (
+      {/* The permanent "stages advance automatically, click to override"
+          line is gone (2026-08-28). It taught a one-time lesson on every
+          single visit, forever, and the stepper's own hover cursor makes
+          the same point. What survives is the CONDITIONAL half — text
+          that only appears when something is genuinely blocked, which is
+          the only time an explanation is worth the space. */}
+      {canEdit && !cancelled && !hasOrder && currentPhase === "PROJECT" && (
         <div className="mt-1.5 text-[10.5px] text-text-subtle">
-          Stages advance automatically as work happens. Click a stage to override manually.
-          {!hasOrder && currentPhase === "PROJECT" && (
-            <span className="ml-1">Create the invoice to unlock later stages.</span>
-          )}
+          Create the invoice to unlock later stages.
         </div>
       )}
     </>

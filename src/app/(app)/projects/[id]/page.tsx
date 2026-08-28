@@ -85,13 +85,14 @@ export default async function ProjectDetailPage({
       advanceRequired: money.advanceRequired,
     } } : {}),
   });
-  const receivedTotal = money?.receiptTotal ?? 0n;
-  const pctCompleteHeader = milestones.length > 0
-    ? Math.round(
-        (milestones.filter((m) => m.status === "COMPLETED").length /
-         milestones.length) * 100,
-      )
-    : 0;
+  // The order value an owner means is what the client has committed to:
+  // the confirmed order if there is one, otherwise the quoted figure, and
+  // only then the stored column as a last resort. Reading the column
+  // first is what produced "₹0" on a project with a live order.
+  const headerOrderValue =
+    (money?.orderValue ?? 0n) > 0n ? money!.orderValue
+    : ledger.quoted > 0n           ? ledger.quoted
+    : p.orderValue;
 
   return (
     <>
@@ -164,10 +165,27 @@ export default async function ProjectDetailPage({
           />
         </div>
 
+        {/* Three figures, from ONE source.
+        
+            This row used to read Project.orderValue — a stored column
+            nothing keeps up to date — while the money rail two hundred
+            pixels to the right computed its own total from the actual
+            orders. A real project showed "ORDER VALUE ₹0" beside
+            "Order ₹1,230". Whichever an owner believed, the screen was
+            lying to them somewhere.
+            
+            Everything here now comes from the ledger, which is also what
+            the rail and the Payment ledger section read, so the three
+            cannot disagree. "Progress" is replaced by balance due:
+            percentage-of-milestones read 0% on a project that was
+            invoiced and paid in full, which told nobody anything. */}
         <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[12.5px] tabular-nums text-text-dim">
-          <HeaderStat k="Order value" v={formatINR(p.orderValue)} />
-          {money && <HeaderStat k="Received" v={formatINR(receivedTotal)} />}
-          <HeaderStat k="Progress" v={`${pctCompleteHeader}%`} />
+          <HeaderStat k="Order value" v={formatINR(headerOrderValue)} />
+          <HeaderStat k="Received" v={formatINR(ledger.received)} />
+          <HeaderStat
+            k={ledger.balance >= 0n ? "Balance due" : "In credit"}
+            v={formatINR(ledger.balance >= 0n ? ledger.balance : -ledger.balance)}
+          />
         </div>
       </div>
 

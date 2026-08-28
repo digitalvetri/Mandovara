@@ -1,7 +1,7 @@
 "use client";
 
 // Owns the interactive state for the Next Action hero:
-//   - the "Start measurement" button (via NextActionCard)
+//   - the "Start measurement" button
 //   - the "Schedule visit" sheet (ENQUIRY-stage action)
 //   - the room-setup sheet that appears when the project has no rooms
 //   - the always-visible "Quick actions" strip (2026-08-26 owner
@@ -21,7 +21,6 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { Route } from "next";
 import { CalendarPlus, Ruler, Loader2 } from "lucide-react";
-import { NextActionCard } from "./NextActionCard";
 import { RoomSetupSheet } from "./RoomSetupSheet";
 import { ScheduleVisitSheet } from "./ScheduleVisitSheet";
 import type { NextAction } from "@/modules/projects/next-action";
@@ -32,7 +31,7 @@ interface Props {
   action: NextAction;
   currentUserId: string;
   /** Show/hide the quick-action buttons per role. Both default to false
-   *  so a permission-less viewer sees only the primary NextActionCard. */
+   *  so a permission-less viewer sees no action buttons at all. */
   canScheduleVisit?: boolean;
   canMeasure?: boolean;
   /** Hide the whole quick-actions strip once install is done. */
@@ -86,13 +85,29 @@ export function StartMeasurementFlow({
 
   return (
     <>
-      <NextActionCard projectId={projectId} action={action} />
-
+      {/* The NextActionCard is gone (2026-08-28, owner instruction:
+          "remove the next action box").
+          
+          It announced one step in a fixed order — the same assumption
+          the section list below was rebuilt to drop — and it took a
+          large banner to say something the stage stepper already shows.
+          Its one genuinely useful part was the shortcut it offered, so
+          that survives here as a normal button beside the others, where
+          it can be used at any time rather than only when the flow
+          decides it is your turn. */}
       {showQuickActions && (
         <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-rule bg-surface-2/40 px-3 py-2">
           <span className="mr-1 text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
             Quick actions
           </span>
+          {action.href && action.cta && (
+            <a
+              href={action.href}
+              className="inline-flex items-center gap-1.5 rounded-[6px] border border-accent/40 bg-accent/10 px-2.5 py-1 text-[12px] font-medium text-accent transition-colors hover:bg-accent/18"
+            >
+              {action.cta}
+            </a>
+          )}
           {canScheduleVisit && (
             <button
               type="button"
