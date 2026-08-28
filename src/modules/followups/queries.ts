@@ -4,6 +4,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { Prisma } from "@prisma/client";
+import { leadVisibilityWhere } from "@/modules/leads/scope";
 
 // ── Automation rules ─────────────────────────────────────────────────────────
 
@@ -226,11 +227,14 @@ export interface FollowUpPickerLead {
 export async function listLeadsForFollowUp(ctx: RequestContext): Promise<FollowUpPickerLead[]> {
   requirePermission(ctx, "lead.view");
   const db = scoped(ctx);
+  // Same visibility rule as the leads list — otherwise the follow-up
+  // picker becomes a back door onto every name in the pipeline.
   return db.lead.findMany({
     where: {
       stage: {
         in: ["NEW", "CONTACTED", "MEASUREMENT_SCHEDULED", "MEASURED", "QUOTED", "NEGOTIATION"],
       },
+      ...leadVisibilityWhere(ctx),
     },
     orderBy: { createdAt: "desc" },
     take:    200,

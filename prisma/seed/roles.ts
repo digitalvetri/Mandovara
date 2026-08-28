@@ -36,7 +36,7 @@ const OWNER_DENIES: readonly string[] = [
 const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
   DESIGNER: [
     "catalog.view", "catalog.viewCost", "catalog.manageCategory", "catalog.attachDocument",
-    "lead.view", "lead.create", "lead.update", "lead.viewOthers", "lead.assign", "lead.convert",
+    "lead.view", "lead.create", "lead.update", "lead.assign", "lead.convert",
     "client.view", "client.create", "client.update", "client.viewOthers", "client.viewOutstanding",
     "contact.view", "contact.create", "contact.update",
     "followup.view", "followup.create", "followup.close",
@@ -56,7 +56,7 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
 
   SALES: [
     "catalog.view",
-    "lead.view", "lead.create", "lead.update", "lead.viewOthers", "lead.assign", "lead.convert", "lead.close",
+    "lead.view", "lead.create", "lead.update", "lead.assign", "lead.convert", "lead.close",
     "client.view", "client.create", "client.update", "client.viewOthers", "client.viewOutstanding",
     "contact.view", "contact.create", "contact.update",
     "followup.view", "followup.create", "followup.close",

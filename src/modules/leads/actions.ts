@@ -9,6 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { canTouchLead } from "./scope";
 import { collectEvents } from "@/kernel/events/bus";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
@@ -133,6 +134,13 @@ export async function updateLead(input: unknown): Promise<ActionResult<{ id: str
     where: { id },
     select: { siteAddress: true, ownerId: true, name: true },
   });
+  // Server-side ownership gate (rule 11). The list and detail page are
+  // already narrowed, but a hand-made POST would otherwise let one
+  // employee edit another's lead.
+  if (existing && !canTouchLead(ctx, existing)) {
+    return { ok: false, error: "You can only edit leads assigned to you." };
+  }
+
   const existingAddr = (existing?.siteAddress ?? {}) as Record<string, unknown>;
 
   const hasSiteFields = rest.city != null || rest.pincode != null ||
@@ -205,8 +213,11 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult<{ id
   await withTransaction(async (tx: TxClient) => {
     const before = await tx.lead.findUniqueOrThrow({
       where: { id },
-      select: { stage: true },
+      select: { stage: true, ownerId: true },
     });
+    if (!canTouchLead(ctx, before)) {
+      throw new Error("You can only update leads assigned to you.");
+    }
     if (before.stage === to) return;
 
     await tx.lead.update({

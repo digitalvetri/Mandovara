@@ -13,6 +13,7 @@ import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { canTouchLead } from "./scope";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
@@ -41,11 +42,15 @@ export async function convertLead(
   const lead = await db.lead.findUniqueOrThrow({
     where: { id },
     select: {
-      id: true, name: true, mobile: true, email: true,
+      id: true, name: true, mobile: true, email: true, ownerId: true,
       stage: true, convertedClientId: true,
       siteAddress: true, architectId: true,
     },
   });
+
+  if (!canTouchLead(ctx, lead)) {
+    return { ok: false, error: "You can only convert leads assigned to you." };
+  }
 
   // Idempotent: already converted — return existing client + first linked project
   if (lead.convertedClientId != null) {
@@ -206,9 +211,12 @@ export async function deleteLead(id: string): Promise<ActionResult> {
   // Owner should archive the client instead.
   const lead = await db.lead.findUnique({
     where:  { id },
-    select: { convertedClientId: true },
+    select: { convertedClientId: true, ownerId: true },
   });
   if (!lead) return { ok: false, error: "Lead not found." };
+  if (!canTouchLead(ctx, lead)) {
+    return { ok: false, error: "You can only delete leads assigned to you." };
+  }
   if (lead.convertedClientId) {
     return {
       ok: false,

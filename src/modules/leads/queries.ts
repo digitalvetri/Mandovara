@@ -6,6 +6,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { buildWhere, orderFor } from "./queries-part2";
+import { leadVisibilityWhere } from "./scope";
 
 export interface ListLeadsQuery {
   search?: string;
@@ -88,7 +89,10 @@ export async function listLeads(
   const page = Math.max(1, q.page ?? 1);
   const skip = (page - 1) * pageSize;
 
-  const where = buildWhere(q);
+  // Visibility is ANDed in here rather than inside buildWhere() so the
+  // narrowing applies to the count as well as the rows — a scoped list
+  // beside an unscoped total is its own bug.
+  const where = { AND: [buildWhere(q), leadVisibilityWhere(ctx)] };
   const orderBy = orderFor(q.sort);
 
   const [rawRows, total] = await Promise.all([

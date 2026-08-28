@@ -9,6 +9,7 @@ import { withTransaction } from "@/kernel/db/transaction";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { LeadDetail, LeadSummaryCounts, ListLeadsQuery, OPEN_STAGES } from "./queries";
+import { canTouchLead, canViewOthersLeads, leadVisibilityWhere } from "./scope";
 
 export async function getLead(ctx: RequestContext, id: string): Promise<LeadDetail | null> {
   requirePermission(ctx, "lead.view");
@@ -24,6 +25,10 @@ export async function getLead(ctx: RequestContext, id: string): Promise<LeadDeta
     },
   });
   if (!lead) return null;
+  // Not "forbidden" — absent. Returning null lets the page render its
+  // ordinary not-found state, and does not confirm to an employee that a
+  // lead with this id exists under someone else's name.
+  if (!canTouchLead(ctx, lead)) return null;
 
   const owner = await db.user.findUnique({
     where: { id: lead.ownerId },
@@ -68,9 +73,17 @@ export async function getLeadSummaryCounts(ctx: RequestContext): Promise<LeadSum
   const now = new Date();
 
   // Single groupBy replaces 6 separate COUNT queries
+  // Same narrowing as listLeads — these are the counts printed on the
+  // tabs above that list, so they have to answer the same question.
+  const visible = leadVisibilityWhere(ctx);
   const [stageCounts, followUp] = await Promise.all([
-    db.lead.groupBy({ by: ["stage"], _count: { id: true } }),
-    db.followUp.count({ where: { refType: "LEAD", completedAt: null, dueAt: { lte: now } } }),
+    db.lead.groupBy({ by: ["stage"], _count: { id: true }, where: visible }),
+    db.followUp.count({
+      where: {
+        refType: "LEAD", completedAt: null, dueAt: { lte: now },
+        ...(canViewOthersLeads(ctx) ? {} : { ownerId: ctx.userId }),
+      },
+    }),
   ]);
 
   const m = new Map(stageCounts.map((s) => [s.stage, s._count.id]));
@@ -97,6 +110,10 @@ export async function getLeadCities(ctx: RequestContext): Promise<string[]> {
   // with no `app.current_org_id` set and the RLS policy would return zero rows.
   // Verified: the bare form returned 0 while the same count via a model op
   // returned 262.
+  // The city dropdown is built from the leads you can see. Left
+  // unscoped it would leak the towns of other people's leads and offer
+  // filters that return nothing.
+  const ownerOnly = canViewOthersLeads(ctx) ? null : ctx.userId;
   const rows = await withTransaction(
     (tx) => tx.$queryRaw<{ city: string }[]>`
       SELECT DISTINCT "siteAddress"->>'city' AS city
@@ -104,6 +121,7 @@ export async function getLeadCities(ctx: RequestContext): Promise<string[]> {
       WHERE "organizationId" = ${ctx.orgId}
         AND "siteAddress"->>'city' IS NOT NULL
         AND "siteAddress"->>'city' != ''
+        AND (${ownerOnly}::text IS NULL OR "ownerId" = ${ownerOnly})
       ORDER BY city
     `,
     { orgId: ctx.orgId },
