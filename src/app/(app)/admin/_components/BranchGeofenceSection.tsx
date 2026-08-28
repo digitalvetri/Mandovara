@@ -8,7 +8,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Loader2, Save, XCircle } from "lucide-react";
+import { MapPin, Loader2, Save, XCircle, Map as MapIcon } from "lucide-react";
+import { GeofenceMapModal } from "./GeofenceMapModal";
 import { setBranchGeofence } from "@/modules/admin/actions";
 
 interface BranchRow {
@@ -51,6 +52,15 @@ function BranchRowEditor({ initial }: { initial: BranchRow }) {
   const [radius, setRadius] = useState(initial.attendanceRadiusM == null ? "" : String(initial.attendanceRadiusM));
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+
+  // The map only means anything once all three numbers parse — a circle
+  // drawn from a half-typed coordinate would be a confident lie.
+  const latN = Number(lat), lngN = Number(lng), radN = Number(radius);
+  const canMap =
+    lat.trim() !== "" && lng.trim() !== "" && radius.trim() !== "" &&
+    Number.isFinite(latN) && Number.isFinite(lngN) && Number.isFinite(radN) &&
+    Math.abs(latN) <= 90 && Math.abs(lngN) <= 180 && radN > 0;
 
   async function useMyLocation() {
     setMsg(null);
@@ -122,6 +132,17 @@ function BranchRowEditor({ initial }: { initial: BranchRow }) {
               : <>No fence — check-in allowed from anywhere</>}
           </div>
         </div>
+        <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setMapOpen(true)}
+          disabled={!canMap}
+          title={canMap ? "See the fence on a map" : "Enter latitude, longitude and radius first"}
+          className="inline-flex items-center gap-1.5 h-[26px] px-2.5 rounded-[5px] text-[11px] font-medium text-text-dim border border-rule hover:text-accent hover:border-accent/50 transition-colors disabled:opacity-40"
+        >
+          <MapIcon size={11} />
+          View on Map
+        </button>
         <button
           type="button"
           onClick={useMyLocation}
@@ -131,7 +152,18 @@ function BranchRowEditor({ initial }: { initial: BranchRow }) {
           {gpsBusy ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} />}
           Use my location
         </button>
+        </div>
       </div>
+
+      {mapOpen && canMap && (
+        <GeofenceMapModal
+          lat={latN}
+          lng={lngN}
+          radius={radN}
+          label={initial.name}
+          onClose={() => setMapOpen(false)}
+        />
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-[1fr_1fr_140px_auto] gap-2">
         <input
           value={lat}

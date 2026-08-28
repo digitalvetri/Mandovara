@@ -23,41 +23,34 @@ export default async function AdminPage() {
     <>
       <Topbar
         title="Administration, Roles & Audit"
-        eyebrow="Users, permissions, audit log and org settings"
+        eyebrow="Employees, geofence, audit log and org settings"
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-10">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6">
-            <div className="flex items-baseline justify-between mb-4">
-              <div className="font-display text-[18px] font-semibold">Users & roles</div>
-              <AddUserForm roles={a.roles} branches={a.branches} />
+          {/* The "Users & roles" table stood here. Removed 2026-08-29
+              (owner): "User and roles in the Admin and Roles module is
+              not needed as I only need the list of employees". It listed
+              the same people as Employees below, from a different table,
+              with a different set of columns — two answers on one screen
+              to the question "who works here".
+
+              The permission matrix at /admin/roles is untouched and still
+              reachable: it is how a role gets a permission granted or
+              revoked, which nothing else in the app can do. */}
+
+          {/* The table went, but creating a login did not: an employee
+              with no user account cannot sign in, and the password
+              control on the row below says exactly that when asked to
+              reset one. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-rule bg-surface px-5 py-4">
+            <div>
+              <div className="text-[14px] font-medium text-text">Login accounts</div>
+              <p className="mt-0.5 text-[12.5px] text-text-dim">
+                Give an employee a sign-in. Their password can be changed from the list below.
+              </p>
             </div>
-            {a.users.length === 0 ? (
-              <div className="py-8 text-center text-[12px] text-text-faint">
-                No users yet. Add your team so they can sign in.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-[12.5px]">
-                  <thead>
-                    <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
-                      <Th>Name</Th><Th>Role</Th><Th>Branch</Th><Th>Email</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {a.users.map((u) => (
-                      <tr key={u.id} className="border-b border-rule/60 last:border-0">
-                        <Td>{u.name}</Td>
-                        <Td className="text-text-dim">{u.role}</Td>
-                        <Td className="text-text-dim">{u.branchLabel}</Td>
-                        <Td className="text-text-faint tabular text-[11px]">{u.email}</Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <AddUserForm roles={a.roles} branches={a.branches} />
           </div>
 
           <EmployeesSection
@@ -113,9 +106,4 @@ export default async function AdminPage() {
   );
 }
 
-function Th({ children }: { children?: React.ReactNode }) {
-  return <th className="px-4 h-[34px] font-medium text-left">{children}</th>;
-}
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-2 text-left ${className}`}>{children}</td>;
-}
+

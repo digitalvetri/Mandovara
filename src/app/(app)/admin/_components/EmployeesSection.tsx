@@ -8,9 +8,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
-import { Plus, Trash2, Archive, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Archive, ChevronRight, KeyRound } from "lucide-react";
 import { createEmployee, deleteEmployee, setEmployeeStatus } from "@/modules/employees/actions";
+import { setEmployeePassword } from "@/modules/employees/actions-password";
 import type { EmployeeRow } from "@/modules/employees/queries";
+import { fieldCls, iso, statusLabel, Field, Th, Td } from "./_employee-fields";
 
 interface Props {
   employees: EmployeeRow[];
@@ -40,6 +42,13 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
   const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
   const [joinDate, setJoinDate] = useState<string>(iso(new Date()));
   const [code, setCode] = useState("");
+
+  // Password reset, one row at a time (owner, 2026-08-29). Nothing here
+  // can read an existing password — bcrypt is one-way — so this sets a
+  // new one for the owner to pass on.
+  const [pwFor,  setPwFor]  = useState<string | null>(null);
+  const [pwText, setPwText] = useState("");
+  const [pwDone, setPwDone] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   function commitAdd(e: React.FormEvent) {
@@ -54,6 +63,19 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
       setName(""); setMobile(""); setDesignation("");
       setDepartment(""); setCode(""); setAddOpen(false);
       router.refresh();
+    });
+  }
+
+  function commitPassword(id: string) {
+    setRowError((e) => ({ ...e, [id]: "" }));
+    setPwDone(null);
+    startTransition(async () => {
+      const res = await setEmployeePassword({ employeeId: id, password: pwText });
+      if (!res.ok) {
+        setRowError((e) => ({ ...e, [id]: res.error ?? "Could not set the password" }));
+        return;
+      }
+      setPwFor(null); setPwText(""); setPwDone(id);
     });
   }
 
@@ -203,7 +225,40 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
                       ) : (
                         <span className="text-[10.5px] text-text-faint">archived</span>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => { setPwFor(pwFor === emp.id ? null : emp.id); setPwText(""); setPwDone(null); }}
+                        title="Set a new login password"
+                        className="inline-flex h-[24px] items-center gap-1 rounded-[4px] border border-rule px-2 text-[10.5px] text-text-dim transition-colors hover:border-accent/50 hover:text-accent"
+                      >
+                        <KeyRound size={11} /> Password
+                      </button>
                     </div>
+
+                    {pwFor === emp.id && (
+                      <div className="mt-2 flex items-center justify-end gap-1.5">
+                        <input
+                          type="password"
+                          value={pwText}
+                          onChange={(e) => setPwText(e.target.value)}
+                          placeholder="New password (min 8)"
+                          className="h-[28px] w-[190px] rounded-[6px] border border-rule bg-white/60 px-2 text-[12px] outline-none focus:border-accent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => commitPassword(emp.id)}
+                          disabled={pending || pwText.length < 8}
+                          className="h-[28px] rounded-[6px] bg-accent px-3 text-[11.5px] font-medium text-white disabled:opacity-40"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    )}
+                    {pwDone === emp.id && (
+                      <div className="mt-1 text-[10.5px] text-good">
+                        Password updated — tell {emp.name} their new password.
+                      </div>
+                    )}
                     {rowError[emp.id] && (
                       <div className="mt-1 text-[10.5px] text-bad max-w-[220px] text-right">
                         {rowError[emp.id]}
@@ -218,34 +273,4 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
       )}
     </div>
   );
-}
-
-const fieldCls =
-  "w-full h-[32px] px-2 bg-white/60 border border-rule rounded-[6px] text-[12.5px] outline-none focus:border-accent";
-
-function iso(d: Date): string { return d.toISOString().slice(0, 10); }
-function statusLabel(s: string): string {
-  const map: Record<string, string> = {
-    ACTIVE: "Active", ON_LEAVE: "On leave", RESIGNED: "Resigned", TERMINATED: "Terminated",
-  };
-  return map[s] ?? s;
-}
-function Field({ label, required, hint, children }: {
-  label: string; required?: boolean; hint?: string; children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <div className="mb-1 text-[11px] uppercase tracking-[0.06em] text-text-dim">
-        {label}{required && <span className="text-accent"> *</span>}
-      </div>
-      {children}
-      {hint && <div className="mt-0.5 text-[10.5px] text-text-faint">{hint}</div>}
-    </label>
-  );
-}
-function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
-  return <th className={`px-3 h-[34px] font-medium ${align === "right" ? "text-right" : "text-left"}`}>{children}</th>;
-}
-function Td({ children, align = "left", className = "" }: { children: React.ReactNode; align?: "left" | "right"; className?: string }) {
-  return <td className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"} ${className}`}>{children}</td>;
 }
