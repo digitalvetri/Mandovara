@@ -32,6 +32,81 @@ const config: NextConfig = {
       // on an empty database) and a silent failure the first time it is
       // not.
       "./src/data/**/*",
+
+      // ── @react-pdf and its whole dependency closure ────────────────
+      //
+      // Every quotation and invoice PDF 500'd in production while
+      // working perfectly under `next dev`. The standalone server said:
+      //
+      //   Failed to load external module @react-pdf/renderer:
+      //   Cannot find package '.../@react-pdf+textkit/node_modules/
+      //   bidi-js/index.js'
+      //
+      // @react-pdf/renderer is in serverExternalPackages, so it is
+      // required from node_modules at runtime rather than bundled.
+      // Tracing then copied bidi-js's package.json and its CJS `main`
+      // but dropped dist/bidi.mjs — the ESM entry @react-pdf/textkit
+      // actually imports — leaving a package that exists on disk and
+      // still cannot be resolved. The renderer failed to load at all,
+      // which is why the route returned 500 even for an unknown share
+      // token, where the handler's own code returns 404.
+      //
+      // Listed as whole package trees rather than the one missing file:
+      // the same partial-copy can hit any of these, and a PDF route is
+      // not the place to find out one release later. Verified by
+      // running .next/standalone/server.js locally — `next dev` and
+      // `next start` both resolve from the full node_modules and cannot
+      // reproduce this.
+      // NOTE: deliberately NOT globbing .pnpm/@react-pdf+*/** — those
+      // directories contain symlinked scope folders that the copier
+      // cannot recreate ("ENOENT: mkdir .../@react-pdf/types"). The
+      // @react-pdf packages themselves trace correctly; it is their
+      // plain leaf dependencies below that lose files.
+      // The canonical store copies…
+      "./node_modules/.pnpm/bidi-js@*/**/*",
+      // …AND the nested paths the importers actually resolve through.
+      // pnpm links a dependency into its dependent's own node_modules;
+      // tracing flattens that symlink and copies only the files it
+      // thinks are reachable, which left
+      //   @react-pdf+textkit/node_modules/bidi-js/
+      // as a real directory holding src/ and NOTHING else — no
+      // package.json, so Node cannot resolve an entry point and looks
+      // for index.js, which is the error above. Filling the store path
+      // alone does not help: textkit resolves through this copy.
+      // pnpm's hoisted store. @react-pdf/layout bundles its own copy of
+      // textkit, and THAT one resolves bidi-js from
+      // node_modules/.pnpm/node_modules/ — a third location for the same
+      // package. Each nesting resolves through whichever copy is closest
+      // to the importer, so all of them have to survive tracing.
+      "./node_modules/.pnpm/node_modules/bidi-js/**/*",
+      "./node_modules/.pnpm/node_modules/hyphen/**/*",
+      "./node_modules/.pnpm/node_modules/unicode-properties/**/*",
+      "./node_modules/.pnpm/node_modules/unicode-trie/**/*",
+      "./node_modules/.pnpm/node_modules/fontkit/**/*",
+      "./node_modules/.pnpm/node_modules/restructure/**/*",
+      "./node_modules/.pnpm/node_modules/linebreak/**/*",
+      "./node_modules/.pnpm/node_modules/dfa/**/*",
+      "./node_modules/.pnpm/node_modules/png-js/**/*",
+      "./node_modules/.pnpm/@react-pdf+textkit@*/node_modules/bidi-js/**/*",
+      "./node_modules/.pnpm/@react-pdf+textkit@*/node_modules/hyphen/**/*",
+      "./node_modules/.pnpm/@react-pdf+textkit@*/node_modules/unicode-properties/**/*",
+      "./node_modules/.pnpm/@react-pdf+font@*/node_modules/**/*",
+      "./node_modules/.pnpm/@react-pdf+pdfkit@*/node_modules/**/*",
+      "./node_modules/.pnpm/@react-pdf+image@*/node_modules/**/*",
+      "./node_modules/.pnpm/@react-pdf+layout@*/node_modules/**/*",
+      "./node_modules/.pnpm/fontkit@*/**/*",
+      "./node_modules/.pnpm/hyphen@*/**/*",
+      "./node_modules/.pnpm/unicode-properties@*/**/*",
+      "./node_modules/.pnpm/unicode-trie@*/**/*",
+      "./node_modules/.pnpm/restructure@*/**/*",
+      "./node_modules/.pnpm/linebreak@*/**/*",
+      "./node_modules/.pnpm/dfa@*/**/*",
+      "./node_modules/.pnpm/png-js@*/**/*",
+      "./node_modules/.pnpm/media-engine@*/**/*",
+      "./node_modules/.pnpm/queue@*/**/*",
+      "./node_modules/.pnpm/abs-svg-path@*/**/*",
+      "./node_modules/.pnpm/parse-svg-path@*/**/*",
+      "./node_modules/.pnpm/svg-arc-to-cubic-bezier@*/**/*",
     ],
   },
   // typedRoutes disabled — friction outweighs value while modules are still
