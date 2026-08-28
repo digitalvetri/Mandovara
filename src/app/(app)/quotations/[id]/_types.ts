@@ -39,6 +39,8 @@ export interface SerializedQuotation {
   clientGstin: string | null;
   projectId:   string | null;
   projectName: string | null;
+  /** Area printed on the quotation's second band. */
+  siteArea:    string | null;
   date: string;
   validUntil: string;
   taxableAmountStr: string;

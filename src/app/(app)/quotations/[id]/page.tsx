@@ -27,6 +27,7 @@ function serializeQuotation(q: QuotationDetail, shareToken: string | null): Seri
     clientGstin: q.clientGstin,
     projectId: q.projectId,
     projectName: q.projectName,
+    siteArea: q.siteArea,
     date: q.date.toISOString(),
     validUntil: q.validUntil.toISOString(),
     taxableAmountStr: q.taxableAmount.toString(),
