@@ -9,35 +9,32 @@
 // sections that show them, so a summary can never quietly stop matching
 // the panel underneath it.
 //
-// Milestones, Tasks and Profitability were removed from this list per
-// user feedback (2026-08-28). The milestone/task DB models and the
-// profitability report are kept — Reports still reads profitability, and
-// milestones are still generated — they are simply not surfaced on the
-// project detail page. Their panels (MilestonesPanel, CollapsedPanels /
-// ProjectPanels, ProfitabilityPanel) remain in this folder in case the
-// sections return.
+// Milestones, Tasks, Profitability and Materials chosen were removed
+// from this list per user feedback (2026-08-28). The underlying models
+// and queries are kept — Reports still reads profitability, milestones
+// are still generated, and chosen items still come off the order — they
+// are simply not surfaced on the project detail page. Their panels
+// (MilestonesPanel, CollapsedPanels / ProjectPanels, ProfitabilityPanel,
+// ChosenItemsPanel) remain in this folder in case the sections return.
 
-import { Ruler, Package, Wallet, Hammer, MapPin } from "lucide-react";
+import { Ruler, Wallet, Hammer, MapPin } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import type { SiteVisitRow } from "@/modules/site-visits/queries";
 import type { ProjectLedger } from "@/modules/projects/queries-ledger";
 import type { ProjectInstallation } from "@/modules/projects/queries-installation";
 import type { ProjectMeasurementRow } from "@/modules/projects/queries-detail";
-import type { ProjectChosenItem } from "@/modules/projects/queries-detail-money-payments";
 import type { ProjectPayments } from "@/modules/projects/queries-detail-money-payments";
 import { ProjectSection } from "./ProjectSection";
 import { PaymentLedgerPanel } from "./PaymentLedgerPanel";
 import { InstallationPanel } from "./InstallationPanel";
 import { MeasurementsSection } from "./MeasurementsSection";
 import { PaymentsPanel } from "./PaymentsPanel";
-import { ChosenItemsPanel } from "./ChosenItemsPanel";
 import { UpcomingVisitsCard } from "./UpcomingVisitsCard";
 import { CreateInvoiceHeaderButton } from "./CreateInvoiceHeaderButton";
 
 interface Props {
   projectId:        string;
   rounds:           ProjectMeasurementRow[];
-  chosen:           ProjectChosenItem[];
   ledger:           ProjectLedger;
   payments:         ProjectPayments | null;
   installation:     ProjectInstallation;
@@ -47,7 +44,7 @@ interface Props {
 }
 
 export function ProjectWorkSections({
-  projectId, rounds, chosen, ledger, payments, installation, visits,
+  projectId, rounds, ledger, payments, installation, visits,
   canCreateInvoice, canUpdate,
 }: Props) {
   // Each section states where it stands without being opened. These
@@ -88,15 +85,6 @@ export function ProjectWorkSections({
           defaultOpen={rounds.length > 0}
         >
           <MeasurementsSection projectId={projectId} rounds={rounds} />
-        </ProjectSection>
-
-        <ProjectSection
-          icon={<Package size={13} />}
-          title="Materials chosen"
-          count={chosen.length}
-          summary={chosen.length === 0 ? "Nothing selected yet" : `${chosen.length} item${chosen.length === 1 ? "" : "s"} selected`}
-        >
-          <ChosenItemsPanel items={chosen} />
         </ProjectSection>
 
         {/* The ledger the owner asked for: quotation, advances,

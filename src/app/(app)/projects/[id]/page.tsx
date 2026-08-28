@@ -32,7 +32,7 @@ import { shortNumber } from "@/lib/short-number";
 import { devContext } from "@/lib/dev-context";
 import {
   getProject, getProjectMeasurements, getProjectMoney,
-  getProjectPayments, getProjectChosenItems,
+  getProjectPayments,
 } from "@/modules/projects/queries";
 import { listSiteVisits } from "@/modules/site-visits/queries";
 import { resolveNextAction } from "@/modules/projects/next-action";
@@ -55,13 +55,12 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const [rounds, money, visits, payments, chosen, ledger, installation] =
+  const [rounds, money, visits, payments, ledger, installation] =
     await Promise.all([
       getProjectMeasurements(ctx, id),
       getProjectMoney(ctx, id),
       listSiteVisits(ctx, { projectId: id, limit: 10 }),
       getProjectPayments(ctx, id),
-      getProjectChosenItems(ctx, id),
       getProjectLedger(ctx, id),
       getProjectInstallation(ctx, id),
     ]);
@@ -205,7 +204,6 @@ export default async function ProjectDetailPage({
           <ProjectWorkSections
             projectId={p.id}
             rounds={rounds}
-            chosen={chosen}
             ledger={ledger}
             payments={payments}
             installation={installation}
