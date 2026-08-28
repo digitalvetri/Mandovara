@@ -20,6 +20,16 @@ const PUBLIC_PATHS = [
 // Path prefixes always allowed (webhooks use their own HMAC; /api/admin/
 // endpoints use a token header; the rest are static assets).
 const PUBLIC_PREFIXES = [
+  // The client-facing share link. /q/<token> and /q/<token>/pdf are
+  // reached by people who have no account and never will — the 64-char
+  // single-use token IS the credential, and it carries its own expiry
+  // (shareTokenExpiresAt, checked in getQuotationByShareToken).
+  //
+  // Without this the middleware bounced every client who tapped the
+  // link in their WhatsApp message to /login. That made the share flow
+  // dead on arrival, and became total on 2026-08-28 when the message
+  // was simplified down to the PDF link and nothing else.
+  "/q/",
   "/api/webhooks/",
   "/api/admin/",
   "/_next/",
@@ -30,6 +40,7 @@ const PUBLIC_PREFIXES = [
   "/catalog/uploads/",
   "/mandovara-mark.png",
   "/mandovara-logo.jpg",
+  "/mandovara-letterhead.jpg",
   "/manifest.webmanifest",
 ];
 
