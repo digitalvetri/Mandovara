@@ -15,7 +15,7 @@
 // Rate limited: 5 failed attempts per 15 minutes per identifier, in-process.
 // See src/lib/rate-limit.ts for the single-container caveat.
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { authBootstrapPrisma as prisma } from "@/kernel/db/client";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from "./session";
@@ -89,13 +89,7 @@ export async function devLoginByCredential(
 
     const signed = await signSession(user.id);
     const jar = await cookies();
-    // COOKIE_SECURE controls the Secure flag independently of NODE_ENV so we
-    // can run in production over plain HTTP (e.g. sslip.io test URLs before
-    // TLS is set up). Default: on unless explicitly disabled. Browsers refuse
-    // to store Secure cookies over HTTP, so leaving this on when serving
-    // plain HTTP breaks login silently.
-    const cookieSecure = process.env["COOKIE_SECURE"] !== "false"
-      && process.env["NODE_ENV"] === "production";
+    const cookieSecure = await secureCookieFlag();
     jar.set(SESSION_COOKIE, signed, {
       httpOnly: true,
       secure: cookieSecure,
@@ -170,4 +164,43 @@ export async function changePassword(
     console.error("[auth] changePassword failed:", e);
     return { ok: false, error: "Could not change password — please try again" };
   }
+}
+
+/**
+ * Should the session cookie carry the Secure flag?
+ *
+ * Browsers refuse to store a Secure cookie over plain HTTP, so getting
+ * this wrong in that direction breaks login silently — which is why
+ * COOKIE_SECURE exists and is currently "false" on the http:// sslip.io
+ * deployment.
+ *
+ * The danger is the other direction. Once the site moves to HTTPS, that
+ * env var is still set, and a session cookie without Secure can be sent
+ * over a plain-http request to the same host — the exact thing HTTPS was
+ * turned on to prevent. Nobody remembers to unset an env var months
+ * later.
+ *
+ * So the actual request wins: if it arrived over HTTPS, the cookie is
+ * Secure regardless of the flag. That is always safe (a Secure cookie
+ * over HTTPS is the correct combination) and makes the switch to TLS
+ * self-correcting. COOKIE_SECURE="false" still does its job on plain
+ * HTTP, where it is genuinely needed.
+ *
+ * x-forwarded-proto is set by Coolify's Traefik, which terminates TLS —
+ * the app itself always sees http from the proxy, so the header is the
+ * only way to know.
+ */
+async function secureCookieFlag(): Promise<boolean> {
+  if (process.env["NODE_ENV"] !== "production") return false;
+
+  try {
+    const h = await headers();
+    const proto = (h.get("x-forwarded-proto") ?? "").split(",")[0]?.trim();
+    if (proto === "https") return true;
+  } catch {
+    // headers() is unavailable outside a request scope — fall through
+    // to the env var rather than throwing during login.
+  }
+
+  return process.env["COOKIE_SECURE"] !== "false";
 }
