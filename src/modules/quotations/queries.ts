@@ -98,6 +98,10 @@ export interface QuotationDetail {
   clientGstin: string | null;
   projectId:   string | null;
   projectName: string | null;
+  /** Site area printed on the quotation's second band (VEERAKERALAM,
+   *  NEELAMBUR …). Project site city, falling back to the client's or
+   *  lead's city. Null when nobody has recorded one. */
+  siteArea:    string | null;
   date: Date;
   validUntil: Date;
   taxableAmount: bigint;

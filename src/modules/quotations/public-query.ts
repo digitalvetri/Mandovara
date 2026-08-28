@@ -4,6 +4,7 @@
 
 import { authBootstrapPrisma as db } from "@/kernel/db/client";
 import type { QuotationDetail } from "./queries";
+import { cityOf } from "./queries-part2";
 
 const ALLOWED_STATUSES = new Set(["SENT", "APPROVED", "ACCEPTED", "REJECTED", "EXPIRED"]);
 
@@ -17,7 +18,7 @@ export async function getQuotationByShareToken(
       leadId: true, projectId: true, clientId: true, ownerId: true,
       date: true, validUntil: true, termsText: true, shareToken: true, shareTokenExpiresAt: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
-      project: { select: { name: true, client: { select: { id: true, name: true, mobile: true, email: true, gstin: true } } } },
+      project: { select: { name: true, siteAddress: true, client: { select: { id: true, name: true, mobile: true, email: true, gstin: true, billingAddress: true } } } },
       lines: {
         orderBy: { lineNo: "asc" },
         select: {
@@ -42,17 +43,27 @@ export async function getQuotationByShareToken(
 
   let clientName = "—", clientMobile = "", clientEmail: string | null = null;
   let clientGstin: string | null = null, projectName: string | null = null;
+  // Same site-area rule as getQuotation. This is the query behind
+  // /q/<token>/pdf — the PDF that actually goes out over WhatsApp — so a
+  // field added only to the app-side query would render blank here.
+  let siteArea: string | null = null;
   if (row.project) {
     clientName   = row.project.client.name;
     clientMobile = row.project.client.mobile;
     clientEmail  = row.project.client.email;
     clientGstin  = row.project.client.gstin;
     projectName  = row.project.name;
+    siteArea     = cityOf(row.project.siteAddress)
+                ?? cityOf(row.project.client.billingAddress);
   } else if (row.leadId) {
     const lead = await db.lead.findUnique({
-      where: { id: row.leadId }, select: { name: true, mobile: true, email: true },
+      where: { id: row.leadId },
+      select: { name: true, mobile: true, email: true, siteAddress: true },
     });
-    if (lead) { clientName = lead.name; clientMobile = lead.mobile; clientEmail = lead.email; }
+    if (lead) {
+      clientName = lead.name; clientMobile = lead.mobile; clientEmail = lead.email;
+      siteArea = cityOf(lead.siteAddress);
+    }
   }
 
   const colIds = [...new Set(row.lines.map(l => l.colourwayId).filter((x): x is string => !!x))];
@@ -67,7 +78,7 @@ export async function getQuotationByShareToken(
     id: row.id, number: row.number, revision: row.revision, status: row.status,
     branchId: row.branchId, branchName: branch.name, supplierStateCode: branch.stateCode,
     ownerName: owner?.name ?? null, leadId: row.leadId, clientId: row.clientId,
-    clientName, clientMobile, clientEmail, clientGstin, projectName, projectId: row.projectId,
+    clientName, clientMobile, clientEmail, clientGstin, projectName, siteArea, projectId: row.projectId,
     date: row.date, validUntil: row.validUntil, termsText: row.termsText,
     shareToken: row.shareToken ?? null, shareTokenExpiresAt: row.shareTokenExpiresAt ?? null,
     taxableAmount: row.taxableAmount, cgst: row.cgst, sgst: row.sgst,

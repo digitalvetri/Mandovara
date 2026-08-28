@@ -5,6 +5,20 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { ListQuotationsQuery, QuotationDetail } from "./queries";
 
+/**
+ * Pull a printable area name out of one of the JSON address columns.
+ *
+ * Project.siteAddress, Client.billingAddress and Lead.siteAddress are all
+ * untyped Json, so this narrows defensively: anything that isn't a
+ * non-empty string is treated as "not recorded" rather than printed as
+ * "undefined" on a document that goes to a client.
+ */
+export function cityOf(addr: unknown): string | null {
+  if (!addr || typeof addr !== "object") return null;
+  const city = (addr as Record<string, unknown>)["city"];
+  return typeof city === "string" && city.trim() ? city.trim() : null;
+}
+
 export async function getQuotation(
   ctx: RequestContext,
   id: string,
@@ -22,7 +36,13 @@ export async function getQuotation(
       project: {
         select: {
           name: true,
-          client: { select: { id: true, name: true, mobile: true, email: true, gstin: true } },
+          siteAddress: true,
+          client: {
+            select: {
+              id: true, name: true, mobile: true, email: true, gstin: true,
+              billingAddress: true,
+            },
+          },
         },
       },
       lines: {
@@ -53,21 +73,25 @@ export async function getQuotation(
   let clientEmail: string | null = null;
   let clientGstin: string | null = null;
   let projectName: string | null = null;
+  let siteArea: string | null = null;
   if (row.project) {
     clientName   = row.project.client.name;
     clientMobile = row.project.client.mobile;
     clientEmail  = row.project.client.email;
     clientGstin  = row.project.client.gstin;
     projectName  = row.project.name;
+    siteArea     = cityOf(row.project.siteAddress)
+                ?? cityOf(row.project.client.billingAddress);
   } else if (row.leadId) {
     const lead = await db.lead.findUnique({
       where:  { id: row.leadId },
-      select: { name: true, mobile: true, email: true },
+      select: { name: true, mobile: true, email: true, siteAddress: true },
     });
     if (lead) {
       clientName   = lead.name;
       clientMobile = lead.mobile;
       clientEmail  = lead.email;
+      siteArea     = cityOf(lead.siteAddress);
     }
   }
 
@@ -96,6 +120,7 @@ export async function getQuotation(
     clientEmail,
     clientGstin,
     projectName,
+    siteArea,
     projectId:   row.projectId,
     date: row.date,
     validUntil: row.validUntil,
