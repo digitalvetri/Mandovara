@@ -16,6 +16,7 @@ import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 import { BillingAddressCard } from "../_components/BillingAddressCard";
 import { StartMeasurementFromClientButton } from "../_components/StartMeasurementFromClientButton";
 import { ClientMeasurementsCard } from "../_components/ClientMeasurementsCard";
+import { ContactsCard } from "../_components/ContactsCard";
 import { ClientLedgerPanel, type InvoiceLedgerRow, type ReceiptLedgerRow } from "../_components/ClientLedgerPanel";
 import { DeleteClientAction } from "../_components/DeleteClientAction";
 
@@ -88,7 +89,7 @@ export default async function ClientDetailPage({
     <>
       <Topbar
         title={client.name}
-        eyebrow={`${client.type} · ${client.mobile} · Since ${client.createdAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}`}
+        eyebrow={`${client.mobile} · Since ${client.createdAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}`}
       />
 
       <div className="flex justify-end gap-2 pb-3">
@@ -176,6 +177,22 @@ export default async function ClientDetailPage({
             )}
           </div>
 
+          {/* Contacts lead the column — the people you ring are what an
+              owner opens this page for, and until now the section could
+              only ever say "No contact persons." */}
+          <ContactsCard
+            clientId={client.id}
+            contacts={client.contacts.map((c) => ({
+              id:          c.id,
+              name:        c.name,
+              designation: c.designation,
+              mobile:      c.mobile,
+              email:       c.email ?? null,
+            }))}
+            canCreate={ctx.permissions.has("contact.create")}
+            canDelete={ctx.permissions.has("contact.delete")}
+          />
+
           {canViewMeasurement && (
             <ClientMeasurementsCard
               clientId={client.id}
@@ -203,26 +220,6 @@ export default async function ClientDetailPage({
 
           <ClientFollowUpForm clientId={client.id} />
 
-          <div className="rounded-[14px] bg-surface border border-rule p-6">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">
-              Contacts ({client.contacts.length})
-            </div>
-            {client.contacts.length === 0 ? (
-              <div className="text-[12px] text-text-faint">No contact persons.</div>
-            ) : (
-              <ul className="space-y-2">
-                {client.contacts.map((c) => (
-                  <li key={c.id} className="text-[12.5px] flex items-baseline justify-between border-b border-rule/60 last:border-0 py-2">
-                    <div>
-                      <span className="text-text">{c.name}</span>
-                      <span className="text-text-dim"> · {(c.designation ?? "—").toLowerCase()}</span>
-                    </div>
-                    <div className="text-text-dim tabular">{c.mobile}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
         </div>
 
         <aside className="space-y-4 h-fit">
