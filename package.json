@@ -19,7 +19,8 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "backup": "node scripts/backup-db.mjs",
-    "preflight": "node scripts/preflight.mjs"
+    "preflight": "node scripts/preflight.mjs",
+    "check:workflows": "node scripts/check-workflows.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
@@ -62,6 +63,7 @@
     "tsx": "^4.19.0",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.20.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "yaml": "^2.9.0"
   }
 }

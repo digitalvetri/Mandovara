@@ -66,6 +66,12 @@ jobs:
       - name: Create restricted app role
         run: node scripts/setup-app-role.mjs
 
+      # Cheap, and catches the failure mode that took the deploy workflow
+      # down on 2026-08-28: a malformed workflow does not fail a step, it
+      # fails the whole run before any step, with no useful message.
+      - name: Validate GitHub Actions workflows
+        run: pnpm check:workflows
+
       - name: Typecheck
         run: pnpm typecheck
 
