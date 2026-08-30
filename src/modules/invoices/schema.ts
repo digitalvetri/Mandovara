@@ -37,7 +37,15 @@ export const invoiceLineInput = z.object({
 });
 
 export const createInvoiceSchema = z.object({
-  orderId:           z.string().min(1, "orderId is required"),
+  // An invoice usually descends from a confirmed Order, and did so
+  // exclusively until 2026-08-30. The owner bills straight from a
+  // project against a rough estimate — no firm quotation, no order —
+  // so this is optional, and projectId/clientId carry the party in that
+  // case. Invoice.orderId is nullable in the schema, so an order-less
+  // invoice was always storable; nothing could create one.
+  orderId:           z.string().min(1).optional(),
+  projectId:         z.string().min(1).optional(),
+  clientId:          z.string().min(1).optional(),
   branchId:          z.string().min(1, "branchId is required"),
   type:              z.enum(INVOICE_TYPES).default("TAX"),
   date:              isoDate,
@@ -47,7 +55,10 @@ export const createInvoiceSchema = z.object({
   // Only populated when type = CREDIT_NOTE — see createCreditNote.
   creditNoteReason:  z.string().trim().min(3).max(500).optional(),
   originalInvoiceId: z.string().min(1).optional(),
-});
+}).refine(
+  (v) => !!v.orderId || (!!v.projectId && !!v.clientId),
+  { message: "An invoice needs either an order, or a project and client." },
+);
 
 export const cancelInvoiceSchema = z.object({
   id:     z.string().min(1),

@@ -29,13 +29,32 @@ export async function createInvoice(
 
   const db = scoped(ctx);
 
-  // Validate order exists and is not cancelled
-  const order = await db.order.findUnique({
-    where: { id: d.orderId },
-    select: { id: true, projectId: true, clientId: true, status: true },
-  });
-  if (!order) return { ok: false, error: "Order not found." };
-  if (order.status === "CANCELLED") return { ok: false, error: "Cannot invoice a cancelled order." };
+  // Party resolution. With an order, it comes from the order, as it
+  // always has. Without one, the caller supplies project and client
+  // directly — see the note on createInvoiceSchema.
+  let order: { id: string; projectId: string | null; clientId: string; status: string } | null = null;
+  if (d.orderId) {
+    order = await db.order.findUnique({
+      where: { id: d.orderId },
+      select: { id: true, projectId: true, clientId: true, status: true },
+    });
+    if (!order) return { ok: false, error: "Order not found." };
+    if (order.status === "CANCELLED") return { ok: false, error: "Cannot invoice a cancelled order." };
+  }
+
+  const projectId = order ? order.projectId : (d.projectId ?? null);
+  const clientId  = order ? order.clientId  : d.clientId!;
+
+  if (!order) {
+    // scoped() already constrains the org; this turns a wrong id into a
+    // clean message rather than a foreign-key error at write time.
+    const project = projectId
+      ? await db.project.findUnique({ where: { id: projectId }, select: { id: true } })
+      : null;
+    if (projectId && !project) return { ok: false, error: "Project not found." };
+    const client = await db.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    if (!client) return { ok: false, error: "Client not found." };
+  }
 
   // Fetch branch for invoice prefix
   const branch = await db.branch.findUnique({
@@ -75,11 +94,11 @@ export async function createInvoice(
       // commits, so it sees the already-updated `adjusted` values and cannot
       // double-consume the same advance balance.
       let advanceAdjusted = 0n;
-      if (order.projectId) {
+      if (projectId) {
         type AdvRow = { id: string; amount: bigint; adjusted: bigint };
         const lockedAdvs = await tx.$queryRaw<AdvRow[]>`
           SELECT id, amount, adjusted FROM "Advance"
-          WHERE "projectId" = ${order.projectId}
+          WHERE "projectId" = ${projectId}
             AND "organizationId" = ${ctx.orgId}
           ORDER BY "receivedAt" ASC
           FOR UPDATE
@@ -126,9 +145,9 @@ export async function createInvoice(
           branchId:          d.branchId,
           number,
           type:              d.type,
-          clientId:          order.clientId,
+          clientId,
           orderId:           d.orderId,
-          projectId:         order.projectId,
+          projectId,
           date:              invoiceDate,
           dueDate:           new Date(d.dueDate),
           placeOfSupplyCode: d.placeOfSupplyCode,
@@ -185,6 +204,6 @@ export async function createInvoice(
   }
 
   revalidatePath("/invoicing");
-  if (order.projectId) revalidatePath(`/projects/${order.projectId}`);
+  if (projectId) revalidatePath(`/projects/${projectId}`);
   return { ok: true, data: created };
 }

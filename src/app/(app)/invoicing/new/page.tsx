@@ -54,14 +54,22 @@ export default async function NewInvoicePage({
         title="Create Invoice"
         eyebrow={project
           ? "One click below — invoice pulls its lines, rates and totals from this project's confirmed order."
-          : "Pick the project to bill — invoices pull their lines, rates and totals from the confirmed order."}
+          : "Pick the project to bill. No confirmed order? Bill the quotation straight from the project page."}
       />
 
       {rows.length === 0 ? (
         <div className="rounded-[14px] border border-rule bg-surface py-16 text-center">
-          <div className="text-[14px] text-text mb-2">No projects ready to invoice.</div>
-          <p className="text-[12px] text-text-dim">
-            A project needs an accepted firm quotation before it can be invoiced.{" "}
+          {/* This page lists ORDER-backed invoices, which is one route
+              of two. Saying "nothing can be invoiced" here was wrong and
+              was where the owner got stuck: a project with a quotation
+              on it can be billed from its own page, no order required
+              (2026-08-30). */}
+          <div className="text-[14px] text-text mb-2">No confirmed orders waiting to be invoiced.</div>
+          <p className="mx-auto max-w-[420px] text-[12.5px] leading-relaxed text-text-dim">
+            That is not the only way to bill. Open the project and use
+            <span className="text-text"> Create invoice </span>
+            on its Payment ledger — it bills the lines on the current quotation
+            directly, with no order needed.{" "}
             <Link href={"/projects" as Route} className="text-accent hover:underline">Open projects →</Link>
           </p>
         </div>

@@ -30,6 +30,7 @@ import { PaymentsPanel } from "./PaymentsPanel";
 import { UpcomingVisitsCard } from "./UpcomingVisitsCard";
 import { CreateInvoiceHeaderButton } from "./CreateInvoiceHeaderButton";
 import { RecordPaymentFromProject } from "./RecordPaymentFromProject";
+import { InvoiceFromQuotationButton, type QuotationStub } from "./InvoiceFromQuotationButton";
 
 interface Props {
   projectId:        string;
@@ -40,6 +41,9 @@ interface Props {
   /** For recording a receipt straight from the ledger. */
   clientId:         string;
   branchId:         string;
+  /** Quotations on this project, newest first — the invoice is billed
+   *  from the current one without waiting for an order. */
+  quotations:       QuotationStub[];
   canCreateInvoice: boolean;
   /** Accepted so the page needs no change; unread since the Installation
    *  section (its only consumer) left on 2026-08-30. */
@@ -47,7 +51,7 @@ interface Props {
 }
 
 export function ProjectWorkSections({
-  projectId, rounds, ledger, payments, visits, clientId, branchId,
+  projectId, rounds, ledger, payments, visits, clientId, branchId, quotations,
   canCreateInvoice,
 }: Props) {
   // Each section states where it stands without being opened. These
@@ -107,8 +111,12 @@ export function ProjectWorkSections({
                     }))}
                 />
               )}
-              {payments?.latestOrderId && canCreateInvoice && (
-                <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
+              {/* An order-backed invoice keeps its own button; without
+                  one, bill the quotation directly. */}
+              {canCreateInvoice && (
+                payments?.latestOrderId
+                  ? <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
+                  : <InvoiceFromQuotationButton quotations={quotations} />
               )}
             </div>
           }
