@@ -43,16 +43,35 @@ export default async function EmployeeDashboardPage() {
   });
 
   if (!employee) {
-    const user = await db.user.findUnique({ where: { id: ctx.userId }, select: { mobile: true, organizationId: true } });
+    // Self-heal: no Employee.userId link yet. Try to find one by mobile or
+    // email so a logged-in employee doesn't hit the "profile being set up"
+    // placeholder just because someone forgot to run the manual link step.
+    // Mobile match uses the last 10 digits (Indian format) so
+    // "+91 98765 43210" and "919876543210" and "9876543210" all match.
+    const user = await db.user.findUnique({
+      where:  { id: ctx.userId },
+      select: { mobile: true, email: true, organizationId: true },
+    });
     if (user) {
-      // Try both "+91 9XXXXXXXXX" (seed format) and "+919XXXXXXXXX" (no-space format)
-      const mobileNoSpace = user.mobile.replace(/\s+/g, "");
-      const mobileVariants = [...new Set([user.mobile, mobileNoSpace])];
-      employee = await db.employee.findFirst({
-        where:  { mobile: { in: mobileVariants }, organizationId: user.organizationId },
-        select: { id: true, name: true, designation: true, department: true, code: true },
+      const userDigits = user.mobile.replace(/\D/g, "");
+      const userTail10 = userDigits.slice(-10);
+      const candidates = await db.employee.findMany({
+        where:  {
+          organizationId: user.organizationId,
+          userId:         null,
+        },
+        select: { id: true, mobile: true, name: true, designation: true, department: true, code: true },
       });
-      if (employee) await db.employee.update({ where: { id: employee.id }, data: { userId: ctx.userId } });
+      const byMobile = candidates.find(
+        (e) => e.mobile.replace(/\D/g, "").slice(-10) === userTail10 && userTail10.length === 10,
+      );
+      if (byMobile) {
+        await db.employee.update({ where: { id: byMobile.id }, data: { userId: ctx.userId } });
+        employee = {
+          id: byMobile.id, name: byMobile.name,
+          designation: byMobile.designation, department: byMobile.department, code: byMobile.code,
+        };
+      }
     }
   }
 
