@@ -9,7 +9,11 @@ const idField = z.string().min(20).max(64);
 const mm      = z.number().positive().max(20_000);
 
 export const quickLineSchema = z.object({
-  roomName:    z.string().trim().min(1).max(80),
+  // Optional since 2026-08-30 (owner): the Quick Quote form no longer
+  // asks for a room. It still groups lines into a Room on the server —
+  // MeasurementItem.roomId is not nullable — so an unnamed line lands in
+  // "General", the same default the simple measurement entry uses.
+  roomName:    z.string().trim().min(1).max(80).optional().default("General"),
   label:       z.string().trim().min(1).max(120),
   // Owner redesign (2026-08-26): width/height are no longer captured
   // in the Quick Quote — the sample estimates just say "MTR 25". When

@@ -44,7 +44,6 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
     lines.length > 0 &&
     lines.every((l) =>
       l.label.trim() &&
-      l.roomName.trim() &&
       parseFloat(l.quantity) > 0 &&
       l.rateEditable && parseFloat(l.rateEditable) > 0,
     );
@@ -68,7 +67,6 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
           ? { newProjectName: newProjectName.trim() }
           : { projectId })),
         lines: lines.map((l) => ({
-          roomName:    l.roomName.trim(),
           label:       l.label.trim(),
           quantity:    parseFloat(l.quantity) || 1,
           gstRate:     l.gstRate ?? 18,

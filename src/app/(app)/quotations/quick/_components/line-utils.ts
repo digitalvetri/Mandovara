@@ -7,7 +7,6 @@ import { parseINR } from "@/kernel/money/format";
 
 export interface LineDraft {
   key:          string;
-  roomName:     string;
   label:        string;
   quantity:     string;
   discountPct:  string;
@@ -24,7 +23,6 @@ export interface LineDraft {
 export function emptyLine(): LineDraft {
   return {
     key:         Math.random().toString(36).slice(2),
-    roomName:    "Living",
     label:       "",
     quantity:    "1",
     discountPct: "0",

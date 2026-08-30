@@ -33,7 +33,7 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
       <div className="p-3">
         <div className="flex items-start gap-2 mb-2">
           <Input
-            label="Description"
+            label="Item"
             value={line.label}
             onChange={(v) => onChange({ label: v })}
             placeholder="e.g. MBR Main, Track, Stitching charge"
@@ -51,8 +51,10 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
           )}
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          <Input label="Room / Section" value={line.roomName} onChange={(v) => onChange({ roomName: v })} />
+        {/* Room / Section was the first field here. Removed 2026-08-30
+            (owner) — lines group into a "General" room on the server, so
+            nothing downstream needed it typed. */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
           <label className="block">
             <div className="text-[10px] uppercase tracking-[0.06em] text-text-dim mb-1">Unit</div>
             <select
