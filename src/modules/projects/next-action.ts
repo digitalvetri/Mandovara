@@ -87,7 +87,10 @@ export function resolveNextAction(
         enabled,
         disabledReason: enabled ? null :
           "Invoices are raised by the accounts team.",
-        href: `/invoicing/new?project=${id}`,
+        // Was /invoicing/new — the order-backed picker, which reported
+        // "no projects ready to invoice" on a project holding a quotation.
+        // This writes the invoice directly (owner, 2026-08-30).
+        href: `/invoicing/create?project=${id}`,
       };
     }
 
@@ -116,7 +119,10 @@ export function resolveNextAction(
             "Invoices are raised by the accounts team.",
           // Project-scope the picker so the owner doesn't have to find
           // their project in the global invoiceable-orders list.
-          href: `/invoicing/new?project=${id}`,
+          // Was /invoicing/new — the order-backed picker, which reported
+        // "no projects ready to invoice" on a project holding a quotation.
+        // This writes the invoice directly (owner, 2026-08-30).
+        href: `/invoicing/create?project=${id}`,
           subLine: "Invoice → advance → install.",
         };
       }

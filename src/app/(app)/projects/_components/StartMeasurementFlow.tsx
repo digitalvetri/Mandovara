@@ -20,7 +20,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { Route } from "next";
-import { CalendarPlus, Ruler, Loader2 } from "lucide-react";
+import { CalendarPlus, Ruler, Loader2, FileText } from "lucide-react";
 import { RoomSetupSheet } from "./RoomSetupSheet";
 import { ScheduleVisitSheet } from "./ScheduleVisitSheet";
 import type { NextAction } from "@/modules/projects/next-action";
@@ -36,11 +36,13 @@ interface Props {
   canMeasure?: boolean;
   /** Hide the whole quick-actions strip once install is done. */
   quickActionsVisible?: boolean;
+  /** Shows "Create invoice" in the strip. */
+  canInvoice?: boolean;
 }
 
 export function StartMeasurementFlow({
   projectId, action, currentUserId,
-  canScheduleVisit = false, canMeasure = false, quickActionsVisible = true,
+  canScheduleVisit = false, canMeasure = false, canInvoice = false, quickActionsVisible = true,
 }: Props) {
   const router     = useRouter();
   const pathname   = usePathname();
@@ -81,7 +83,11 @@ export function StartMeasurementFlow({
     });
   }
 
-  const showQuickActions = quickActionsVisible && (canScheduleVisit || canMeasure);
+  // Create invoice belongs here unconditionally — it is the thing an
+  // owner reaches for most and it used to appear only when the flow
+  // decided it was that stage's turn (owner, 2026-08-30: "i dont want to
+  // follow a flow i just want to do anythings whenever i need").
+  const showQuickActions = quickActionsVisible && (canScheduleVisit || canMeasure || canInvoice);
 
   return (
     <>
@@ -100,10 +106,21 @@ export function StartMeasurementFlow({
           <span className="mr-1 text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
             Quick actions
           </span>
-          {action.href && action.cta && (
+          {canInvoice && (
+            <a
+              href={`/invoicing/create?project=${projectId}`}
+              className="inline-flex items-center gap-1.5 rounded-[6px] border border-accent/40 bg-accent/10 px-2.5 py-1 text-[12px] font-medium text-accent transition-colors hover:bg-accent/18"
+            >
+              <FileText size={13} strokeWidth={1.8} />
+              Create invoice
+            </a>
+          )}
+          {/* The flow's own CTA only when it is something else — it used
+              to render a second "Create invoice" beside the one above. */}
+          {action.href && action.cta && !action.cta.toLowerCase().includes("invoice") && (
             <a
               href={action.href}
-              className="inline-flex items-center gap-1.5 rounded-[6px] border border-accent/40 bg-accent/10 px-2.5 py-1 text-[12px] font-medium text-accent transition-colors hover:bg-accent/18"
+              className="inline-flex items-center gap-1.5 rounded-[6px] border border-rule bg-surface px-2.5 py-1 text-[12px] text-text-dim transition-colors hover:border-gold hover:text-text"
             >
               {action.cta}
             </a>

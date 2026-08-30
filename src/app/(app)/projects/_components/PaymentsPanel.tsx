@@ -12,41 +12,25 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Receipt, ArrowRight, Plus, AlertCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Receipt, ArrowRight, AlertCircle } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
-import { createInvoiceFromOrder } from "@/modules/invoices/actions-part2";
 import type { ProjectPayments, ProjectPaymentInvoice } from "@/modules/projects/queries";
 
 interface Props {
   payments: ProjectPayments;
-  canCreate: boolean;
+  /** Accepted so the caller needs no change; unread since the panel's
+   *  own Create invoice button was removed on 2026-08-30. */
+  canCreate?: boolean;
 }
 
-export function PaymentsPanel({ payments, canCreate }: Props) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+export function PaymentsPanel({ payments }: Props) {
+  // The invoice-creating state that lived here went with the button on
+  // 2026-08-30 — see the note further down. createInvoiceFromOrder is
+  // untouched and still drives the one-click path on the order page.
+  const [error] = useState<string | null>(null);
 
-  function createInvoice(): void {
-    if (!payments.latestOrderId) return;
-    setError(null);
-    start(async () => {
-      const res = await createInvoiceFromOrder({
-        salesOrderId: payments.latestOrderId!,
-      });
-      if (!res.ok || !res.data) {
-        setError(res.error ?? "Could not create invoice");
-        return;
-      }
-      router.push(`/invoicing/${res.data.id}` as Route);
-      router.refresh();
-    });
-  }
-
-  const hasOrder    = payments.latestOrderId !== null;
   const hasInvoices = payments.invoices.length > 0;
 
   return (
@@ -55,17 +39,11 @@ export function PaymentsPanel({ payments, canCreate }: Props) {
         <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
           Payments
         </div>
-        {canCreate && hasOrder && !hasInvoices && (
-          <button
-            type="button"
-            onClick={createInvoice}
-            disabled={pending}
-            className="inline-flex items-center gap-1.5 rounded-[8px] bg-gold px-3 py-1.5 text-[11.5px] font-semibold text-ink transition-colors hover:bg-gold-strong disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {pending ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} strokeWidth={2.6} />}
-            {pending ? "Creating…" : "Create invoice"}
-          </button>
-        )}
+        {/* A third "Create invoice" lived here, gated on there being a
+            confirmed order. Removed 2026-08-30: the section header and
+            the Quick actions strip both carry one, and three buttons for
+            one job — two of them usually hidden — is the confusion the
+            owner reported. */}
       </div>
 
       {/* ── Summary tiles ────────────────────────────────────── */}
@@ -122,13 +100,15 @@ export function PaymentsPanel({ payments, canCreate }: Props) {
             </li>
           ))}
         </ul>
-      ) : hasOrder ? (
-        <div className="rounded-[10px] border border-dashed border-rule px-4 py-6 text-center text-[11.5px] text-text-dim">
-          No invoices yet. Use <span className="text-text">Create invoice</span> to bill against the confirmed order.
-        </div>
       ) : (
+        // Both branches used to hinge on hasOrder, and the order-less one
+        // said invoices "become available once an order is confirmed".
+        // That stopped being true on 2026-08-30 — Create invoice above
+        // opens the builder whether or not an order exists — and a panel
+        // telling an owner they cannot do the thing the button beside it
+        // does is worse than saying nothing.
         <div className="rounded-[10px] border border-dashed border-rule px-4 py-6 text-center text-[11.5px] text-text-dim">
-          Invoices become available once an order is confirmed for this project.
+          No invoices yet. Use <span className="text-text">Create invoice</span> above to bill this project.
         </div>
       )}
 

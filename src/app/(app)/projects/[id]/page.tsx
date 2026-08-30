@@ -39,11 +39,9 @@ import { resolveNextAction } from "@/modules/projects/next-action";
 import { StageStepper } from "../_components/StageStepper";
 import { RightRail } from "../_components/RightRail";
 import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
-import { UpcomingVisitsCard } from "../_components/UpcomingVisitsCard";
 import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
 import { ProjectWorkSections } from "../_components/ProjectWorkSections";
 import { getProjectLedger } from "@/modules/projects/queries-ledger";
-import { getProjectQuotationsAndOrder } from "@/modules/projects/queries-quotations";
 
 export const dynamic = "force-dynamic";
 
@@ -55,14 +53,13 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const [rounds, money, visits, payments, ledger, quotes] =
+  const [rounds, money, visits, payments, ledger] =
     await Promise.all([
       getProjectMeasurements(ctx, id),
       getProjectMoney(ctx, id),
       listSiteVisits(ctx, { projectId: id, limit: 10 }),
       getProjectPayments(ctx, id),
       getProjectLedger(ctx, id),
-      getProjectQuotationsAndOrder(ctx, id),
     ]);
 
   const action = resolveNextAction(ctx, {
@@ -92,7 +89,7 @@ export default async function ProjectDetailPage({
       />
 
       {/* ── Header ────────────────────────────────────────────────── */}
-      <div className="mb-6 rounded-[14px] border border-rule bg-surface p-6">
+      <div className="mb-4 rounded-[14px] border border-rule bg-surface p-5">
         {/* Row 1 — meta + primary action (right-aligned) */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -141,7 +138,7 @@ export default async function ProjectDetailPage({
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-3.5">
           <StageStepper
             stage={p.stage}
             projectId={p.id}
@@ -169,7 +166,7 @@ export default async function ProjectDetailPage({
             cannot disagree. "Progress" is replaced by balance due:
             percentage-of-milestones read 0% on a project that was
             invoiced and paid in full, which told nobody anything. */}
-        <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[12.5px] tabular-nums text-text-dim">
+        <div className="mt-3.5 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[12.5px] tabular-nums text-text-dim">
           <HeaderStat k="Order value" v={formatINR(headerOrderValue)} />
           <HeaderStat k="Received" v={formatINR(ledger.received)} />
           <HeaderStat
@@ -180,8 +177,8 @@ export default async function ProjectDetailPage({
       </div>
 
       {/* ── Body — 2-column grid ────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 pb-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-3">
           <StartMeasurementFlow
             projectId={p.id}
             action={action}
@@ -195,12 +192,11 @@ export default async function ProjectDetailPage({
               ctx.permissions.has("measurement.create.own") ||
               ctx.permissions.has("measurement.create")
             }
+            canInvoice={ctx.permissions.has("invoice.create")}
             quickActionsVisible={
               p.stage !== "COMPLETED" && p.stage !== "CANCELLED"
             }
           />
-          <UpcomingVisitsCard visits={visits} />
-
           <ProjectWorkSections
             projectId={p.id}
             rounds={rounds}
@@ -209,9 +205,6 @@ export default async function ProjectDetailPage({
             visits={visits}
             clientId={p.clientId}
             branchId={p.branchId}
-            quotations={quotes.quotations.map((qq) => ({
-              id: qq.id, number: qq.number, status: qq.status,
-            }))}
             canCreateInvoice={ctx.permissions.has("invoice.create")}
             canUpdate={ctx.permissions.has("project.update")}
           />

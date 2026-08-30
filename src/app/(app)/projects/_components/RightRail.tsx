@@ -15,7 +15,7 @@ interface Props {
 
 export function RightRail({ project, money }: Props) {
   return (
-    <aside className="space-y-4 lg:sticky lg:top-4 lg:h-fit">
+    <aside className="space-y-3 lg:sticky lg:top-4 lg:h-fit">
       <ClientCard
         clientId={project.clientId}
         name={project.clientName}
@@ -33,7 +33,7 @@ export function RightRail({ project, money }: Props) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[14px] border border-rule bg-surface p-5">
+    <section className="rounded-[14px] border border-rule bg-surface p-4">
       <div className="mb-3 text-[10.5px] uppercase tracking-[0.16em] text-text-dim">{title}</div>
       {children}
     </section>
