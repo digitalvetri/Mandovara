@@ -7,15 +7,18 @@ import { EmployeesSection } from "./_components/EmployeesSection";
 import { BranchGeofenceSection } from "./_components/BranchGeofenceSection";
 import { PeopleAndAuditSection } from "./_components/PeopleAndAuditSection";
 import { getAuditRetentionDays } from "@/modules/admin/audit-retention";
+import { getRlsStatus } from "@/kernel/db/rls-status";
+import { DataIsolationCard } from "./_components/DataIsolationCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const ctx = await devContext();
-  const [a, employees, retentionDays] = await Promise.all([
+  const [a, employees, retentionDays, rls] = await Promise.all([
     loadAdmin(ctx),
     listEmployees(ctx, { includeTerminated: true }),
     getAuditRetentionDays(),
+    getRlsStatus(),
   ]);
 
   return (
@@ -94,6 +97,8 @@ export default async function AdminPage() {
               </ul>
             )}
           </div>
+
+          <DataIsolationCard status={rls} />
 
           <div id="company" className="scroll-mt-[calc(var(--topbar-h)+12px)]">
             <CompanySettingsForm initial={a.company} />
