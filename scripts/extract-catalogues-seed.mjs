@@ -15,6 +15,10 @@ import fs from "node:fs";
 const SRC = "./CATALOGUE-LIST.xlsx";
 const OUT = "src/modules/catalog/catalogues-seed-data.ts";
 
+// Each sheet maps to a ProductFamily. PAMPLETS moved to RUG (a distinct
+// enum value for small-catalog rugs/carpets) so it doesn't collide with
+// CARPETS on cross-sheet dedup. CURTAIN MAIN & SHEER stays under
+// CURTAIN_FABRIC — same-family collisions there are true duplicates.
 const SHEET_TO_FAMILY = {
   "WALLPAPER":            "WALLPAPER",
   "CUSTOMISED WP":        "MURAL",
@@ -24,17 +28,24 @@ const SHEET_TO_FAMILY = {
   "FABRIC":               "UPHOLSTERY_FABRIC",
   "WOODEN FLOORING":      "FLOORING",
   "CARPETS":              "CARPET_ROLL",
-  "PAMPLETS":             "CARPET_ROLL",
+  "PAMPLETS":             "RUG",
   "BLINDS":               "BLIND",
 };
 
 const HEADER_STRINGS = new Set([
   "CATALOGUE NAMES", "CATALOGUE NAME", "CATALOGE NAME",
-  "BLINDS IN PAMPLETS",
+  "BLINDS IN PAMPLETS", "S.NO", "S. NO",
 ]);
 
 function norm(s) {
   return String(s ?? "").trim().replace(/\s+/g, " ");
+}
+
+// Rows like "1.WONDERFUL BLACKOUT" in the BLINDS sheet are catalogue
+// names prefixed with a bullet-like number. Strip that so the display
+// name reads cleanly.
+function stripLeadingNumber(s) {
+  return s.replace(/^\d+\.\s*/, "").trim();
 }
 
 const wb = XLSX.readFile(SRC);
@@ -54,19 +65,27 @@ for (const sheet of wb.SheetNames) {
 
   for (const row of data) {
     const a = row[0];
-    const b = norm(row[1]);
+    let b = norm(row[1]);
+    if (!b) continue;
+    // BLINDS sub-items look like "1.WONDERFUL BLACKOUT" — strip the
+    // leading numeric prefix so the catalogue name reads cleanly. Also
+    // pick up rows where col A is empty (BLINDS uses that layout for
+    // sub-items under NL BLIND / BLINDS parent labels).
+    b = stripLeadingNumber(b);
     if (!b) continue;
     const bUpper = b.toUpperCase();
     if (HEADER_STRINGS.has(bUpper)) continue;
     if (bUpper.startsWith("SUN SCREEN FABRIC")) continue;
-    // BLINDS sub-items (rows without a numeric S.NO) are structured as
-    // "1.WONDERFUL BLACKOUT" etc. inside col B while col A is empty.
-    // The parent NL BLIND row already covers the group, so skip these.
-    if (typeof a !== "number") continue;
+    // Parent-label rows for BLINDS sub-groups repeat "NL BLIND" or
+    // "BLINDS" as an S.NO group header. The real catalogue names are
+    // the sub-items below, not these labels — skip them.
+    if (sheet === "BLINDS" && (bUpper === "NL BLIND" || bUpper === "BLINDS")) continue;
     const key = bUpper;
     if (bucket.has(key)) continue;
     bucket.set(key, b);
     rawRowsSeen++;
+    // Track whether the row had no S.NO for logging only.
+    if (typeof a !== "number") { /* sub-item, still counted */ }
   }
   byFamily.set(family, bucket);
 }

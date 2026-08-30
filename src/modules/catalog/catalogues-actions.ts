@@ -122,11 +122,17 @@ export async function loadCataloguesFromSeed(): Promise<SeedLoadResult> {
     requirePermission(ctx, "catalog.create");
     const db = scoped(ctx);
 
+    // Pull existing rows with id + family so we can upsert-and-move on
+    // re-runs: if a row already exists under the wrong family (e.g.
+    // PAMPLETS names that used to sit under CARPET_ROLL and are now
+    // classified as RUG), a re-run corrects the family in place.
     const existingRows = await db.catalogue.findMany({
       where:  { organizationId: ctx.orgId },
-      select: { name: true },
+      select: { id: true, name: true, family: true },
     });
-    const existingKeys = new Set(existingRows.map((r) => r.name.toUpperCase()));
+    const existing = new Map(
+      existingRows.map((r) => [r.name.toUpperCase(), r]),
+    );
 
     const byFamily: SeedLoadResult["byFamily"] = [];
     let totalCreated = 0, totalSkipped = 0;
@@ -134,16 +140,27 @@ export async function loadCataloguesFromSeed(): Promise<SeedLoadResult> {
     for (const bucket of CATALOGUE_SEED) {
       let created = 0, skipped = 0;
       for (const name of bucket.names) {
-        if (existingKeys.has(name.toUpperCase())) { skipped++; continue; }
-        await db.catalogue.create({
+        const hit = existing.get(name.toUpperCase());
+        if (hit) {
+          if (hit.family !== bucket.family) {
+            await db.catalogue.update({
+              where: { id: hit.id },
+              data:  { family: bucket.family },
+            });
+          }
+          skipped++;
+          continue;
+        }
+        const created_ = await db.catalogue.create({
           data: {
             organizationId: ctx.orgId,
             name,
             family:         bucket.family,
             isActive:       true,
           },
+          select: { id: true, name: true, family: true },
         });
-        existingKeys.add(name.toUpperCase());
+        existing.set(name.toUpperCase(), created_);
         created++;
       }
       byFamily.push({ family: bucket.family, created, skipped });
