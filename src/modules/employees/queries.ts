@@ -13,7 +13,10 @@ export interface EmployeeRow {
   code: string;
   name: string;
   mobile: string;
-  email: null;             // Not in schema — always null
+  /** Login address, from the linked User. Null when they have no sign-in. */
+  email: string | null;
+  /** Whether this person can sign in at all — i.e. Employee.userId is set. */
+  hasLogin: boolean;
   designation: string | null;
   department: string | null;
   branchName: string;      // Not in schema — always "—"
@@ -97,7 +100,7 @@ export async function listEmployees(
       select: {
         id: true, code: true, name: true, mobile: true,
         designation: true, department: true,
-        doj: true, status: true,
+        doj: true, status: true, userId: true,
       },
     }),
     db.employee.count(),
@@ -109,7 +112,12 @@ export async function listEmployees(
   }
 
   const empIds = rows.map((r) => r.id);
-  const [attendanceSample, payslipSample] = await Promise.all([
+  // The linked logins, so the list can show who can sign in and with which
+  // address. This used to be hardcoded null, which meant the Employees table
+  // could not tell a person with a login from one without — and "give them an
+  // email to log in with" had nowhere to show its result.
+  const userIds = rows.map((r) => r.userId).filter((id): id is string => !!id);
+  const [attendanceSample, payslipSample, users] = await Promise.all([
     db.attendance.findMany({
       where: { employeeId: { in: empIds } },
       select: { employeeId: true },
@@ -120,8 +128,12 @@ export async function listEmployees(
       select: { employeeId: true },
       distinct: ["employeeId"],
     }),
+    userIds.length > 0
+      ? db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, email: true } })
+      : Promise.resolve([]),
   ]);
 
+  const emailByUserId = new Map(users.map((u) => [u.id, u.email]));
   const hasAttendanceIds = new Set(attendanceSample.map((a) => a.employeeId));
   const hasPayslipIds = new Set(payslipSample.map((p) => p.employeeId));
 
@@ -131,7 +143,8 @@ export async function listEmployees(
       code: r.code,
       name: r.name,
       mobile: r.mobile,
-      email: null,
+      email: r.userId ? emailByUserId.get(r.userId) ?? null : null,
+      hasLogin: !!r.userId,
       designation: r.designation,
       department: r.department,
       branchName: "—",

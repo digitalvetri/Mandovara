@@ -10,7 +10,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { Plus, Trash2, Archive, ChevronRight, KeyRound } from "lucide-react";
 import { deleteEmployee, setEmployeeStatus } from "@/modules/employees/actions";
-import { setEmployeePassword } from "@/modules/employees/actions-password";
+import { setEmployeeLogin } from "@/modules/employees/actions-login";
 import type { EmployeeRow } from "@/modules/employees/queries";
 import { iso, statusLabel, Th, Td } from "./_employee-fields";
 import { EmployeeAddForm } from "./EmployeeAddForm";
@@ -41,18 +41,23 @@ export function EmployeesSection({ employees, branches, roles, activeCount, tota
   // new one for the owner to pass on.
   const [pwFor,  setPwFor]  = useState<string | null>(null);
   const [pwText, setPwText] = useState("");
+  const [pwEmail, setPwEmail] = useState("");
+  const [pwRole,  setPwRole]  = useState("");
   const [pwDone, setPwDone] = useState<string | null>(null);
 
   function commitPassword(id: string) {
     setRowError((e) => ({ ...e, [id]: "" }));
     setPwDone(null);
     startTransition(async () => {
-      const res = await setEmployeePassword({ employeeId: id, password: pwText });
+      const res = await setEmployeeLogin({
+        employeeId: id, email: pwEmail, password: pwText, roleId: pwRole,
+      });
       if (!res.ok) {
         setRowError((e) => ({ ...e, [id]: res.error ?? "Could not set the password" }));
         return;
       }
-      setPwFor(null); setPwText(""); setPwDone(id);
+      setPwFor(null); setPwText(""); setPwEmail(""); setPwRole(""); setPwDone(id);
+      router.refresh();
     });
   }
 
@@ -170,38 +175,73 @@ export function EmployeesSection({ employees, branches, roles, activeCount, tota
                       ) : (
                         <span className="text-[10.5px] text-text-faint">archived</span>
                       )}
+                      {/* One control for the whole sign-in, because the two
+                          halves are useless apart: this used to set a password
+                          only, and refused for anyone with no account at all —
+                          telling the owner it was broken without offering the
+                          fix. It now sets the login address too, and creates
+                          the account when there isn't one. */}
                       <button
                         type="button"
-                        onClick={() => { setPwFor(pwFor === emp.id ? null : emp.id); setPwText(""); setPwDone(null); }}
-                        title="Set a new login password"
+                        onClick={() => {
+                          setPwFor(pwFor === emp.id ? null : emp.id);
+                          setPwText(""); setPwEmail(emp.email ?? ""); setPwRole("");
+                          setPwDone(null);
+                        }}
+                        title={emp.hasLogin ? "Change their email or password" : "Give this person a login"}
                         className="inline-flex h-[24px] items-center gap-1 rounded-[4px] border border-rule px-2 text-[10.5px] text-text-dim transition-colors hover:border-accent/50 hover:text-accent"
                       >
-                        <KeyRound size={11} /> Password
+                        <KeyRound size={11} /> {emp.hasLogin ? "Login" : "Give login"}
                       </button>
                     </div>
 
                     {pwFor === emp.id && (
-                      <div className="mt-2 flex items-center justify-end gap-1.5">
+                      <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+                        {!emp.hasLogin && (
+                          <select
+                            value={pwRole}
+                            onChange={(e) => setPwRole(e.target.value)}
+                            className="h-[28px] w-[150px] rounded-[6px] border border-rule bg-white/60 px-2 text-[12px] outline-none focus:border-accent"
+                          >
+                            <option value="">Pick a role…</option>
+                            {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                          </select>
+                        )}
                         <input
-                          type="password"
+                          type="email"
+                          value={pwEmail}
+                          onChange={(e) => setPwEmail(e.target.value)}
+                          placeholder="Email for signing in"
+                          className="h-[28px] w-[190px] rounded-[6px] border border-rule bg-white/60 px-2 text-[12px] outline-none focus:border-accent"
+                        />
+                        <input
+                          type="text"
                           value={pwText}
                           onChange={(e) => setPwText(e.target.value)}
-                          placeholder="New password (min 8)"
+                          placeholder={emp.hasLogin ? "New password (optional)" : "First password (min 8)"}
                           className="h-[28px] w-[190px] rounded-[6px] border border-rule bg-white/60 px-2 text-[12px] outline-none focus:border-accent"
                         />
                         <button
                           type="button"
                           onClick={() => commitPassword(emp.id)}
-                          disabled={pending || pwText.length < 8}
+                          disabled={
+                            pending ||
+                            (emp.hasLogin
+                              ? !pwEmail && pwText.length < 8
+                              : !pwRole || pwText.length < 8)
+                          }
                           className="h-[28px] rounded-[6px] bg-accent px-3 text-[11.5px] font-medium text-white disabled:opacity-40"
                         >
                           Save
                         </button>
+                        <div className="w-full text-right text-[10px] text-text-faint">
+                          They can sign in with this email, their mobile, or code {emp.code}.
+                        </div>
                       </div>
                     )}
                     {pwDone === emp.id && (
                       <div className="mt-1 text-[10.5px] text-good">
-                        Password updated — tell {emp.name} their new password.
+                        Sign-in updated — tell {emp.name} their new details.
                       </div>
                     )}
                     {rowError[emp.id] && (
