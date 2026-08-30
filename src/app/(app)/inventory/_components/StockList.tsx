@@ -111,7 +111,7 @@ function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
               onClick={(e) => e.stopPropagation()}
               className="line-clamp-2 text-[13px] font-semibold leading-snug text-text hover:text-accent"
             >
-              {r.designName} — {r.colourName}
+              {r.designName}{r.colourName && r.colourName.toLowerCase() !== "default" ? ` — ${r.colourName}` : ""}
             </Link>
             {statusBadge && <span className="mt-0.5 shrink-0">{statusBadge}</span>}
           </div>
@@ -178,7 +178,7 @@ function Row({ r, onEdit }: { r: StockItemRow; onEdit: () => void }) {
                 onClick={(e) => e.stopPropagation()}
                 className="truncate text-[13.5px] font-semibold text-text hover:text-accent hover:-translate-y-0.5 transition-all duration-200"
               >
-                {r.designName} — {r.colourName}
+                {r.designName}{r.colourName && r.colourName.toLowerCase() !== "default" ? ` — ${r.colourName}` : ""}
               </Link>
               {statusBadge}
             </div>
