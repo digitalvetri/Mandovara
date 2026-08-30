@@ -100,19 +100,6 @@ export default async function AdminPage() {
               Open permission matrix →
             </a>
           </div>
-
-          <div className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6">
-            <div className="font-display text-[18px] font-semibold mb-1">Catalog PDF backfill</div>
-            <p className="text-[12px] text-text-dim mb-4">
-              Register missing Platinum Range and Ready Stock collections against PDFs already on the server.
-            </p>
-            <a
-              href="/admin/backfill-pdfs"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-rule text-[12px] text-text font-medium hover:bg-surface-muted transition-colors"
-            >
-              Open backfill tool →
-            </a>
-          </div>
         </aside>
       </div>
     </>
