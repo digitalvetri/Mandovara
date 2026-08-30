@@ -39,6 +39,7 @@ const PUBLIC_PREFIXES = [
   "/fonts/",
   "/catalog/uploads/",
   "/mandovara-mark.png",
+  "/mandovara-icon.png",
   "/mandovara-logo.jpg",
   "/mandovara-letterhead.jpg",
   "/manifest.webmanifest",

@@ -1,16 +1,18 @@
-// Matches the actual Mandovara brand logo: /mandovara-mark.png icon + bold teal "Mandovara™" text.
+// Matches the actual Mandovara brand logo: the butterfly mark + bold teal "Mandovara™" text.
 // Same PNG used by the authenticated app shell (GlobalTopbar, Sidebar).
+//
+// Sized by height, not into a square box — the mark is 1.31:1, so a
+// square with objectFit: contain letterboxed it and made it look small.
 
 // ── Right-panel variant: teal text on white ───────────────────────────────────
 export function MandovaraLogo() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
       <img
-        src="/mandovara-mark.png"
+        src="/mandovara-icon.png"
         alt="Mandovara"
-        width={52}
         height={52}
-        style={{ width: 52, height: 52, objectFit: "contain" }}
+        style={{ height: 52, width: "auto", display: "block" }}
       />
       <div style={{
         color: "#2BA89A",
@@ -40,11 +42,10 @@ export function MandovaraLogoLight() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <img
-        src="/mandovara-mark.png"
+        src="/mandovara-icon.png"
         alt="Mandovara"
-        width={44}
         height={44}
-        style={{ width: 44, height: 44, objectFit: "contain" }}
+        style={{ height: 44, width: "auto", display: "block" }}
       />
       <div style={{
         color: "#FFFFFF",

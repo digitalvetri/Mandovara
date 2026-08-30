@@ -154,19 +154,25 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
   );
 }
 
-// The actual Mandovara mark — a chromakeyed PNG extracted from the
-// owner's brand file (public/mandovara-mark.png, transparent BG).
-// See scripts/extract-logo-mark.mts for the extraction pipeline.
-// Same API as the previous SVG icon so every caller keeps working.
+// The Mandovara butterfly (public/mandovara-icon.png — the brand mark
+// trimmed of its shipped padding, transparent BG).
+//
+// Owner, 2026-08-30: "the size of the logo ... is very small". It was
+// drawn into a size x size box with objectFit: contain, and the mark is
+// 1.31:1 — so a 40px box rendered it 40 wide and 27 tall, then lost more
+// again to the padding baked into the source file. A wide shape cannot
+// fill a square; constraining it by width is what made it small.
+//
+// So `size` is now the height and the width follows the artwork. Callers
+// keep the same prop and get a mark that is actually `size` tall.
 export function MandovaraLeafIcon({ size = 36 }: { size?: number; colour?: string }) {
   return (
     <img
-      src="/mandovara-mark.png"
+      src="/mandovara-icon.png"
       alt=""
       aria-hidden
-      width={size}
       height={size}
-      style={{ width: size, height: size, objectFit: "contain" }}
+      style={{ height: size, width: "auto", display: "block" }}
     />
   );
 }
