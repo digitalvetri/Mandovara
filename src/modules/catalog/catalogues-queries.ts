@@ -55,12 +55,19 @@ const FAMILY_ORDER: readonly ProductFamily[] = [
   "ACCESSORY", "SERVICE",
 ];
 
+// The /catalogues page shows entries under the auto-managed "Catalogues"
+// brand only — not every Collection in the org. Keeps the paste-list page
+// scoped to what the operator added via Add / Load starter list, so
+// pre-existing brands (Platinum Range, Ready Stock, Fedora …) don't
+// bleed in.
+const CATALOGUES_BRAND_NAME = "Catalogues";
+
 export async function listCataloguesByFamily(
   ctx: RequestContext,
 ): Promise<FamilyGroup[]> {
   const db = scoped(ctx);
   const rows = await db.collection.findMany({
-    where:   { isActive: true },
+    where:   { isActive: true, brand: { name: CATALOGUES_BRAND_NAME } },
     orderBy: { name: "asc" },
     select:  { id: true, name: true, family: true },
   });
