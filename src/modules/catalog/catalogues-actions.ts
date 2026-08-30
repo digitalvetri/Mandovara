@@ -18,6 +18,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { scanTransactionalRefs } from "./refs-scan";
+import { CATALOGUE_SEED } from "./catalogues-seed-data";
 
 const CATALOGUES_BRAND_NAME = "Catalogues";
 const MAX_NAME_LEN = 120;
@@ -127,6 +128,70 @@ export async function bulkAddCatalogues(
       ok: false,
       error: err instanceof Error ? err.message : "Failed to add catalogues.",
       created: 0, skipped: 0, invalid: 0,
+    };
+  }
+}
+
+export interface SeedLoadResult {
+  ok:       boolean;
+  error?:   string;
+  created:  number;
+  skipped:  number;   // already existed
+  byFamily: Array<{ family: ProductFamily; created: number; skipped: number }>;
+}
+
+// One-time load of the ~713 names baked in from CATALOGUE LIST.xlsx.
+// Idempotent — re-running only creates missing rows. The button that
+// calls this is only shown in the empty state on /catalogues.
+export async function loadCataloguesFromSeed(): Promise<SeedLoadResult> {
+  try {
+    const ctx = await devContext();
+    requirePermission(ctx, "catalog.create");
+    const db = scoped(ctx);
+
+    const brand = await ensureCataloguesBrand(db, ctx.orgId);
+
+    // Pull existing names in this brand once — the seed loop below just
+    // does membership checks, no per-row round-trip.
+    const existingRows = await db.collection.findMany({
+      where:  { organizationId: ctx.orgId, brandId: brand.id },
+      select: { name: true },
+    });
+    const existingKeys = new Set(existingRows.map((r) => r.name.toUpperCase()));
+
+    const byFamily: SeedLoadResult["byFamily"] = [];
+    let totalCreated = 0, totalSkipped = 0;
+
+    for (const bucket of CATALOGUE_SEED) {
+      let created = 0, skipped = 0;
+      for (const name of bucket.names) {
+        if (existingKeys.has(name.toUpperCase())) { skipped++; continue; }
+        await db.collection.create({
+          data: {
+            organizationId: ctx.orgId,
+            brandId:        brand.id,
+            name,
+            family:         bucket.family,
+            isActive:       true,
+          },
+        });
+        existingKeys.add(name.toUpperCase());
+        created++;
+      }
+      byFamily.push({ family: bucket.family, created, skipped });
+      totalCreated += created;
+      totalSkipped += skipped;
+    }
+
+    revalidatePath("/catalogues");
+    revalidatePath("/products");
+    return { ok: true, created: totalCreated, skipped: totalSkipped, byFamily };
+  } catch (err) {
+    console.error("loadCataloguesFromSeed failed:", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to load starter list.",
+      created: 0, skipped: 0, byFamily: [],
     };
   }
 }

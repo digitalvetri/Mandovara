@@ -9,6 +9,7 @@ import { can } from "@/kernel/rbac/guard";
 import { listCataloguesByFamily } from "@/modules/catalog/catalogues-queries";
 import { AddCataloguesModal } from "./_components/AddCataloguesModal";
 import { CatalogueRow } from "./_components/CatalogueRow";
+import { LoadStarterListButton } from "./_components/LoadStarterListButton";
 
 export const dynamic = "force-dynamic";
 
@@ -69,10 +70,15 @@ function EmptyState({ canAdd }: { canAdd: boolean }) {
       </div>
       <div className="text-[12.5px] text-text-dim/70 mb-6 max-w-[380px]">
         {canAdd
-          ? "Click Add catalogues, pick a category, and paste a list of names — one per line."
+          ? "Load the 713-name starter list from your Excel, or add one category at a time."
           : "Nothing to show yet. Ask an owner to add catalogues."}
       </div>
-      {canAdd && <AddCataloguesModal />}
+      {canAdd && (
+        <div className="flex items-center gap-2">
+          <LoadStarterListButton />
+          <AddCataloguesModal />
+        </div>
+      )}
     </div>
   );
 }
