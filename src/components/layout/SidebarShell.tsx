@@ -9,10 +9,12 @@ import { GlobalTopbar } from "./GlobalTopbar";
 interface Props {
   userName: string;
   userRole: string;
+  userEmail: string | null;
+  userAvatar: string | null;
   userPermissions: string[];
 }
 
-export function SidebarShell({ userName, userRole, userPermissions }: Props) {
+export function SidebarShell({ userName, userRole, userEmail, userAvatar, userPermissions }: Props) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -32,6 +34,9 @@ export function SidebarShell({ userName, userRole, userPermissions }: Props) {
       <GlobalTopbar
         userName={userName}
         userRole={userRole}
+        userEmail={userEmail}
+        userAvatar={userAvatar}
+        userPermissions={userPermissions}
         onMenuOpen={() => setOpen(true)}
       />
 

@@ -95,7 +95,9 @@ export default async function AdminPage() {
             )}
           </div>
 
-          <CompanySettingsForm initial={a.company} />
+          <div id="company" className="scroll-mt-[calc(var(--topbar-h)+12px)]">
+            <CompanySettingsForm initial={a.company} />
+          </div>
 
           <div className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6">
             <div className="font-display text-[18px] font-semibold mb-1">Role permissions</div>

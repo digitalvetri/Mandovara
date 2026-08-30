@@ -15,17 +15,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await devContext();
   let userName = "User";
   let userRole = ctx.roles[0] ?? "STAFF";
+  // For the header menu: the photo and address the person already set on
+  // their profile. Without these the menu shows initials and a role while
+  // /profile shows a photograph, which reads as two different accounts.
+  let userAvatar: string | null = null;
+  let userEmail:  string | null = null;
 
   try {
     const user = await orgPrisma(ctx.orgId).user.findUnique({
       where: { id: ctx.userId },
-      select: { name: true, role: true, mustChangePassword: true },
+      select: { name: true, role: true, mustChangePassword: true, avatarKey: true, email: true },
     });
     if (user) {
       // Force password rotation before the user can access any app route.
       if (user.mustChangePassword) redirect("/change-password?forced=1");
-      userName = user.name;
-      userRole = user.role;
+      userName   = user.name;
+      userRole   = user.role;
+      userAvatar = user.avatarKey;
+      userEmail  = user.email;
     }
   } catch {
     // DB unavailable — use stubs
@@ -35,7 +42,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen page-wash">
-      <SidebarShell userName={userName} userRole={userRole} userPermissions={userPermissions} />
+      <SidebarShell
+        userName={userName}
+        userRole={userRole}
+        userEmail={userEmail}
+        userAvatar={userAvatar}
+        userPermissions={userPermissions}
+      />
       {/* Top padding tracks the bar's real height, which grows by the
           status-bar inset when the app runs installed. The bottom padding
           keeps the last row of content clear of the home indicator. Both
