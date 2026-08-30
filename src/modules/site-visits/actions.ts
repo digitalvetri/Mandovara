@@ -123,13 +123,28 @@ export async function updateSiteVisitStatus(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   const ctx = await devContext();
-  requirePermission(ctx, "sitelog.create");
 
   const parsed = updateVisitStatusSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
   const { id, status, observations, customerNotes } = parsed.data;
 
   const db = scoped(ctx);
+
+  // Assignment override: an employee who is the assignedToId on the
+  // visit can update its status regardless of sitelog.create — otherwise
+  // a MEASURE_EXEC / SALES role that only has sitelog.view cannot mark
+  // their own visit complete, which is the exact flow site-visits are
+  // built around.
+  const existing = await db.siteVisit.findUnique({
+    where:  { id },
+    select: { assignedToId: true },
+  });
+  if (!existing) return { ok: false, error: "Site visit not found." };
+  const isAssignee = existing.assignedToId === ctx.userId;
+  if (!isAssignee) {
+    requirePermission(ctx, "sitelog.create");
+  }
+
   try {
     const visit = await db.siteVisit.update({
       where: { id },
