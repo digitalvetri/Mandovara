@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Upload, Trash2, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { Upload, Trash2, CheckCircle2, AlertCircle, X, AlertTriangle } from "lucide-react";
 import { uploadCollectionPdf, deleteCollection } from "@/modules/catalog/pdf-actions";
 import { PdfViewerModal } from "./PdfViewerModal";
 
@@ -36,10 +36,10 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const hasPdf     = !!c.catalogPdfKey;
-  const isEmpty    = c._count.designs === 0;
-  const canDestroy = canDelete && isEmpty;
-  const busy       = uploading || deleting;
+  const hasPdf       = !!c.catalogPdfKey;
+  const hasContent   = c._count.designs > 0;
+  const canDestroy   = canDelete;
+  const busy         = uploading || deleting;
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -64,7 +64,7 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
   function handleDelete() {
     setDeleteError(null);
     startDelete(async () => {
-      const res = await deleteCollection(c.id);
+      const res = await deleteCollection(c.id, { cascade: hasContent });
       if (!res.ok) { setDeleteError(res.error ?? "Delete failed"); return; }
       setConfirmOpen(false);
     });
@@ -156,7 +156,7 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal aria-label={`Delete ${c.name}`}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => !deleting && setConfirmOpen(false)} />
-          <div className="relative w-full max-w-sm rounded-[14px] bg-surface border border-rule shadow-xl overflow-hidden">
+          <div className="relative w-full max-w-md rounded-[14px] bg-surface border border-rule shadow-xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-rule">
               <h3 className="text-[14px] font-semibold text-text">Delete collection?</h3>
               <button
@@ -173,9 +173,27 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
               <p className="text-[13px] text-text">
                 Delete <span className="font-semibold">{c.name}</span>?
               </p>
-              {hasPdf && (
+
+              {hasContent && (
+                <div className="rounded-[8px] border border-fault/25 bg-fault/8 p-3 flex gap-2.5">
+                  <AlertTriangle size={15} strokeWidth={1.75} className="text-fault mt-0.5 shrink-0" />
+                  <div className="text-[12px] text-text space-y-1">
+                    <div className="font-medium">This will also delete:</div>
+                    <ul className="text-text-dim list-disc pl-4">
+                      <li>{c._count.designs} design{c._count.designs === 1 ? "" : "s"} + all their colourways, prices and stock balances</li>
+                      {hasPdf && <li>The attached catalog PDF</li>}
+                    </ul>
+                    <div className="text-text-dim pt-1">
+                      Refused if any quotation, order, PO, stock move, allocation or sample book references these designs.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!hasContent && hasPdf && (
                 <p className="text-[12px] text-text-dim">The attached PDF will also be removed.</p>
               )}
+
               {deleteError && (
                 <p className="text-[12px] text-fault">{deleteError}</p>
               )}

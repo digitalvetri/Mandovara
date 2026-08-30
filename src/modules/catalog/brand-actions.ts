@@ -13,34 +13,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { PDFS_DIR } from "./pdf-paths";
-
-async function scanTransactionalRefs(
-  db: ReturnType<typeof scoped>,
-  colourwayIds: string[],
-  collectionIds: string[],
-): Promise<string | null> {
-  if (colourwayIds.length === 0) return null;
-  const inCw  = { colourwayId:  { in: colourwayIds  } };
-  const inCol = { collectionId: { in: collectionIds } };
-  const [quoteLines, orderLines, poLines, grnLines, stockMoves, allocations, sampleBooks] = await Promise.all([
-    db.quotationLine.count({ where: inCw }),
-    db.orderLine.count({ where: inCw }),
-    db.pOLine.count({ where: inCw }),
-    db.gRNLine.count({ where: inCw }),
-    db.stockMove.count({ where: inCw }),
-    db.allocation.count({ where: inCw }),
-    db.sampleBook.count({ where: inCol }),
-  ]);
-  const parts: string[] = [];
-  if (quoteLines)  parts.push(`${quoteLines} quotation line${quoteLines === 1 ? "" : "s"}`);
-  if (orderLines)  parts.push(`${orderLines} order line${orderLines === 1 ? "" : "s"}`);
-  if (poLines)     parts.push(`${poLines} PO line${poLines === 1 ? "" : "s"}`);
-  if (grnLines)    parts.push(`${grnLines} GRN line${grnLines === 1 ? "" : "s"}`);
-  if (stockMoves)  parts.push(`${stockMoves} stock move${stockMoves === 1 ? "" : "s"}`);
-  if (allocations) parts.push(`${allocations} allocation${allocations === 1 ? "" : "s"}`);
-  if (sampleBooks) parts.push(`${sampleBooks} sample book${sampleBooks === 1 ? "" : "s"}`);
-  return parts.length === 0 ? null : parts.join(", ");
-}
+import { scanTransactionalRefs } from "./refs-scan";
 
 // Delete a brand and everything under it — collections, designs,
 // colourways, prices, stock balances. Empty (no designs / sample books)

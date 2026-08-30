@@ -7,6 +7,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { PDFS_DIR } from "./pdf-paths";
+import { scanTransactionalRefs } from "./refs-scan";
 import type { PdfActionResult } from "./pdf-actions-types";
 
 // PDFS_DIR + PdfActionResult moved to sibling files — a "use server"
@@ -87,11 +88,16 @@ export async function removeCollectionPdf(collectionId: string): Promise<PdfActi
   }
 }
 
-// Delete an empty collection. Refuses if any Design or SampleBook FKs into it
-// — deleting a collection with real product data underneath would silently
-// break projects/orders/stock that reference those colourways.
+// Delete a collection. Without cascade, refuses if the collection has any
+// designs or sample books — deleting a populated collection would leave
+// orphan FKs in projects/orders/stock. With cascade=true, sweeps designs +
+// colourways + prices + stock balances too, but still refuses if any
+// transactional record (quotes / orders / POs / GRNs / stock moves /
+// allocations / sample books) still references those colourways — the
+// audit trail is never silently orphaned.
 export async function deleteCollection(
   collectionId: string,
+  opts: { cascade?: boolean } = {},
 ): Promise<{ ok: boolean; error?: string }> {
   const ctx = await devContext();
   requirePermission(ctx, "catalog.delete");
@@ -101,15 +107,28 @@ export async function deleteCollection(
     where:  { id: collectionId },
     select: {
       id: true, brandId: true, catalogPdfKey: true,
-      _count: { select: { designs: true, sampleBooks: true } },
+      _count:  { select: { designs: true, sampleBooks: true } },
+      designs: { select: { id: true, colourways: { select: { id: true } } } },
     },
   });
 
-  if (col._count.designs > 0) {
-    return { ok: false, error: `Collection has ${col._count.designs} design${col._count.designs === 1 ? "" : "s"} — remove them first.` };
+  const hasContent = col._count.designs > 0 || col._count.sampleBooks > 0;
+
+  if (hasContent && !opts.cascade) {
+    const parts: string[] = [];
+    if (col._count.designs)     parts.push(`${col._count.designs} design${col._count.designs === 1 ? "" : "s"}`);
+    if (col._count.sampleBooks) parts.push(`${col._count.sampleBooks} sample book${col._count.sampleBooks === 1 ? "" : "s"}`);
+    return { ok: false, error: `Collection has ${parts.join(" and ")} — remove them first.` };
   }
-  if (col._count.sampleBooks > 0) {
-    return { ok: false, error: `Collection has ${col._count.sampleBooks} sample book${col._count.sampleBooks === 1 ? "" : "s"} — remove them first.` };
+
+  const designIds    = col.designs.map((d) => d.id);
+  const colourwayIds = col.designs.flatMap((d) => d.colourways.map((cw) => cw.id));
+
+  if (opts.cascade) {
+    const blocking = await scanTransactionalRefs(db, colourwayIds, [col.id]);
+    if (blocking) {
+      return { ok: false, error: `Cannot delete: this collection's designs are still referenced by ${blocking}. Delete those first.` };
+    }
   }
 
   if (col.catalogPdfKey) {
@@ -117,7 +136,27 @@ export async function deleteCollection(
     try { await unlink(filePath); } catch { /* already gone */ }
   }
 
-  await db.collection.delete({ where: { id: collectionId } });
+  try {
+    await db.$transaction([
+      ...(colourwayIds.length > 0
+        ? [
+            db.calcResult.updateMany({ where: { colourwayId: { in: colourwayIds } }, data: { colourwayId: null } }),
+            db.purchaseRequestLine.updateMany({ where: { colourwayId: { in: colourwayIds } }, data: { colourwayId: null } }),
+            db.stockBalance.deleteMany({ where: { colourwayId: { in: colourwayIds } } }),
+            db.price.deleteMany({ where: { colourwayId: { in: colourwayIds } } }),
+            db.colourway.deleteMany({ where: { id: { in: colourwayIds } } }),
+          ]
+        : []),
+      ...(designIds.length > 0
+        ? [db.design.deleteMany({ where: { id: { in: designIds } } })]
+        : []),
+      db.collection.delete({ where: { id: collectionId } }),
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("deleteCollection failed:", err);
+    return { ok: false, error: `Delete failed: ${msg.split("\n")[0]}` };
+  }
 
   revalidatePath("/products");
   revalidatePath(`/products/brand/${col.brandId}`);
