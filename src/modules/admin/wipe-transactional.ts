@@ -2,9 +2,17 @@
 
 // Destructive: wipes ALL transactional data (leads → clients → projects
 // → measurements → quotations → orders → invoices → receipts → visits
-// → make jobs → POs → GRNs → stock movements → audit log). Preserves
-// catalog (Design/Colourway/Brand/Collection/Price), inventory master
-// (StockBalance), users, roles, branches, org, and numbering series.
+// → make jobs → POs → GRNs → HR records → audit log).
+//
+// Preserves, per the owner's instruction (2026-08-30) to clear the demo
+// data "except the datas in the Catloug and stock module":
+//
+//   · catalog — Brand / Collection / Design / Colourway / Price
+//   · stock   — StockBalance AND StockMove. The movements used to be
+//               wiped while the balances stayed, which left quantities
+//               with no working behind them; both survive now.
+//   · logins  — User, Role, Branch, Organization, numbering series.
+//               Employee rows go, the accounts they point at do not.
 //
 // Gated on OWNER role at runtime. Uses TRUNCATE ... CASCADE with the
 // append-only StockMove trigger disabled for the duration, exactly like
@@ -81,7 +89,27 @@ const TABLES_TO_WIPE = [
   "SampleIssue",
   "SiteLog",
   "SiteVisit",
-  "StockMove",
+  // ── HR and vendors ────────────────────────────────────────────────
+  // Added 2026-08-30. prisma/seed/masters.ts plants nine standalone
+  // demo employees plus user-linked ones, and demo vendors, and none of
+  // it was reachable from here — a studio with seven real people was
+  // looking at a payroll full of names it had never hired.
+  //
+  // Listed explicitly rather than left to CASCADE: Attendance, Leave,
+  // LeaveBalance and Payslip carry an employeeId COLUMN but no Prisma
+  // relation, so there is no database-level foreign key and TRUNCATE
+  // Employee CASCADE would leave every one of them behind, orphaned.
+  //
+  // User is deliberately NOT here. Employee.userId points at User, not
+  // the other way round, so clearing employees cannot log anyone out —
+  // and deleting a login nobody asked to delete is not recoverable.
+  "Attendance",
+  "Employee",
+  "Leave",
+  "LeaveBalance",
+  "PayrollRun",
+  "Payslip",
+  "Vendor",
   "Task",
   "TaskComment",
   "VendorBill",

@@ -35,8 +35,12 @@ export function WipeForm() {
             </div>
             <div className="text-[12px] text-text-dim leading-relaxed">
               Wipes measurements, quotations, orders, invoices, receipts, site visits, make jobs,
-              purchase orders, stock movements, audit log. Resets document numbering to 0001.
-              Preserves the product catalog, on-hand stock balances, users, branches, roles.
+              purchase orders, employees and their attendance, leave and payroll, vendors, and the
+              audit log. Resets document numbering to 0001.
+              <br /><br />
+              Preserves the product catalog, <strong className="text-text">all stock — balances and
+              movements</strong>, and every login account, branch and role. Employee records go;
+              the accounts they sign in with do not, so nobody is locked out.
               <strong className="text-fault"> This cannot be undone.</strong>
             </div>
           </div>

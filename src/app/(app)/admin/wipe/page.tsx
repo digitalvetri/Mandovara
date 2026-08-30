@@ -12,7 +12,7 @@ export default async function AdminWipePage() {
     <>
       <Topbar
         title="Wipe transactional data"
-        eyebrow="Destructive. Preserves catalog, inventory master, users, roles, branches, numbering series."
+        eyebrow="Destructive. Preserves the catalog, all stock, and every login account."
       />
       {canWipe ? (
         <WipeForm />
