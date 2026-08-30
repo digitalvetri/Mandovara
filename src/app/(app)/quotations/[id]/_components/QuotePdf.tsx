@@ -28,7 +28,7 @@ import { Document, Page, View, Text, Image, Font } from "@react-pdf/renderer";
 import type { QuotationDetail, QuotationLine } from "@/modules/quotations/queries";
 import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 import { pdfStyles as s } from "./_pdf-styles";
-import { TableHead, ItemRow, GroupRow, FigureRow, SpacerRow } from "./_pdf-table";
+import { TableHead, ItemRow, GroupRow, DeductionRow, amt } from "./_pdf-table";
 import {
   MANDOVARA_TERMS, EMPHASISED_TERM, CANCELLATION_HEADING,
   CANCELLATION_TERMS, CLOSING_LINES,
@@ -64,8 +64,7 @@ function pctOf(l: QuotationLine): string {
 type Block =
   | { kind: "group";    label: string }
   | { kind: "line";     line: QuotationLine }
-  | { kind: "discount"; label: string; value: bigint }
-  | { kind: "spacer" };
+  | { kind: "discount"; label: string; value: bigint };
 
 /**
  * Lay the table out the way the studio does.
@@ -93,7 +92,6 @@ function layout(lines: QuotationLine[]): Block[] {
       label: only ? `LESS DIS. ${only}%` : "LESS DISCOUNT",
       value: -runTotal,
     });
-    blocks.push({ kind: "spacer" });
     runTotal = 0n;
     runPcts = new Set();
   }
@@ -132,7 +130,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
     ? q.termsText.split("\n").map((t) => t.trim()).filter(Boolean)
     : null;
 
-  const headline = [q.clientName, q.clientMobile].filter(Boolean).join(" - ");
+  const area = q.siteArea ?? q.projectName ?? "";
 
   return (
     <Document
@@ -148,56 +146,77 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
           : <Text style={s.letterheadFallback}>Mandovara</Text>}
 
         {/* ── Who and where ────────────────────────────────────────── */}
-        <View style={s.band}>
-          <Text style={s.bandText}>{headline}</Text>
-        </View>
-        <View style={[s.band, s.bandLast]}>
-          <Text style={s.bandText}>{q.siteArea?.toUpperCase() ?? q.projectName?.toUpperCase() ?? ""}</Text>
+        {/* Same two facts the yellow bars carried — the client with
+            their number, and the area — set as one block instead of two
+            shouting bands. */}
+        <View style={s.headRow}>
+          <View style={s.partyBlock}>
+            <Text style={s.partyLabel}>QUOTATION FOR</Text>
+            <Text style={s.partyName}>{q.clientName}</Text>
+            <Text style={s.partyMeta}>
+              {[q.clientMobile, area].filter(Boolean).join("  ·  ")}
+            </Text>
+          </View>
         </View>
 
         {/* ── Items ────────────────────────────────────────────────── */}
         <View style={s.table}>
           <TableHead />
 
-          {blocks.map((b, i) => {
-            if (b.kind === "group")    return <GroupRow key={`g-${i}`} label={b.label} />;
-            if (b.kind === "spacer")   return <SpacerRow key={`s-${i}`} />;
-            if (b.kind === "discount") return <FigureRow key={`d-${i}`} label={b.label} value={b.value} />;
-            return (
-              <ItemRow
-                key={b.line.id}
-                item={b.line.description}
-                unit={b.line.unit}
-                quantity={b.line.quantity}
-                rate={b.line.rate}
-                amount={grossOf(b.line)}
-              />
-            );
-          })}
+          {(() => {
+            // Zebra counts only priced rows, so a caption or a discount
+            // line does not break the alternation of the items around it.
+            let n = 0;
+            return blocks.map((b, i) => {
+              if (b.kind === "group")    return <GroupRow key={`g-${i}`} label={b.label} />;
+              if (b.kind === "discount") return <DeductionRow key={`d-${i}`} label={b.label} value={b.value} />;
+              const alt = n++ % 2 === 1;
+              return (
+                <ItemRow
+                  key={b.line.id}
+                  item={b.line.description}
+                  unit={b.line.unit}
+                  quantity={b.line.quantity}
+                  rate={b.line.rate}
+                  amount={grossOf(b.line)}
+                  alt={alt}
+                />
+              );
+            });
+          })()}
+        </View>
 
-          <FigureRow label="TOTAL" value={printedTotal} last />
+        {/* The figure a client looks for first, given its own block
+            rather than being one more cell in a grid. */}
+        <View style={s.totalWrap}>
+          <View style={s.totalBox}>
+            <Text style={s.totalLabel}>TOTAL</Text>
+            <Text style={s.totalValue}>{amt(printedTotal)}</Text>
+          </View>
         </View>
 
         {/* ── Terms ────────────────────────────────────────────────── */}
         <View style={s.termsWrap}>
-          {/* An estimate must keep saying it is one — it is priced before
-              anyone has measured. */}
           {estimate && <Text style={s.caveat}>{ESTIMATE_CAVEAT}</Text>}
 
+          <Text style={s.termsHead}>TERMS &amp; CONDITIONS</Text>
           {(customTerms ?? MANDOVARA_TERMS).map((t, i) => (
-            <Text
-              key={i}
-              style={!customTerms && i === EMPHASISED_TERM ? s.termRed : s.term}
-            >
-              {i + 1}. {t}
-            </Text>
+            <View key={i} style={s.termRow}>
+              <Text style={s.termNum}>{i + 1}.</Text>
+              <Text style={!customTerms && i === EMPHASISED_TERM ? s.termStrong : s.termText}>
+                {t}
+              </Text>
+            </View>
           ))}
 
           {!customTerms && (
             <>
-              <Text style={s.policyHead}>{CANCELLATION_HEADING}</Text>
+              <Text style={s.policyHead}>{CANCELLATION_HEADING.toUpperCase()}</Text>
               {CANCELLATION_TERMS.map((t, i) => (
-                <Text key={i} style={s.term}>{i + 1}.{t}</Text>
+                <View key={i} style={s.termRow}>
+                  <Text style={s.termNum}>{i + 1}.</Text>
+                  <Text style={s.termText}>{t}</Text>
+                </View>
               ))}
               {CLOSING_LINES.map((t, i) => (
                 <Text key={i} style={s.closing}>{t}</Text>

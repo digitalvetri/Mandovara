@@ -2,29 +2,32 @@
 // Pure presentational; no server calls. Rendered at 595px wide and scaled
 // down to fit the preview panel via CSS zoom in workspace-helpers.tsx.
 //
-// Rewritten 2026-08-28 to mirror QuotePdf.tsx. It had been showing the
-// old GST tax-quotation — teal header, Bill To / From boxes, a GST%
-// column and a CGST/SGST totals stack — while the PDF now produces the
-// studio's own document. An operator checking the layout on screen and
-// a client opening the attachment were looking at two different papers.
+// Mirrors QuotePdf.tsx. An operator checking the layout on screen and a
+// client opening the attachment must be looking at the same paper —
+// they diverged once already and it is not worth repeating.
 //
-// Everything structural here is decided in the PDF and copied: the same
-// two yellow bands, the same ITEM/Unit/QTY/RATE/AMT columns, the same
-// "LESS DIS. 25%" run behaviour, and the same TOTAL — the taxable sum,
-// so the column adds up on a page that shows no tax. Change one, change
-// the other; they are the same document in two media.
+// Redesigned alongside the PDF on 2026-08-30: one teal accent instead of
+// yellow fills and red text, hairline horizontal rules instead of a box
+// around every cell, figures right-aligned, and the total lifted out of
+// the table into its own block. Same content throughout.
+//
+// Everything structural is decided in the PDF and copied here — the
+// columns, the "LESS DIS. 25%" run behaviour, and the TOTAL being the
+// taxable sum so the column adds up on a page that shows no tax. Change
+// one, change the other.
 
 import type { SerializedQuotation } from "../_types";
-import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
-import {
-  MANDOVARA_TERMS, EMPHASISED_TERM, CANCELLATION_HEADING,
-  CANCELLATION_TERMS, CLOSING_LINES,
-} from "./_quote-terms";
+import { isEstimate } from "@/modules/quotations/lib";
+import { PreviewTerms } from "./PreviewTerms";
 
-const INK    = "#000000";
-const RED    = "#FF0000";
-const YELLOW = "#FFFF00";
-const WHITE  = "#FFFFFF";
+const BRAND      = "#1B8A7E";
+const BRAND_DEEP = "#14655C";
+const BRAND_TINT = "#EEF7F5";
+const INK        = "#1A1A1A";
+const INK_SOFT   = "#5B6470";
+const RULE_SOFT  = "#EDF0F2";
+const DEDUCT     = "#B3261E";
+const WHITE      = "#FFFFFF";
 
 export interface EditLine {
   _key: string;
@@ -62,7 +65,7 @@ function fmtAmt(n: number): string {
     : s.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + s.slice(-3);
 
   const body = paise === 0 ? grouped : `${grouped}.${String(paise).padStart(2, "0")}`;
-  return neg ? `-${body}` : body;
+  return neg ? `\u2212${body}` : body;
 }
 
 function fmtQty(q: string): string {
@@ -83,8 +86,7 @@ function cutOf(l: EditLine): number {
 type Row =
   | { kind: "group";    label: string }
   | { kind: "line";     line: EditLine }
-  | { kind: "discount"; label: string; value: number }
-  | { kind: "spacer" };
+  | { kind: "discount"; label: string; value: number };
 
 /** Mirror of layout() in QuotePdf.tsx — see the note at the top. */
 function layout(lines: EditLine[]): Row[] {
@@ -101,7 +103,6 @@ function layout(lines: EditLine[]): Row[] {
       label: only ? `LESS DIS. ${only}%` : "LESS DISCOUNT",
       value: -runTotal,
     });
-    rows.push({ kind: "spacer" });
     runTotal = 0;
     runPcts = new Set();
   }
@@ -128,14 +129,22 @@ function layout(lines: EditLine[]): Row[] {
 }
 
 const CELL: React.CSSProperties = {
-  border: `0.75px solid ${INK}`,
-  padding: "3px 4px",
-  textAlign: "center",
-  fontSize: "9px",
+  borderBottom: `0.5px solid ${RULE_SOFT}`,
+  padding: "5px 7px",
+  fontSize: "9.5px",
+  color: INK,
   verticalAlign: "middle",
 };
-const HEAD: React.CSSProperties = { ...CELL, fontWeight: 700, color: RED };
-const REDCELL: React.CSSProperties = { ...CELL, fontWeight: 700, color: RED };
+const NUM: React.CSSProperties = { ...CELL, textAlign: "right" };
+const MUTED: React.CSSProperties = { ...CELL, color: INK_SOFT, textAlign: "center" };
+const HEAD: React.CSSProperties = {
+  padding: "6.5px 7px",
+  fontSize: "7.5px",
+  fontWeight: 700,
+  color: WHITE,
+  letterSpacing: "0.9px",
+  background: BRAND,
+};
 
 interface Props {
   quotation: SerializedQuotation;
@@ -151,7 +160,6 @@ export function QuotePreviewA4({ quotation, lines, totals }: Props) {
   const rows = layout(lines);
   // Same figure the PDF prints: the AMT column added up, tax excluded.
   const printedTotal = totals.taxable;
-  const headline = [quotation.clientName, quotation.clientMobile].filter(Boolean).join(" - ");
   const area = quotation.siteArea ?? quotation.projectName ?? "";
   const customTerms = quotation.termsText
     ? quotation.termsText.split("\n").map((t) => t.trim()).filter(Boolean)
@@ -173,7 +181,7 @@ export function QuotePreviewA4({ quotation, lines, totals }: Props) {
           fontSize: "9px",
           color: INK,
           margin: "0 auto",
-          padding: "34px 46px 40px",
+          padding: "26px 42px 28px",
           boxSizing: "border-box",
         }}
       >
@@ -184,113 +192,99 @@ export function QuotePreviewA4({ quotation, lines, totals }: Props) {
         <img
           src="/mandovara-letterhead.jpg"
           alt="Mandovara"
-          style={{ width: "340px", height: "199px", display: "block" }}
+          style={{ width: "196px", height: "115px", display: "block", marginBottom: "12px" }}
         />
 
         {/* ── Who and where ── */}
-        <div style={{ background: YELLOW, border: `0.75px solid ${INK}`, borderBottom: "none", padding: "3px 4px", textAlign: "center", fontWeight: 700, color: RED, fontSize: "10px" }}>
-          {headline}
-        </div>
-        <div style={{ background: YELLOW, border: `0.75px solid ${INK}`, padding: "3px 4px", textAlign: "center", fontWeight: 700, color: RED, fontSize: "10px" }}>
-          {area.toUpperCase()}
+        <div style={{ borderLeft: `2.5px solid ${BRAND}`, paddingLeft: "10px", marginBottom: "13px" }}>
+          <div style={{ fontSize: "7px", letterSpacing: "1.4px", color: INK_SOFT, marginBottom: "4px" }}>
+            QUOTATION FOR
+          </div>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: INK, marginBottom: "2px" }}>
+            {quotation.clientName}
+          </div>
+          <div style={{ fontSize: "9px", color: INK_SOFT }}>
+            {[quotation.clientMobile, area].filter(Boolean).join("  ·  ")}
+          </div>
         </div>
 
         {/* ── Items ── */}
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: "44%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "14%" }} />
+            <col style={{ width: "46%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "14.5%" }} />
+            <col style={{ width: "14.5%" }} />
           </colgroup>
           <thead>
             <tr>
-              {(["ITEM", "Unit", "QTY", "RATE", "AMT"] as const).map((h) => (
-                <th key={h} style={HEAD}>{h}</th>
-              ))}
+              <th style={{ ...HEAD, textAlign: "left" }}>ITEM</th>
+              <th style={{ ...HEAD, textAlign: "center" }}>UNIT</th>
+              <th style={{ ...HEAD, textAlign: "right" }}>QTY</th>
+              <th style={{ ...HEAD, textAlign: "right" }}>RATE</th>
+              <th style={{ ...HEAD, textAlign: "right" }}>AMOUNT</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
-              if (r.kind === "group") {
+            {(() => {
+              let n = 0;
+              return rows.map((r, i) => {
+                if (r.kind === "group") {
+                  return (
+                    <tr key={`g-${i}`} style={{ background: BRAND_TINT }}>
+                      <td colSpan={5} style={{
+                        ...CELL, fontSize: "7.5px", fontWeight: 700,
+                        color: BRAND_DEEP, letterSpacing: "1.1px", padding: "5.5px 7px",
+                      }}>
+                        {r.label}
+                      </td>
+                    </tr>
+                  );
+                }
+                if (r.kind === "discount") {
+                  return (
+                    <tr key={`d-${i}`}>
+                      <td style={{ ...CELL, color: DEDUCT, fontSize: "9px" }}>{r.label}</td>
+                      <td style={CELL} /><td style={CELL} /><td style={CELL} />
+                      <td style={{ ...NUM, color: DEDUCT }}>{fmtAmt(r.value)}</td>
+                    </tr>
+                  );
+                }
+                const l = r.line;
+                const alt = n++ % 2 === 1;
+                const bg = alt ? { background: "#FAFBFC" } : {};
                 return (
-                  <tr key={`g-${i}`}>
-                    <td style={CELL}>{r.label}</td>
-                    <td style={CELL} /><td style={CELL} /><td style={CELL} /><td style={CELL} />
+                  <tr key={l._key} style={bg}>
+                    <td style={CELL}>{l.description || "—"}</td>
+                    <td style={MUTED}>{l.unit}</td>
+                    <td style={NUM}>{fmtQty(l.quantity)}</td>
+                    <td style={NUM}>{fmtAmt(parseFloat(l.rate) || 0)}</td>
+                    <td style={NUM}>{fmtAmt(grossOf(l))}</td>
                   </tr>
                 );
-              }
-              if (r.kind === "spacer") {
-                return (
-                  <tr key={`s-${i}`} style={{ height: "15px" }}>
-                    <td style={CELL} /><td style={CELL} /><td style={CELL} /><td style={CELL} /><td style={CELL} />
-                  </tr>
-                );
-              }
-              if (r.kind === "discount") {
-                return (
-                  <tr key={`d-${i}`}>
-                    <td style={REDCELL}>{r.label}</td>
-                    <td style={CELL} /><td style={CELL} /><td style={CELL} />
-                    <td style={REDCELL}>{fmtAmt(r.value)}</td>
-                  </tr>
-                );
-              }
-              const l = r.line;
-              return (
-                <tr key={l._key}>
-                  <td style={CELL}>{l.description || "—"}</td>
-                  <td style={CELL}>{l.unit}</td>
-                  <td style={CELL}>{fmtQty(l.quantity)}</td>
-                  <td style={CELL}>{fmtAmt(parseFloat(l.rate) || 0)}</td>
-                  <td style={CELL}>{fmtAmt(grossOf(l))}</td>
-                </tr>
-              );
-            })}
-
-            <tr>
-              <td style={REDCELL}>TOTAL</td>
-              <td style={CELL} /><td style={CELL} /><td style={CELL} />
-              <td style={REDCELL}>{fmtAmt(printedTotal)}</td>
-            </tr>
+              });
+            })()}
           </tbody>
         </table>
 
-        {/* ── Terms ── */}
-        <div style={{ marginTop: "14px", fontSize: "8.5px", lineHeight: 1.35 }}>
-          {estimate && (
-            <div style={{ marginBottom: "6px", fontWeight: 700, color: RED }}>
-              {ESTIMATE_CAVEAT}
-            </div>
-          )}
-
-          {(customTerms ?? MANDOVARA_TERMS).map((t, i) => (
-            <div
-              key={i}
-              style={{
-                marginBottom: "4px",
-                ...(!customTerms && i === EMPHASISED_TERM ? { fontWeight: 700, color: RED } : {}),
-              }}
-            >
-              {i + 1}. {t}
-            </div>
-          ))}
-
-          {!customTerms && (
-            <>
-              <div style={{ marginTop: "6px", marginBottom: "4px", fontWeight: 700, color: RED, fontSize: "9px" }}>
-                {CANCELLATION_HEADING}
-              </div>
-              {CANCELLATION_TERMS.map((t, i) => (
-                <div key={i} style={{ marginBottom: "4px" }}>{i + 1}.{t}</div>
-              ))}
-              {CLOSING_LINES.map((t, i) => (
-                <div key={i} style={{ marginTop: "4px" }}>{t}</div>
-              ))}
-            </>
-          )}
+        {/* ── Total ── */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px", marginBottom: "15px" }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            width: "45%", background: BRAND_TINT, borderTop: `1.5px solid ${BRAND}`,
+            padding: "7.5px 11px",
+          }}>
+            <span style={{ fontSize: "8px", fontWeight: 700, color: BRAND_DEEP, letterSpacing: "1.2px" }}>
+              TOTAL
+            </span>
+            <span style={{ fontSize: "14px", fontWeight: 700, color: BRAND_DEEP }}>
+              {fmtAmt(printedTotal)}
+            </span>
+          </div>
         </div>
+
+        <PreviewTerms estimate={estimate} customTerms={customTerms} />
       </div>
     </div>
   );
