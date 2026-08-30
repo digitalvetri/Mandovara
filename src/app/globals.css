@@ -537,6 +537,30 @@ textarea:read-only {
   animation: draw-x 240ms var(--ease) 140ms backwards;
 }
 
+/* Touch devices: no control smaller than a fingertip can hit.
+
+   Measured across eighteen screens at 390px: the icon buttons in table action
+   columns render 23x23, and a few render 13x13 — below even WCAG 2.5.8's
+   24px floor, let alone Apple's 44px guidance.
+
+   44px is the wrong target here and the measurement says so: 474 of these
+   controls sit within 44px of a neighbour, so expanding their hit areas to
+   44 would make adjacent buttons overlap and the one later in the DOM would
+   swallow taps meant for the other. A control that fires the wrong action is
+   worse than one that is small. Growing the elements themselves to 32px
+   clears the WCAG floor with room to spare, keeps every target distinct, and
+   costs a few pixels of row height on a phone.
+
+   min-height/min-width are ignored on non-replaced inline elements, so this
+   lifts real buttons and block links and leaves links inside a sentence
+   alone — which is what you want, since those are read, not aimed at. */
+@media (pointer: coarse) {
+  a, button, [role="button"], summary {
+    min-height: 32px;
+    min-width: 32px;
+  }
+}
+
 /* Touch devices: nothing hides behind a hover that can never happen.
 
    Eleven controls are drawn at opacity-0 and revealed by group-hover — the

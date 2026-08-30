@@ -16,7 +16,7 @@
 //
 // So it now discovers detail routes the way a person reaches them (click the
 // first row of each list), adds 320px — the real floor, not 390 — and checks
-// five failure classes instead of one. Each failure names the element, so a
+// six failure classes instead of one. Each failure names the element, so a
 // red run tells you what to fix rather than that something, somewhere, is
 // wrong.
 
@@ -123,7 +123,23 @@ function probeSource(): string[] {
     }
   }
 
-  // (5) A control that only appears on hover, on a device that cannot hover.
+  // (5) Controls too small to hit. WCAG 2.5.8 puts the floor at 24x24 CSS px;
+  //     globals.css lifts touch targets to 32, so this gates the standard and
+  //     leaves headroom rather than failing on every pixel of drift.
+  if (matchMedia("(pointer: coarse)").matches) {
+    for (const el of Array.from(document.querySelectorAll("main a, main button, main [role=button]"))) {
+      const b = el.getBoundingClientRect();
+      if (b.width === 0 || b.height === 0) continue;
+      if (getComputedStyle(el).display === "inline") continue;   // links inside a sentence
+      const smallest = Math.min(b.width, b.height);
+      if (smallest < 24) {
+        problems.push(`${label(el)} is ${Math.round(b.width)}x${Math.round(b.height)} — under the 24px tap-target floor`);
+        break;
+      }
+    }
+  }
+
+  // (6) A control that only appears on hover, on a device that cannot hover.
   if (matchMedia("(hover: none)").matches) {
     for (const el of Array.from(document.querySelectorAll("main a, main button"))) {
       if (el.getBoundingClientRect().width === 0) continue;
