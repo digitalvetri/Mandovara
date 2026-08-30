@@ -154,7 +154,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
     <Document
       title={`${estimate ? "Estimate" : "Quotation"} ${q.number}`}
       author="Mandovara"
-      creator="Mandovara Interior OS"
+      creator="Mandovara"
     >
       <Page size="A4" style={s.page}>
 

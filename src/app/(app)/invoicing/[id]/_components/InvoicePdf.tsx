@@ -162,7 +162,7 @@ export function InvoicePdf({ invoice: i, logoSrc }: { invoice: InvoiceDetail; lo
   ];
 
   return (
-    <Document title={`Tax Invoice ${i.number}`} author="Mandovara" creator="Mandovara Interior OS">
+    <Document title={`Tax Invoice ${i.number}`} author="Mandovara" creator="Mandovara">
       <Page size="A4" style={s.page}>
 
         <View style={s.header}>

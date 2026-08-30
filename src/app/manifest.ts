@@ -12,7 +12,10 @@ import type { MetadataRoute } from "next";
 // into every page automatically.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Mandovara Interior OS",
+    // Owner, 2026-08-31: "name the app as Mandovara this is enough".
+    // This is the label under the icon once installed; short_name is
+    // what a cramped home screen falls back to, so both say the same.
+    name: "Mandovara",
     short_name: "Mandovara",
     description:
       "Operating system for Mandovara — measurements, quotations, dye-lot stock, make and money.",

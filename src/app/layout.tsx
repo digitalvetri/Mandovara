@@ -5,7 +5,7 @@ import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar"
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Mandovara Business OS",
+  title: "Mandovara",
   description:
     "Single business operating system for Mandovara — leads, quotations, inventory, projects, invoicing, WhatsApp.",
   applicationName: "Mandovara",

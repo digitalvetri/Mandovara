@@ -34,7 +34,7 @@ export function ReportPdf({ periodLabel, generatedAt, logoSrc, kpi, leads, agein
   ];
 
   return (
-    <Document title={`Mandovara Report — ${periodLabel}`} author="Mandovara" creator="Mandovara Interior OS">
+    <Document title={`Mandovara Report — ${periodLabel}`} author="Mandovara" creator="Mandovara">
 
       {/* ══════════════════════════════════════════════════════════════════
           PAGE 1 — EXECUTIVE SUMMARY

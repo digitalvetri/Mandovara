@@ -123,7 +123,7 @@ function TableRow({ line, idx }: { line: POLineRow; idx: number }) {
 
 export function POPdf({ po, logoSrc }: { po: PODetail; logoSrc?: string }) {
   return (
-    <Document title={`Purchase Order ${po.number}`} author="Mandovara" creator="Mandovara Interior OS">
+    <Document title={`Purchase Order ${po.number}`} author="Mandovara" creator="Mandovara">
       <Page size="A4" style={s.page}>
 
         <View style={s.header}>
