@@ -128,14 +128,37 @@ export default async function LoginPage() {
         {/* Desktop border seam */}
         <div aria-hidden className="hidden lg:block absolute inset-y-0 left-0 w-px bg-[#E0EEEC]" />
 
-        {/* Mobile-only brand wash — a whisper of teal so the login stops
-            looking like a blank sheet under a card. Desktop keeps flat #FFF. */}
+        {/* ── Mobile brand ground ────────────────────────────────────────
+            The showcase panel to the left is `hidden lg:flex`, so on a
+            phone none of it arrived: the card floated on a near-white
+            wash with large empty bands above and below it. Owner,
+            2026-08-30: "in mobile view ... there is no background design
+            or image in the login page".
+
+            Rather than invent something for small screens, this is the
+            same three layers the desktop panel is built from — the dark
+            ground, the accent dot-grid, the instrument motif off the
+            sidebar rail — so the phone and the desktop are recognisably
+            the same front door. The card stays white and opaque on top,
+            so nothing here touches the contrast of the form itself. */}
+        <div aria-hidden className="lg:hidden absolute inset-0 pointer-events-none bg-sidebar" />
+        <div
+          aria-hidden
+          className="lg:hidden absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, color-mix(in oklab, var(--color-accent) 20%, transparent) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
+          }}
+        />
+        <div aria-hidden className="lg:hidden absolute inset-0 pointer-events-none chrome-motif" />
         <div
           aria-hidden
           className="lg:hidden absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(120% 60% at 50% 0%, rgba(43,168,154,0.09), transparent 55%), radial-gradient(90% 55% at 50% 100%, rgba(43,168,154,0.06), transparent 60%), #F6FBFA",
+              "radial-gradient(ellipse 85% 40% at 50% 8%, color-mix(in oklab, var(--color-accent) 16%, transparent) 0%, transparent 70%)," +
+              "radial-gradient(ellipse 70% 35% at 50% 96%, color-mix(in oklab, var(--color-accent) 12%, transparent) 0%, transparent 72%)",
           }}
         />
         <div aria-hidden className="hidden lg:block absolute inset-0" style={{ background: "#FFFFFF" }} />

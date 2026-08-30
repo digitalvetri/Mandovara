@@ -93,7 +93,7 @@ export function ScheduleVisitModal({ open, onClose, leadId }: Props) {
               <option value="">Select team member…</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name} — {u.role.replace(/_/g, " ")}
+                  {u.name}
                 </option>
               ))}
             </select>

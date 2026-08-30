@@ -8,11 +8,14 @@
 //     for a soft archive — payroll history must remain intact.
 
 import type { z } from "zod";
+import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
+import { withTransaction, type TxClient } from "@/kernel/db/transaction";
+import { resolveDynamicRoleId } from "@/kernel/people/role-name";
 import type { RequestContext } from "@/kernel/auth/context";
 import {
   createEmployeeSchema, deleteEmployeeSchema, setEmployeeStatusSchema,
@@ -35,19 +38,64 @@ export async function createEmployee(input: unknown): Promise<ActionResult<{ id:
     ? d.code.trim().toUpperCase()
     : await nextEmployeeCode(ctx);
 
-  const created = await db.employee.create({
-    data: {
-      organizationId: ctx.orgId,
-      code,
-      name:           d.name,
-      mobile,
-      designation:    nullish(d.designation) ?? "",
-      department:     nullish(d.department) ?? "",
-      doj:            new Date(d.joinDate),
-      status:         "ACTIVE",
-    },
-    select: { id: true },
-  });
+  // A role means "this person also gets a login". The two rows are made in
+  // one transaction: a half-finished pair is either a login with nobody to
+  // pay, or a person on the roster who cannot sign in — and the second was
+  // exactly the state the separate "Login accounts" card kept producing.
+  const wantsLogin = !!nullish(d.roleId);
+  const email      = nullish(d.email)?.toLowerCase() ?? null;
+
+  if (wantsLogin) {
+    const clash = await db.user.findFirst({
+      where:  { OR: [{ mobile }, ...(email ? [{ email }] : [])] },
+      select: { id: true },
+    });
+    if (clash) {
+      return { ok: false, error: "Someone already signs in with that mobile or email." };
+    }
+  }
+
+  const roleForLogin  = d.roleId as Exclude<typeof d.roleId, "" | undefined>;
+  const dynamicRoleId = wantsLogin
+    ? await resolveDynamicRoleId(db, ctx.orgId, roleForLogin)
+    : null;
+  const passwordHash = wantsLogin && nullish(d.password)
+    ? await bcrypt.hash(d.password as string, 12)
+    : null;
+
+  const created = await withTransaction(async (tx: TxClient) => {
+    const user = wantsLogin
+      ? await tx.user.create({
+          data: {
+            organizationId: ctx.orgId,
+            name:           d.name,
+            mobile,
+            email,
+            status:         "ACTIVE",
+            branchIds:      [d.branchId],
+            role:           roleForLogin,
+            roleId:         dynamicRoleId,
+            ...(passwordHash ? { passwordHash } : {}),
+          },
+          select: { id: true },
+        })
+      : null;
+
+    return tx.employee.create({
+      data: {
+        organizationId: ctx.orgId,
+        userId:         user?.id ?? null,
+        code,
+        name:           d.name,
+        mobile,
+        designation:    nullish(d.designation) ?? "",
+        department:     nullish(d.department) ?? "",
+        doj:            new Date(d.joinDate),
+        status:         "ACTIVE",
+      },
+      select: { id: true },
+    });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/admin");
   revalidatePath("/payroll");

@@ -9,15 +9,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import { Plus, Trash2, Archive, ChevronRight, KeyRound } from "lucide-react";
-import { createEmployee, deleteEmployee, setEmployeeStatus } from "@/modules/employees/actions";
+import { deleteEmployee, setEmployeeStatus } from "@/modules/employees/actions";
 import { setEmployeePassword } from "@/modules/employees/actions-password";
 import type { EmployeeRow } from "@/modules/employees/queries";
-import { EMPLOYEE_TEAMS } from "@/modules/employees/teams";
-import { fieldCls, iso, statusLabel, Field, Th, Td } from "./_employee-fields";
+import { iso, statusLabel, Th, Td } from "./_employee-fields";
+import { EmployeeAddForm } from "./EmployeeAddForm";
 
 interface Props {
   employees: EmployeeRow[];
   branches: { id: string; name: string }[];
+  roles: { id: string; name: string }[];
   activeCount: number;
   totalCount: number;
 }
@@ -29,20 +30,11 @@ const STATUS_TONE: Record<string, string> = {
   TERMINATED: "bg-bad/12 text-bad",
 };
 
-export function EmployeesSection({ employees, branches, activeCount, totalCount }: Props) {
+export function EmployeesSection({ employees, branches, roles, activeCount, totalCount }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [addOpen, setAddOpen] = useState(false);
   const [rowError, setRowError] = useState<Record<string, string>>({});
-
-  // add-form state
-  const [name, setName] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [designation, setDesignation] = useState("");
-  const [department, setDepartment] = useState("");
-  const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
-  const [joinDate, setJoinDate] = useState<string>(iso(new Date()));
-  const [code, setCode] = useState("");
 
   // Password reset, one row at a time (owner, 2026-08-29). Nothing here
   // can read an existing password — bcrypt is one-way — so this sets a
@@ -50,22 +42,6 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
   const [pwFor,  setPwFor]  = useState<string | null>(null);
   const [pwText, setPwText] = useState("");
   const [pwDone, setPwDone] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-
-  function commitAdd(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-    startTransition(async () => {
-      const res = await createEmployee({
-        name, mobile, designation, department,
-        branchId, joinDate, code,
-      });
-      if (!res.ok) { setFormError(res.error ?? "Could not add employee"); return; }
-      setName(""); setMobile(""); setDesignation("");
-      setDepartment(""); setCode(""); setAddOpen(false);
-      router.refresh();
-    });
-  }
 
   function commitPassword(id: string) {
     setRowError((e) => ({ ...e, [id]: "" }));
@@ -124,47 +100,11 @@ export function EmployeesSection({ employees, branches, activeCount, totalCount 
       </div>
 
       {addOpen && (
-        <form onSubmit={commitAdd} className="mb-4 pb-4 border-b border-rule grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Field label="Full name" required>
-            <input value={name} onChange={(e) => setName(e.target.value)} className={fieldCls} autoFocus />
-          </Field>
-          <Field label="Mobile" required hint="10 digits or +91-prefixed">
-            <input value={mobile} onChange={(e) => setMobile(e.target.value)} inputMode="tel" className={`${fieldCls} tabular`} />
-          </Field>
-          <Field label="Code" hint="Leave blank to auto-generate (EMP0001)">
-            <input value={code} onChange={(e) => setCode(e.target.value)} className={`${fieldCls} tabular uppercase`} />
-          </Field>
-          <Field label="Designation">
-            <input value={designation} onChange={(e) => setDesignation(e.target.value)}
-                   placeholder="e.g. Site Engineer" className={fieldCls} />
-          </Field>
-          {/* One of the three teams rather than free text — the same
-              team typed three ways stops grouping in exports. */}
-          <Field label="Team">
-            <select value={department} onChange={(e) => setDepartment(e.target.value)} className={fieldCls}>
-              <option value="">Select a team…</option>
-              {EMPLOYEE_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </Field>
-          <Field label="Branch" required>
-            <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={fieldCls}>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Join date" required>
-            <input type="date" value={joinDate} onChange={(e) => setJoinDate(e.target.value)}
-                   className={`${fieldCls} tabular`} />
-          </Field>
-          <div className="lg:col-span-3 flex items-center justify-end gap-2">
-            {formError && <div className="text-[11.5px] text-bad mr-auto">{formError}</div>}
-            <button type="button" onClick={() => setAddOpen(false)}
-                    className="h-[30px] px-3 text-[11.5px] text-text-dim hover:text-text">Cancel</button>
-            <button type="submit" disabled={pending || !name || !mobile || !branchId}
-                    className="h-[30px] px-3 rounded-[6px] bg-accent text-white text-[11.5px] font-medium disabled:opacity-40">
-              {pending ? "Adding…" : "Add employee"}
-            </button>
-          </div>
-        </form>
+        <EmployeeAddForm
+          branches={branches}
+          roles={roles}
+          onDone={() => setAddOpen(false)}
+        />
       )}
 
       {employees.length === 0 ? (

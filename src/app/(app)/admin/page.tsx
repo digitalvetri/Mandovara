@@ -2,7 +2,6 @@ import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { loadAdmin } from "@/modules/admin/queries";
 import { listEmployees } from "@/modules/employees/queries";
-import { AddUserForm } from "./_components/AddUserForm";
 import { CompanySettingsForm } from "./_components/CompanySettingsForm";
 import { EmployeesSection } from "./_components/EmployeesSection";
 import { BranchGeofenceSection } from "./_components/BranchGeofenceSection";
@@ -39,23 +38,23 @@ export default async function AdminPage() {
               reachable: it is how a role gets a permission granted or
               revoked, which nothing else in the app can do. */}
 
-          {/* The table went, but creating a login did not: an employee
-              with no user account cannot sign in, and the password
-              control on the row below says exactly that when asked to
-              reset one. */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-rule bg-surface px-5 py-4">
-            <div>
-              <div className="text-[14px] font-medium text-text">Login accounts</div>
-              <p className="mt-0.5 text-[12.5px] text-text-dim">
-                Give an employee a sign-in. Their password can be changed from the list below.
-              </p>
-            </div>
-            <AddUserForm roles={a.roles} branches={a.branches} />
-          </div>
+          {/* The "Login accounts" card stood here, with its own Add user
+              form. Removed 2026-08-30 (owner): "remove the Login Accounts
+              or we can merge that Employee with that".
+
+              It was the same split that took the users table away in the
+              first place — one card created a User, the section below
+              created an Employee, and the two were different people as
+              far as the database was concerned. Someone added to the
+              roster could not sign in, and someone given a login did not
+              appear on payroll. Adding a person now does both at once,
+              in the form below, with the role left blank for anyone who
+              should not have access. */}
 
           <EmployeesSection
             employees={employees.rows}
             branches={a.branches}
+            roles={a.roles}
             activeCount={employees.activeCount}
             totalCount={employees.totalCount}
           />

@@ -10,6 +10,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { ensureEmployeeForUser } from "@/kernel/people/ensure-employee";
+import { resolveDynamicRoleId } from "@/kernel/people/role-name";
 
 export interface ActionResult<T = unknown> {
   ok: boolean; data?: T; error?: string; fieldErrors?: Record<string, string>;
@@ -57,17 +58,9 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
   const db = scoped(ctx);
   const mobile = d.mobile.startsWith("+91") ? d.mobile : `+91${d.mobile}`;
 
-  // Resolve dynamic Role row matching this AppRole (for the new RBAC system)
-  const ROLE_NAME_MAP: Record<string, string> = {
-    OWNER: "Owner", DESIGNER: "Designer", SALES: "Sales",
-    MEASURE_EXEC: "Measure Executive", STORE: "Store",
-    MAKE_SUPERVISOR: "Make Supervisor",
-    ACCOUNTS: "Accounts", HR: "HR",
-  };
-  const dynamicRole = await db.role.findFirst({
-    where: { organizationId: ctx.orgId, name: ROLE_NAME_MAP[d.roleId] },
-    select: { id: true },
-  });
+  // Resolve dynamic Role row matching this AppRole (for the new RBAC system).
+  // Shared with createEmployee, which now creates logins too.
+  const dynamicRoleId = await resolveDynamicRoleId(db, ctx.orgId, d.roleId);
 
   // The User and their Employee record are created together (2026-08-27,
   // owner instruction: users ARE employees here). One transaction, so a
@@ -85,7 +78,7 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
         locale:         d.locale,
         branchIds:      d.branchIds,
         role:           d.roleId,
-        roleId:         dynamicRole?.id ?? null,
+        roleId:         dynamicRoleId,
       },
       select: { id: true },
     });

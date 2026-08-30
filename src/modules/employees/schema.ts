@@ -11,6 +11,12 @@ const mobileRegex = /^(\+91)?\d{10}$/;
 const panRegex    = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const isoDate     = z.string().regex(/^\d{4}-\d{2}-\d{2}/);
 
+/** AppRole enum values — the same list the admin console offers. */
+export const APP_ROLE_VALUES = [
+  "OWNER", "DESIGNER", "SALES", "MEASURE_EXEC", "STORE",
+  "MAKE_SUPERVISOR", "ACCOUNTS", "HR",
+] as const;
+
 export const createEmployeeSchema = z.object({
   name:         z.string().trim().min(2).max(120),
   mobile:       z.string().trim().regex(mobileRegex, "10-digit mobile, optionally +91-prefixed"),
@@ -21,6 +27,12 @@ export const createEmployeeSchema = z.object({
   branchId:     z.string().min(1, "Pick a branch"),
   joinDate:     isoDate,
   panNumber:    z.string().trim().regex(panRegex, "10-char PAN").optional().or(z.literal("")),
+  // Login, created alongside the staff record when a role is picked
+  // (owner, 2026-08-30: "remove the Login Accounts or we can merge that
+  // Employee with that"). Leave the role blank for someone who should
+  // appear on the roster and payroll but not be able to sign in.
+  roleId:       z.enum(APP_ROLE_VALUES).optional().or(z.literal("")),
+  password:     z.string().min(8, "Use at least 8 characters.").max(128).optional().or(z.literal("")),
 });
 
 export const deleteEmployeeSchema = z.object({

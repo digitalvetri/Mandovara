@@ -109,7 +109,7 @@ export function LoginCard() {
               className="text-[11px] font-semibold tracking-[0.08em] uppercase"
               style={{ color: "#3A5A58" }}
             >
-              Email or Mobile Number
+              Email, mobile or code
             </label>
             {SHOW_CREDS_HELPER && (
               <button
@@ -138,7 +138,7 @@ export function LoginCard() {
             inputMode="email"
             value={credential}
             onChange={(e) => setCredential(e.target.value)}
-            placeholder="mandovara22@gmail.com  or  +91 98xxxxxxxx"
+            placeholder="mandovara22@gmail.com · +91 98xxxxxxxx · EMP-001"
             autoComplete="username"
             className="w-full outline-none transition-all"
             suppressHydrationWarning
