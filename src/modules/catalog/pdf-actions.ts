@@ -88,6 +88,35 @@ export async function removeCollectionPdf(collectionId: string): Promise<PdfActi
   }
 }
 
+// Hide (or unhide) a collection from the /products view without
+// touching its designs, colourways, PDF or stock. Sets isActive to
+// false so listBrandsWithPdf() / brand-detail queries skip it. Useful
+// when a stock-imported collection (BRAHMOS et al.) clutters Product
+// Catalog even though we still want to track its inventory.
+export async function setCollectionHidden(
+  collectionId: string,
+  hidden: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ctx = await devContext();
+    requirePermission(ctx, "catalog.update");
+    const db = scoped(ctx);
+
+    const col = await db.collection.update({
+      where:  { id: collectionId },
+      data:   { isActive: !hidden },
+      select: { brandId: true },
+    });
+
+    revalidatePath("/products");
+    revalidatePath(`/products/brand/${col.brandId}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("setCollectionHidden failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to toggle visibility." };
+  }
+}
+
 // Delete a collection. Without cascade, refuses if the collection has any
 // designs or sample books — deleting a populated collection would leave
 // orphan FKs in projects/orders/stock. With cascade=true, sweeps designs +

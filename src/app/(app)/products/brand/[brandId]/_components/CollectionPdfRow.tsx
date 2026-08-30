@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Upload, Trash2, CheckCircle2, AlertCircle, X, AlertTriangle } from "lucide-react";
-import { uploadCollectionPdf, deleteCollection } from "@/modules/catalog/pdf-actions";
+import { Upload, Trash2, CheckCircle2, AlertCircle, X, AlertTriangle, EyeOff } from "lucide-react";
+import { uploadCollectionPdf, deleteCollection, setCollectionHidden } from "@/modules/catalog/pdf-actions";
 import { PdfViewerModal } from "./PdfViewerModal";
 
 const FAMILY_LABELS: Record<string, string> = {
@@ -33,14 +33,24 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, startUpload]   = useTransition();
   const [deleting,  startDelete]   = useTransition();
+  const [hiding,    startHide]     = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [hideError,   setHideError]   = useState<string | null>(null);
 
   const hasPdf       = !!c.catalogPdfKey;
   const hasContent   = c._count.designs > 0;
   const canDestroy   = canDelete;
-  const busy         = uploading || deleting;
+  const busy         = uploading || deleting || hiding;
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  function handleHide() {
+    setHideError(null);
+    startHide(async () => {
+      const res = await setCollectionHidden(c.id, true);
+      if (!res.ok) setHideError(res.error ?? "Hide failed");
+    });
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -138,6 +148,20 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
           </>
         )}
 
+        {canWrite && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleHide}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[7px] text-[12px] font-medium text-text-dim/70 border border-rule hover:text-text hover:border-text/40 disabled:opacity-50 transition-colors shrink-0"
+            aria-label={`Hide ${c.name} from product catalog`}
+            title="Hide from Product Catalog — stock stays intact"
+          >
+            <EyeOff size={13} strokeWidth={1.75} />
+            {hiding ? "Hiding…" : "Hide"}
+          </button>
+        )}
+
         {canDestroy && (
           <button
             type="button"
@@ -152,6 +176,10 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
           </button>
         )}
       </div>
+
+      {hideError && (
+        <div className="absolute left-4 right-4 -bottom-6 text-[11px] text-fault truncate">{hideError}</div>
+      )}
 
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal aria-label={`Delete ${c.name}`}>
