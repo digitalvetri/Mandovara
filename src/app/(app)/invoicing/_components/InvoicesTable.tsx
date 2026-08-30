@@ -72,13 +72,13 @@ export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
       )}
 
       <div className="overflow-x-auto rounded-[12px] border border-rule bg-surface">
-        <table className="w-full min-w-[820px] border-collapse">
+        <table className="w-full lg:min-w-[820px] border-collapse">
           <thead>
             <tr className="border-b border-rule text-left">
               <Th>Invoice #</Th>
               <Th>Client</Th>
-              <Th>Project/SO</Th>
-              <Th>Invoice Date</Th>
+              <Th hide="hidden lg:table-cell">Project/SO</Th>
+              <Th hide="hidden md:table-cell">Invoice Date</Th>
               <Th>Status</Th>
               <Th align="right">Amount</Th>
               <th className="w-[44px]" />
@@ -111,10 +111,10 @@ export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
                 >
                   <Td className="font-medium tabular-nums text-text">{r.number}</Td>
                   <Td className="text-text">{r.clientName}</Td>
-                  <Td className="text-text-dim">
+                  <Td hide="hidden lg:table-cell" className="text-text-dim">
                     {r.projectName ?? r.orderNumber ?? "—"}
                   </Td>
-                  <Td className="tabular-nums text-text-dim">{fmtDate(r.date)}</Td>
+                  <Td hide="hidden md:table-cell" className="tabular-nums text-text-dim">{fmtDate(r.date)}</Td>
                   <Td><StatusPill status={r.status} /></Td>
                   <Td align="right" className="font-semibold tabular-nums text-text">
                     {fmtINR(r.total)}
@@ -135,12 +135,12 @@ export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
   );
 }
 
-function Th({ children, align }: { children?: React.ReactNode; align?: "right" }) {
+function Th({ children, align, hide }: { children?: React.ReactNode; align?: "right"; hide?: string }) {
   return (
     <th
-      className={`px-4 py-3 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-text-dim ${
+      className={`px-2.5 sm:px-4 py-3 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-text-dim ${
         align === "right" ? "text-right" : "text-left"
-      }`}
+      } ${hide ?? ""}`}
     >
       {children}
     </th>
@@ -148,10 +148,10 @@ function Th({ children, align }: { children?: React.ReactNode; align?: "right" }
 }
 
 function Td({
-  children, className, align,
-}: { children?: React.ReactNode; className?: string; align?: "right" }) {
+  children, className, align, hide,
+}: { children?: React.ReactNode; className?: string; align?: "right"; hide?: string }) {
   return (
-    <td className={`px-4 py-3.5 text-[13.5px] ${align === "right" ? "text-right" : ""} ${className ?? ""}`}>
+    <td className={`px-2.5 sm:px-4 py-3.5 text-[13.5px] ${align === "right" ? "text-right" : ""} ${hide ?? ""} ${className ?? ""}`}>
       {children}
     </td>
   );

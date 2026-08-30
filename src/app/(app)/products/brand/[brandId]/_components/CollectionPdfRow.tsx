@@ -83,7 +83,7 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
   const familyLabel = FAMILY_LABELS[c.family] ?? c.family;
 
   return (
-    <div className="flex items-center gap-4 py-3.5 px-4 border-b border-rule last:border-0 hover:bg-ink/20 transition-colors">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 py-3.5 px-4 border-b border-rule last:border-0 hover:bg-ink/20 transition-colors">
 
       {/* Status dot */}
       <div className="shrink-0">
@@ -94,9 +94,9 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
       </div>
 
       {/* Collection info */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1 basis-[55%]">
         <div className="text-[13.5px] font-medium text-text truncate">{c.name}</div>
-        <div className="flex items-center gap-3 mt-0.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
           <span className="text-[11px] text-text-dim">{familyLabel}</span>
           {c.seasonYear && (
             <span className="text-[11px] text-text-dim tabular">{c.seasonYear}</span>
@@ -117,7 +117,7 @@ export function CollectionPdfRow({ collection: c, brandName, canWrite, canDelete
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         {hasPdf && (
           <PdfViewerModal
             collectionId={c.id}

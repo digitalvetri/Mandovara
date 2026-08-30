@@ -125,19 +125,19 @@ export function LeadsTable({
 
   return (
     <div className="overflow-x-auto rounded-[12px] border border-rule bg-surface">
-      <table className="min-w-[900px] w-full border-collapse">
+      <table className="lg:min-w-[900px] w-full border-collapse">
         <thead>
           <tr className="bg-surface-2 border-b border-rule">
             <th className="w-[5px] p-0" aria-hidden />
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Lead</th>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Mobile</th>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">City</th>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Source</th>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Stage</th>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">Priority</th>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Assigned To</th>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Added</th>
-            <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Actions</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Lead</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden sm:table-cell">Mobile</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">City</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Source</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Stage</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">Priority</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Assigned To</th>
+            <th className="px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden lg:table-cell">Added</th>
+            <th className="px-2.5 sm:px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -162,23 +162,23 @@ export function LeadsTable({
                 </td>
 
                 {/* Lead name + number */}
-                <td className="px-4 py-3.5 max-w-[200px]">
+                <td className="px-2.5 sm:px-4 py-3.5 max-w-[200px]">
                   <div className="text-[13px] font-semibold text-text truncate">{r.name}</div>
                   <div className="text-[10.5px] text-text-faint mt-0.5 tabular">{r.number}</div>
                 </td>
 
                 {/* Mobile */}
-                <td className="px-4 py-3.5 hidden sm:table-cell">
+                <td className="px-2.5 sm:px-4 py-3.5 hidden sm:table-cell">
                   <span className="tabular text-[12.5px] text-text-dim">{fmtMobile(r.mobile)}</span>
                 </td>
 
                 {/* City */}
-                <td className="px-4 py-3.5 text-[12.5px] text-text-dim hidden md:table-cell">
+                <td className="px-2.5 sm:px-4 py-3.5 text-[12.5px] text-text-dim hidden md:table-cell">
                   {r.city ?? <span className="text-text-faint">—</span>}
                 </td>
 
                 {/* Source */}
-                <td className="px-4 py-3.5 hidden lg:table-cell">
+                <td className="px-2.5 sm:px-4 py-3.5 hidden lg:table-cell">
                   <span className="inline-flex items-center gap-1.5 text-[12.5px] text-text-dim">
                     {sourceDot && (
                       <span className={`w-[6px] h-[6px] rounded-full shrink-0 ${sourceDot}`} aria-hidden />
@@ -188,12 +188,12 @@ export function LeadsTable({
                 </td>
 
                 {/* Stage */}
-                <td className="px-4 py-3.5">
+                <td className="px-2.5 sm:px-4 py-3.5">
                   <StatusPill status={r.stage} />
                 </td>
 
                 {/* Priority */}
-                <td className="px-4 py-3.5 hidden md:table-cell">
+                <td className="px-2.5 sm:px-4 py-3.5 hidden md:table-cell">
                   {priority ? (
                     <span className={`text-[10px] font-semibold uppercase tracking-[0.07em] px-[7px] py-0.5 rounded-[4px] ${priority.cls}`}>
                       {priority.label}
@@ -204,7 +204,7 @@ export function LeadsTable({
                 </td>
 
                 {/* Assigned To */}
-                <td className="px-4 py-3.5 hidden lg:table-cell">
+                <td className="px-2.5 sm:px-4 py-3.5 hidden lg:table-cell">
                   {initial ? (
                     <div className="flex items-center gap-2">
                       <span className="w-[24px] h-[24px] rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center uppercase select-none shrink-0">
@@ -218,13 +218,13 @@ export function LeadsTable({
                 </td>
 
                 {/* Added date */}
-                <td className="px-4 py-3.5 tabular text-[12px] text-text-dim hidden lg:table-cell whitespace-nowrap">
+                <td className="px-2.5 sm:px-4 py-3.5 tabular text-[12px] text-text-dim hidden lg:table-cell whitespace-nowrap">
                   {fmtDate(r.createdAt)}
                 </td>
 
                 {/* Actions */}
                 <td
-                  className="px-4 py-3.5 text-right"
+                  className="px-2.5 sm:px-4 py-3.5 text-right"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="inline-flex items-center gap-1 justify-end">
@@ -246,7 +246,7 @@ export function LeadsTable({
                     </a>
                     <Link
                       href={`/leads/${r.id}` as Route}
-                      className="ml-1 h-7 px-2.5 rounded-[7px] text-[11.5px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors flex items-center gap-1"
+                      className="ml-1 h-7 px-2.5 rounded-[7px] text-[11.5px] font-medium border border-rule text-text-dim hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-colors hidden sm:flex items-center gap-1"
                     >
                       Details
                       <ArrowUpRight size={11} strokeWidth={2} />

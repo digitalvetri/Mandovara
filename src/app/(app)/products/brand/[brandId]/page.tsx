@@ -59,18 +59,21 @@ export default async function BrandCatalogPage({ params }: Props) {
 
       {/* Brand header */}
       <div className="rounded-[14px] bg-surface border border-rule p-6 mb-6 shadow-sm">
-        <div className="flex items-start gap-4">
+        {/* Wraps on a phone. The brand mark, the name and three destructive
+            buttons all sat in one non-wrapping row, so at 390px the buttons
+            were laid straight over the brand name and the stats under it. */}
+        <div className="flex flex-wrap items-start gap-4">
           <div className="w-12 h-12 rounded-[10px] bg-accent/10 border border-accent/15 flex items-center justify-center shrink-0">
             <span className="text-[17px] font-bold text-accent select-none">
               {brand.name[0]?.toUpperCase()}
             </span>
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1 basis-[60%]">
             <h1 className="text-[20px] font-semibold text-text leading-tight">{brand.name}</h1>
             {brand.country && (
               <div className="text-[12.5px] text-text-dim mt-0.5">{brand.country}</div>
             )}
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
               <div className="text-[11px] text-text-dim">
                 Lead time: <span className="font-medium text-text">{brand.leadTimeDays} days</span>
               </div>
@@ -83,7 +86,7 @@ export default async function BrandCatalogPage({ params }: Props) {
             </div>
           </div>
           {canDelete && (
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <WipeCollectionsButton
                 brandId={brandId}
                 brandName={brand.name}

@@ -99,7 +99,7 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
         <EmptyRounds status={status ?? null} search={search ?? null} />
       ) : (
         <div className="overflow-x-auto rounded-[12px] border border-rule bg-surface">
-          <table className="min-w-[900px] w-full border-collapse">
+          <table className="lg:min-w-[900px] w-full border-collapse">
             {/* Column headers */}
             <thead>
               <tr className="bg-surface-2 border-b border-rule">

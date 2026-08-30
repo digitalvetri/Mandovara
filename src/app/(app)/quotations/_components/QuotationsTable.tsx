@@ -134,7 +134,7 @@ function Row({ r, i }: { r: QuotationRow; i: number }) {
       </td>
 
       {/* QT number + date */}
-      <td className="px-4 py-4">
+      <td className="px-2.5 sm:px-4 py-4">
         <Link
           href={`/quotations/${r.id}` as Route}
           className="block tabular text-[13px] font-semibold text-accent hover:underline"
@@ -146,38 +146,38 @@ function Row({ r, i }: { r: QuotationRow; i: number }) {
       </td>
 
       {/* Client */}
-      <td className="px-4 py-4">
+      <td className="px-2.5 sm:px-4 py-4">
         <div className="text-[13px] font-medium text-text leading-snug">{r.clientName}</div>
         <div className="tabular text-[11px] text-text-dim mt-0.5">{r.clientMobile}</div>
       </td>
 
       {/* Project */}
-      <td className="px-4 py-4 max-w-[180px] hidden md:table-cell">
+      <td className="px-2.5 sm:px-4 py-4 max-w-[180px] hidden md:table-cell">
         <span className="text-[12.5px] text-text-dim truncate block">{r.projectName}</span>
       </td>
 
       {/* Status */}
-      <td className="px-4 py-4">
+      <td className="px-2.5 sm:px-4 py-4">
         <StatusPill status={r.status} />
       </td>
 
       {/* Total */}
-      <td className="px-4 py-4 text-right">
+      <td className="px-2.5 sm:px-4 py-4 text-right">
         <span className="tabular text-[13px] font-semibold text-text">{formatINR(r.total)}</span>
       </td>
 
       {/* Valid upto */}
-      <td className="px-4 py-4 hidden sm:table-cell">
+      <td className="px-2.5 sm:px-4 py-4 hidden sm:table-cell">
         <ValidUpto row={r} />
       </td>
 
       {/* Created */}
-      <td className="px-4 py-4 hidden lg:table-cell">
+      <td className="px-2.5 sm:px-4 py-4 hidden lg:table-cell">
         <span className="tabular text-[12px] text-text-dim">{formatDate(r.date)}</span>
       </td>
 
       {/* Actions */}
-      <td className="px-4 py-4">
+      <td className="px-2.5 sm:px-4 py-4">
         <RowActions row={r} />
       </td>
     </tr>
@@ -195,12 +195,12 @@ export function QuotationsTable({ rows }: { rows: QuotationRow[] }) {
     );
   }
 
-  const th = "px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim";
-  const thr = "px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim";
+  const th = "px-2.5 sm:px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim";
+  const thr = "px-2.5 sm:px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim";
 
   return (
     <div className="overflow-x-auto rounded-[12px] border border-rule bg-surface">
-      <table className="min-w-[900px] w-full border-collapse">
+      <table className="lg:min-w-[900px] w-full border-collapse">
         <thead>
           <tr className="bg-surface-2 border-b border-rule">
             <th className="w-[5px] p-0" aria-hidden />
@@ -211,7 +211,7 @@ export function QuotationsTable({ rows }: { rows: QuotationRow[] }) {
             <th className={thr}>Total Value</th>
             <th className={`${th} hidden sm:table-cell`}>Valid Upto</th>
             <th className={`${th} hidden lg:table-cell`}>Created On</th>
-            <th className="px-4 py-3 w-[80px]" />
+            <th className="px-2.5 sm:px-4 py-3 w-[80px]" />
           </tr>
         </thead>
         <tbody>

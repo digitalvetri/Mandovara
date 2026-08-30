@@ -177,6 +177,12 @@ export default tseslint.config(
       "src/app/api/admin/test-user/route.ts",     // create / delete disposable OWNER for QA
       "src/app/api/admin/reset-password/route.ts", // admin password reset — runs before any tenant context
       "src/app/api/admin/link-employee/route.ts",  // one-shot employee↔user link — runs before tenant context
+      // Removes leftover demo logins after a data wipe. Operates ACROSS the
+      // User table rather than within one tenant's request context, which is
+      // the point — the accounts it removes are exactly the ones with no
+      // staff record to scope them by. Token-gated, dry-run by default, and
+      // it refuses any keep-list without an active OWNER.
+      "src/app/api/admin/prune-users/route.ts",
       "src/modules/admin/wipe-transactional.ts",  // destructive: TRUNCATE needs owner-level DB access
       "src/modules/quotations/public-query.ts",   // token IS the credential — no org context exists
       // Same credential model as public-query, but it writes. Every function

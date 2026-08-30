@@ -59,7 +59,7 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
 
   return (
     <div className="rounded-[12px] border border-rule bg-surface overflow-x-auto">
-      <table className="min-w-[720px] w-full text-left border-collapse">
+      <table className="lg:min-w-[720px] w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-rule bg-surface-2">
             <th className="w-[5px] p-0" aria-hidden />
