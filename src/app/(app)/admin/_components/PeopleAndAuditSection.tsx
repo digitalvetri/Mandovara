@@ -18,6 +18,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Trash2, Loader2, ShieldAlert } from "lucide-react";
 import { backfillEmployeesForUsers } from "@/modules/admin/actions";
+import { RemoveAccountsPanel } from "./RemoveAccountsPanel";
 import { setAuditRetentionDays, purgeAuditLog } from "@/modules/admin/audit-retention";
 
 export function PeopleAndAuditSection({ retentionDays }: { retentionDays: number }) {
@@ -155,6 +156,9 @@ export function PeopleAndAuditSection({ retentionDays }: { retentionDays: number
             </p>
           )}
         </div>
+
+        {/* ── Remove accounts you didn't add ── */}
+        <RemoveAccountsPanel />
       </div>
 
       {msg && (
