@@ -17,17 +17,18 @@
 //
 // The two defaults it fills in:
 //
-//   surface: WALL    — the label already says where it goes, and this
-//                      column drives nothing downstream on its own.
-//   family:  SERVICE — the app's existing catch-all bucket (the
-//                      Installation panel groups under "General /
-//                      services"). Critically it is also the only sane
-//                      choice: every other family triggers §6.4's
-//                      required extras — curtains demand headingType
-//                      and fullness, flooring a layPattern, wallpaper a
-//                      deductions array — and asking for those is
-//                      exactly what this form exists to avoid. The
-//                      office sets the real family when quoting.
+//   surface — derived from the product type. A curtain hangs at a
+//             window, wallpaper goes on a wall, flooring on a floor.
+//             Nobody should be asked a question the answer to which is
+//             already known.
+//
+//   the family's required extras — §6.4 demands headingType and fullness
+//             for curtains, a layPattern for flooring, and a deductions
+//             array for wallpaper. Asking for those is exactly what this
+//             form exists to avoid, so it fills in the ordinary answer
+//             and the office corrects it when quoting if it matters.
+//             Without this, picking "Curtain" would fail validation and
+//             the form would look broken.
 
 import { z } from "zod";
 import { scoped } from "@/kernel/db/scoped";
@@ -35,6 +36,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { addMeasurementItem } from "./actions-item";
 import { type ActionResult, zodError, ensureRoomForParty } from "./actions-shared";
+import { SIMPLE_FAMILIES } from "./simple-families";
 
 const simpleItemSchema = z.object({
   measurementId: z.string().trim().min(1),
@@ -45,7 +47,33 @@ const simpleItemSchema = z.object({
   // the CalcResult write when dimensions are absent.
   widthMm:       z.number().positive().max(100_000).optional(),
   heightMm:      z.number().positive().max(100_000).optional(),
+  family:        z.enum(SIMPLE_FAMILIES).default("SERVICE"),
 });
+
+/** Where this product type lives, so the form never has to ask. */
+function surfaceFor(family: string): "WINDOW" | "WALL" | "FLOOR" {
+  if (family === "CURTAIN_FABRIC" || family === "SHEER" || family === "BLIND") return "WINDOW";
+  if (family === "FLOORING" || family === "CARPET_ROLL") return "FLOOR";
+  return "WALL";
+}
+
+/**
+ * The extras §6.4 insists on, per family.
+ *
+ * These are defaults, not decisions: a pinch pleat at 2× fullness is the
+ * ordinary curtain, straight is the ordinary lay, and an empty
+ * deductions array means "no openings noted yet". The detailed form and
+ * the quotation stage can change any of them. Refusing to save without
+ * them is what would make this form feel broken.
+ */
+function familyExtras(family: string): Record<string, unknown> {
+  if (family === "CURTAIN_FABRIC" || family === "SHEER") {
+    return { headingType: "PINCH_PLEAT", fullness: 2 };
+  }
+  if (family === "FLOORING") return { layPattern: "STRAIGHT" };
+  if (family === "WALLPAPER") return { deductions: [] };
+  return {};
+}
 
 export async function addSimpleMeasurementItem(
   input: unknown,
@@ -79,9 +107,10 @@ export async function addSimpleMeasurementItem(
     measurementId: d.measurementId,
     roomId,
     label:    d.place,
-    surface:  "WALL",
-    family:   "SERVICE",
+    surface:  surfaceFor(d.family),
+    family:   d.family,
     quantity: d.quantity,
+    ...familyExtras(d.family),
     ...(d.widthMm  !== undefined && { widthMm:  d.widthMm }),
     ...(d.heightMm !== undefined && { heightMm: d.heightMm }),
   });

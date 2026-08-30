@@ -10,16 +10,17 @@ import { submitMeasurementRound, approveMeasurementRound } from "@/modules/measu
 import type { RoundDetail } from "@/modules/measurement/queries";
 import { StatusPill } from "./StatusPill";
 import { ItemCard } from "./ItemCard";
-import { AddItemPanel } from "./AddItemPanel";
 import { SimpleMeasurementEntry } from "@/components/measurement/SimpleMeasurementEntry";
-import { AdvancedEntryDisclosure } from "./AdvancedEntryDisclosure";
 
 interface RoundDetailViewProps {
   round: RoundDetail;
-  rooms: { id: string; name: string; floorLabel: string | null; sortOrder: number }[];
+  /** Accepted so both callers (project and lead rounds) need no change.
+   *  Unread since the detailed entry panel left this page on
+   *  2026-08-30 — the simple form resolves its own room. */
+  rooms?: { id: string; name: string; floorLabel: string | null; sortOrder: number }[];
 }
 
-export function RoundDetailView({ round, rooms }: RoundDetailViewProps) {
+export function RoundDetailView({ round }: RoundDetailViewProps) {
   const [status, setStatus] = useState(round.status);
   const [busyKind, setBusyKind] = useState<"submit" | "approve" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -123,18 +124,17 @@ export function RoundDetailView({ round, rooms }: RoundDetailViewProps) {
       )}
 
       {/* Add item.
-          The four-field form leads: place, quantity, width, height, and
-          it invents a room rather than stopping to demand one. The full
-          panel — rooms, surface, family, heading/lay/mount — is still
-          here, one click down, because nothing has been taken away from
-          the people who use it. */}
+          Place or wall, what it is, quantity, width, height — and
+          nothing else. The owner asked for exactly that (2026-08-30):
+          "i just want to use this page for enter the room or wall,
+          Width, Height ... and whether curtain or wallpapers".
+          The full panel is gone from this page; it asked for rooms,
+          surfaces, heading types, lay patterns and mounts, and that is
+          what made the screen read as confusing. AddItemPanel and its
+          disclosure remain in the folder for the field PWA and for
+          whenever a designer needs that depth back. */}
       {status === "DRAFT" && (
-        <div className="space-y-2.5">
-          <SimpleMeasurementEntry measurementId={round.id} />
-          <AdvancedEntryDisclosure>
-            <AddItemPanel measurementId={round.id} projectId={round.subject.id} rooms={rooms} />
-          </AdvancedEntryDisclosure>
-        </div>
+        <SimpleMeasurementEntry measurementId={round.id} />
       )}
 
       {round.notes && (

@@ -43,7 +43,6 @@ import { UpcomingVisitsCard } from "../_components/UpcomingVisitsCard";
 import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
 import { ProjectWorkSections } from "../_components/ProjectWorkSections";
 import { getProjectLedger } from "@/modules/projects/queries-ledger";
-import { getProjectInstallation } from "@/modules/projects/queries-installation";
 
 export const dynamic = "force-dynamic";
 
@@ -55,14 +54,13 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const [rounds, money, visits, payments, ledger, installation] =
+  const [rounds, money, visits, payments, ledger] =
     await Promise.all([
       getProjectMeasurements(ctx, id),
       getProjectMoney(ctx, id),
       listSiteVisits(ctx, { projectId: id, limit: 10 }),
       getProjectPayments(ctx, id),
       getProjectLedger(ctx, id),
-      getProjectInstallation(ctx, id),
     ]);
 
   const action = resolveNextAction(ctx, {
@@ -206,8 +204,9 @@ export default async function ProjectDetailPage({
             rounds={rounds}
             ledger={ledger}
             payments={payments}
-            installation={installation}
             visits={visits}
+            clientId={p.clientId}
+            branchId={p.branchId}
             canCreateInvoice={ctx.permissions.has("invoice.create")}
             canUpdate={ctx.permissions.has("project.update")}
           />

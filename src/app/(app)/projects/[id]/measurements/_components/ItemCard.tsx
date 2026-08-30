@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Camera, Trash2, PencilLine, Save, X } from "lucide-react";
 import type { ItemDetail } from "@/modules/measurement/queries";
+import { familyLabel } from "./family-label";
 import { deleteMeasurementItem, updateMeasurementItem } from "@/modules/measurement/actions-item";
 import {
   SURFACE_TYPES, HEADING_TYPES, LAY_PATTERNS, MOUNT_TYPES, PRODUCT_FAMILIES,
@@ -140,11 +141,12 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-[13px] font-medium text-text">{item.label}</h3>
-            <span className="rounded-full bg-surface px-1.5 py-0.5 text-[10px] uppercase tracking-[0.05em] text-text-dim">
-              {item.surface}
-            </span>
-            <span className="rounded-full bg-surface px-1.5 py-0.5 text-[10px] uppercase tracking-[0.05em] text-gold-strong">
-              {item.family.replace(/_/g, " ")}
+            {/* One tag, saying what the thing is. It used to print the
+                surface AND the family — "WALL SERVICE" — which is the
+                database's vocabulary, not an owner's, and told nobody
+                anything (2026-08-30). */}
+            <span className="rounded-full bg-surface px-2 py-0.5 text-[10.5px] text-gold-strong">
+              {familyLabel(item.family)}
             </span>
           </div>
 
@@ -177,10 +179,14 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
           )}
         </div>
 
-        {/* Right: MATERIAL block */}
-        <div className="min-w-[160px] text-right border-l border-rule pl-4">
-          <div className="text-[9.5px] uppercase tracking-[0.08em] text-text-faint mb-1">Material</div>
-          {item.calc ? (
+        {/* Right: MATERIAL block — only when there is a real quantity.
+            An item measured before a product is picked showed "0 piece",
+            which reads as a computed answer rather than an absent one. */}
+        <div className={`min-w-[160px] text-right ${item.calc && item.calc.materialQty ? "border-l border-rule pl-4" : ""}`}>
+          {item.calc && item.calc.materialQty ? (
+            <div className="text-[9.5px] uppercase tracking-[0.08em] text-text-faint mb-1">Material</div>
+          ) : null}
+          {item.calc && item.calc.materialQty ? (
             <div>
               <div className="tabular text-[15px] text-text font-medium">
                 {formatQty(item.calc.materialQty)} <span className="text-[11.5px] text-text-dim">{item.calc.materialUnit.toLowerCase()}</span>
@@ -204,9 +210,7 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
                 </div>
               )}
             </div>
-          ) : (
-            <div className="text-[11.5px] text-text-dim">Not calculated</div>
-          )}
+          ) : null}
         </div>
       </div>
 

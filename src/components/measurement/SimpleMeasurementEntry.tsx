@@ -19,6 +19,7 @@
 import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { addSimpleMeasurementItem } from "@/modules/measurement/actions-simple";
+import { SIMPLE_FAMILIES, FAMILY_LABEL, type SimpleFamily } from "@/modules/measurement/simple-families";
 import { toMm } from "@/app/(mobile)/m/measure/[projectId]/_components/unit-convert";
 
 type Unit = "mm" | "in" | "ft";
@@ -33,6 +34,9 @@ interface Props {
 
 export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
   const [place,  setPlace]  = useState("");
+  // What is going there. The owner's brief (2026-08-30): "whether
+  // curtain or wallpapers or something thats all i m going to enter".
+  const [family, setFamily] = useState<SimpleFamily>("CURTAIN_FABRIC");
   const [qty,    setQty]    = useState("1");
   const [width,  setWidth]  = useState("");
   const [height, setHeight] = useState("");
@@ -71,6 +75,7 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
       const r = await addSimpleMeasurementItem({
         measurementId,
         place:    place.trim(),
+        family,
         quantity,
         ...(w !== null && { widthMm:  w }),
         ...(h !== null && { heightMm: h }),
@@ -78,7 +83,8 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
       if (!r.ok) { setError(r.error ?? "Could not save that."); return; }
 
       setSaved(`Saved “${place.trim()}”.`);
-      // Keep the unit — the next window is measured with the same tape.
+      // Keep the unit AND the product type — a measurer does all the
+      // curtains in a house, then all the wallpaper, not one of each.
       setPlace(""); setQty("1"); setWidth(""); setHeight("");
       onAdded?.();
     });
@@ -107,13 +113,25 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1.3fr_0.8fr_1fr_1fr_auto]">
         <Field
           label="Place or wall"
           value={place}
           onChange={setPlace}
           placeholder="Living room — east wall"
         />
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] text-text-dim">What is it</span>
+          <select
+            value={family}
+            onChange={(e) => setFamily(e.target.value as SimpleFamily)}
+            className="h-[38px] rounded-[6px] border border-rule bg-surface-2 px-3 text-[14px] text-text outline-none transition-colors focus:border-accent"
+          >
+            {SIMPLE_FAMILIES.map((f) => (
+              <option key={f} value={f}>{FAMILY_LABEL[f]}</option>
+            ))}
+          </select>
+        </label>
         <Field label="Quantity" value={qty} onChange={setQty} inputMode="numeric" />
         <Field
           label={`Width (${UNIT_LABEL[unit]})`}
