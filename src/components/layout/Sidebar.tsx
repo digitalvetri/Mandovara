@@ -8,7 +8,7 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, MapPin, Briefcase, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
-  BarChart2, CheckSquare, UserCircle, Ruler,
+  BarChart2, CheckSquare, UserCircle, Ruler, BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -42,9 +42,10 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   {
     section: "Catalog & Stock",
     items: [
-      { label: "Product Catalog",   href: "/products",  icon: Package },
-      { label: "Purchase & Vendors",href: "/purchase",  icon: Truck   },
-      { label: "Stocks",            href: "/inventory", icon: Boxes   },
+      { label: "Catalogues",        href: "/catalogues", icon: BookOpen },
+      { label: "Product Catalog",   href: "/products",   icon: Package },
+      { label: "Purchase & Vendors",href: "/purchase",   icon: Truck   },
+      { label: "Stocks",            href: "/inventory",  icon: Boxes   },
     ],
   },
   {
@@ -103,7 +104,8 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   {
     section: "Catalog",
     items: [
-      { label: "Product Catalog", href: "/products", icon: Package, perm: "catalog.view" },
+      { label: "Catalogues",      href: "/catalogues", icon: BookOpen, perm: "catalog.view" },
+      { label: "Product Catalog", href: "/products",   icon: Package,  perm: "catalog.view" },
     ],
   },
   {
