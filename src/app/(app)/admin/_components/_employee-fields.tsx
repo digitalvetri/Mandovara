@@ -26,8 +26,8 @@ export function Field({ label, required, hint, children }: {
   );
 }
 export function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
-  return <th className={`px-3 h-[34px] font-medium ${align === "right" ? "text-right" : "text-left"}`}>{children}</th>;
+  return <th className={`px-2.5 first:pl-0 last:pr-0 h-[34px] font-medium ${align === "right" ? "text-right" : "text-left"}`}>{children}</th>;
 }
 export function Td({ children, align = "left", className = "" }: { children: React.ReactNode; align?: "left" | "right"; className?: string }) {
-  return <td className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"} ${className}`}>{children}</td>;
+  return <td className={`px-2.5 first:pl-0 last:pr-0 py-2 ${align === "right" ? "text-right" : "text-left"} ${className}`}>{children}</td>;
 }

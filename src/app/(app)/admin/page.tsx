@@ -67,11 +67,21 @@ export default async function AdminPage() {
 
         <aside className="space-y-4 h-fit">
           <div className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6">
-            <div className="font-display text-[18px] font-semibold mb-4">Audit log</div>
+            <div className="mb-4 flex items-baseline justify-between gap-3">
+              <div className="font-display text-[18px] font-semibold">Audit log</div>
+              {a.audit.length > 0 && (
+                <div className="text-[11px] text-text-faint">most recent first</div>
+              )}
+            </div>
             {a.audit.length === 0 ? (
               <div className="text-[12px] text-text-faint py-4">Nothing audited yet.</div>
             ) : (
-              <ul className="space-y-3 text-[12px]">
+              /* Capped and scrolled. The log is the longest thing on this
+                 page and it set the height of the whole right-hand column,
+                 pushing Company settings and Role permissions below the fold
+                 and leaving the left column ending in dead space. Its own
+                 scroller keeps the two columns roughly level. */
+              <ul className="max-h-[380px] space-y-3 overflow-y-auto pr-1 text-[12px]">
                 {a.audit.map((row) => (
                   <li key={row.id} className="pb-3 border-b border-rule/60 last:border-0 last:pb-0">
                     <div className="flex items-baseline justify-between mb-0.5">

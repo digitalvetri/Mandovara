@@ -122,9 +122,13 @@ export function EmployeesSection({ employees, branches, roles, activeCount, tota
             <thead>
               <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
                 <Th>Code</Th>
+                {/* Branch stood here and always read "—": listEmployees
+                    hardcodes it, because an employee has no branch in the
+                    schema. An empty column is not free — it was 90px of the
+                    675px this card gets, which is why the Terminate button
+                    was cut off at the card's edge. */}
                 <Th>Name</Th>
                 <Th>Designation</Th>
-                <Th>Branch</Th>
                 <Th>Mobile</Th>
                 <Th>Status</Th>
                 <Th align="right">Action</Th>
@@ -142,7 +146,6 @@ export function EmployeesSection({ employees, branches, roles, activeCount, tota
                     {emp.designation ?? "—"}
                     {emp.department && <div className="text-[10.5px] text-text-faint">{emp.department}</div>}
                   </Td>
-                  <Td className="text-text-dim">{emp.branchName}</Td>
                   <Td className="tabular">{emp.mobile}</Td>
                   <Td>
                     <span className={`inline-block text-[10.5px] font-medium tracking-[0.06em] uppercase px-2 py-0.5 rounded-[3px] ${STATUS_TONE[emp.status] ?? "bg-text-dim/12 text-text-dim"}`}>

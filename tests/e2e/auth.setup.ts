@@ -19,7 +19,14 @@ import path from "path";
 export const OWNER_AUTH_FILE = path.join(__dirname, ".auth", "owner.json");
 
 // Matches the seed's DEFAULT_DEV_PASSWORD in prisma/seed/masters.ts.
-const OWNER_EMAIL   = "rohit@mandovara.com";
+//
+// Two addresses, because a database can be stood up two ways and they
+// disagree: `pnpm db:seed` writes rohit@mandovara.com, while
+// scripts/bootstrap-admin.ts writes mandovara22@gmail.com (the owner's real
+// address, changed 2026-08-30). Trying only the seeded one meant a
+// bootstrapped database failed here with "re-run the seed", which is not the
+// problem and not the fix.
+const OWNER_EMAILS  = ["rohit@mandovara.com", "mandovara22@gmail.com"];
 const OWNER_TEMP    = "Mandovara@2026";
 // Canonical post-setup password. Used only within this test suite; must
 // meet the changePassword min-length policy (10 chars).
@@ -43,26 +50,43 @@ setup("authenticate as owner", async ({ page, context }) => {
   // temp password first, then the stable one this setup itself installs.
   //
   // No tab click: the login card is a single password form (upstream 9e218f9).
-  async function attempt(password: string): Promise<boolean> {
+  // The 60s below is for a cold server compiling /login, the sign-in action
+  // and /dashboard on the very first attempt. Every attempt after that runs
+  // against a warm server, and four 60s waits would overrun this setup's
+  // 180s budget and be torn down mid-navigation.
+  let firstAttempt = true;
+  async function attempt(email: string, password: string): Promise<boolean> {
     await page.goto("/login");
-    await page.getByLabel(/email.*mobile/i).fill(OWNER_EMAIL);
+    await page.getByLabel(/email.*mobile/i).fill(email);
     await page.getByLabel(/^password$/i).fill(password);
     await page.getByRole("button", { name: /sign in/i }).click();
     try {
       // Generous: the sign-in action, /change-password and /dashboard may all
       // still be compiling on the first attempt against a cold server.
-      await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 60_000 });
+      await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
+        timeout: firstAttempt ? 60_000 : 15_000,
+      });
       return true;
     } catch {
       return false;
+    } finally {
+      firstAttempt = false;
     }
   }
 
-  const ok = (await attempt(OWNER_TEMP)) || (await attempt(OWNER_STABLE));
+  let ok = false;
+  // Remembered because the forced-change branch below has to sign back in
+  // as the same person.
+  let ownerEmail = OWNER_EMAILS[0]!;
+  for (const email of OWNER_EMAILS) {
+    if (await attempt(email, OWNER_TEMP) || await attempt(email, OWNER_STABLE)) {
+      ok = true; ownerEmail = email; break;
+    }
+  }
   if (!ok) {
     throw new Error(
-      `Could not sign in as ${OWNER_EMAIL} with either the seeded password or the ` +
-      `stable spec password. Re-run the seed: SEED_DEMO_DATA=true pnpm db:seed`,
+      `Could not sign in as any of ${OWNER_EMAILS.join(" / ")} with either the seeded ` +
+      `password or the stable spec password. Re-run the seed: SEED_DEMO_DATA=true pnpm db:seed`,
     );
   }
 
@@ -78,7 +102,7 @@ setup("authenticate as owner", async ({ page, context }) => {
     await page.waitForURL(/\/login/, { timeout: 10_000 });
 
     // Log back in with the new password.
-    await page.getByLabel(/email.*mobile/i).fill(OWNER_EMAIL);
+    await page.getByLabel(/email.*mobile/i).fill(ownerEmail);
     await page.getByLabel(/^password$/i).fill(OWNER_STABLE);
     await page.getByRole("button", { name: /sign in/i }).click();
     await page.waitForURL((url) =>

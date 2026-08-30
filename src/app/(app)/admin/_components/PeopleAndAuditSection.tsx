@@ -148,9 +148,10 @@ export function PeopleAndAuditSection({ retentionDays }: { retentionDays: number
 
           {retentionDays <= 7 && (
             <p className="mt-2.5 max-w-[62ch] rounded-[8px] border-l-2 border-warn bg-warn/8 px-3 py-2 text-[11.5px] text-text">
-              At {retentionDays} days, a dispute raised about last week&apos;s work will
-              have no record behind it. Dye-lot and quantity questions in this trade
-              often surface weeks later — 90 days costs almost nothing to keep.
+              {`At ${retentionDays} days, a dispute raised about last week's work ` +
+               `will have no record behind it. Dye-lot and quantity questions in ` +
+               `this trade often surface weeks later — 90 days costs almost ` +
+               `nothing to keep.`}
             </p>
           )}
         </div>

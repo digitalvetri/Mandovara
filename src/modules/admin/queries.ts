@@ -106,7 +106,11 @@ export async function loadAdmin(ctx: RequestContext): Promise<AdminView> {
   const auditRows: AuditRow[] = audit.map((a) => ({
     id:     a.id,
     when:   relTime(a.createdAt),
-    actor:  a.actorId ? (actorsById.get(a.actorId) ?? "Unknown") : "System",
+    // "Unknown" was the wrong word for the commonest case by far: the person
+    // still has an audit trail, their account has simply been removed since.
+    // A column of nine "Unknown"s reads like the log is broken rather than
+    // like it is doing its job, which is to outlive the account.
+    actor:  a.actorId ? (actorsById.get(a.actorId) ?? "Removed account") : "System",
     action: humaniseAction(a.action),
     entity: humaniseEntity(a.entityType),
   }));
