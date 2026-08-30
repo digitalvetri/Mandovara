@@ -19,6 +19,7 @@
 import type { SerializedQuotation } from "../_types";
 import { isEstimate } from "@/modules/quotations/lib";
 import { PreviewTerms } from "./PreviewTerms";
+import { PreviewHeader } from "./PreviewHeader";
 
 const BRAND      = "#1B8A7E";
 const BRAND_DEEP = "#14655C";
@@ -66,6 +67,14 @@ function fmtAmt(n: number): string {
 
   const body = paise === 0 ? grouped : `${grouped}.${String(paise).padStart(2, "0")}`;
   return neg ? `\u2212${body}` : body;
+}
+
+function fmtLongDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata",
+    });
+  } catch { return iso; }
 }
 
 function fmtQty(q: string): string {
@@ -185,28 +194,15 @@ export function QuotePreviewA4({ quotation, lines, totals }: Props) {
           boxSizing: "border-box",
         }}
       >
-        {/* ── Letterhead ── */}
-        {/* Plain <img>, not next/image: this block is measured in exact
-            pixels and CSS-zoomed as a unit to fake an A4 sheet, which
-            next/image's wrapper and srcset would fight. */}
-        <img
-          src="/mandovara-letterhead.jpg"
-          alt="Mandovara"
-          style={{ width: "196px", height: "115px", display: "block", marginBottom: "12px" }}
+        <PreviewHeader
+          title={estimate ? "ESTIMATE" : "QUOTATION"}
+          number={quotation.number}
+          date={fmtLongDate(quotation.date)}
+          validUntil={fmtLongDate(quotation.validUntil)}
+          clientName={quotation.clientName}
+          clientMobile={quotation.clientMobile}
+          area={area}
         />
-
-        {/* ── Who and where ── */}
-        <div style={{ borderLeft: `2.5px solid ${BRAND}`, paddingLeft: "10px", marginBottom: "13px" }}>
-          <div style={{ fontSize: "7px", letterSpacing: "1.4px", color: INK_SOFT, marginBottom: "4px" }}>
-            QUOTATION FOR
-          </div>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: INK, marginBottom: "2px" }}>
-            {quotation.clientName}
-          </div>
-          <div style={{ fontSize: "9px", color: INK_SOFT }}>
-            {[quotation.clientMobile, area].filter(Boolean).join("  ·  ")}
-          </div>
-        </div>
 
         {/* ── Items ── */}
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>

@@ -27,7 +27,7 @@ Font.register({
   ],
 });
 import { QuotePdf } from "../src/app/(app)/quotations/[id]/_components/QuotePdf.tsx";
-import { LETTERHEAD_SRC } from "../src/assets/letterhead-base64.ts";
+import { MARK_SRC } from "../src/assets/mark-base64.ts";
 
 const P = (rupees) => BigInt(Math.round(rupees * 100));
 let n = 0;
@@ -82,7 +82,7 @@ const quotation = {
 };
 
 await renderToFile(
-  React.createElement(QuotePdf, { quotation, logoSrc: LETTERHEAD_SRC }),
+  React.createElement(QuotePdf, { quotation, logoSrc: MARK_SRC }),
   process.argv[2],
 );
 console.log("total printed (paise):", taxableAmount.toString(), "= ₹", Number(taxableAmount) / 100);

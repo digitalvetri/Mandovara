@@ -33,6 +33,24 @@ import {
   MANDOVARA_TERMS, EMPHASISED_TERM, CANCELLATION_HEADING,
   CANCELLATION_TERMS, CLOSING_LINES,
 } from "./_quote-terms";
+import {
+  ContactLine, MetaCard, SectionHeading, Clause,
+  PhoneIcon, MailIcon, PinIcon, DocIcon, CalendarIcon, ClockIcon,
+  InfoIcon, ShieldIcon, NoteIcon,
+} from "./_pdf-chrome";
+
+/** Studio details, printed rather than pasted in as a photograph. */
+const FROM = {
+  phone: "+91 089404 30051",
+  email: "mandovara22@gmail.com",
+  addr:  "32, Thirumurthy Layout, Thadagam Road,\nR S Puram, Coimbatore - 641 002",
+};
+
+function fd(d: Date): string {
+  return d.toLocaleDateString("en-IN", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata",
+  });
+}
 
 // ── fonts ──────────────────────────────────────────────────────────────────
 const FONTS = path.join(process.cwd(), "public", "fonts");
@@ -140,22 +158,49 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
     >
       <Page size="A4" style={s.page}>
 
-        {/* ── Letterhead ───────────────────────────────────────────── */}
-        {logoSrc
-          ? <Image src={logoSrc} style={s.letterhead} />
-          : <Text style={s.letterheadFallback}>Mandovara</Text>}
+        <View style={s.edgeLeft} fixed />
+        <View style={s.edgeBottom} fixed />
+
+        {/* ── Identity ─────────────────────────────────────────────── */}
+        <View style={s.identityRow}>
+          <View style={s.identityLeft}>
+            {logoSrc && <Image src={logoSrc} style={s.mark} />}
+            <Text style={s.wordmark}>Mandovara</Text>
+            <Text style={s.tagline}>PREMIUM WALL COVERINGS</Text>
+
+            <ContactLine icon={<PhoneIcon />}>{FROM.phone}</ContactLine>
+            <ContactLine icon={<MailIcon />}>{FROM.email}</ContactLine>
+            <ContactLine icon={<PinIcon />}>{FROM.addr}</ContactLine>
+          </View>
+
+          <View style={s.identityRight}>
+            <Text style={s.docTitle}>{estimate ? "ESTIMATE" : "QUOTATION"}</Text>
+            <View style={s.docRule} />
+
+            <MetaCard icon={<DocIcon />}      label="QUOTE NO."   value={q.number} />
+            <MetaCard icon={<CalendarIcon />} label="DATE"        value={fd(q.date)} />
+            <MetaCard icon={<ClockIcon />}    label="VALID UNTIL" value={fd(q.validUntil)} />
+          </View>
+        </View>
+
+        <View style={s.divider} />
 
         {/* ── Who and where ────────────────────────────────────────── */}
-        {/* Same two facts the yellow bars carried — the client with
-            their number, and the area — set as one block instead of two
-            shouting bands. */}
         <View style={s.headRow}>
           <View style={s.partyBlock}>
             <Text style={s.partyLabel}>QUOTATION FOR</Text>
             <Text style={s.partyName}>{q.clientName}</Text>
-            <Text style={s.partyMeta}>
-              {[q.clientMobile, area].filter(Boolean).join("  ·  ")}
-            </Text>
+            <View style={s.partyMetaRow}>
+              <PhoneIcon size={8} />
+              <Text style={[s.partyMeta, { marginLeft: 5 }]}>{q.clientMobile}</Text>
+              {!!area && (
+                <>
+                  <View style={s.partySep} />
+                  <PinIcon size={8} />
+                  <Text style={[s.partyMeta, { marginLeft: 5 }]}>{area}</Text>
+                </>
+              )}
+            </View>
           </View>
         </View>
 
@@ -195,35 +240,50 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
           </View>
         </View>
 
-        {/* ── Terms ────────────────────────────────────────────────── */}
-        <View style={s.termsWrap}>
-          {estimate && <Text style={s.caveat}>{ESTIMATE_CAVEAT}</Text>}
+        {/* An estimate must keep saying it is one — it is priced
+            before anyone has measured. */}
+        {estimate && (
+          <View style={s.notice}>
+            <View style={s.noticeIcon}><InfoIcon /></View>
+            <Text style={s.noticeText}>{ESTIMATE_CAVEAT}</Text>
+          </View>
+        )}
 
-          <Text style={s.termsHead}>TERMS &amp; CONDITIONS</Text>
-          {(customTerms ?? MANDOVARA_TERMS).map((t, i) => (
-            <View key={i} style={s.termRow}>
-              <Text style={s.termNum}>{i + 1}.</Text>
-              <Text style={!customTerms && i === EMPHASISED_TERM ? s.termStrong : s.termText}>
+        {/* ── Terms, side by side ──────────────────────────────────── */}
+        {/* Two columns rather than one long list: the same clauses read
+            in half the height, which is what keeps this on one page. */}
+        <View style={s.termsCols}>
+          <View style={s.termsCol}>
+            <SectionHeading icon={<NoteIcon />} title="TERMS & CONDITIONS" />
+            {(customTerms ?? MANDOVARA_TERMS).map((t, i) => (
+              <Clause key={i} n={i + 1} strong={!customTerms && i === EMPHASISED_TERM}>
                 {t}
-              </Text>
-            </View>
-          ))}
+              </Clause>
+            ))}
+          </View>
 
-          {!customTerms && (
-            <>
-              <Text style={s.policyHead}>{CANCELLATION_HEADING.toUpperCase()}</Text>
-              {CANCELLATION_TERMS.map((t, i) => (
-                <View key={i} style={s.termRow}>
-                  <Text style={s.termNum}>{i + 1}.</Text>
-                  <Text style={s.termText}>{t}</Text>
-                </View>
-              ))}
-              {CLOSING_LINES.map((t, i) => (
-                <Text key={i} style={s.closing}>{t}</Text>
-              ))}
-            </>
-          )}
+          <View style={s.termsCol}>
+            {!customTerms && (
+              <>
+                <SectionHeading icon={<ShieldIcon />} title={CANCELLATION_HEADING.toUpperCase()} />
+                {CANCELLATION_TERMS.map((t, i) => (
+                  <Clause key={i} n={i + 1}>{t}</Clause>
+                ))}
+              </>
+            )}
+          </View>
         </View>
+
+        {!customTerms && (
+          <View style={s.closingBox}>
+            <View style={s.closingBadge}><DocIcon size={12} color="#FFFFFF" /></View>
+            <View style={{ flex: 1 }}>
+              {CLOSING_LINES.map((t, i) => (
+                <Text key={i} style={s.closingText}>{t}</Text>
+              ))}
+            </View>
+          </View>
+        )}
 
       </Page>
     </Document>

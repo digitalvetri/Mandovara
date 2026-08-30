@@ -5,9 +5,10 @@ import type { DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import { getQuotationByShareToken } from "@/modules/quotations/public-query";
 import { QuotePdf } from "@/app/(app)/quotations/[id]/_components/QuotePdf";
-// The banner, not the square mark — the quotation leads with the
-// studio letterhead clients already recognise.
-import { LETTERHEAD_SRC } from "@/assets/letterhead-base64";
+// The butterfly mark. The redesign (2026-08-30) sets the studio's
+// identity in type beside it rather than pasting in a photograph of a
+// business card, which is what the owner's reference design does.
+import { MARK_SRC } from "@/assets/mark-base64";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export async function GET(
   const q = await getQuotationByShareToken(token);
   if (!q) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const element = React.createElement(QuotePdf, { quotation: q, logoSrc: LETTERHEAD_SRC }) as ReactElement<DocumentProps>;
+  const element = React.createElement(QuotePdf, { quotation: q, logoSrc: MARK_SRC }) as ReactElement<DocumentProps>;
   const buffer = await renderToBuffer(element);
   const bytes = new Uint8Array(buffer);
 

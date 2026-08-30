@@ -51,12 +51,40 @@ export const pdfStyles = StyleSheet.create({
     fontFamily: "Geist", fontSize: 9, color: INK, backgroundColor: "#FFFFFF",
   },
 
-  // ── Letterhead ────────────────────────────────────────────────────
-  letterhead: { width: 196, height: 115, marginBottom: 12, alignSelf: "flex-start" },
-  letterheadFallback: {
-    fontSize: 20, fontWeight: "bold", color: BRAND,
-    textAlign: "left", marginBottom: 18,
+  // ── Edge accents ──────────────────────────────────────────────────
+  // A teal bar down the top-left and another across the foot. They frame
+  // the page without taking any space from it.
+  edgeLeft:   { position: "absolute", left: 0, top: 0, width: 7, height: 132, backgroundColor: BRAND },
+  edgeBottom: { position: "absolute", left: 0, right: 0, bottom: 0, height: 9, backgroundColor: BRAND },
+
+  // ── Identity ──────────────────────────────────────────────────────
+  identityRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 14 },
+  identityLeft: { width: "54%" },
+  mark: { width: 52, height: 40, marginBottom: 6 },
+  wordmark: { fontSize: 22, fontWeight: "bold", color: BRAND_DEEP, marginBottom: 2 },
+  tagline: { fontSize: 7.5, letterSpacing: 2.2, color: INK_SOFT, marginBottom: 12 },
+
+  contactRow:  { flexDirection: "row", alignItems: "flex-start", marginBottom: 5 },
+  contactIcon: { width: 13, marginTop: 0.5 },
+  contactText: { flex: 1, fontSize: 8.2, color: INK, lineHeight: 1.35 },
+
+  // Right block, separated by a hairline rather than a box.
+  identityRight: {
+    width: "42%", paddingLeft: 16,
+    borderLeftWidth: 0.5, borderLeftColor: RULE, borderStyle: "solid",
   },
+  docTitle: { fontSize: 25, color: INK, textAlign: "right", letterSpacing: 0.5 },
+  docRule:  { height: 1.6, width: 78, backgroundColor: BRAND, alignSelf: "flex-end", marginTop: 5, marginBottom: 12 },
+
+  metaRow:     { flexDirection: "row", alignItems: "center", marginBottom: 9 },
+  metaIconBox: {
+    width: 19, height: 19, backgroundColor: BRAND_TINT,
+    alignItems: "center", justifyContent: "center", marginRight: 8,
+  },
+  metaLabel: { fontSize: 6.8, letterSpacing: 1.1, color: BRAND, marginBottom: 1.5 },
+  metaValue: { fontSize: 9, color: INK },
+
+  divider: { height: 0.5, backgroundColor: RULE, marginBottom: 13 },
 
   // ── Client band ───────────────────────────────────────────────────
   // The two yellow bars became one quiet block: the client's name set
@@ -67,9 +95,11 @@ export const pdfStyles = StyleSheet.create({
     borderLeftWidth: 2.5, borderLeftColor: BRAND, borderStyle: "solid",
     paddingLeft: 10,
   },
-  partyLabel: { fontSize: 7, letterSpacing: 1.4, color: INK_SOFT, marginBottom: 4 },
-  partyName:  { fontSize: 14, fontWeight: "bold", color: INK, marginBottom: 2 },
-  partyMeta:  { fontSize: 9, color: INK_SOFT },
+  partyLabel: { fontSize: 7.2, letterSpacing: 1.4, color: BRAND, marginBottom: 4 },
+  partyName:  { fontSize: 17, fontWeight: "bold", color: INK, marginBottom: 4 },
+  partyMetaRow: { flexDirection: "row", alignItems: "center" },
+  partyMeta:  { fontSize: 8.6, color: INK, marginRight: 4 },
+  partySep:   { width: 0.5, height: 9, backgroundColor: RULE, marginHorizontal: 8 },
 
   // ── Table ─────────────────────────────────────────────────────────
   table: { marginBottom: 0 },
@@ -104,6 +134,42 @@ export const pdfStyles = StyleSheet.create({
 
   deductLabel: { fontSize: 9, color: DEDUCT },
   deductNum:   { fontSize: 9.5, color: DEDUCT, textAlign: "right" },
+
+  // ── Notice ────────────────────────────────────────────────────────
+  notice: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: BRAND_TINT, paddingVertical: 8, paddingHorizontal: 11,
+    marginBottom: 14,
+  },
+  noticeIcon: { marginRight: 8 },
+  noticeText: { flex: 1, fontSize: 8.4, color: BRAND_DEEP, lineHeight: 1.35 },
+
+  // ── Terms, two columns ────────────────────────────────────────────
+  termsCols: { flexDirection: "row", justifyContent: "space-between" },
+  termsCol:  { width: "47.5%" },
+
+  sectionHeadWrap: { marginBottom: 8 },
+  sectionHeadRow:  { flexDirection: "row", alignItems: "flex-start" },
+  sectionIcon:     { width: 14, marginTop: 0.5 },
+  sectionTitle:    { flex: 1, fontSize: 8.4, fontWeight: "bold", color: BRAND, letterSpacing: 0.7 },
+  sectionRule:     { height: 1.4, width: 34, backgroundColor: BRAND, marginTop: 4, marginLeft: 14 },
+
+  clauseRow:    { flexDirection: "row", marginBottom: 4.5 },
+  clauseNum:    { width: 13, fontSize: 7.4, color: BRAND },
+  clauseText:   { flex: 1, fontSize: 7.4, color: INK, lineHeight: 1.45 },
+  clauseStrong: { flex: 1, fontSize: 7.4, color: BRAND_DEEP, fontWeight: "bold", lineHeight: 1.45 },
+
+  // ── Closing note ──────────────────────────────────────────────────
+  closingBox: {
+    flexDirection: "row", alignItems: "center",
+    borderWidth: 0.5, borderColor: RULE, borderStyle: "solid",
+    paddingVertical: 10, paddingHorizontal: 12, marginTop: 14,
+  },
+  closingBadge: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: BRAND,
+    alignItems: "center", justifyContent: "center", marginRight: 11,
+  },
+  closingText: { fontSize: 7.6, color: INK, lineHeight: 1.5, marginBottom: 1.5 },
 
   // ── Total ─────────────────────────────────────────────────────────
   // Its own block below the table rather than one more row inside it.
