@@ -1,15 +1,11 @@
 export const DEFAULT_PASSWORD = "Mandovara@2026";
 
+// The single administrator account. This helper renders only outside
+// production (SHOW_CREDS_HELPER in LoginTabs), and it used to list nine
+// seeded demo logins — eight of which the 2026-08-30 data wipe removed,
+// so it was offering accounts that no longer exist.
 const SEEDED_USERS = [
-  { role: "Owner",            email: "rohit@mandovara.com"     },
-  { role: "Designer",         email: "aishwarya@mandovara.com" },
-  { role: "Sales",            email: "karthik@mandovara.com"   },
-  { role: "Measure Exec",     email: "bala@mandovara.com"      },
-  { role: "Store Keeper",     email: "senthil@mandovara.com"   },
-  { role: "Make Supervisor",  email: "manoj@mandovara.com"     },
-  { role: "Installer",        email: "vignesh@mandovara.com"   },
-  { role: "Accounts",         email: "deepa@mandovara.com"     },
-  { role: "HR",               email: "priya@mandovara.com"     },
+  { role: "Administrator", email: "mandovara22@gmail.com" },
 ] as const;
 
 export function CredentialsPanel({ onSelect }: { onSelect: (email: string) => void }) {
@@ -20,7 +16,7 @@ export function CredentialsPanel({ onSelect }: { onSelect: (email: string) => vo
     >
       <div className="px-3 py-2 border-b" style={{ borderColor: "#C8E8E4" }}>
         <div className="text-[10.5px] font-semibold" style={{ color: "#1B8A7E" }}>
-          Seeded accounts · password for all:{" "}
+          Local dev account · password:{" "}
           <span className="font-mono tracking-wide">{DEFAULT_PASSWORD}</span>
         </div>
       </div>

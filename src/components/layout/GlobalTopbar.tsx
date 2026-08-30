@@ -97,7 +97,7 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
         {/* Inline global search */}
         <GlobalSearch />
 
-        <div className="flex-1" />
+        <div className="hidden sm:block sm:flex-1" />
 
         {/* Notification bell */}
         <NotificationBell />

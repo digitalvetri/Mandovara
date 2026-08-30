@@ -68,7 +68,7 @@ export function DaySummary({ items, userName, hour, dateLabel, punch }: Props) {
       <div aria-hidden className="pointer-events-none absolute inset-0 chrome-veil" />
       <div aria-hidden className="pointer-events-none absolute inset-0 hero-facets" />
 
-      <div className="relative z-10 px-6 py-6 sm:px-8 sm:py-7">
+      <div className="relative z-10 px-4 py-5 sm:px-8 sm:py-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] font-medium tracking-[0.04em] text-sidebar-dim">
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-chrome" />
@@ -102,7 +102,7 @@ export function DaySummary({ items, userName, hour, dateLabel, punch }: Props) {
 
         {/* The day itself, at display scale — this is the sentence the owner
             came to read, so it gets the size the clock used to have. */}
-        <h2 className="mt-1.5 max-w-[46ch] font-display text-[24px] sm:text-[30px] font-[560] leading-[1.18] tracking-[-0.015em] text-sidebar-text">
+        <h2 className="mt-1.5 max-w-[46ch] font-display text-[20px] sm:text-[30px] font-[560] leading-[1.18] tracking-[-0.015em] text-sidebar-text">
           {buildNarrative(items)}
         </h2>
 

@@ -98,7 +98,7 @@ export function GlobalSearch() {
   }
 
   return (
-    <div ref={containerRef} className="relative flex-1 min-w-0 max-w-[440px]">
+    <div ref={containerRef} className="relative flex-1 min-w-[120px] max-w-[440px]">
 
       {/* ── Search bar ── */}
       <div className={[

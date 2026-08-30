@@ -26,7 +26,7 @@ const CONFIG = {
   admin: {
     name:   "Rohit",
     mobile: "+918940430051",
-    email:  "rohit@mandovara.com",
+    email:  "mandovara22@gmail.com",
     // No hardcoded default. Supply it at run time so a real production
     // password never lives in the repo (or in a shipped sourcemap):
     //   BOOTSTRAP_ADMIN_PASSWORD='...' pnpm tsx scripts/bootstrap-admin.ts

@@ -39,7 +39,7 @@ export function KpiCard({ label, value, subLine, helpText, href, emphasize, hero
       <div
         className={[
           "font-display tabular-nums font-semibold leading-none text-text",
-          hero ? "text-[32px] sm:text-[42px]" : "text-[22px] sm:text-[26px]",
+          hero ? "text-[24px] sm:text-[42px]" : "text-[19px] sm:text-[26px]",
         ].join(" ")}
       >
         {value}

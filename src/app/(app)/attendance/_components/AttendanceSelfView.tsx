@@ -10,7 +10,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { TodayCard } from "./TodayCard";
-import { STATUS_LABEL } from "../page";
+import { STATUS_LABEL } from "../_status-styles";
 import { AttendanceBadge, LeaveStateBadge, SummaryChip , humaniseType} from "./AttendanceBadges";
 import { DAY_LABELS, LEAVE_DEFAULTS, MONTH_NAMES, calendarDotColor, fmtDate, fmtDateFull, fmtTime, workedStr } from "./AttendanceViews";
 

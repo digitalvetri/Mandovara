@@ -138,7 +138,7 @@ export function LoginCard() {
             inputMode="email"
             value={credential}
             onChange={(e) => setCredential(e.target.value)}
-            placeholder="rohit@mandovara.com  or  +91 98xxxxxxxx"
+            placeholder="mandovara22@gmail.com  or  +91 98xxxxxxxx"
             autoComplete="username"
             className="w-full outline-none transition-all"
             suppressHydrationWarning

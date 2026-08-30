@@ -47,7 +47,7 @@ export function KpiCard({
   return (
     <div
       className={[
-        "lift group relative overflow-hidden rounded-[14px] border p-5",
+        "lift group relative overflow-hidden rounded-[14px] border p-4 sm:p-5",
         featured
           ? "bg-sidebar border-transparent text-sidebar-text"
           : "bg-surface border-rule shadow-sm",
@@ -61,7 +61,7 @@ export function KpiCard({
         <div className="flex items-start justify-between gap-3">
           <div
             className={[
-              "grid h-9 w-9 shrink-0 place-items-center rounded-[10px]",
+              "grid h-8 w-8 sm:h-9 sm:w-9 shrink-0 place-items-center rounded-[10px]",
               featured
                 ? "bg-white/10 text-accent-chrome"
                 : alarm
@@ -86,7 +86,7 @@ export function KpiCard({
 
         <div
           className={[
-            "mt-4 text-[10.5px] font-semibold uppercase tracking-[0.14em] leading-none",
+            "mt-3 sm:mt-4 text-[10px] sm:text-[10.5px] font-semibold uppercase tracking-[0.1em] sm:tracking-[0.14em] leading-none",
             featured ? "text-sidebar-dim" : "text-text-dim",
           ].join(" ")}
         >
@@ -97,11 +97,13 @@ export function KpiCard({
             hairline drawing in beneath it once on load. Accent, not the old
             ochre: that gold was drawn for a dark ground and turns brown when
             darkened enough to be legible on white. */}
-        <div className="mt-2 inline-block">
+        <div className="mt-1.5 sm:mt-2 inline-block">
           <div
             className={[
               "font-data tabular-nums font-medium leading-none tracking-[-0.01em]",
-              featured ? "text-[34px] text-sidebar-text" : "text-[30px] text-text",
+              featured
+                ? "text-[24px] sm:text-[34px] text-sidebar-text"
+                : "text-[21px] sm:text-[30px] text-text",
             ].join(" ")}
           >
             {value}
@@ -109,13 +111,13 @@ export function KpiCard({
           <div
             aria-hidden
             className={[
-              "kpi-underline mt-2 h-[1.5px] w-full",
+              "kpi-underline mt-1.5 sm:mt-2 h-[1.5px] w-full",
               alarm ? "bg-fault/50" : "bg-accent/45",
             ].join(" ")}
           />
         </div>
 
-        <div className={`mt-3 truncate text-[11px] ${featured ? "text-sidebar-dim" : "text-text-dim"}`}>
+        <div className={`mt-2 sm:mt-3 truncate text-[10.5px] sm:text-[11px] ${featured ? "text-sidebar-dim" : "text-text-dim"}`}>
           {subtitle}
         </div>
       </div>

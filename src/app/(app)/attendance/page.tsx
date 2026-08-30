@@ -7,28 +7,9 @@ import { SelfView } from "./_components/AttendanceSelfView";
 import { BandCard, Td, Th } from "./_components/AttendanceBadges";
 import { AttendanceToolbar } from "./_components/AttendanceToolbar";
 import { LeaveRequestList } from "./_components/LeaveRequestList";
+import { STATUS_TONE, STATUS_LABEL } from "./_status-styles";
 
 export const dynamic = "force-dynamic";
-
-// ── Manager view styles ───────────────────────────────────────────────────────
-
-export const STATUS_TONE: Record<string, string> = {
-  PRESENT:  "bg-solid/12 text-solid",
-  ABSENT:   "bg-fault/12 text-fault",
-  HALF_DAY: "bg-heat/15 text-heat",
-  LEAVE:    "bg-info/12 text-info",
-  HOLIDAY:  "bg-gold/12 text-gold",
-  WEEK_OFF: "bg-surface-2 text-text-muted",
-};
-export const STATUS_LABEL: Record<string, string> = {
-  PRESENT: "Present", ABSENT: "Absent", HALF_DAY: "Half day",
-  LEAVE: "Leave", HOLIDAY: "Holiday", WEEK_OFF: "Week off",
-};
-export const LEAVE_TONE: Record<string, string> = {
-  APPROVED: "bg-solid/12 text-solid",
-  PENDING:  "bg-heat/15 text-heat",
-  REJECTED: "bg-fault/12 text-fault",
-};
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -99,10 +80,11 @@ async function ManagerView({
         ) : (
         <div className="lg:col-span-2 rounded-[14px] bg-surface border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <div className="overflow-x-auto text-[13px] text-text">
+            <div className="text-[13px] text-text">
               {isToday ? "Today" : iso} <span className="text-text-muted">· mobile punch (GPS + selfie)</span>
             </div>
           </div>
+          <div className="overflow-x-auto">
           <table className="min-w-[480px] w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-border text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
@@ -128,6 +110,7 @@ async function ManagerView({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
         )}
 

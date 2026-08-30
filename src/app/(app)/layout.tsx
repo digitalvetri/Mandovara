@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen page-wash">
       <SidebarShell userName={userName} userRole={userRole} userPermissions={userPermissions} />
       <main className="pt-[68px] md:pl-[var(--sidebar-w)]">
-        <div className="w-full px-5 sm:px-7 md:px-9 xl:px-11 py-4">{children}</div>
+        <div className="w-full px-5 sm:px-7 md:px-9 xl:px-11 py-5 sm:py-4">{children}</div>
       </main>
     </div>
   );
