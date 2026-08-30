@@ -66,18 +66,19 @@ export function LoginCard() {
   const canSubmit = credential.trim().length > 0 && password.length > 0;
 
   return (
-    // Mobile: the whole thing sits inside a soft white card that floats on
-    // the brand wash. Desktop keeps it flush to the right panel (no card
-    // ring, no shadow — the panel itself is the container there).
-    <div className="rise w-full max-w-[420px] mx-auto lg:max-w-[400px] lg:bg-transparent lg:shadow-none lg:border-0 lg:p-0 lg:rounded-none bg-white rounded-[20px] p-6 sm:p-8 shadow-[0_20px_60px_-20px_rgba(43,168,154,0.20),0_2px_8px_rgba(15,42,40,0.06)] border border-[#E7F1EF]">
+    // No card chrome of its own any more: the frosted panel in page.tsx is
+    // the card. Leaving the old white background here put a solid card
+    // inside a glass one, which reads as a bug rather than as depth.
+    <div className="w-full">
 
-      {/* Logo — bigger and more generous on mobile */}
-      <div className="mb-8 lg:mb-10">
+      {/* Logo */}
+      <div className="rise mb-7">
         <MandovaraLogo />
       </div>
 
-      {/* Heading */}
-      <div className="mb-7 lg:mb-8">
+      {/* Heading — each block enters just behind the one above it, so the
+          card assembles rather than appearing all at once. */}
+      <div className="rise mb-7" style={{ "--d": "70ms" } as React.CSSProperties}>
         <h1
           style={{
             color: "#0F2A28",
@@ -99,7 +100,11 @@ export function LoginCard() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        className="rise space-y-5"
+        style={{ "--d": "140ms" } as React.CSSProperties}
+      >
 
         {/* Email / Mobile */}
         <div>

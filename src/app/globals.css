@@ -597,6 +597,85 @@ textarea:read-only {
   }
 }
 
+
+/* ── Sign-in canvas ──────────────────────────────────────────────────
+   The login page is the one screen every person sees before they trust
+   anything else here, and it was a white card on a near-blank ground.
+
+   Three slow-drifting pools of the brand teal over the dark rail colour.
+   Deliberately slow (28–40s) and low-contrast: a login is a place you
+   pass through, and motion that asks to be watched gets old by the
+   fiftieth sign-in. They are painted, never interactive, and stop
+   entirely under prefers-reduced-motion. */
+/* Not the flat rail colour: a gradient gives the pools something to sit
+   in, and keeps the corners from going to near-black. */
+.auth-canvas {
+  background:
+    linear-gradient(150deg,
+      color-mix(in oklab, var(--color-sidebar) 88%, var(--color-accent)) 0%,
+      var(--color-sidebar) 45%,
+      color-mix(in oklab, var(--color-sidebar) 92%, black) 100%);
+}
+
+.auth-aurora {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: 0.85;
+  will-change: transform;
+}
+.auth-aurora-1 {
+  width: 46vmax; height: 46vmax; top: -14vmax; left: -10vmax;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent) 85%, transparent), transparent 68%);
+  animation: auth-drift-1 34s var(--ease) infinite alternate;
+}
+.auth-aurora-2 {
+  width: 38vmax; height: 38vmax; bottom: -12vmax; right: -8vmax;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-gold) 62%, transparent), transparent 68%);
+  animation: auth-drift-2 40s var(--ease) infinite alternate;
+}
+.auth-aurora-3 {
+  width: 30vmax; height: 30vmax; top: 38%; left: 46%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent) 70%, transparent), transparent 70%);
+  animation: auth-drift-3 28s var(--ease) infinite alternate;
+}
+
+@keyframes auth-drift-1 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(6vmax, 5vmax, 0) scale(1.14); }
+}
+@keyframes auth-drift-2 {
+  from { transform: translate3d(0, 0, 0) scale(1.06); }
+  to   { transform: translate3d(-7vmax, -4vmax, 0) scale(1); }
+}
+@keyframes auth-drift-3 {
+  from { transform: translate3d(-3vmax, 2vmax, 0) scale(0.94); }
+  to   { transform: translate3d(4vmax, -3vmax, 0) scale(1.1); }
+}
+
+/* Frosted panel. Light rather than dark on purpose: the form's type and
+   fields are solved against a light ground for the 4.5:1 floor (§6.2),
+   and tinting the glass dark to look moody would break every one of
+   them. backdrop-filter is progressive — where it is unsupported the
+   rgba background alone still gives an opaque, legible card. */
+.auth-glass {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 24px 60px -12px rgba(6, 26, 24, 0.45),
+    0 2px 8px rgba(6, 26, 24, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .auth-glass { background: rgba(255, 255, 255, 0.86); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-aurora { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
