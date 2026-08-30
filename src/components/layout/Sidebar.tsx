@@ -131,10 +131,6 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
       { label: "My Profile",         href: "/profile",    icon: UserCircle    },
     ],
   },
-  {
-    section: "Admin",
-    items: [{ label: "Reports", href: "/reports", icon: BarChart2, perm: "report.view.sales" as const }],
-  },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
