@@ -50,7 +50,18 @@ export function GlobalTopbar({ userName, userRole, onMenuOpen }: Props) {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 h-[68px] flex items-stretch bg-sidebar">
+    // The bar grows by the status-bar inset and pads its contents down by
+    // the same amount, so the row of controls starts below the phone's own
+    // icons instead of underneath them. Both are 0 outside standalone mode.
+    <header
+      className="fixed inset-x-0 top-0 z-40 flex items-stretch bg-sidebar"
+      style={{
+        height:      "var(--topbar-h)",
+        paddingTop:  "var(--safe-top)",
+        paddingLeft: "var(--safe-left)",
+        paddingRight:"var(--safe-right)",
+      }}
+    >
 
       {/* ── Brand block — width from --sidebar-w so the vertical seam between
              topbar and sidebar stays perfectly aligned as the rail grows. ── */}

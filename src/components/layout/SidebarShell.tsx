@@ -52,10 +52,17 @@ export function SidebarShell({ userName, userRole, userPermissions }: Props) {
           // Mobile: 288px drawer, full height, slides in/out
           "top-0 w-[288px]",
           open ? "translate-x-0" : "-translate-x-full",
-          // Desktop: always visible below the 68px topbar; width from --sidebar-w
-          "md:top-[68px] md:translate-x-0",
+          // Desktop: always visible below the topbar; width from --sidebar-w
+          "md:top-[var(--topbar-h)] md:translate-x-0",
         ].join(" ")}
-        style={{ ["--desktop-w" as string]: "var(--sidebar-w)" }}
+        // Desktop sits below the bar, so it reads the same --topbar-h the bar
+        // and <main> use. On mobile the drawer covers the full height, which
+        // means its own contents start under the status bar — hence the top
+        // padding. Both collapse to today's values off a notched device.
+        style={{
+          ["--desktop-w" as string]: "var(--sidebar-w)",
+          paddingTop: "var(--safe-top)",
+        }}
       >
         <div className="md:w-[var(--sidebar-w)] h-full w-full">
           {/* Mobile close button inside the drawer */}
@@ -63,7 +70,10 @@ export function SidebarShell({ userName, userRole, userPermissions }: Props) {
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Close navigation menu"
-            className="md:hidden absolute top-3.5 right-3.5 z-10 h-9 w-9 grid place-items-center rounded-[8px] text-sidebar-dim hover:text-sidebar-text hover:bg-sidebar-hover transition-colors"
+            // Absolute children resolve against the padding box, so the
+            // drawer's own top padding does not move this — it needs the
+            // status-bar inset applied directly or it sits under the clock.
+            className="md:hidden absolute top-[calc(0.875rem+var(--safe-top))] right-3.5 z-10 h-9 w-9 grid place-items-center rounded-[8px] text-sidebar-dim hover:text-sidebar-text hover:bg-sidebar-hover transition-colors"
           >
             <X size={16} strokeWidth={2} />
           </button>

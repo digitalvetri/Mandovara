@@ -120,6 +120,26 @@
      spacious on desktop without cramping the workspace on 1366-class laptops. */
   --sidebar-w: 272px;
 
+  /* Safe area — the strip the phone's own status bar, notch or home
+     indicator sits in.
+
+     The app declares viewportFit: "cover" and manifest display
+     "standalone", which together mean an installed Mandovara draws edge
+     to edge, underneath the status bar rather than below it. Nothing
+     accounted for that, so on a real handset the signal, wifi and
+     battery icons landed on top of the topbar's theme and sign-out
+     buttons. env() resolves to 0px in a normal browser tab and on
+     desktop, so this costs nothing anywhere else.
+
+     --topbar-h is the one source of truth for the chrome's height: the
+     bar itself, <main>'s top padding, and the desktop sidebar's offset
+     all read it, so the three can never drift apart again. */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+  --topbar-h:    calc(68px + var(--safe-top));
+
   /* ── Elevation. Light theme only, per §6.2: dark lifts with border +
      surface-2 instead. Tinted with the ground hue so shadows read as
      depth rather than dirt. */

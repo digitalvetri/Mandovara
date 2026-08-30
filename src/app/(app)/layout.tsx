@@ -36,8 +36,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen page-wash">
       <SidebarShell userName={userName} userRole={userRole} userPermissions={userPermissions} />
-      <main className="pt-[68px] md:pl-[var(--sidebar-w)]">
-        <div className="w-full px-5 sm:px-7 md:px-9 xl:px-11 py-5 sm:py-4">{children}</div>
+      {/* Top padding tracks the bar's real height, which grows by the
+          status-bar inset when the app runs installed. The bottom padding
+          keeps the last row of content clear of the home indicator. Both
+          insets are 0 in an ordinary browser tab and on desktop. */}
+      <main className="pt-[var(--topbar-h)] md:pl-[var(--sidebar-w)]">
+        <div
+          className="w-full px-5 sm:px-7 md:px-9 xl:px-11 pt-5 sm:pt-4"
+          style={{ paddingBottom: "calc(1.25rem + var(--safe-bottom))" }}
+        >
+          {children}
+        </div>
       </main>
     </div>
   );
