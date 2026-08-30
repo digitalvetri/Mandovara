@@ -28,6 +28,7 @@
 // to no name, exactly as they already do for any missing user.
 
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { authBootstrapPrisma } from "@/kernel/db/client";
 
 export const runtime = "nodejs";
@@ -40,28 +41,73 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let body: { keepEmails?: string[]; confirm?: boolean };
+  interface Body {
+    keepEmails?: string[];
+    admin?: { email?: string; password?: string };
+    confirm?: boolean;
+  }
+  let body: Body;
   try {
-    body = await req.json() as { keepEmails?: string[]; confirm?: boolean };
+    body = await req.json() as Body;
   } catch {
     return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
 
-  const keep = (body.keepEmails ?? [])
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+  const db = authBootstrapPrisma;
+  let all = await db.user.findMany({
+    select: { id: true, name: true, email: true, mobile: true, role: true, status: true },
+    orderBy: { name: "asc" },
+  });
+
+  // ── "Leave exactly this one administrator" ──────────────────────────
+  //
+  // The two-step version of this (move the address with reset-password,
+  // then prune by that address) has an ordering trap: run the prune first,
+  // or name the new address before the move, and the keep-list matches
+  // nothing. Naming the administrator you want to END UP with removes the
+  // ordering entirely — it promotes whichever account is the owner today,
+  // sets the address and password on it, and deletes the rest. Running it
+  // twice changes nothing the second time.
+  const wantAdmin = body.admin?.email?.trim().toLowerCase();
+  const wantPassword = body.admin?.password;
+  let promote: (typeof all)[number] | undefined;
+
+  if (wantAdmin) {
+    if (!wantPassword || wantPassword.length < 8) {
+      return NextResponse.json(
+        { error: "admin.password is required with admin.email (min 8 characters)." },
+        { status: 400 },
+      );
+    }
+    promote =
+      all.find((u) => u.email?.toLowerCase() === wantAdmin) ??
+      all.find((u) => u.role === "OWNER" && u.status === "ACTIVE");
+    if (!promote) {
+      return NextResponse.json(
+        {
+          error: "No account matches that address and no active OWNER exists to promote.",
+          existingAccounts: all.map((u) => `${u.name} <${u.email ?? "no email"}> ${u.role}`),
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  const keep = wantAdmin
+    ? [wantAdmin]
+    : (body.keepEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
   if (keep.length === 0) {
     return NextResponse.json(
-      { error: "keepEmails must list at least one address to keep." },
+      { error: "Give either keepEmails, or admin: { email, password }." },
       { status: 400 },
     );
   }
 
-  const db = authBootstrapPrisma;
-  const all = await db.user.findMany({
-    select: { id: true, name: true, email: true, mobile: true, role: true, status: true },
-    orderBy: { name: "asc" },
-  });
+  // With an admin named, the account being promoted counts as kept even
+  // though it does not carry that address yet.
+  if (promote) {
+    all = all.map((u) => (u.id === promote!.id ? { ...u, email: wantAdmin!, role: "OWNER" as const, status: "ACTIVE" as const } : u));
+  }
 
   const kept   = all.filter((u) => u.email && keep.includes(u.email.toLowerCase()));
   const doomed = all.filter((u) => !(u.email && keep.includes(u.email.toLowerCase())));
@@ -88,9 +134,26 @@ export async function POST(req: Request) {
     );
   }
 
+  // Staff records with no login of their own. In admin mode the intent is
+  // "leave exactly this one person", so the roster goes too — otherwise the
+  // Employees screen still lists people the owner never added and cannot
+  // sign in as. Counted here so the dry run shows it before it happens.
+  const keptUserIds = new Set(kept.map((u) => u.id));
+  const strayEmployees = wantAdmin
+    ? await db.employee.findMany({
+        where:  { OR: [{ userId: null }, { userId: { notIn: [...keptUserIds] } }] },
+        select: { id: true, code: true, name: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
+
   const summary = {
     keeping:  kept.map((u) => `${u.name} <${u.email}> ${u.role}`),
     deleting: doomed.map((u) => `${u.name} <${u.email ?? "no email"}> ${u.role}`),
+    ...(promote ? { promoting: `${promote.name} → ${wantAdmin} (OWNER, password reset)` } : {}),
+    ...(strayEmployees.length
+      ? { alsoRemovingStaffRecords: strayEmployees.map((e) => `${e.code} ${e.name}`) }
+      : {}),
   };
 
   if (!body.confirm) {
@@ -102,11 +165,41 @@ export async function POST(req: Request) {
     });
   }
 
+  // Promote first. If the delete ran first and the promote then failed, the
+  // org would be left with one account nobody has the password to.
+  if (promote && wantAdmin && wantPassword) {
+    const clash = await db.user.findFirst({
+      where:  { email: wantAdmin, NOT: { id: promote.id } },
+      select: { id: true },
+    });
+    if (clash) {
+      return NextResponse.json(
+        { error: `Another account already uses ${wantAdmin}. Nothing was changed.` },
+        { status: 409 },
+      );
+    }
+    await db.user.update({
+      where: { id: promote.id },
+      data: {
+        email:              wantAdmin,
+        passwordHash:       await bcrypt.hash(wantPassword, 12),
+        role:               "OWNER",
+        status:             "ACTIVE",
+        mustChangePassword: false,
+      },
+    });
+  }
+
   const ids = doomed.map((u) => u.id);
   // Their staff records go with them: an Employee whose userId points at a
   // deleted login is a person who cannot sign in and whom nobody added.
-  const employees = await db.employee.deleteMany({ where: { userId: { in: ids } } });
-  const users     = await db.user.deleteMany({ where: { id: { in: ids } } });
+  // In admin mode this also takes the roster-only records listed above.
+  const employees = await db.employee.deleteMany({
+    where: strayEmployees.length
+      ? { id: { in: strayEmployees.map((e) => e.id) } }
+      : { userId: { in: ids } },
+  });
+  const users = await db.user.deleteMany({ where: { id: { in: ids } } });
 
   return NextResponse.json({
     ok: true,
