@@ -23,16 +23,24 @@ function ctxWith(perms: readonly string[]): RequestContext {
   };
 }
 
-describe("resolveNextAction — pre-order stages route to /invoicing/new", () => {
+// Destination changed on 2026-08-30. /invoicing/new is the order-backed
+// picker, which reports "no projects ready to invoice" for exactly these
+// pre-order stages — it was sending an owner to a page that told them
+// they could not do the thing they had just clicked. /invoicing/create
+// writes the invoice for the project directly.
+describe("resolveNextAction — pre-order stages route to /invoicing/create", () => {
   it.each(["ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION"])(
-    "stage=%s → CREATE_INVOICE routing to /invoicing/new?project=…",
+    "stage=%s → CREATE_INVOICE routing to /invoicing/create?project=…",
     (stage) => {
       const ctx = ctxWith(["project.view", "invoice.create"]);
       const a = resolveNextAction(ctx, { id: "p1", clientId: "c1", stage });
       expect(a.kind).toBe("CREATE_INVOICE");
       expect(a.label).toBe("Create invoice");
-      expect(a.href).toBe("/invoicing/new?project=p1");
+      expect(a.href).toBe("/invoicing/create?project=p1");
       expect(a.enabled).toBe(true);
+      // The page it must NOT point at — the one that stops on a
+      // pre-order project.
+      expect(a.href).not.toContain("/invoicing/new");
     },
   );
 
