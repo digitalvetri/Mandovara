@@ -24,7 +24,7 @@ const NEW_PWD = "OneTimeSpec_2026!";
 // Login card is a single password form now (PIN tab was collapsed in the
 // remote 030cc9a merge). No tab-switch needed.
 async function submitPasswordLogin(page: Page, email: string, password: string) {
-  await page.getByLabel(/email or mobile/i).fill(email);
+  await page.getByLabel(/email.*mobile/i).fill(email);
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
 }

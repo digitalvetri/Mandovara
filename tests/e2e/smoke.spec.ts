@@ -10,6 +10,6 @@ test("login page renders brand mark and sign-in prompt", async ({ page, context 
   await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
   // Login form has a Sign In button — always visible now that the PIN tab
   // was removed and the card is a single password form.
-  await expect(page.getByLabel(/email or mobile/i)).toBeVisible();
+  await expect(page.getByLabel(/email.*mobile/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 });

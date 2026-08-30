@@ -45,7 +45,7 @@ setup("authenticate as owner", async ({ page, context }) => {
   // No tab click: the login card is a single password form (upstream 9e218f9).
   async function attempt(password: string): Promise<boolean> {
     await page.goto("/login");
-    await page.getByLabel(/email or mobile/i).fill(OWNER_EMAIL);
+    await page.getByLabel(/email.*mobile/i).fill(OWNER_EMAIL);
     await page.getByLabel(/^password$/i).fill(password);
     await page.getByRole("button", { name: /sign in/i }).click();
     try {
@@ -78,7 +78,7 @@ setup("authenticate as owner", async ({ page, context }) => {
     await page.waitForURL(/\/login/, { timeout: 10_000 });
 
     // Log back in with the new password.
-    await page.getByLabel(/email or mobile/i).fill(OWNER_EMAIL);
+    await page.getByLabel(/email.*mobile/i).fill(OWNER_EMAIL);
     await page.getByLabel(/^password$/i).fill(OWNER_STABLE);
     await page.getByRole("button", { name: /sign in/i }).click();
     await page.waitForURL((url) =>
