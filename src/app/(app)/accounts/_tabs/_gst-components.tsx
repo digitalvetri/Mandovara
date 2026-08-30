@@ -37,7 +37,12 @@ export function Section({
         <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim font-medium">{title}</div>
         {action}
       </div>
-      {children}
+      {/* The card clips (overflow-hidden gives it its rounded corners), so
+          anything wider than the phone — every GST table in here is held at
+          480px — was cut off with no way to reach the rest. Scrolling the
+          body rather than each table means a table added later is covered
+          too, instead of repeating the same bug a fourth time. */}
+      <div className="overflow-x-auto">{children}</div>
     </div>
   );
 }

@@ -537,6 +537,42 @@ textarea:read-only {
   animation: draw-x 240ms var(--ease) 140ms backwards;
 }
 
+/* Touch devices: nothing hides behind a hover that can never happen.
+
+   Eleven controls are drawn at opacity-0 and revealed by group-hover — the
+   call and WhatsApp buttons on a client row, the delete on a catalogue row,
+   the pencil that shows a field is editable, the remove-line button on a
+   quotation. A finger produces no hover, so on a phone those controls are
+   not merely hard to find, they are invisible and unreachable.
+
+   Targeting the reveal utility itself rather than opacity-0 keeps this
+   exact: it turns on precisely the things that were meant to become
+   visible, and leaves anything deliberately transparent alone. */
+@media (hover: none) {
+  .group-hover\:opacity-100 { opacity: 1; }
+}
+
+/* Touch devices: form controls never below 16px.
+
+   iOS Safari zooms the whole page in when you focus a control whose text is
+   under 16px, then leaves it zoomed — every field in this app is 12–13.5px,
+   so tapping any input threw the layout sideways and the person had to pinch
+   back out to carry on. It is the most common mobile-web defect there is and
+   it is invisible on a desktop browser.
+
+   Scoped to coarse pointers so the desktop keeps its denser type, and
+   !important because the size comes from a utility class on each element,
+   which would otherwise win on specificity. Checkboxes and radios are
+   excluded — they have no text to zoom toward and sizing them here would
+   only distort the control. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

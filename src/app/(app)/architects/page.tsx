@@ -32,11 +32,12 @@ export default async function ArchitectsPage() {
         {rows.length === 0 ? (
           <div className="py-14 text-center">
             <div className="text-[14px] text-text mb-1">No architects yet.</div>
-            <div className="overflow-x-auto text-[11.5px] text-text-dim">
+            <div className="text-[11.5px] text-text-dim">
               Add a referral partner to auto-stamp commissions on their clients&apos; orders.
             </div>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="min-w-[480px] w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
@@ -81,6 +82,7 @@ export default async function ArchitectsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </>

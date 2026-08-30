@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { CheckCircle2, Clock, AlertCircle, ExternalLink, CheckSquare, CalendarClock, Inbox } from "lucide-react";
 import { CompleteButton } from "./CompleteButton";
-import { refHref, dueLabel, urgencyBorder, fmtDate, type Tab } from "../page";
+import { refHref, dueLabel, urgencyBorder, fmtDate, type Tab } from "../_task-helpers";
 
 export function AllView({
   overdue, today, upcoming, nameMap, todayUTC,
