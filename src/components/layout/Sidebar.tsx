@@ -79,7 +79,7 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
   {
     section: "System",
     items: [
-      { label: "Reports",       href: "/reports", icon: BarChart2   },
+      { label: "Reports",       href: "/reports", icon: BarChart2,   perm: "report.view.sales" },
       { label: "Admin & Roles", href: "/admin",   icon: ShieldCheck },
     ],
   },
@@ -209,9 +209,14 @@ export function Sidebar({ userName, userRole, permissions, isOwner }: SidebarPro
           a hair-thin scrollbar only when short viewports force it. */}
       <nav className="relative z-10 flex-1 min-h-0 overflow-y-auto rail-scroll px-3 py-2">
         {nav.map((section) => {
-          const visible = isOwner
-            ? section.items
-            : section.items.filter((item) => !item.perm || permissions.includes(item.perm));
+          // Filter by per-item perm regardless of owner flag. An OWNER user
+          // whose dynamic role happens to lack a specific permission would
+          // otherwise see a nav item that the destination page then bounces
+          // them from — always contradictory. `!item.perm` items (most of
+          // OWNER_NAV) still pass unconditionally.
+          const visible = section.items.filter(
+            (item) => !item.perm || permissions.includes(item.perm),
+          );
           if (visible.length === 0) return null;
           return (
             <div key={section.section} className="mb-3 first:mt-1">
