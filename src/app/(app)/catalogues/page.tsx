@@ -8,7 +8,7 @@ import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { listCataloguesByFamily } from "@/modules/catalog/catalogues-queries";
 import { AddCataloguesModal } from "./_components/AddCataloguesModal";
-import { CatalogueRow } from "./_components/CatalogueRow";
+import { CategorySection } from "./_components/CategorySection";
 import { LoadStarterListButton } from "./_components/LoadStarterListButton";
 
 export const dynamic = "force-dynamic";
@@ -34,27 +34,15 @@ export default async function CataloguesPage() {
       {total === 0 ? (
         <EmptyState canAdd={canAdd} />
       ) : (
-        <div className="space-y-6 pb-10">
+        <div className="space-y-3 pb-10">
           {groups.map((g) => (
-            <section key={g.family} className="rounded-[14px] bg-surface border border-rule shadow-sm overflow-hidden">
-              <header className="flex items-baseline justify-between px-5 py-3 border-b border-rule bg-ink/10">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim font-semibold">
-                  {g.label}
-                </div>
-                <div className="text-[11.5px] text-text-dim tabular">
-                  {g.rows.length}
-                </div>
-              </header>
-              <ul>
-                {g.rows.map((r) => (
-                  <CatalogueRow
-                    key={r.id}
-                    row={r}
-                    canDelete={canDelete}
-                  />
-                ))}
-              </ul>
-            </section>
+            <CategorySection
+              key={g.family}
+              family={g.family}
+              label={g.label}
+              rows={g.rows}
+              canDelete={canDelete}
+            />
           ))}
         </div>
       )}
