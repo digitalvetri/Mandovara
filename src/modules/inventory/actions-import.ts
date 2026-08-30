@@ -135,7 +135,9 @@ async function importOneRow(
         organizationId: orgId,
         designId:       design.id,
         code:           row.code,
-        colourName:     "Default",
+        // Import rows carry no colour info — echo the code so the DB
+        // field isn't a "Default" placeholder that leaks into every UI.
+        colourName:     row.code,
         sellUnit:       row.sellUnit,
       },
       select: { id: true },

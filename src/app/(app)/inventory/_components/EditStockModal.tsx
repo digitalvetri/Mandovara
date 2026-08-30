@@ -89,7 +89,7 @@ export function EditStockModal({ item, open, onClose }: Props) {
         <div className="mb-2 flex items-baseline justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate font-display text-[19px] font-semibold text-text">
-              {item.designName} — {item.colourName}
+              {item.designName}{item.colourName && item.colourName.toLowerCase() !== "default" && item.colourName.toLowerCase() !== item.designName.toLowerCase() ? ` — ${item.colourName}` : ""}
             </h2>
             <div className="mt-0.5 text-[11.5px] text-text-dim">
               <span className="tabular-nums">{item.code}</span>
