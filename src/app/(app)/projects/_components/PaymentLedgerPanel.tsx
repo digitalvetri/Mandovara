@@ -55,12 +55,12 @@ export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
 
       {/* Wide content scrolls inside itself — the page never goes sideways. */}
       <div className="overflow-x-auto rounded-[10px] border border-rule">
-        <table className="w-full min-w-[640px] border-collapse">
+        <table className="w-full md:min-w-[640px] border-collapse">
           <thead>
             <tr className="border-b border-rule bg-surface-2">
               <Th>Date</Th>
               <Th>Reference</Th>
-              <Th>Detail</Th>
+              <Th hide>Detail</Th>
               <Th right>Charged</Th>
               <Th right>Received</Th>
               <Th right>Balance</Th>
@@ -78,7 +78,7 @@ export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
                   </span>
                   <span className="tabular ml-2 text-[12px] text-text">{r.ref}</span>
                 </td>
-                <td className="px-3 py-2.5 text-[12px] text-text-dim">
+                <td className="hidden px-3 py-2.5 text-[12px] text-text-dim md:table-cell">
                   {r.label}
                   {r.note && <span className="ml-1.5 text-text-faint">· {r.note}</span>}
                 </td>
@@ -116,9 +116,9 @@ function Total({ k, v, tone = "text-text" }: { k: string; v: string; tone?: stri
   );
 }
 
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
+function Th({ children, right, hide }: { children: React.ReactNode; right?: boolean; hide?: boolean }) {
   return (
-    <th className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-dim ${right ? "text-right" : "text-left"}`}>
+    <th className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-dim ${right ? "text-right" : "text-left"} ${hide ? "hidden md:table-cell" : ""}`}>
       {children}
     </th>
   );

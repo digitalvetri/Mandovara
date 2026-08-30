@@ -90,21 +90,26 @@ export default async function ProjectDetailPage({
 
       {/* ── Header ────────────────────────────────────────────────── */}
       <div className="mb-4 rounded-[14px] border border-rule bg-surface p-5">
-        {/* Row 1 — meta + primary action (right-aligned) */}
-        <div className="flex items-start justify-between gap-4">
+        {/* Row 1 — meta + primary action (right-aligned)
+            Stacks on a phone. "Edit" and "Create quotation" together are
+            about 205px of the 350px a 390px screen leaves inside this card,
+            so side by side they squeezed the heading into ~145px: the
+            project number broke across three lines and the name across
+            four. They get their own row below the title instead. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-baseline gap-3 text-[11px] uppercase tracking-[0.14em] text-text-dim">
+            <div className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] uppercase tracking-[0.14em] text-text-dim">
               <span className="tabular-nums">{shortNumber(p.number, "P-")}</span>
               <span aria-hidden>·</span>
               <span>{formatDate(p.createdAt)}</span>
             </div>
 
-            <h1 className="font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.015em] text-text">
+            <h1 className="font-display text-[22px] font-semibold leading-[1.05] tracking-[-0.015em] text-text sm:text-[30px]">
               {p.name}
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {ctx.permissions.has("project.update") && (
               <a
                 href={`/projects/${p.id}/edit`}

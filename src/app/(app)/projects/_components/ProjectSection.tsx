@@ -53,12 +53,12 @@ export function ProjectSection({
 
   return (
     <section className="overflow-hidden rounded-[12px] border border-rule bg-surface">
-      <div className="flex items-center gap-2 px-4 sm:px-5">
+      <div className="flex flex-wrap items-center gap-x-2 px-4 sm:px-5">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left transition-colors hover:opacity-80"
+          className="flex min-w-0 flex-1 basis-full items-center gap-3 py-3.5 text-left transition-colors hover:opacity-80 sm:basis-auto"
         >
           <ChevronRight
             size={13}
@@ -73,7 +73,7 @@ export function ProjectSection({
             {summary}
           </span>
         </button>
-        {action && <div className="shrink-0 py-3.5">{action}</div>}
+        {action && <div className="shrink-0 pb-3.5 sm:py-3.5">{action}</div>}
       </div>
 
       {open && (
