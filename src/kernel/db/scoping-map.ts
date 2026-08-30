@@ -15,6 +15,8 @@ export const TENANT_SCOPED = new Set<string>([
   "Branch", "User", "NumberSequence", "AuditLog", "SavedView", "Setting",
   // catalog
   "Brand", "Collection", "Design", "Colourway", "Price", "ServiceRate",
+  // catalogues (plain reference name list — kept separate from catalog)
+  "Catalogue",
   // sample library
   "SampleBook", "SampleIssue",
   // CRM

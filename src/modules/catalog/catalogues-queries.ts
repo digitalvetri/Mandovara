@@ -1,6 +1,7 @@
-// Queries for the /catalogues listing page — a flat, name-only view of
-// every Collection organized by ProductFamily. Distinct from
-// listBrandsWithPdf(), which groups by brand for the PDF-management view.
+// Queries for /catalogues — the plain reference-list page. Reads from
+// the dedicated Catalogue model, NOT the Brand / Collection tree that
+// powers /products. See the "product catalog vs catalogues" note in
+// user memory — they are separate systems by design.
 
 import type { RequestContext } from "@/kernel/auth/context";
 import { scoped } from "@/kernel/db/scoped";
@@ -18,8 +19,6 @@ export interface FamilyGroup {
   rows:   CatalogueRow[];
 }
 
-// Display labels for ProductFamily enum values. Keep in sync with
-// FAMILY_LABELS in CollectionPdfRow.tsx (both are UI-only).
 export const FAMILY_LABEL: Record<ProductFamily, string> = {
   WALLPAPER:         "Wallpaper",
   CURTAIN_FABRIC:    "Curtain — main",
@@ -42,7 +41,6 @@ export const FAMILY_LABEL: Record<ProductFamily, string> = {
   SERVICE:           "Services",
 };
 
-// Order families for display — most-common categories first.
 const FAMILY_ORDER: readonly ProductFamily[] = [
   "WALLPAPER", "MURAL",
   "CURTAIN_FABRIC", "SHEER", "LINING",
@@ -55,19 +53,12 @@ const FAMILY_ORDER: readonly ProductFamily[] = [
   "ACCESSORY", "SERVICE",
 ];
 
-// The /catalogues page shows entries under the auto-managed "Catalogues"
-// brand only — not every Collection in the org. Keeps the paste-list page
-// scoped to what the operator added via Add / Load starter list, so
-// pre-existing brands (Platinum Range, Ready Stock, Fedora …) don't
-// bleed in.
-const CATALOGUES_BRAND_NAME = "Catalogues";
-
 export async function listCataloguesByFamily(
   ctx: RequestContext,
 ): Promise<FamilyGroup[]> {
   const db = scoped(ctx);
-  const rows = await db.collection.findMany({
-    where:   { isActive: true, brand: { name: CATALOGUES_BRAND_NAME } },
+  const rows = await db.catalogue.findMany({
+    where:   { isActive: true },
     orderBy: { name: "asc" },
     select:  { id: true, name: true, family: true },
   });
@@ -86,8 +77,6 @@ export async function listCataloguesByFamily(
       groups.push({ family, label: FAMILY_LABEL[family], rows: list });
     }
   }
-  // Any families we didn't order explicitly get appended (shouldn't happen
-  // — the enum is closed — but keeps behaviour deterministic).
   for (const [family, list] of byFamily.entries()) {
     if (!FAMILY_ORDER.includes(family)) {
       groups.push({ family, label: FAMILY_LABEL[family], rows: list });

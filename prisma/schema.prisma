@@ -590,6 +590,24 @@ model Collection {
   @@index([organizationId, family])
 }
 
+// Plain reference list of catalogue names the owner maintains via the
+// /catalogues page. Intentionally has no relation to Brand / Design /
+// Colourway — the owner said explicitly (2026-08-30) that Product
+// Catalog (/products) and Catalogues (/catalogues) are entirely
+// separate systems.
+model Catalogue {
+  id             String        @id @default(cuid())
+  organizationId String
+  name           String
+  family         ProductFamily
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, family])
+}
+
 model Design {
   id              String        @id @default(cuid())
   organizationId  String
