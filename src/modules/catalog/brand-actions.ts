@@ -15,6 +15,35 @@ import { scoped } from "@/kernel/db/scoped";
 import { PDFS_DIR } from "./pdf-paths";
 import { scanTransactionalRefs } from "./refs-scan";
 
+// Hide (or unhide) a brand from the /products view without touching
+// any collections, designs, colourways, PDFs or stock underneath. Sets
+// isActive to false so listBrandsWithPdf() skips the whole card. Useful
+// when the stock importer materialises a brand (BRAHMOS) whose designs
+// are already referenced by stock moves — a real delete would refuse,
+// but we still want the brand off Product Catalog.
+export async function setBrandHidden(
+  brandId: string,
+  hidden:  boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ctx = await devContext();
+    requirePermission(ctx, "catalog.update");
+    const db = scoped(ctx);
+
+    await db.brand.update({
+      where: { id: brandId },
+      data:  { isActive: !hidden },
+    });
+
+    revalidatePath("/products");
+    revalidatePath(`/products/brand/${brandId}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("setBrandHidden failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to toggle visibility." };
+  }
+}
+
 // Delete a brand and everything under it — collections, designs,
 // colourways, prices, stock balances. Empty (no designs / sample books)
 // by default; set cascade:true to also sweep populated collections.

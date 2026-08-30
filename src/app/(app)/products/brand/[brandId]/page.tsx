@@ -9,6 +9,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { CollectionPdfRow } from "./_components/CollectionPdfRow";
 import { NewCollectionForm } from "./_components/NewCollectionForm";
 import { DeleteBrandButton } from "./_components/DeleteBrandButton";
+import { HideBrandButton } from "./_components/HideBrandButton";
 import { WipeCollectionsButton } from "./_components/WipeCollectionsButton";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +90,12 @@ export default async function BrandCatalogPage({ params }: Props) {
                 collectionCount={totalCount}
                 designCount={designCount}
               />
+              {canWrite && (
+                <HideBrandButton
+                  brandId={brandId}
+                  brandName={brand.name}
+                />
+              )}
               <DeleteBrandButton
                 brandId={brandId}
                 brandName={brand.name}
