@@ -672,6 +672,21 @@ textarea:read-only {
   .auth-glass { background: rgba(255, 255, 255, 0.86); }
 }
 
+/* On a wide screen the sign-in form sits on a panel that is already white,
+   beside the brand column. Frost over white is invisible, and the ring and
+   shadow around it are then just noise — so the glass is dropped there and
+   kept for the phone, where it floats over moving colour. */
+@media (min-width: 1024px) {
+  .auth-glass-flat-lg,
+  .auth-glass.auth-glass-flat-lg {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 0;
+    box-shadow: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auth-aurora { animation: none; }
 }
