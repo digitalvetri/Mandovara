@@ -36,6 +36,12 @@ const updateVisitStatusSchema = z.object({
   status: z.enum(VISIT_STATUSES),
   observations: z.string().trim().max(2000).optional(),
   customerNotes: z.string().trim().max(2000).optional(),
+  // Where the person was standing when they closed the visit. The columns
+  // (checkInLat/Lng) and the detail page's "Checked in at" link both
+  // existed already; nothing had ever been able to write them, so the
+  // link never appeared on a single visit.
+  checkInLat: z.number().gte(-90).lte(90).optional(),
+  checkInLng: z.number().gte(-180).lte(180).optional(),
 });
 
 export async function createSiteVisit(
@@ -126,7 +132,7 @@ export async function updateSiteVisitStatus(
 
   const parsed = updateVisitStatusSchema.safeParse(input);
   if (!parsed.success) return zodError(parsed.error);
-  const { id, status, observations, customerNotes } = parsed.data;
+  const { id, status, observations, customerNotes, checkInLat, checkInLng } = parsed.data;
 
   const db = scoped(ctx);
 
@@ -154,6 +160,11 @@ export async function updateSiteVisitStatus(
         ...(status === "COMPLETED"   ? { completedAt: new Date() }  : {}),
         ...(observations    !== undefined ? { observations }    : {}),
         ...(customerNotes   !== undefined ? { customerNotes }   : {}),
+        // Both or neither — half a coordinate is not a location, and the
+        // detail page builds a maps link out of the pair.
+        ...(checkInLat !== undefined && checkInLng !== undefined
+          ? { checkInLat, checkInLng }
+          : {}),
       },
       select: { id: true, projectId: true, purpose: true },
     });

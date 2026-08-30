@@ -39,8 +39,8 @@ export default async function SiteVisitDetailPage({
   return (
     <>
       <Topbar
-        title={visit.number}
-        eyebrow={`${visit.purpose} · ${visit.status.replace(/_/g, " ").toLowerCase()}`}
+        title={visit.projectName ?? visit.leadName ?? "Site visit"}
+        eyebrow={`${visit.number} · ${visit.purpose}`}
         actions={
           <Link
             href={"/site-visits" as Route}
@@ -57,15 +57,14 @@ export default async function SiteVisitDetailPage({
         <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
           <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
             <div>
+              {/* The name moved up into the page title — repeating it here
+                  gave the page two headings and no client. */}
               <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim mb-1">
-                {visit.purpose}
+                Client
               </div>
-              <div className="font-display text-[22px] font-semibold text-text leading-tight">
-                {visit.projectName ?? visit.leadName ?? "Site visit"}
+              <div className="text-[14px] font-medium text-text">
+                {visit.clientName ?? "—"}
               </div>
-              {visit.clientName && (
-                <div className="text-[12px] text-text-dim mt-0.5">{visit.clientName}</div>
-              )}
             </div>
             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium ${STATUS_CHIP[visit.status] ?? "bg-surface-2 text-text-dim"}`}>
               {visit.status.replace(/_/g, " ")}
@@ -124,17 +123,24 @@ export default async function SiteVisitDetailPage({
           <StockStatusPanel ctx={ctx} projectId={visit.projectId} />
         )}
 
-        {/* Notes */}
-        {(hasObserved || hasCustomer) && (
-          <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <FileText size={13} strokeWidth={1.75} className="text-text-dim" />
-              <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">Notes</div>
+        {/* What the person who went recorded.
+            Always rendered, including when it is empty: this section used
+            to disappear entirely if nothing had been written, so a visit
+            closed with no notes looked identical to one whose notes had
+            failed to load. It also names the person, because "who saw
+            this" is the first question the office asks. */}
+        <section className="rounded-[14px] bg-surface border border-rule p-5 md:p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText size={13} strokeWidth={1.75} className="text-text-dim" />
+            <div className="text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
+              {visit.assignedTo}&rsquo;s report
             </div>
+          </div>
+          {hasObserved || hasCustomer ? (
             <div className="space-y-4">
               {hasObserved && (
                 <div>
-                  <div className="text-[11px] text-text-dim mb-1">Observations</div>
+                  <div className="text-[11px] text-text-dim mb-1">What they saw on site</div>
                   <p className="text-[13px] text-text leading-relaxed whitespace-pre-wrap">
                     {visit.observations}
                   </p>
@@ -142,15 +148,20 @@ export default async function SiteVisitDetailPage({
               )}
               {hasCustomer && (
                 <div>
-                  <div className="text-[11px] text-text-dim mb-1">Customer said</div>
+                  <div className="text-[11px] text-text-dim mb-1">What the client said</div>
                   <p className="text-[13px] text-text leading-relaxed whitespace-pre-wrap">
                     {visit.customerNotes}
                   </p>
                 </div>
               )}
             </div>
-          </section>
-        )}
+          ) : (
+            <p className="text-[12.5px] text-text-faint">
+              Nothing written down for this visit yet. Notes are entered when the
+              visit is marked completed.
+            </p>
+          )}
+        </section>
 
         {/* Photos */}
         {hasPhotos && (
