@@ -42,6 +42,8 @@ import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
 import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
 import { ProjectWorkSections } from "../_components/ProjectWorkSections";
 import { getProjectLedger } from "@/modules/projects/queries-ledger";
+import { AttachmentsCard } from "@/components/documents/AttachmentsCard";
+import { listAttachments } from "@/modules/documents/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +55,14 @@ export default async function ProjectDetailPage({
   const p = await getProject(ctx, id);
   if (!p) notFound();
 
-  const [rounds, money, visits, payments, ledger] =
+  const [rounds, money, visits, payments, ledger, attachments] =
     await Promise.all([
       getProjectMeasurements(ctx, id),
       getProjectMoney(ctx, id),
       listSiteVisits(ctx, { projectId: id, limit: 10 }),
       getProjectPayments(ctx, id),
       getProjectLedger(ctx, id),
+      listAttachments(ctx, "PROJECT", id),
     ]);
 
   const action = resolveNextAction(ctx, {
@@ -212,6 +215,18 @@ export default async function ProjectDetailPage({
             branchId={p.branchId}
             canCreateInvoice={ctx.permissions.has("invoice.create")}
             canUpdate={ctx.permissions.has("project.update")}
+          />
+
+          {/* Site photos and drawings for the project, alongside the ones
+              captured against individual measurement items. */}
+          <AttachmentsCard
+            ownerType="PROJECT"
+            ownerId={p.id}
+            rows={attachments}
+            canEdit={ctx.permissions.has("project.update")}
+            title="Site photos & files"
+            hint="Site shots, drawings and documents for this project."
+            defaultCategory="SITE_SHOT"
           />
         </div>
 

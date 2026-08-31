@@ -19,6 +19,8 @@ import { ClientMeasurementsCard } from "../_components/ClientMeasurementsCard";
 import { ContactsCard } from "../_components/ContactsCard";
 import { ClientLedgerPanel, type InvoiceLedgerRow, type ReceiptLedgerRow } from "../_components/ClientLedgerPanel";
 import { DeleteClientAction } from "../_components/DeleteClientAction";
+import { AttachmentsCard } from "@/components/documents/AttachmentsCard";
+import { listAttachments } from "@/modules/documents/queries";
 
 const STAGE_LABEL: Record<string, string> = {
   ENQUIRY: "Enquiry", MEASUREMENT: "Measurement", QUOTATION: "Quotation",
@@ -46,11 +48,12 @@ export default async function ClientDetailPage({
     ctx.permissions.has("measurement.create");
   const canViewMeasurement = ctx.permissions.has("measurement.view");
 
-  const [quotations, measurementRounds] = await Promise.all([
+  const [quotations, measurementRounds, attachments] = await Promise.all([
     listQuotationsForClient(ctx, client.id),
     canViewMeasurement
       ? listRoundsForClient(ctx, client.id, 10).catch((): ClientRoundRow[] => [])
       : Promise.resolve<ClientRoundRow[]>([]),
+    listAttachments(ctx, "CLIENT", client.id),
   ]);
 
   const canCreateReceipt = ctx.permissions.has("receipt.create");
@@ -217,6 +220,17 @@ export default async function ClientDetailPage({
               canRecord={canCreateReceipt && !!defaultBranch}
             />
           )}
+
+          {/* Anything that belongs with the client but isn't a quote, an
+              invoice or a measurement: a signed approval, a reference shot
+              the client sent on WhatsApp, a floor plan. */}
+          <AttachmentsCard
+            ownerType="CLIENT"
+            ownerId={client.id}
+            rows={attachments}
+            canEdit={ctx.permissions.has("client.update")}
+            hint="Reference images, floor plans, signed approvals — anything that belongs with this client."
+          />
 
           <ClientFollowUpForm clientId={client.id} />
 
