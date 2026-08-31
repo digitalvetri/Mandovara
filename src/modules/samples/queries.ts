@@ -58,6 +58,7 @@ export async function listSampleBooks(
             brand: { select: { name: true } },
           },
         },
+        catalogue: { select: { name: true } },
         issues: {
           where: { returnedAt: null },
           orderBy: { issuedAt: "desc" },
@@ -67,6 +68,7 @@ export async function listSampleBooks(
             clientId: true,
             architectId: true,
             userId: true,
+            holderName: true,
             issuedAt: true,
             dueAt: true,
           },
@@ -117,15 +119,21 @@ export async function listSampleBooks(
       if (issue.architectId) holderName = archName.get(issue.architectId) ?? null;
       if (issue.userId)      holderName = userName.get(issue.userId) ?? null;
 
-      const dueMs = now.getTime() - issue.dueAt.getTime();
-      if (dueMs > 0) daysOverdue = Math.ceil(dueMs / 86_400_000);
+      // A loan with no agreed return date cannot be overdue — a catalogue
+      // handed to a walk-in usually has none.
+      if (issue.dueAt) {
+        const dueMs = now.getTime() - issue.dueAt.getTime();
+        if (dueMs > 0) daysOverdue = Math.ceil(dueMs / 86_400_000);
+      }
+      // Falls back to the snapshot for a holder whose record has gone.
+      holderName ??= issue.holderName ?? null;
     }
 
     return {
       id: b.id,
       barcode: b.barcode,
-      collectionName: b.collection.name,
-      brandName: b.collection.brand.name,
+      collectionName: b.collection?.name ?? b.catalogue?.name ?? "—",
+      brandName: b.collection?.brand.name ?? (b.catalogue ? "Studio catalogue" : "—"),
       costValue: b.costValue,
       status: b.status,
       holderType,

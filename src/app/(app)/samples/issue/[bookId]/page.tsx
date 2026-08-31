@@ -21,6 +21,7 @@ export default async function IssueSamplePage({
         barcode: true,
         status:  true,
         collection: { select: { name: true, brand: { select: { name: true } } } },
+        catalogue:  { select: { name: true } },
       },
     }),
     db.client.findMany({
@@ -77,7 +78,11 @@ export default async function IssueSamplePage({
     <>
       <Topbar
         title={`Issue sample — ${book.barcode}`}
-        eyebrow={`${book.collection.brand.name} · ${book.collection.name}`}
+        eyebrow={
+          book.collection
+            ? `${book.collection.brand.name} · ${book.collection.name}`
+            : book.catalogue?.name ?? "Studio catalogue"
+        }
       />
 
       <div className="max-w-lg">

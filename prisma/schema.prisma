@@ -604,9 +604,12 @@ model Catalogue {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @default(now()) @updatedAt
 
+  books SampleBook[]
+
   @@unique([organizationId, name])
   @@index([organizationId, family])
 }
+
 
 model Design {
   id              String        @id @default(cuid())
@@ -695,18 +698,33 @@ model ServiceRate {
 
 // ─── SAMPLE LIBRARY ──────────────────────────────────────────────────────────
 
+// A lendable physical book.
+//
+// Originally this was always a barcoded supplier book hanging off a
+// Collection. The studio's own shelf is the Catalogue list — 694 of them —
+// and the owner asked for "like library book management" on THAT list.
+//
+// Rather than a second issue/return ledger (CLAUDE.md #14), a SampleBook
+// now points at EITHER a Collection or a Catalogue. SampleIssue, which is
+// the ledger, is untouched: one table records every loan of every book,
+// whichever shelf it came from.
 model SampleBook {
   id             String       @id @default(cuid())
   organizationId String
-  collectionId   String
+  /** Set for a barcoded supplier book. Null for a studio catalogue. */
+  collectionId   String?
+  /** Set for one of the studio's own catalogues. Null for a supplier book. */
+  catalogueId    String?      @unique
   barcode        String
-  costValue      BigInt
+  costValue      BigInt       @default(0)
   status         SampleStatus @default(IN_LIBRARY)
 
-  collection Collection    @relation(fields: [collectionId], references: [id])
+  collection Collection?   @relation(fields: [collectionId], references: [id])
+  catalogue  Catalogue?    @relation(fields: [catalogueId], references: [id], onDelete: Cascade)
   issues     SampleIssue[]
 
   @@unique([organizationId, barcode])
+  @@index([organizationId, status])
 }
 
 model SampleIssue {
@@ -718,9 +736,14 @@ model SampleIssue {
   architectId    String?
   userId         String?
   issuedAt       DateTime  @default(now())
-  dueAt          DateTime
+  /** Null when no return date was agreed — common for a catalogue lent to
+   *  a walk-in. Overdue is only computed for loans that have one. */
+  dueAt          DateTime?
   returnedAt     DateTime?
   depositAmount  BigInt    @default(0)
+  /** Snapshot of who took it, so the row still reads correctly after the
+   *  client is renamed or removed. */
+  holderName     String?
   notes          String?
 
   book SampleBook @relation(fields: [sampleBookId], references: [id])
