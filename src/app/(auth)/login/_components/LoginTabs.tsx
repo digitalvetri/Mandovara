@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { devLoginByCredential } from "@/lib/dev-auth";
-import { Loader2, Eye, EyeOff, ArrowRight, Info } from "lucide-react";
+import { Loader2, Eye, EyeOff, ArrowRight, Info, ShieldCheck } from "lucide-react";
 import { MandovaraLogo } from "./MandovaraLogo";
 import { CredentialsPanel, DEFAULT_PASSWORD } from "./CredentialsPanel";
 
@@ -73,7 +73,7 @@ export function LoginCard() {
 
       {/* Logo */}
       <div className="rise mb-7">
-        <MandovaraLogo />
+        <MandovaraLogo studio />
       </div>
 
       {/* Heading — each block enters just behind the one above it, so the
@@ -94,7 +94,7 @@ export function LoginCard() {
         </h1>
         <p
           className="mt-2.5 leading-snug"
-          style={{ color: "#5A7A78", fontSize: "clamp(13.5px, 3.6vw, 14.5px)" }}
+          style={{ color: "#4F6E6C", fontSize: "clamp(13.5px, 3.6vw, 14.5px)" }}
         >
           Sign in to your Mandovara Studio Console
         </p>
@@ -264,12 +264,23 @@ export function LoginCard() {
         </button>
       </form>
 
-      {/* Footer */}
+      {/* Footer. The padlock is not decoration: sessions are a signed HMAC
+          cookie over TLS, and a studio owner typing a password into a
+          browser they were sent a link to is entitled to see it said. */}
       <div
-        className="mt-8 lg:mt-10 pt-5 text-center text-[10.5px]"
-        style={{ borderTop: "1px solid #E2F0EE", color: "#8AACAA" }}
+        className="mt-8 pt-5 lg:mt-10"
+        style={{ borderTop: "1px solid #E2F0EE" }}
       >
-        Mandovara Business Solutions · RS Puram, Coimbatore
+        <div
+          className="flex items-center justify-center gap-1.5 text-[11px] font-medium"
+          style={{ color: "#3D7268" }}
+        >
+          <ShieldCheck size={13} strokeWidth={1.9} />
+          Secure sign-in
+        </div>
+        <div className="mt-2 text-center text-[10.5px]" style={{ color: "#557472" }}>
+          Mandovara Business Solutions · RS Puram, Coimbatore
+        </div>
       </div>
     </div>
   );

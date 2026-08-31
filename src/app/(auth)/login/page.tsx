@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ClipboardCheck, Users, Award, MapPin } from "lucide-react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LoginCard } from "./_components/LoginTabs";
@@ -30,10 +31,13 @@ export const dynamic = "force-dynamic";
 // field text, the error state — is solved against a light ground for §6.2's
 // 4.5:1 floor; tinting the panel dark would break all of them at once.
 
+// The proof strip. Ten years of actual trading — a furnishing house is
+// judged on how much it has hung, not on adjectives. Static copy, not a
+// live count, so the figures carry a "+" rather than pretending to be exact.
 const CLAIMS = [
-  { figure: "1,200", caption: "projects delivered" },
-  { figure: "1,000", caption: "clients" },
-  { figure: "22",    caption: "supplier brands" },
+  { Icon: ClipboardCheck, figure: "1,200+", caption: "Projects Delivered" },
+  { Icon: Users,          figure: "1,000+", caption: "Happy Clients" },
+  { Icon: Award,          figure: "22+",    caption: "Supplier Brands" },
 ];
 
 export default async function LoginPage() {
@@ -103,25 +107,35 @@ export default async function LoginPage() {
             </p>
           </div>
 
-          {/* The proof strip. Ten years of actual trading, in mono — a
-              furnishing house is judged on how much it has hung, not on
-              adjectives. Static copy, not a live count. */}
           <div className="rise" style={{ "--d": "180ms" } as React.CSSProperties}>
-            <div className="on-chrome-rule mb-6 h-px" />
-            <dl className="mb-7 flex flex-wrap gap-x-12 gap-y-5">
-              {CLAIMS.map(({ figure, caption }) => (
-                <div key={caption}>
-                  <dt className="font-data text-[22px] leading-none tabular-nums text-sidebar-text">
-                    {figure}
-                  </dt>
-                  <dd className="mt-1.5 text-[10.5px] tracking-[0.04em] text-sidebar-dim">
-                    {caption}
-                  </dd>
+            <div className="on-chrome-rule mb-7 h-px" />
+            <dl className="mb-8 flex flex-wrap gap-x-10 gap-y-6 xl:gap-x-14">
+              {CLAIMS.map(({ Icon, figure, caption }) => (
+                <div key={caption} className="flex items-center gap-3">
+                  <span
+                    aria-hidden
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
+                    style={{
+                      border: "1px solid color-mix(in oklab, var(--color-accent) 38%, transparent)",
+                      background: "color-mix(in oklab, var(--color-accent) 10%, transparent)",
+                    }}
+                  >
+                    <Icon size={17} strokeWidth={1.6} className="text-accent-chrome" />
+                  </span>
+                  <div>
+                    <dt className="font-data text-[20px] leading-none tabular-nums text-sidebar-text">
+                      {figure}
+                    </dt>
+                    <dd className="mt-1.5 text-[10.5px] tracking-[0.04em] text-sidebar-dim">
+                      {caption}
+                    </dd>
+                  </div>
                 </div>
               ))}
             </dl>
-            <div className="text-[10.5px] tracking-[0.04em] text-sidebar-dim opacity-70">
-              32 Thirumoorthy Layout, RS Puram &middot; Coimbatore 641002
+            <div className="flex items-start gap-2 text-[10.5px] leading-[1.6] tracking-[0.04em] text-sidebar-dim opacity-70">
+              <MapPin size={12} strokeWidth={1.7} className="mt-[1px] shrink-0" />
+              <span>32 Thirumoorthy Layout, RS Puram &middot; Coimbatore 641002</span>
             </div>
           </div>
         </div>
@@ -151,8 +165,11 @@ export default async function LoginPage() {
           }}
         />
 
-        {/* Desktop ground: flat white, and the seam against the brand column. */}
-        <div aria-hidden className="absolute inset-0 hidden bg-white lg:block" />
+        {/* Desktop ground: warm ivory rather than flat white, so the panel
+            reads as paper beside the deep green column instead of as a hole
+            cut out of it. #FCFAF6 against #3A5A58 body copy is 8.9:1 — the
+            §6.2 floor is unaffected by the warmth. */}
+        <div aria-hidden className="absolute inset-0 hidden bg-[#FCFAF6] lg:block" />
         <div aria-hidden className="absolute inset-y-0 left-0 hidden w-px bg-[#E0EEEC] lg:block" />
 
         <div
@@ -167,6 +184,34 @@ export default async function LoginPage() {
               <Suspense>
                 <LoginCard />
               </Suspense>
+            </div>
+
+            {/* Below lg the brand column is hidden, so the page would
+                otherwise say nothing about who this is beyond a logo. The
+                same three figures, compact, on the canvas under the card —
+                and gone again the moment the full column is available. */}
+            <div className="mt-7 lg:hidden">
+              <div className="flex items-center justify-center gap-x-7 gap-y-4 sm:gap-x-10">
+                {CLAIMS.map(({ Icon, figure, caption }) => (
+                  <div key={caption} className="text-center">
+                    <Icon
+                      size={15}
+                      strokeWidth={1.6}
+                      aria-hidden
+                      className="mx-auto mb-1.5 text-accent-chrome"
+                    />
+                    <div className="font-data text-[15px] leading-none tabular-nums text-sidebar-text">
+                      {figure}
+                    </div>
+                    <div className="mt-1 text-[10px] tracking-[0.04em] text-sidebar-dim">
+                      {caption}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 text-center text-[10px] tracking-[0.04em] text-sidebar-dim opacity-70">
+                32 Thirumoorthy Layout, RS Puram &middot; Coimbatore 641002
+              </div>
             </div>
           </div>
         </div>
