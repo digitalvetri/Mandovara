@@ -132,7 +132,7 @@ export async function recordCommissionPayment(
         after: { paidAt: paidAtDate.toISOString(), paymentRef },
       },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   safeRevalidate("/architects");
   safeRevalidate(`/architects/${c.architectId}`);
@@ -173,7 +173,7 @@ export async function cancelCommission(
         after: { reason },
       },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   safeRevalidate("/architects");
   safeRevalidate(`/architects/${c.architectId}`);

@@ -68,7 +68,7 @@ export async function getProjectMilestones(
         projectId,
         families:  [],
       });
-    });
+    }, { orgId: ctx.orgId });
   }
 
   const rows = await db.milestone.findMany({

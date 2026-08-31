@@ -154,7 +154,7 @@ export async function updateProduct(input: unknown): Promise<ActionResult<{ id: 
         },
       });
     }
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/products");
   revalidatePath(`/products/${id}`);

@@ -77,7 +77,7 @@ export async function assignTaskToUser(
       },
       select: { id: true, number: true },
     });
-  });
+  }, { orgId: ctx.orgId });
 
   if (d.projectId) revalidatePath(`/projects/${d.projectId}`);
   revalidatePath("/employee");

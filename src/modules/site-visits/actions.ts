@@ -108,7 +108,7 @@ export async function createSiteVisit(
       }
 
       return { ...visit, stageAdvanced };
-    });
+    }, { orgId: ctx.orgId });
 
     revalidatePath("/site-visits");
     revalidatePath("/projects");

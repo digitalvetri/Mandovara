@@ -319,7 +319,7 @@ export async function createQuickQuote(
     });
 
     return { quotationId: q.id, projectId, measurementId };
-  });
+  }, { orgId: ctx.orgId });
 
   if (isLeadScoped) revalidatePath(`/leads/${d.leadId!}`);
   else              revalidatePath(`/clients/${d.clientId!}`);

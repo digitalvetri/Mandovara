@@ -80,7 +80,7 @@ export async function createProject(input: unknown): Promise<ActionResult<{ id: 
     });
 
     return project;
-  });
+  }, { orgId: ctx.orgId });
 
   revalidatePath("/projects");
   return { ok: true, data: created };
@@ -238,7 +238,7 @@ export async function addTask(input: unknown): Promise<ActionResult<{ id: string
       },
       select: { id: true },
     });
-  });
+  }, { orgId: ctx.orgId });
   revalidatePath(`/projects/${d.projectId}`);
   return { ok: true, data: created };
 }
