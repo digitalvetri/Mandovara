@@ -190,7 +190,7 @@ export default async function LoginPage() {
                 otherwise say nothing about who this is beyond a logo. The
                 same three figures, compact, on the canvas under the card —
                 and gone again the moment the full column is available. */}
-            <div className="mt-7 lg:hidden">
+            <div className="mt-6 sm:mt-7 lg:hidden">
               <div className="flex items-center justify-center gap-x-7 gap-y-4 sm:gap-x-10">
                 {CLAIMS.map(({ Icon, figure, caption }) => (
                   <div key={caption} className="text-center">

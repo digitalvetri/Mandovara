@@ -658,18 +658,41 @@ textarea:read-only {
    and tinting the glass dark to look moody would break every one of
    them. backdrop-filter is progressive — where it is unsupported the
    rgba background alone still gives an opaque, legible card. */
+/* Frosted sign-in card, for the phone.
+   0.78 white, not the 0.94 it was: at 0.94 the blur had almost nothing
+   left to show through and the card read as flat white with a shadow.
+   0.78 is the floor, and it is a contrast floor rather than a taste one —
+   the card composites over the drifting canvas, so its effective ground
+   ranges rgb(199,203,203) at the darkest corner to rgb(199,226,223) under
+   the accent pool. Every text colour in the card is solved against the
+   DARKER of those (see LoginTabs.tsx). Going lower moves the muted text
+   below 4.5:1 and there is no colour that fixes it without flattening the
+   heading and the body copy into the same value.
+   The two-stop sheen and the brighter top edge are what actually read as
+   glass — a pane catches light along its top edge, and that is the cue
+   the flat fill was missing. */
 .auth-glass {
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(26px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.86) 0%,
+      rgba(255, 255, 255, 0.74) 46%,
+      rgba(255, 255, 255, 0.80) 100%
+    );
+  backdrop-filter: blur(30px) saturate(175%);
+  -webkit-backdrop-filter: blur(30px) saturate(175%);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-top-color: rgba(255, 255, 255, 0.9);
   box-shadow:
-    0 24px 60px -12px rgba(6, 26, 24, 0.45),
-    0 2px 8px rgba(6, 26, 24, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 28px 64px -14px rgba(6, 26, 24, 0.5),
+    0 2px 10px rgba(6, 26, 24, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.25);
 }
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .auth-glass { background: rgba(255, 255, 255, 0.86); }
+/* Without backdrop-filter there is nothing to frost, so the fill has to
+   carry the card on its own — opaque enough to stay legible. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .auth-glass { background: rgba(255, 255, 255, 0.95); }
 }
 
 /* On a wide screen the sign-in form sits on a panel that is already white,

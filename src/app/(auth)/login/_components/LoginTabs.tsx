@@ -72,13 +72,13 @@ export function LoginCard() {
     <div className="w-full">
 
       {/* Logo */}
-      <div className="rise mb-7">
+      <div className="rise mb-6 sm:mb-7">
         <MandovaraLogo studio />
       </div>
 
       {/* Heading — each block enters just behind the one above it, so the
           card assembles rather than appearing all at once. */}
-      <div className="rise mb-7" style={{ "--d": "70ms" } as React.CSSProperties}>
+      <div className="rise mb-6 sm:mb-7" style={{ "--d": "70ms" } as React.CSSProperties}>
         <h1
           style={{
             color: "#0F2A28",
@@ -87,14 +87,14 @@ export function LoginCard() {
             letterSpacing: "-0.02em",
             lineHeight: 1.1,
             margin: 0,
-            fontSize: "clamp(26px, 7vw, 32px)",
+            fontSize: "clamp(22px, 6vw, 32px)",
           }}
         >
           Welcome back
         </h1>
         <p
           className="mt-2.5 leading-snug"
-          style={{ color: "#4F6E6C", fontSize: "clamp(13.5px, 3.6vw, 14.5px)" }}
+          style={{ color: "#375653", fontSize: "clamp(12.5px, 3.4vw, 14.5px)" }}
         >
           Sign in to your Mandovara Studio Console
         </p>
@@ -102,7 +102,7 @@ export function LoginCard() {
 
       <form
         onSubmit={handleSubmit}
-        className="rise space-y-5"
+        className="rise space-y-4 sm:space-y-5"
         style={{ "--d": "140ms" } as React.CSSProperties}
       >
 
@@ -111,8 +111,8 @@ export function LoginCard() {
           <div className="flex items-center justify-between mb-2">
             <label
               htmlFor="cred"
-              className="text-[11px] font-semibold tracking-[0.08em] uppercase"
-              style={{ color: "#3A5A58" }}
+              className="text-[10px] sm:text-[11px] font-semibold tracking-[0.08em] uppercase"
+              style={{ color: "#2F4E4C" }}
             >
               Email, mobile or code
             </label>
@@ -121,7 +121,7 @@ export function LoginCard() {
                 type="button"
                 onClick={() => setShowCreds((v) => !v)}
                 className="flex items-center gap-1 text-[10.5px] font-medium transition-opacity hover:opacity-70"
-                style={{ color: "#2BA89A" }}
+                style={{ color: "#14564C" }}
                 suppressHydrationWarning
               >
                 <Info size={10} strokeWidth={2.2} />
@@ -166,15 +166,15 @@ export function LoginCard() {
           <div className="flex items-center justify-between mb-2">
             <label
               htmlFor="pwd"
-              className="text-[11px] font-semibold tracking-[0.08em] uppercase"
-              style={{ color: "#3A5A58" }}
+              className="text-[10px] sm:text-[11px] font-semibold tracking-[0.08em] uppercase"
+              style={{ color: "#2F4E4C" }}
             >
               Password
             </label>
             <a
               href="/forgot-password"
               className="text-[11.5px] font-medium transition-opacity hover:opacity-70"
-              style={{ color: "#2BA89A" }}
+              style={{ color: "#14564C" }}
               suppressHydrationWarning
             >
               Forgot password?
@@ -208,7 +208,7 @@ export function LoginCard() {
               tabIndex={-1}
               onClick={() => setShowPwd((v) => !v)}
               className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-[10px] transition-opacity hover:opacity-70"
-              style={{ color: "#7A9A98" }}
+              style={{ color: "#5F7F7D" }}
               aria-label={showPwd ? "Hide password" : "Show password"}
             >
               {showPwd
@@ -240,7 +240,7 @@ export function LoginCard() {
           disabled={pending}
           className={[
             "group/cta w-full h-[56px] mt-1.5 rounded-[14px]",
-            "flex items-center justify-center gap-2.5 font-semibold text-[15.5px]",
+            "flex items-center justify-center gap-2.5 font-semibold text-[14px] sm:text-[15.5px]",
             "transition-all duration-200 press",
             pending
               ? "bg-surface-hover text-text-subtle border border-rule cursor-not-allowed"
@@ -268,17 +268,17 @@ export function LoginCard() {
           cookie over TLS, and a studio owner typing a password into a
           browser they were sent a link to is entitled to see it said. */}
       <div
-        className="mt-8 pt-5 lg:mt-10"
+        className="mt-7 pt-4 sm:mt-8 sm:pt-5 lg:mt-10"
         style={{ borderTop: "1px solid #E2F0EE" }}
       >
         <div
           className="flex items-center justify-center gap-1.5 text-[11px] font-medium"
-          style={{ color: "#3D7268" }}
+          style={{ color: "#2F4E4C" }}
         >
           <ShieldCheck size={13} strokeWidth={1.9} />
           Secure sign-in
         </div>
-        <div className="mt-2 text-center text-[10.5px]" style={{ color: "#557472" }}>
+        <div className="mt-2 text-center text-[10.5px]" style={{ color: "#375653" }}>
           Mandovara Business Solutions · RS Puram, Coimbatore
         </div>
       </div>

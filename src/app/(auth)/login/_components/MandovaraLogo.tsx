@@ -36,13 +36,13 @@ export function MandovaraLogo({ studio = false }: { studio?: boolean }) {
             verticalAlign: "super",
             letterSpacing: 0,
             marginLeft: 2,
-            color: "#4F6E6C",
+            color: "#375653",
           }}>™</sup>
         </div>
         {studio && (
           <div style={{
             marginTop: 5,
-            color: "#557472",
+            color: "#375653",
             fontSize: 9.5,
             fontWeight: 600,
             letterSpacing: "0.19em",
