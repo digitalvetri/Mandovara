@@ -172,13 +172,19 @@ export async function listQuotations(
       select: {
         id: true, number: true, date: true, validUntil: true, status: true, total: true,
         clientId: true, ownerId: true,
-        project: {
-          select: {
-            id: true,
-            name: true,
-            client: { select: { name: true, mobile: true } },
-          },
-        },
+        // Deliberately NOT nesting `client` through the project.
+        //
+        // Project.client is a REQUIRED relation in the schema, so Prisma
+        // asserts a row came back for it. Under scoped()/RLS the join can
+        // legitimately return nothing — a client outside the caller's org
+        // or hidden by a row policy — and Prisma then fails the whole
+        // findMany with "Inconsistent query result: Field client is
+        // required to return data, got null instead". That took the entire
+        // quotations list down over one unreachable client row.
+        //
+        // Fetching clients separately by id (same shape as the owner
+        // lookup below) keeps a missing row to a single dash in one cell.
+        project: { select: { id: true, name: true, clientId: true } },
         _count: { select: { lines: true } },
       },
     }),
@@ -190,6 +196,15 @@ export async function listQuotations(
     ? await db.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })
     : [];
   const userMap = new Map(users.map((u) => [u.id, u.name]));
+
+  const clientIds = [...new Set(rows.map((r) => r.project?.clientId).filter((v): v is string => v != null))];
+  const clients = clientIds.length > 0
+    ? await db.client.findMany({
+        where: { id: { in: clientIds } },
+        select: { id: true, name: true, mobile: true },
+      })
+    : [];
+  const clientMap = new Map(clients.map((c) => [c.id, c]));
 
   const now = new Date();
   const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
@@ -214,8 +229,10 @@ export async function listQuotations(
         id: r.id,
         number: r.number,
         clientId: r.clientId,
-        clientName: r.project.client.name,
-        clientMobile: r.project.client.mobile,
+        // A client the caller cannot see costs this row its name and
+        // number, not the page.
+        clientName: clientMap.get(r.project.clientId)?.name ?? "—",
+        clientMobile: clientMap.get(r.project.clientId)?.mobile ?? "",
         projectId: r.project.id,
         projectName: r.project.name,
         date: r.date,

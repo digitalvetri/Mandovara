@@ -53,7 +53,11 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
       setError("Enter where this goes — a room, a wall, or a window.");
       return;
     }
-    const quantity = parseInt(qty, 10);
+    // Blank means one. The field is seeded with "1", so clearing it to type
+    // over it and then tabbing away is the common path, not a mistake — and
+    // this form is for someone who should not have to think about it. A real
+    // value that is wrong (0, -2, "abc") still gets told.
+    const quantity = qty.trim() === "" ? 1 : parseInt(qty, 10);
     if (!Number.isFinite(quantity) || quantity < 1) {
       setError("Quantity must be at least 1.");
       return;
