@@ -48,6 +48,11 @@ const simpleItemSchema = z.object({
   widthMm:       z.number().positive().max(100_000).optional(),
   heightMm:      z.number().positive().max(100_000).optional(),
   family:        z.enum(SIMPLE_FAMILIES).default("SERVICE"),
+  // Curtain-only. The form only shows them for CURTAIN_FABRIC / SHEER
+  // (simple-field-plan.ts); accepted here for any family rather than
+  // rejected, because a stray value is worth less than a save that fails.
+  parts:         z.number().int().positive().max(50).optional(),
+  runningMeters: z.number().positive().max(10_000).optional(),
 });
 
 /** Where this product type lives, so the form never has to ask. */
@@ -113,5 +118,7 @@ export async function addSimpleMeasurementItem(
     ...familyExtras(d.family),
     ...(d.widthMm  !== undefined && { widthMm:  d.widthMm }),
     ...(d.heightMm !== undefined && { heightMm: d.heightMm }),
+    ...(d.parts         !== undefined && { parts:         d.parts }),
+    ...(d.runningMeters !== undefined && { runningMeters: d.runningMeters }),
   });
 }

@@ -1115,6 +1115,13 @@ model MeasurementItem {
   layPattern         LayPattern?
   mountType          MountType?
   trackTypeNote      String?
+  // Curtain-only, both optional. "Parts" is how many panels the drop is
+  // split into — a 12ft window is usually two, and the tailor needs to be
+  // told. "runningMeters" is fabric actually booked, which a measurer who
+  // knows the fullness by eye will often write down instead of letting the
+  // calc derive it. Neither is asked for any other family.
+  parts              Int?
+  runningMeters      Decimal?      @db.Decimal(10, 3)
   requiresPowerPoint Boolean       @default(false)
   floorLevelDiffMm   Decimal?      @db.Decimal(10, 2)
   photoKeys          String[]

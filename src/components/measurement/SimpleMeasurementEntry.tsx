@@ -20,6 +20,7 @@ import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { addSimpleMeasurementItem } from "@/modules/measurement/actions-simple";
 import { SIMPLE_FAMILIES, FAMILY_LABEL, type SimpleFamily } from "@/modules/measurement/simple-families";
+import { FIELD_PLAN, asks } from "@/modules/measurement/simple-field-plan";
 import { toMm } from "@/app/(mobile)/m/measure/[projectId]/_components/unit-convert";
 
 type Unit = "mm" | "in" | "ft";
@@ -40,6 +41,8 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
   const [qty,    setQty]    = useState("1");
   const [width,  setWidth]  = useState("");
   const [height, setHeight] = useState("");
+  const [parts,  setParts]  = useState("");
+  const [meters, setMeters] = useState("");
   const [unit,   setUnit]   = useState<Unit>("in");
   const [error,  setError]  = useState<string | null>(null);
   const [saved,  setSaved]  = useState<string | null>(null);
@@ -56,8 +59,10 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
     // Blank means one. The field is seeded with "1", so clearing it to type
     // over it and then tabbing away is the common path, not a mistake — and
     // this form is for someone who should not have to think about it. A real
-    // value that is wrong (0, -2, "abc") still gets told.
-    const quantity = qty.trim() === "" ? 1 : parseInt(qty, 10);
+    // value that is wrong (0, -2, "abc") still gets told. Families that
+    // never show the field (a curtain is split into parts, not counted)
+    // simply save one.
+    const quantity = !asks(family, "quantity") || qty.trim() === "" ? 1 : parseInt(qty, 10);
     if (!Number.isFinite(quantity) || quantity < 1) {
       setError("Quantity must be at least 1.");
       return;
@@ -75,6 +80,17 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
       return;
     }
 
+    // Curtain-only, and only when the family actually asks. A stale value
+    // left in state after switching product type must not be saved.
+    const partsN  = asks(family, "parts")  && parts.trim()  ? parseInt(parts, 10)   : null;
+    const metersN = asks(family, "meters") && meters.trim() ? parseFloat(meters)    : null;
+    if (partsN  !== null && (!Number.isFinite(partsN)  || partsN  < 1)) {
+      setError("Parts must be a whole number, 1 or more."); return;
+    }
+    if (metersN !== null && (!Number.isFinite(metersN) || metersN <= 0)) {
+      setError("Meters must be a number greater than zero."); return;
+    }
+
     start(async () => {
       const r = await addSimpleMeasurementItem({
         measurementId,
@@ -83,13 +99,15 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
         quantity,
         ...(w !== null && { widthMm:  w }),
         ...(h !== null && { heightMm: h }),
+        ...(partsN  !== null && { parts:         partsN }),
+        ...(metersN !== null && { runningMeters: metersN }),
       });
       if (!r.ok) { setError(r.error ?? "Could not save that."); return; }
 
       setSaved(`Saved “${place.trim()}”.`);
       // Keep the unit AND the product type — a measurer does all the
       // curtains in a house, then all the wallpaper, not one of each.
-      setPlace(""); setQty("1"); setWidth(""); setHeight("");
+      setPlace(""); setQty("1"); setWidth(""); setHeight(""); setParts(""); setMeters("");
       onAdded?.();
     });
   }
@@ -117,7 +135,7 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1.3fr_0.8fr_1fr_1fr_auto]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Field
           label="Place or wall"
           value={place}
@@ -136,21 +154,27 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
             ))}
           </select>
         </label>
-        <Field label="Quantity" value={qty} onChange={setQty} inputMode="numeric" />
-        <Field
-          label={`Width (${UNIT_LABEL[unit]})`}
-          value={width}
-          onChange={setWidth}
-          inputMode="decimal"
-          placeholder="Optional"
-        />
-        <Field
-          label={`Height (${UNIT_LABEL[unit]})`}
-          value={height}
-          onChange={setHeight}
-          inputMode="decimal"
-          placeholder="Optional"
-        />
+        {/* Fields follow the product type, not one row for everything —
+            a curtain is split into parts and booked in metres; wallpaper
+            is an area with a count. See simple-field-plan.ts. */}
+        {FIELD_PLAN[family].map((f) => {
+          const [value, set] =
+            f.key === "width"    ? [width,  setWidth]  :
+            f.key === "height"   ? [height, setHeight] :
+            f.key === "quantity" ? [qty,    setQty]    :
+            f.key === "parts"    ? [parts,  setParts]  :
+                                   [meters, setMeters];
+          return (
+            <Field
+              key={f.key}
+              label={f.dimension ? `${f.label} (${UNIT_LABEL[unit]})` : f.label}
+              value={value as string}
+              onChange={set as (v: string) => void}
+              inputMode={f.key === "quantity" || f.key === "parts" ? "numeric" : "decimal"}
+              {...(f.optional ? { placeholder: "Optional" } : {})}
+            />
+          );
+        })}
         <div className="flex items-end">
           <button
             type="button"

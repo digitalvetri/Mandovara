@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from "vitest";
 import { addItemSchema } from "../../../src/modules/measurement/schema";
+import { FIELD_PLAN, asks } from "../../../src/modules/measurement/simple-field-plan";
+import { SIMPLE_FAMILIES } from "../../../src/modules/measurement/simple-families";
 
 const base = {
   measurementId: "cly0000000000000000000001",
@@ -85,5 +87,67 @@ describe("addItemSchema · family-specific required fields", () => {
     const rN = addItemSchema.safeParse({ ...base, heightMm: -1, family: "INTERIOR_FILM" });
     expect(r0.success).toBe(false);
     expect(rN.success).toBe(false);
+  });
+});
+
+// ── Curtain-only optional fields (2026-08-31) ────────────────────────────
+//
+// The owner asked for a curtain to take parts and meters, and for wallpaper
+// to take neither. The FORM enforces which fields are shown
+// (simple-field-plan.ts); the SCHEMA only has to accept them and reject
+// nonsense, because a stale value surviving a family switch is a bug worth
+// catching in the client, not a reason to fail a save.
+describe("addItemSchema · parts and runningMeters", () => {
+  const curtain = { ...base, family: "CURTAIN_FABRIC" as const, headingType: "EYELET" as const, fullness: 2 };
+
+  it("accepts a curtain with parts and runningMeters", () => {
+    const r = addItemSchema.safeParse({ ...curtain, parts: 2, runningMeters: 14.5 });
+    expect(r.success).toBe(true);
+  });
+
+  it("accepts a curtain with neither — both are optional", () => {
+    expect(addItemSchema.safeParse(curtain).success).toBe(true);
+  });
+
+  it("rejects a fractional parts count", () => {
+    const r = addItemSchema.safeParse({ ...curtain, parts: 2.5 });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects zero or negative parts", () => {
+    expect(addItemSchema.safeParse({ ...curtain, parts: 0 }).success).toBe(false);
+    expect(addItemSchema.safeParse({ ...curtain, parts: -1 }).success).toBe(false);
+  });
+
+  it("rejects runningMeters of zero", () => {
+    expect(addItemSchema.safeParse({ ...curtain, runningMeters: 0 }).success).toBe(false);
+  });
+});
+
+describe("simple field plan · what each family asks for", () => {
+  it("curtain and sheer ask height, width, parts, meters — and not quantity", () => {
+    for (const f of ["CURTAIN_FABRIC", "SHEER"] as const) {
+      expect(FIELD_PLAN[f].map((x) => x.key)).toEqual(["height", "width", "parts", "meters"]);
+      expect(asks(f, "quantity")).toBe(false);
+    }
+  });
+
+  it("wallpaper asks height, width and quantity — and not parts or meters", () => {
+    expect(FIELD_PLAN.WALLPAPER.map((x) => x.key)).toEqual(["height", "width", "quantity"]);
+    expect(asks("WALLPAPER", "parts")).toBe(false);
+    expect(asks("WALLPAPER", "meters")).toBe(false);
+  });
+
+  it("marks parts, meters and quantity optional but never the dimensions", () => {
+    for (const specs of Object.values(FIELD_PLAN)) {
+      for (const s of specs) {
+        if (s.key === "width" || s.key === "height") expect(s.optional).toBe(false);
+        else expect(s.optional).toBe(true);
+      }
+    }
+  });
+
+  it("covers every family the simple form offers", () => {
+    for (const f of SIMPLE_FAMILIES) expect(FIELD_PLAN[f]?.length).toBeGreaterThan(0);
   });
 });

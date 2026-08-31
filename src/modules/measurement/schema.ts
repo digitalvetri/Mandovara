@@ -93,6 +93,11 @@ const itemCoreShape = {
   heightMm:     mmOpt,
   depthMm:      mmOpt,
   quantity:     z.number().int().positive().max(200).default(1),
+  // Curtain-only, both optional — see simple-field-plan.ts. A wide window
+  // is normally split into two panels and the tailor has to be told;
+  // runningMeters is fabric the measurer already knows they are booking.
+  parts:         z.number().int().positive().max(50).optional(),
+  runningMeters: z.number().positive().max(10_000).optional(),
   deductions:   z.array(deductionSchema).max(20).optional(),
   family:       z.enum(PRODUCT_FAMILIES),
   headingType:  z.enum(HEADING_TYPES).optional(),
