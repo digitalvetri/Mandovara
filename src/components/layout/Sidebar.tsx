@@ -8,7 +8,7 @@ import {
   LayoutDashboard, UserPlus, Users, FileText, Package, Truck,
   Boxes, MapPin, Briefcase, Receipt, Wallet,
   CalendarCheck, IndianRupee, ShieldCheck, LogOut,
-  BarChart2, CheckSquare, UserCircle, Ruler, BookOpen,
+  BarChart2, CheckSquare, UserCircle, Ruler, BookOpen, PiggyBank,
   type LucideIcon,
 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
@@ -62,6 +62,8 @@ const OWNER_NAV: readonly { section: string; items: readonly NavItem[] }[] = [
     items: [
       { label: "Invoicing & GST",    href: "/invoicing", icon: Receipt },
       { label: "Accounts & Payments",href: "/accounts",  icon: Wallet  },
+      // Personal, not the studio's books — see /my-expenses.
+      { label: "My Expenses",        href: "/my-expenses", icon: PiggyBank },
     ],
   },
   {
@@ -117,7 +119,10 @@ const EMPLOYEE_NAV: readonly { section: string; items: readonly NavItem[] }[] = 
   },
   {
     section: "My Work",
-    items: [{ label: "My Tasks", href: "/tasks", icon: CheckSquare }],
+    items: [
+      { label: "My Tasks",    href: "/tasks",       icon: CheckSquare },
+      { label: "My Expenses", href: "/my-expenses", icon: PiggyBank },
+    ],
   },
   {
     section: "People",

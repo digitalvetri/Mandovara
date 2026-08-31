@@ -2080,6 +2080,33 @@ model Document {
   @@index([organizationId, ownerType, ownerId])
 }
 
+// The owner's own spending — fuel, food, groceries, rent.
+//
+// Deliberately NOT a category on Expense. That table carries GST fields,
+// approvalState, branchId and a sourcePoId, and it feeds the P&L, the "To
+// Pay" KPI and the monthly GST filing. A household grocery bill in there
+// would corrupt every one of those. This is a private notebook that happens
+// to live in the same app.
+//
+// Scoped to the user, not the org: two owners in one organization must not
+// see each other's personal spending. Every query filters on userId, and
+// the RLS policy still pins the org underneath.
+model PersonalExpense {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  /** Fuel, Food, Groceries, Rent … free text so nobody is boxed in. */
+  category       String
+  note           String?
+  /** Paise, like every other money column here. Never a float. */
+  amount         BigInt
+  spentAt        DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([organizationId, userId, spentAt])
+}
+
 model Notification {
   id             String         @id @default(cuid())
   organizationId String

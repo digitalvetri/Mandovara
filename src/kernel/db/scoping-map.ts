@@ -35,6 +35,9 @@ export const TENANT_SCOPED = new Set<string>([
   "MakeJob",
   // money
   "Invoice", "Advance", "Receipt", "ProjectExpense", "Expense",
+  // Personal spending — org-scoped like everything else, and additionally
+  // filtered to the owning user in every query. See personal-expenses.
+  "PersonalExpense",
   // HR
   "Employee", "Attendance", "Leave", "StatutorySlab", "PayrollRun",
   // automation
