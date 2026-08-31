@@ -33,18 +33,10 @@ export async function getQuotation(
       leadId: true, projectId: true, clientId: true, ownerId: true,
       date: true, validUntil: true, termsText: true, shareToken: true, shareTokenExpiresAt: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
-      project: {
-        select: {
-          name: true,
-          siteAddress: true,
-          client: {
-            select: {
-              id: true, name: true, mobile: true, email: true, gstin: true,
-              billingAddress: true,
-            },
-          },
-        },
-      },
+      // Client fetched separately below, not nested. Project.client is a
+      // REQUIRED relation, so Prisma fails the whole query when the join
+      // returns nothing under scoped()/RLS — see listQuotations().
+      project: { select: { name: true, siteAddress: true, clientId: true } },
       lines: {
         orderBy: { lineNo: "asc" },
         select: {
@@ -75,13 +67,19 @@ export async function getQuotation(
   let projectName: string | null = null;
   let siteArea: string | null = null;
   if (row.project) {
-    clientName   = row.project.client.name;
-    clientMobile = row.project.client.mobile;
-    clientEmail  = row.project.client.email;
-    clientGstin  = row.project.client.gstin;
-    projectName  = row.project.name;
-    siteArea     = cityOf(row.project.siteAddress)
-                ?? cityOf(row.project.client.billingAddress);
+    projectName = row.project.name;
+    const client = await db.client.findUnique({
+      where:  { id: row.project.clientId },
+      select: { name: true, mobile: true, email: true, gstin: true, billingAddress: true },
+    });
+    if (client) {
+      clientName   = client.name;
+      clientMobile = client.mobile;
+      clientEmail  = client.email;
+      clientGstin  = client.gstin;
+    }
+    siteArea = cityOf(row.project.siteAddress)
+            ?? (client ? cityOf(client.billingAddress) : null);
   } else if (row.leadId) {
     const lead = await db.lead.findUnique({
       where:  { id: row.leadId },
@@ -219,7 +217,9 @@ export async function listOpenQuotationsForAppend(
     select: {
       id: true, number: true, total: true, date: true,
       leadId: true, clientId: true,
-      project: { select: { client: { select: { name: true } } } },
+      // Not nested — a required relation the RLS join cannot satisfy
+      // fails the whole query. See listQuotations().
+      project: { select: { clientId: true } },
     },
   });
   const leadIds = Array.from(new Set(rows.map((r) => r.leadId).filter((x): x is string => !!x)));
@@ -227,12 +227,18 @@ export async function listOpenQuotationsForAppend(
     ? await db.lead.findMany({ where: { id: { in: leadIds } }, select: { id: true, name: true } })
     : [];
   const leadName = new Map(leads.map((l) => [l.id, l.name] as const));
+
+  const clientIds = Array.from(new Set(rows.map((r) => r.project?.clientId).filter((x): x is string => !!x)));
+  const clients = clientIds.length > 0
+    ? await db.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true } })
+    : [];
+  const clientName = new Map(clients.map((c) => [c.id, c.name] as const));
   return rows.map((r) => ({
     id:         r.id,
     number:     r.number,
     clientName: r.leadId
       ? `Lead: ${leadName.get(r.leadId) ?? "—"}`
-      : `Client: ${r.project?.client.name ?? "—"}`,
+      : `Client: ${(r.project ? clientName.get(r.project.clientId) : null) ?? "—"}`,
     total:      r.total,
     date:       r.date,
     isLead:     !!r.leadId,
