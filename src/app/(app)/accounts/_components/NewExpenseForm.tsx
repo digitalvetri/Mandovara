@@ -1,30 +1,82 @@
 "use client";
 
-// "New expense" form — opens as a compact card that expands from the button.
-// Head + description + amount + date + optional GST capture.
-// GST fields (rate, vendor GSTIN, bill ref) are collapsed behind a toggle
-// so the common case (no GST / exempt) stays fast.
+// "New expense" — a trigger that lives in the tab header, and a form that
+// does NOT.
+//
+// The button used to replace ITSELF with the whole form. Its call site sits
+// inside the header's `flex items-center gap-2` row, next to the period
+// chips, so a five-field card was being laid out in a slot sized for a
+// chip: the fields collapsed into a narrow right-hand column and left half
+// the row empty. Nothing was wrong with the form — it was the container.
+//
+// So the two are split. `NewExpenseSection` owns the open state and renders
+// the trigger inline where the header wants it, then the form as a
+// full-width row of its own beneath. Head + note + amount + date, with GST
+// (rate, vendor GSTIN, bill ref) behind a toggle so the common case —
+// no GST, or exempt — stays a four-field form.
 
-import { useState, useTransition } from "react";
+import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2, IndianRupee, X, ChevronDown } from "lucide-react";
 import { createExpense } from "@/modules/expenses/actions";
-import { GENERAL_EXPENSE_HEADS, GST_RATES } from "@/modules/expenses/schema";
+import { GENERAL_EXPENSE_HEADS } from "@/modules/expenses/schema";
+import {
+  GstFields, GstPreview, expenseFieldCls, expenseLabelCls,
+} from "./_expense-gst";
 import { safePaise, iso } from "./_receipt-primitives";
 
-export function NewExpenseButton() {
+// Shared between the trigger and the form so the two can sit in different
+// places in the tree without the parent having to be a client component.
+const ExpenseFormCtx = createContext<{
+  open: boolean;
+  setOpen: (v: boolean) => void;
+} | null>(null);
+
+function useExpenseForm() {
+  const ctx = useContext(ExpenseFormCtx);
+  if (!ctx) throw new Error("NewExpenseButton/Panel must be inside NewExpenseSection");
+  return ctx;
+}
+
+/** Wraps the part of the tab that contains both the trigger and the form. */
+export function NewExpenseSection({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  if (open) return <NewExpenseSheet onClose={() => setOpen(false)} />;
+  return (
+    <ExpenseFormCtx.Provider value={{ open, setOpen }}>
+      {children}
+    </ExpenseFormCtx.Provider>
+  );
+}
+
+/** The trigger. Belongs in the header row, beside the period chips. */
+export function NewExpenseButton() {
+  const { open, setOpen } = useExpenseForm();
   return (
     <button
       type="button"
-      onClick={() => setOpen(true)}
-      className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] bg-gold text-ink text-[12.5px] font-semibold hover:bg-gold-strong transition-colors"
+      onClick={() => setOpen(!open)}
+      aria-expanded={open}
+      className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] text-[12.5px] font-semibold transition-colors ${
+        open
+          ? "border border-rule text-text-dim hover:text-text"
+          : "bg-gold text-ink hover:bg-gold-strong"
+      }`}
     >
-      <Plus size={13} strokeWidth={2.5} />
-      New expense
+      <Plus
+        size={13}
+        strokeWidth={2.5}
+        className={`transition-transform ${open ? "rotate-45" : ""}`}
+      />
+      {open ? "Close" : "New expense"}
     </button>
   );
+}
+
+/** The form. Belongs on a row of its own, at full width. */
+export function NewExpensePanel() {
+  const { open, setOpen } = useExpenseForm();
+  if (!open) return null;
+  return <NewExpenseSheet onClose={() => setOpen(false)} />;
 }
 
 function NewExpenseSheet({ onClose }: { onClose: () => void }) {
@@ -49,12 +101,6 @@ function NewExpenseSheet({ onClose }: { onClose: () => void }) {
   const usingCustom = head === "__custom__";
   const finalHead   = usingCustom ? customHead.trim() : head;
   const totalPaise  = safePaise(amount);
-
-  // Live GST preview
-  const taxablePaise = gstRate > 0 && totalPaise > 0n
-    ? (totalPaise * 100n) / BigInt(100 + gstRate)
-    : null;
-  const gstPaise = taxablePaise !== null ? totalPaise - taxablePaise : null;
 
   const canSubmit = !!finalHead && description.trim().length >= 3 && totalPaise > 0n && !pending;
 
@@ -89,10 +135,10 @@ function NewExpenseSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="mb-4 rounded-[14px] bg-surface border border-gold/40 p-5">
-      <div className="flex items-baseline justify-between mb-3">
+    <div className="mb-5 overflow-hidden rounded-[14px] border border-gold/40 bg-surface">
+      <div className="flex items-start justify-between gap-3 border-b border-gold/25 bg-gold/[0.06] px-5 py-3.5">
         <div>
-          <div className="text-[10.5px] uppercase tracking-[0.14em] text-gold mb-0.5">New expense</div>
+          <div className="mb-0.5 text-[10.5px] uppercase tracking-[0.14em] text-gold">New expense</div>
           <div className="text-[12px] text-text-dim">
             Rent, travel, utilities — anything the business paid for that isn't tied to a project.
           </div>
@@ -107,14 +153,14 @@ function NewExpenseSheet({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      <form onSubmit={onSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <form onSubmit={onSubmit} className="grid grid-cols-1 gap-x-4 gap-y-3.5 p-5 sm:grid-cols-12">
         {/* Head */}
-        <div className="sm:col-span-1">
-          <label className="block text-[11px] text-text-dim mb-1">What was it for?</label>
+        <div className="sm:col-span-5">
+          <label className={expenseLabelCls}>What was it for?</label>
           <select
             value={head}
             onChange={(e) => setHead(e.target.value)}
-            className="w-full h-10 rounded-[8px] border border-rule bg-transparent px-2.5 text-[12.5px] text-text outline-none focus:border-gold"
+            className={expenseFieldCls}
           >
             {GENERAL_EXPENSE_HEADS.map((h) => (
               <option key={h} value={h}>{h}</option>
@@ -127,14 +173,16 @@ function NewExpenseSheet({ onClose }: { onClose: () => void }) {
               onChange={(e) => setCustomHead(e.target.value)}
               placeholder="e.g. Petrol · Client dinner"
               maxLength={60}
-              className="w-full mt-2 h-10 rounded-[8px] border border-rule bg-transparent px-2.5 text-[12.5px] text-text outline-none focus:border-gold"
+              className={`${expenseFieldCls} mt-2`}
             />
           )}
         </div>
 
         {/* Amount */}
-        <div className="sm:col-span-1">
-          <label className="block text-[11px] text-text-dim mb-1">How much (total paid)?</label>
+        <div className="sm:col-span-3">
+          <label className="mb-1 block text-[11px] text-text-dim">
+            How much (total paid)? <span className="text-fault">*</span>
+          </label>
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-dim">
               <IndianRupee size={13} strokeWidth={2} />
@@ -144,33 +192,30 @@ function NewExpenseSheet({ onClose }: { onClose: () => void }) {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
-              className="w-full h-10 rounded-[8px] border border-rule bg-transparent pl-7 pr-2.5 text-[13px] tabular-nums text-text outline-none focus:border-gold"
+              className={`${expenseFieldCls} pl-7 tabular-nums`}
             />
           </div>
           {fieldErrors["amount"] && (
             <div className="mt-1 text-[10.5px] text-fault">{fieldErrors["amount"]}</div>
           )}
-          {/* GST preview */}
-          {showGst && gstRate > 0 && taxablePaise !== null && (
-            <div className="mt-1.5 text-[10.5px] text-text-dim space-y-0.5">
-              <div>Taxable: ₹{(Number(taxablePaise) / 100).toFixed(2)}</div>
-              {isInterState
-                ? <div>IGST ({gstRate}%): ₹{(Number(gstPaise!) / 100).toFixed(2)}</div>
-                : <div>CGST {gstRate/2}% + SGST {gstRate/2}% = ₹{(Number(gstPaise!) / 100).toFixed(2)}</div>
-              }
-            </div>
+          {showGst && (
+            <GstPreview
+              totalPaise={totalPaise} gstRate={gstRate} isInterState={isInterState}
+            />
           )}
         </div>
 
         {/* Description */}
-        <div className="sm:col-span-2">
-          <label className="block text-[11px] text-text-dim mb-1">Note (what exactly)</label>
+        <div className="sm:col-span-12">
+          <label className="mb-1 block text-[11px] text-text-dim">
+            Note (what exactly) <span className="text-fault">*</span>
+          </label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder='e.g. "Coimbatore ↔ Chennai for the Alila site visit"'
             maxLength={300}
-            className="w-full h-10 rounded-[8px] border border-rule bg-transparent px-2.5 text-[12.5px] text-text outline-none focus:border-gold"
+            className={expenseFieldCls}
           />
           {fieldErrors["description"] && (
             <div className="mt-1 text-[10.5px] text-fault">{fieldErrors["description"]}</div>
@@ -178,18 +223,18 @@ function NewExpenseSheet({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Date */}
-        <div className="sm:col-span-1">
-          <label className="block text-[11px] text-text-dim mb-1">When?</label>
+        <div className="sm:col-span-4">
+          <label className={expenseLabelCls}>When?</label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full h-10 rounded-[8px] border border-rule bg-transparent px-2.5 text-[12.5px] text-text tabular-nums outline-none focus:border-gold"
+            className={`${expenseFieldCls} tabular-nums`}
           />
         </div>
 
         {/* GST toggle */}
-        <div className="sm:col-span-1 flex items-end">
+        <div className="flex items-end sm:col-span-8">
           <button
             type="button"
             onClick={() => setShowGst((v) => !v)}
@@ -203,86 +248,48 @@ function NewExpenseSheet({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* GST section */}
+        {/* GST section — four fields, one idea. See _expense-gst.tsx. */}
         {showGst && (
-          <>
-            {/* GST Rate */}
-            <div className="sm:col-span-1">
-              <label className="block text-[11px] text-text-dim mb-1">GST rate</label>
-              <select
-                value={gstRate}
-                onChange={(e) => setGstRate(Number(e.target.value))}
-                className="w-full h-10 rounded-[8px] border border-rule bg-transparent px-2.5 text-[12.5px] text-text outline-none focus:border-gold"
-              >
-                {GST_RATES.map((r) => (
-                  <option key={r} value={r}>{r === 0 ? "Exempt / nil" : `${r}%`}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Inter-state toggle */}
-            {gstRate > 0 && (
-              <div className="sm:col-span-1 flex items-end">
-                <label className="inline-flex items-center gap-2 cursor-pointer h-10">
-                  <input
-                    type="checkbox"
-                    checked={isInterState}
-                    onChange={(e) => setIsInterState(e.target.checked)}
-                    className="h-4 w-4 rounded border-rule accent-gold"
-                  />
-                  <span className="text-[12px] text-text-dim">Out-of-state purchase (IGST)</span>
-                </label>
-              </div>
-            )}
-
-            {/* Vendor GSTIN */}
-            <div className="sm:col-span-1">
-              <label className="block text-[11px] text-text-dim mb-1">Vendor GSTIN (optional)</label>
-              <input
-                value={vendorGstin}
-                onChange={(e) => setVendorGstin(e.target.value.toUpperCase())}
-                placeholder="33AABCM1234Q1Z5"
-                maxLength={15}
-                className="w-full h-10 rounded-[8px] border border-rule bg-transparent px-2.5 text-[12.5px] tabular-nums text-text outline-none focus:border-gold"
-              />
-            </div>
-
-            {/* Vendor bill ref */}
-            <div className="sm:col-span-1">
-              <label className="block text-[11px] text-text-dim mb-1">Vendor invoice no. (optional)</label>
-              <input
-                value={billRef}
-                onChange={(e) => setBillRef(e.target.value)}
-                placeholder="e.g. INV/2026-27/0048"
-                maxLength={50}
-                className="w-full h-10 rounded-[8px] border border-rule bg-transparent px-2.5 text-[12.5px] text-text outline-none focus:border-gold"
-              />
-            </div>
-          </>
+          <GstFields
+            gstRate={gstRate} setGstRate={setGstRate}
+            isInterState={isInterState} setIsInterState={setIsInterState}
+            vendorGstin={vendorGstin} setVendorGstin={setVendorGstin}
+            billRef={billRef} setBillRef={setBillRef}
+          />
         )}
 
         {error && (
-          <div className="sm:col-span-2 rounded-[8px] border border-fault/40 bg-fault/5 px-3 py-2 text-[11.5px] text-fault">
+          <div className="sm:col-span-12 rounded-[8px] border border-fault/40 bg-fault/5 px-3 py-2 text-[11.5px] text-fault">
             {error}
           </div>
         )}
 
-        <div className="sm:col-span-2 flex justify-end gap-2 mt-1">
+        {/* Footer. On a phone the hint reads first and the buttons stack
+            with Save on top (thumb reach); on desktop it is hint-left,
+            actions-right. */}
+        <div className="mt-1 flex flex-col gap-3 border-t border-rule pt-4 sm:col-span-12 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-[11px] text-text-dim">
+            {canSubmit
+              ? "Ready to save."
+              : "Pick a head, add a short note and an amount above."}
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-[8px] text-[12.5px] text-text-dim hover:text-text transition-colors"
+            className="h-10 rounded-[8px] border border-rule px-4 text-[12.5px] text-text-dim transition-colors hover:border-text-dim hover:text-text sm:border-transparent"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[8px] bg-gold text-ink text-[13px] font-semibold hover:bg-gold-strong disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[8px] bg-gold px-5 text-[13px] font-semibold text-ink transition-colors hover:bg-gold-strong disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-text-faint"
           >
             {pending && <Loader2 size={12} className="animate-spin" />}
             Save expense
           </button>
+          </div>
         </div>
       </form>
     </div>

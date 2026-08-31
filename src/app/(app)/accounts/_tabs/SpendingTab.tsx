@@ -10,7 +10,9 @@ import { formatDate } from "@/kernel/datetime";
 import { can } from "@/kernel/rbac/guard";
 import { loadSpending, type SpendingPeriod } from "@/modules/accounts/spending";
 import { WhereMoneyGoesBars, type ExpenseHeadUI } from "../_components/WhereMoneyGoesBars";
-import { NewExpenseButton } from "../_components/NewExpenseForm";
+import {
+  NewExpenseSection, NewExpenseButton, NewExpensePanel,
+} from "../_components/NewExpenseForm";
 
 interface Props {
   ctx:    Awaited<ReturnType<typeof devContext>>;
@@ -49,6 +51,10 @@ export async function SpendingTab({ ctx, period, head }: Props) {
 
   return (
     <>
+      {/* The trigger sits in the header row; the form renders full-width
+          beneath it. Both are inside NewExpenseSection, which owns the
+          open state — see NewExpenseForm.tsx for why they are split. */}
+      <NewExpenseSection>
       {/* Header — total + period toggle + New expense button */}
       <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
         <div>
@@ -78,6 +84,9 @@ export async function SpendingTab({ ctx, period, head }: Props) {
           <NewExpenseButton />
         </div>
       </div>
+
+      <NewExpensePanel />
+      </NewExpenseSection>
 
       {/* Where the money goes — same period as the list */}
       <div className="mb-5">
