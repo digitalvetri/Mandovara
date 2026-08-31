@@ -5,6 +5,7 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import { resolveClients, resolveClient, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export interface SiteVisitRow {
   id:           string;
@@ -66,7 +67,7 @@ export async function listSiteVisits(
       project: {
         select: {
           name: true,
-          client: { select: { name: true } },
+          clientId: true,
         },
       },
     },
@@ -79,6 +80,7 @@ export async function listSiteVisits(
     select: { id: true, name: true },
   });
   const nameById = new Map(userNames.map((u) => [u.id, u.name]));
+  const clientMap = await resolveClients(db, visits.map((v) => v.project?.clientId));
 
   return visits.map((v) => ({
     id:           v.id,
@@ -88,7 +90,7 @@ export async function listSiteVisits(
     status:       v.status,
     assignedTo:   nameById.get(v.assignedToId) ?? "—",
     projectName:  v.project?.name ?? null,
-    clientName:   v.project?.client?.name ?? null,
+    clientName:   v.project ? clientMap.get(v.project.clientId)?.name ?? UNKNOWN_CLIENT : null,
     leadName:     null,
     observations: v.observations,
   }));
@@ -151,7 +153,7 @@ export async function getSiteVisit(
       project: {
         select: {
           name: true,
-          client: { select: { name: true } },
+          clientId: true,
         },
       },
     },
@@ -159,6 +161,7 @@ export async function getSiteVisit(
   if (!v) return null;
 
   const assignee = await db.user.findUnique({ where: { id: v.assignedToId }, select: { name: true } });
+  const client = await resolveClient(db, v.project?.clientId);
 
   return {
     id:           v.id,
@@ -168,7 +171,7 @@ export async function getSiteVisit(
     status:       v.status,
     assignedTo:   assignee?.name ?? "—",
     projectName:  v.project?.name ?? null,
-    clientName:   v.project?.client?.name ?? null,
+    clientName:   v.project ? client?.name ?? UNKNOWN_CLIENT : null,
     leadName:     null,
     observations: v.observations,
     checkInLat:   v.checkInLat?.toString() ?? null,

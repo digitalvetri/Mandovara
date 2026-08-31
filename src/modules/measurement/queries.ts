@@ -11,6 +11,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { resolveSubject } from "./subject";
+import { resolveClient } from "@/kernel/db/resolve-clients";
 export * from "./queries-rooms";
 import type {
   RoundListRow, RoundListGroup, RoundDetail, ItemDetail, RoomItemsBucket,
@@ -109,7 +110,7 @@ export async function getRoundDetail(
       project: {
         select: {
           id: true, name: true, number: true,
-          client: { select: { name: true } },
+          clientId: true,
         },
       },
       items: {
@@ -167,6 +168,8 @@ export async function getRoundDetail(
       })
     : null;
 
+  const client = await resolveClient(db, round.project?.clientId);
+
   return {
     id:             round.id,
     number:         round.number,
@@ -179,7 +182,7 @@ export async function getRoundDetail(
     approvedByName: round.approvedById ? (nameOf.get(round.approvedById) ?? "—") : null,
     approvedAt:     round.approvedAt,
     supersedesId:   round.supersedesId,
-    subject:        resolveSubject(round.project, lead),
+    subject:        resolveSubject(round.project && { ...round.project, client }, lead),
     itemsByRoom,
   };
 }

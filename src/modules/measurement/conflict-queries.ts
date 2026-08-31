@@ -9,6 +9,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { MeasurementStatusStr } from "./queries-types";
+import { resolveClients, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export interface ServerItemSnapshot {
   clientCuid:     string;
@@ -51,7 +52,7 @@ export async function fetchServerItemsForConflict(
           number: true, status: true, projectId: true, leadId: true,
           project: {
             select: {
-              name: true, client: { select: { name: true } },
+              name: true, clientId: true,
             },
           },
         },
@@ -60,6 +61,7 @@ export async function fetchServerItemsForConflict(
   });
 
   const found = new Map(items.map((it) => [it.id, it] as const));
+  const clientMap = await resolveClients(db, items.map((it) => it.measurement.project?.clientId));
   return ids.map((cuid) => {
     const it = found.get(cuid);
     if (!it) return { clientCuid: cuid, exists: false };
@@ -73,7 +75,9 @@ export async function fetchServerItemsForConflict(
       // context lines above the diff, so a placeholder beats a crash.
       projectId:    it.measurement.projectId ?? undefined,
       projectName:  it.measurement.project?.name ?? "Lead measurement",
-      clientName:   it.measurement.project?.client.name ?? "Not yet a client",
+      clientName:   it.measurement.project
+        ? clientMap.get(it.measurement.project.clientId)?.name ?? UNKNOWN_CLIENT
+        : "Not yet a client",
       roomName:     it.room.name,
       label:        it.label,
       surface:      it.surface,

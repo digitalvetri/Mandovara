@@ -3,6 +3,7 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import { resolveClients, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export interface ArchitectRow {
   id:               string;
@@ -105,7 +106,6 @@ export async function getArchitect(
             select: {
               number: true,
               clientId: true,
-              client: { select: { name: true } },
             },
           },
         },
@@ -115,6 +115,7 @@ export async function getArchitect(
   if (!row) return null;
 
   const activeCommissions = row.commissions.filter((c) => c.cancelledAt == null);
+  const clientMap = await resolveClients(db, row.commissions.map((c) => c.project.clientId));
   const earnedTotal = activeCommissions.reduce((s, c) => s + c.amount, 0n);
   const paidTotal   = activeCommissions.reduce(
     (s, c) => s + (c.paidAt != null ? c.amount : 0n), 0n,
@@ -135,7 +136,7 @@ export async function getArchitect(
       projectId:     c.projectId,
       projectNumber: c.project.number,
       clientId:      c.project.clientId,
-      clientName:    c.project.client.name,
+      clientName:    clientMap.get(c.project.clientId)?.name ?? UNKNOWN_CLIENT,
       createdAt:     c.createdAt,
       baseAmount:    c.baseAmount,
       pct:           c.pct.toString(),

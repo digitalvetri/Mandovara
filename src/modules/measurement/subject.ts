@@ -36,11 +36,15 @@ export interface RoundSubject {
   href: string;
 }
 
+import { UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
+
 export interface ProjectSubjectRow {
   id: string;
   name: string;
   number: string;
-  client: { name: string };
+  /** Null when the client row is unreachable — see resolve-clients.ts.
+   *  A round still has a subject; it just cannot name the party. */
+  client: { name: string } | null;
 }
 
 export interface LeadSubjectRow {
@@ -55,7 +59,7 @@ export function projectSubject(p: ProjectSubjectRow): RoundSubject {
     id:        p.id,
     name:      p.name,
     number:    p.number,
-    partyName: p.client.name,
+    partyName: p.client?.name ?? UNKNOWN_CLIENT,
     href:      `/projects/${p.id}`,
   };
 }

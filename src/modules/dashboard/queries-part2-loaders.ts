@@ -8,6 +8,7 @@
 import { scoped } from "@/kernel/db/scoped";
 import type { ActivityItem, ProjectStage, RevenueMonth, SiteVisit } from "@/app/(app)/_dashboard/types";
 import { MONTHS_LOOKBACK, RECENT_ACTIVITY_LIMIT, REV_STATUSES, SITE_VISITS_LIMIT } from "./queries";
+import { resolveClients } from "@/kernel/db/resolve-clients";
 
 // ── field-specific loaders ────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ export async function loadRecentActivity(db: Db): Promise<ActivityItem[]> {
       orderBy: { sentAt: "desc" },
       take: 3,
       include: {
-        project: { include: { client: { select: { name: true } } } },
+        project: { select: { clientId: true } },
       },
     }),
     db.receipt.findMany({
@@ -141,6 +142,7 @@ export async function loadRecentActivity(db: Db): Promise<ActivityItem[]> {
       })
     : [];
   const clientName = new Map(rcptClients.map((c) => [c.id, c.name]));
+  const quoteClientMap = await resolveClients(db, quotes.map((q) => q.project?.clientId));
 
   const now = Date.now();
   const events: (ActivityItem & { at: number })[] = [];
@@ -149,7 +151,7 @@ export async function loadRecentActivity(db: Db): Promise<ActivityItem[]> {
     const ts = q.sentAt ?? q.date;
     // Lead-scoped quotations have no project — label the party generically
     // until the dashboard grows a lead-party lookup.
-    const recipient = q.project?.client.name ?? "a lead";
+    const recipient = (q.project ? quoteClientMap.get(q.project.clientId)?.name : null) ?? "a lead";
     events.push({
       id: `q-${q.id}`, kind: "quote",
       title: `Quote ${q.number.split("/").pop() ?? q.number} sent to ${recipient}`,

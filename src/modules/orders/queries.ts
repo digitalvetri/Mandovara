@@ -3,6 +3,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { type OrderStatus } from "./schema";
 import { buildWhere } from "./queries-part2";
+import { resolveClients, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export interface ListOrdersQuery {
   search?: string;
@@ -114,19 +115,21 @@ export async function listOrders(
       select: {
         id: true, number: true, date: true, status: true, totalValue: true,
         clientId: true, quotationId: true,
-        project: { select: { client: { select: { name: true } } } },
+        project: { select: { clientId: true } },
         _count: { select: { lines: true } },
       },
     }),
     db.order.count({ where }),
   ]);
 
+  const clientMap = await resolveClients(db, rows.map((r) => r.project.clientId));
+
   return {
     rows: rows.map((r) => ({
       id: r.id,
       number: r.number,
       clientId: r.clientId,
-      clientName: r.project.client.name,
+      clientName: clientMap.get(r.project.clientId)?.name ?? UNKNOWN_CLIENT,
       date: r.date,
       status: r.status,
       totalValue: r.totalValue,

@@ -5,6 +5,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { ORDER_STATUSES, type OrderStatus } from "./schema";
 import { AcceptedQuotationOption, ListOrdersQuery, OrderDetail, OrderStatusCounts } from "./queries";
+import { resolveClients, resolveClient, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export async function getOrder(
   ctx: RequestContext,
@@ -23,7 +24,7 @@ export async function getOrder(
       project: {
         select: {
           number: true, name: true, ownerId: true,
-          client: { select: { id: true, name: true, mobile: true } },
+          clientId: true,
         },
       },
       lines: {
@@ -65,13 +66,15 @@ export async function getOrder(
     paidTotal = allocations.reduce((s, a) => s + a.amount, 0n);
   }
 
+  const client = await resolveClient(db, row.project.clientId);
+
   return {
     id: row.id,
     number: row.number,
     status: row.status,
     clientId: row.clientId,
-    clientName: row.project.client.name,
-    clientMobile: row.project.client.mobile,
+    clientName: client?.name ?? UNKNOWN_CLIENT,
+    clientMobile: client?.mobile ?? "",
     branchId: row.branchId,
     branchName: branch.name,
     projectId: row.projectId,
@@ -145,15 +148,17 @@ export async function listAcceptedQuotations(
     take: 200,
     select: {
       id: true, number: true, total: true, date: true, clientId: true,
-      project: { select: { client: { select: { name: true } } } },
+      project: { select: { clientId: true } },
     },
   });
-  return rows
-    .filter((r): r is typeof r & { project: NonNullable<typeof r.project> } => r.project !== null)
+  const withProject = rows
+    .filter((r): r is typeof r & { project: NonNullable<typeof r.project> } => r.project !== null);
+  const clientMap = await resolveClients(db, withProject.map((r) => r.project.clientId));
+  return withProject
     .map((r) => ({
       id: r.id,
       number: r.number,
-      clientName: r.project.client.name,
+      clientName: clientMap.get(r.project.clientId)?.name ?? UNKNOWN_CLIENT,
       total: r.total,
       date: r.date,
     }));
@@ -211,11 +216,13 @@ export async function listInvoiceableOrders(
       project: {
         select: {
           id: true, number: true, name: true, siteAddress: true,
-          client: { select: { name: true } },
+          clientId: true,
         },
       },
     },
   });
+
+  const clientMap = await resolveClients(db, rows.map((r) => r.project.clientId));
 
   return rows.map((r) => {
     const addr = r.project.siteAddress as Record<string, unknown> | null;
@@ -227,7 +234,7 @@ export async function listInvoiceableOrders(
       orderStatus: r.status,
       totalValue: r.totalValue,
       clientId: r.clientId,
-      clientName: r.project.client.name,
+      clientName: clientMap.get(r.project.clientId)?.name ?? UNKNOWN_CLIENT,
       projectId: r.project.id,
       projectName: r.project.name,
       projectNumber: r.project.number,

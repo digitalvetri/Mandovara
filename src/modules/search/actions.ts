@@ -6,6 +6,7 @@
 
 import { scoped } from "@/kernel/db/scoped";
 import { devContext } from "@/lib/dev-context";
+import { resolveClients, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export type SearchKind =
   | "client" | "project" | "quotation" | "order" | "invoice"
@@ -49,7 +50,7 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
         take: LIMIT_PER_KIND,
         select: {
           id: true, name: true, number: true,
-          client: { select: { name: true } },
+          clientId: true,
         },
       }),
       db.quotation.findMany({
@@ -60,7 +61,7 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
         take: LIMIT_PER_KIND,
         select: {
           id: true, number: true, total: true, status: true,
-          project: { select: { client: { select: { name: true } } } },
+          project: { select: { clientId: true } },
         },
       }),
       db.order.findMany({
@@ -71,7 +72,7 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
         take: LIMIT_PER_KIND,
         select: {
           id: true, number: true, status: true,
-          project: { select: { client: { select: { name: true } } } },
+          project: { select: { clientId: true } },
         },
       }),
       db.invoice.findMany({
@@ -110,6 +111,12 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
       }),
     ]);
 
+  const clientMap = await resolveClients(db, [
+    ...projects.map((p) => p.clientId),
+    ...quotes.map((q) => q.project?.clientId),
+    ...orders.map((o) => o.project?.clientId),
+  ]);
+
   const hits: SearchHit[] = [
     ...clients.map((c): SearchHit => ({
       kind: "client", id: c.id, title: c.name,
@@ -118,7 +125,7 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
     })),
     ...projects.map((p): SearchHit => ({
       kind: "project", id: p.id, title: p.name,
-      subtitle: `${p.number} · ${p.client.name}`,
+      subtitle: `${p.number} · ${clientMap.get(p.clientId)?.name ?? UNKNOWN_CLIENT}`,
       href: `/projects/${p.id}`,
     })),
     ...quotes.map((q): SearchHit => ({
@@ -126,13 +133,13 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
       // Lead-scoped quotations have no project; label them "Lead quote"
       // until the search index grows a lead-name lookup next session.
       subtitle: q.project
-        ? `${q.project.client.name} · ${q.status.toLowerCase()}`
+        ? `${clientMap.get(q.project.clientId)?.name ?? UNKNOWN_CLIENT} · ${q.status.toLowerCase()}`
         : `Lead quote · ${q.status.toLowerCase()}`,
       href: `/quotations/${q.id}`,
     })),
     ...orders.map((o): SearchHit => ({
       kind: "order", id: o.id, title: o.number,
-      subtitle: `${o.project.client.name} · ${o.status.toLowerCase()}`,
+      subtitle: `${(o.project ? clientMap.get(o.project.clientId)?.name : null) ?? UNKNOWN_CLIENT} · ${o.status.toLowerCase()}`,
       href: `/orders/${o.id}`,
     })),
     ...invoices.map((i): SearchHit => ({

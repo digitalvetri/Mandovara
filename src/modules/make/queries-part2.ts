@@ -4,6 +4,7 @@ import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { MakeJobDetail } from "./queries";
+import { resolveClient, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export async function getMakeJob(
   ctx: RequestContext,
@@ -46,7 +47,7 @@ export async function getMakeJob(
       where: { id: job.projectId },
       select: {
         name: true,
-        client: { select: { name: true } },
+        clientId: true,
         orders: { where: { id: job.orderId }, select: { number: true }, take: 1 },
       },
     }),
@@ -71,6 +72,8 @@ export async function getMakeJob(
       : Promise.resolve([]),
   ]);
 
+  const client = await resolveClient(orgPrisma(ctx.orgId), project?.clientId);
+
   const cwIds = [...new Set(orderLines.map((l) => l.colourwayId).filter(Boolean))] as string[];
   const colourways = cwIds.length > 0
     ? await orgPrisma(ctx.orgId).colourway.findMany({ where: { id: { in: cwIds } }, select: { id: true, code: true, colourName: true } })
@@ -91,7 +94,7 @@ export async function getMakeJob(
     completedAt:    job.completedAt,
     projectId:      job.projectId,
     projectName:    project?.name ?? "—",
-    clientName:     project?.client.name ?? "—",
+    clientName:     client?.name ?? UNKNOWN_CLIENT,
     orderId:        job.orderId,
     orderNumber:    project?.orders[0]?.number ?? "—",
     vendorName:     vendor?.name ?? null,

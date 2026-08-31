@@ -6,6 +6,7 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import { resolveClients, resolveClient, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export interface ListProjectsQuery {
   search?: string;
@@ -145,7 +146,7 @@ export async function listProjects(
       select: {
         id: true, number: true, name: true, stage: true,
         orderValue: true, expectedInstallAt: true, createdAt: true,
-        client: { select: { id: true, name: true } },
+        clientId: true,
         milestones: {
           orderBy: { order: "asc" },
           select: { id: true, name: true, status: true, order: true },
@@ -155,6 +156,8 @@ export async function listProjects(
     db.project.count({ where }),
   ]);
 
+  const clientMap = await resolveClients(db, rows.map((r) => r.clientId));
+
   return {
     rows: rows.map((r) => {
       const done  = r.milestones.filter((m) => m.status === "COMPLETED").length;
@@ -162,7 +165,7 @@ export async function listProjects(
       const next  = r.milestones.find((m) => m.status !== "COMPLETED") ?? null;
       return {
         id: r.id, number: r.number, name: r.name, stage: r.stage,
-        clientId: r.client.id, clientName: r.client.name,
+        clientId: r.clientId, clientName: clientMap.get(r.clientId)?.name ?? UNKNOWN_CLIENT,
         orderValue: r.orderValue,
         expectedInstallAt: r.expectedInstallAt,
         createdAt: r.createdAt,
@@ -198,14 +201,18 @@ export async function getProject(ctx: RequestContext, id: string): Promise<Proje
       id: true, number: true, name: true, stage: true, branchId: true, ownerId: true,
       siteAddress: true, siteContactName: true, siteContactMobile: true,
       expectedInstallAt: true, orderValue: true, createdAt: true,
-      client: { select: { id: true, name: true, mobile: true } },
+      clientId: true,
     },
   });
   if (!row) return null;
 
+  const client = await resolveClient(db, row.clientId);
+
   return {
     id: row.id, number: row.number, name: row.name, stage: row.stage,
-    clientId: row.client.id, clientName: row.client.name, clientMobile: row.client.mobile,
+    clientId: row.clientId,
+    clientName: client?.name ?? UNKNOWN_CLIENT,
+    clientMobile: client?.mobile ?? "",
     branchId: row.branchId, ownerId: row.ownerId,
     siteAddress: row.siteAddress as Record<string, unknown> | null,
     siteContactName: row.siteContactName,

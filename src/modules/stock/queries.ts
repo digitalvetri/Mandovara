@@ -2,6 +2,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import { resolveClients, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 // ── Stock balances ─────────────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ export async function listAllocationCandidates(
       order: {
         select: {
           number: true, status: true,
-          project: { select: { client: { select: { name: true } } } },
+          project: { select: { clientId: true } },
         },
       },
     },
@@ -162,6 +163,8 @@ export async function listAllocationCandidates(
       select: { id: true, code: true, colourName: true, design: { select: { family: true } } },
     }),
   ]);
+
+  const clientMap = await resolveClients(db, lines.map((l) => l.order.project?.clientId));
 
   const allocByLine = new Map<string, { qty: Decimal; lot: string | null }>();
   for (const a of allocations) {
@@ -196,7 +199,7 @@ export async function listAllocationCandidates(
         existingLot:  allocInfo.lot,
         orderNumber:  l.order.number,
         orderStatus:  l.order.status,
-        clientName:   l.order.project.client.name,
+        clientName:   clientMap.get(l.order.project.clientId)?.name ?? UNKNOWN_CLIENT,
         rateStr:      l.rate.toString(),
       };
     })

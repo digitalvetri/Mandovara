@@ -2,6 +2,7 @@ import { orgPrisma } from "@/kernel/db/rls";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { MakeJobStatus } from "@/kernel/db/client";
+import { resolveClients, UNKNOWN_CLIENT } from "@/kernel/db/resolve-clients";
 
 export interface MakeJobRow {
   id: string;
@@ -124,7 +125,7 @@ export async function listMakeJobs(
   const [projects, vendors, assignees, orders, measItems] = await Promise.all([
     orgPrisma(ctx.orgId).project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, name: true, client: { select: { name: true } } },
+      select: { id: true, name: true, clientId: true },
     }),
     vendorIds.length > 0
       ? orgPrisma(ctx.orgId).vendor.findMany({ where: { id: { in: vendorIds } }, select: { id: true, name: true } })
@@ -142,6 +143,8 @@ export async function listMakeJobs(
         })
       : Promise.resolve([]),
   ]);
+
+  const clientMap = await resolveClients(orgPrisma(ctx.orgId), projects.map((p) => p.clientId));
 
   const projectMap  = new Map(projects.map((p) => [p.id, p]));
   const vendorMap   = new Map(vendors.map((v) => [v.id, v.name]));
@@ -161,7 +164,7 @@ export async function listMakeJobs(
       id: j.id, number: j.number, status: j.status, priority: j.priority,
       targetDate: j.targetDate, startedAt: j.startedAt, completedAt: j.completedAt,
       projectId: j.projectId, orderId: j.orderId,
-      projectName: project?.name ?? "—", clientName: project?.client.name ?? "—",
+      projectName: project?.name ?? "—", clientName: (project ? clientMap.get(project.clientId)?.name : null) ?? UNKNOWN_CLIENT,
       orderNumber: orderMap.get(j.orderId) ?? "—",
       vendorName: j.vendorId ? (vendorMap.get(j.vendorId) ?? null) : null,
       assignedToName: j.assignedToId ? (assigneeMap.get(j.assignedToId) ?? null) : null,

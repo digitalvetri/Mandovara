@@ -12,6 +12,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { MeasurementStatusStr } from "./queries-types";
 import { resolveSubject, type RoundSubject } from "./subject";
+import { resolveClients } from "@/kernel/db/resolve-clients";
 
 export interface OrgRoundRow {
   id:             string;
@@ -89,7 +90,7 @@ export async function listOrgRounds(
       project: {
         select: {
           id: true, name: true, number: true,
-          client: { select: { id: true, name: true } },
+          clientId: true,
         },
       },
       items: { select: { id: true, roomId: true } },
@@ -113,6 +114,7 @@ export async function listOrgRounds(
     ? await db.lead.findMany({ where: { id: { in: leadIds } }, select: { id: true, name: true, number: true } })
     : [];
   const leadById = new Map(leads.map((l) => [l.id, l] as const));
+  const clientMap = await resolveClients(db, window.map((r) => r.project?.clientId));
 
   const rows: OrgRoundRow[] = window.map((r) => ({
     id:             r.id,
@@ -125,9 +127,12 @@ export async function listOrgRounds(
     itemCount:      r.items.length,
     roomCount:      new Set(r.items.map((i) => i.roomId)).size,
     supersedesId:   r.supersedesId,
-    subject:        resolveSubject(r.project, r.leadId ? leadById.get(r.leadId) : null),
-    clientId:       r.project?.client?.id   ?? null,
-    clientName:     r.project?.client?.name ?? null,
+    subject:        resolveSubject(
+      r.project ? { ...r.project, client: clientMap.get(r.project.clientId) ?? null } : null,
+      r.leadId ? leadById.get(r.leadId) : null,
+    ),
+    clientId:       r.project?.clientId ?? null,
+    clientName:     r.project ? clientMap.get(r.project.clientId)?.name ?? null : null,
   }));
 
   // Header pills — one groupBy per status.  Cheap enough at this scale
