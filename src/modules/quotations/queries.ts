@@ -113,6 +113,8 @@ export interface QuotationDetail {
   termsText: string | null;
   shareToken: string | null;
   shareTokenExpiresAt: Date | null;
+  /** Edits spent since the last owner unlock — see edit-budget.ts. */
+  editCount: number;
   lines: QuotationLine[];
 }
 

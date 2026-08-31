@@ -1207,6 +1207,22 @@ model Quotation {
   ownerConvertApprovedById String?
   ownerConvertApprovedAt   DateTime?
 
+  // Edit budget (owner, 2026-08-31): an employee may edit a quotation
+  // three times on their own. The fourth needs an owner to unlock it,
+  // and unlocking grants three more.
+  //
+  // Deliberately NOT `revision`. Revision counts reissues — a new
+  // document sent to the client — while this counts times the employee
+  // changed the lines before sending anything. Reusing it would make
+  // "how many edits are left" depend on how many times the quote was
+  // reissued, which is a different question.
+  //
+  // editCount resets to 0 each time editsUnlockedAt is stamped, so the
+  // remaining budget is always EDIT_BUDGET - editCount.
+  editCount           Int       @default(0)
+  editsUnlockedById   String?
+  editsUnlockedAt     DateTime?
+
   project Project?        @relation(fields: [projectId], references: [id])
   lines   QuotationLine[]
 

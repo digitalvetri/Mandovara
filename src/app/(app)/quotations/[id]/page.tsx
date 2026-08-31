@@ -16,6 +16,7 @@ function serializeQuotation(q: QuotationDetail, shareToken: string | null): Seri
     number: q.number,
     revision: q.revision,
     status: q.status,
+    editCount: q.editCount,
     branchId: q.branchId,
     branchName: q.branchName,
     supplierStateCode: q.supplierStateCode,

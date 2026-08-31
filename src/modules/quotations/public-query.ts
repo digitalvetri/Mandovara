@@ -78,6 +78,8 @@ export async function getQuotationByShareToken(
     id: row.id, number: row.number, revision: row.revision, status: row.status,
     branchId: row.branchId, branchName: branch.name, supplierStateCode: branch.stateCode,
     ownerName: owner?.name ?? null, leadId: row.leadId, clientId: row.clientId,
+    // The public share view has no editor, so the budget is irrelevant here.
+    editCount: 0,
     clientName, clientMobile, clientEmail, clientGstin, projectName, siteArea, projectId: row.projectId,
     date: row.date, validUntil: row.validUntil, termsText: row.termsText,
     shareToken: row.shareToken ?? null, shareTokenExpiresAt: row.shareTokenExpiresAt ?? null,

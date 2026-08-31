@@ -33,6 +33,7 @@ export async function getQuotation(
       leadId: true, projectId: true, clientId: true, ownerId: true,
       date: true, validUntil: true, termsText: true, shareToken: true, shareTokenExpiresAt: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
+      editCount: true,
       // Client fetched separately below, not nested. Project.client is a
       // REQUIRED relation, so Prisma fails the whole query when the join
       // returns nothing under scoped()/RLS — see listQuotations().
@@ -129,6 +130,7 @@ export async function getQuotation(
     igst: row.igst,
     roundOff: row.roundOff,
     total: row.total,
+    editCount: row.editCount,
     lines: row.lines.map((l) => {
       const cw = l.colourwayId ? cwMap.get(l.colourwayId) : undefined;
       return {

@@ -8,12 +8,13 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
-import { requirePermission } from "@/kernel/rbac/guard";
+import { requirePermission, can } from "@/kernel/rbac/guard";
 import { parseINR } from "@/kernel/money/format";
 import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kernel/tax/gst";
 import { devContext } from "@/lib/dev-context";
 import "@/kernel/events/register";
 import { findMeasurementGateViolation, zodError } from "./lib";
+import { checkEditBudget, EDIT_BUDGET } from "./edit-budget";
 import { quotationLineInput, type QuotationLineInput } from "./schema";
 import type { ActionResult } from "./actions";
 
@@ -66,11 +67,22 @@ export async function updateQuotationLines(
 
   const q = await db.quotation.findUnique({
     where: { id: d.quotationId },
-    select: { id: true, status: true, branchId: true },
+    select: { id: true, status: true, branchId: true, editCount: true },
   });
   if (!q) return { ok: false, error: "Quotation not found" };
   if (!["DRAFT", "REVISED"].includes(q.status)) {
     return { ok: false, error: "Only DRAFT quotations can have their lines edited" };
+  }
+
+  // §edit-budget — three edits per employee, then an owner unlocks three
+  // more. Enforced HERE and not only in the UI: hiding the button is a
+  // courtesy, this is the rule (CLAUDE.md #11).
+  const verdict = checkEditBudget({
+    editCount:  q.editCount,
+    canApprove: can(ctx, "quotation.approve"),
+  });
+  if (!verdict.allowed) {
+    return { ok: false, errorCode: "EDIT_BUDGET_EXHAUSTED", error: verdict.reason ?? "Edit limit reached." };
   }
 
   const branch = await db.branch.findUniqueOrThrow({
@@ -189,10 +201,57 @@ export async function updateQuotationLines(
         igst:          totals.igst,
         roundOff:      totals.roundOff,
         total:         totals.total,
+        // Spend one edit, inside the same transaction as the change it
+        // paid for. Counted outside it, a failed write would still burn
+        // a budget the employee never used.
+        ...(verdict.allowed && !can(ctx, "quotation.approve")
+          ? { editCount: { increment: 1 } }
+          : {}),
       },
     });
   }, { orgId: ctx.orgId });
 
   revalidatePath(`/quotations/${d.quotationId}`);
   return { ok: true, data: { id: d.quotationId } };
+}
+
+/**
+ * Owner unlocks a quotation whose employee has used all three edits.
+ *
+ * Resets the counter rather than raising a ceiling, because the owner's
+ * rule is "three more", not "four in total" — so an unlock is worth the
+ * same whether it is the first or the fifth.
+ */
+export async function unlockQuotationEdits(
+  quotationId: string,
+): Promise<ActionResult<{ id: string; remaining: number }>> {
+  const ctx = await devContext();
+  try {
+    requirePermission(ctx, "quotation.approve");
+  } catch {
+    return { ok: false, error: "Only the studio owner can unlock a quotation for more edits." };
+  }
+
+  const db = scoped(ctx);
+  const q = await db.quotation.findUnique({
+    where:  { id: quotationId },
+    select: { id: true, editCount: true },
+  });
+  if (!q) return { ok: false, error: "Quotation not found" };
+  if (q.editCount === 0) {
+    return { ok: false, error: "That quotation still has all its edits — nothing to unlock." };
+  }
+
+  await db.quotation.update({
+    where: { id: quotationId },
+    data: {
+      editCount:         0,
+      editsUnlockedById: ctx.userId,
+      editsUnlockedAt:   new Date(),
+    },
+  });
+
+  revalidatePath(`/quotations/${quotationId}`);
+  revalidatePath("/quotations");
+  return { ok: true, data: { id: quotationId, remaining: EDIT_BUDGET } };
 }

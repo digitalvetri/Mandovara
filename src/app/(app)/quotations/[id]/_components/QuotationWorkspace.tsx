@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Save } from "lucide-react";
 import { updateQuotationLines } from "@/modules/quotations/actions-status";
+import { EditBudgetBar } from "./EditBudgetBar";
 import type { EditLine } from "./QuotePreviewA4";
 import type { SerializedQuotation } from "../_types";
 import { SELL_UNITS, newKey, computeTotals, initLines } from "./workspace-helpers";
@@ -12,7 +13,7 @@ import { QuoteItemRow } from "./QuoteItemRow";
 
 export function QuotationWorkspace({
   quotation,
-  canApprove: _canApprove,
+  canApprove,
 }: {
   quotation: SerializedQuotation;
   canApprove: boolean;
@@ -85,6 +86,17 @@ export function QuotationWorkspace({
   }
 
   return (
+    <>
+    {/* How many edits are left. Enforced server-side in
+        updateQuotationLines; this only makes the limit visible before
+        someone spends twenty minutes rearranging lines. */}
+    {isDraft && (
+      <EditBudgetBar
+        quotationId={quotation.id}
+        editCount={quotation.editCount}
+        canApprove={canApprove}
+      />
+    )}
     <div className="rounded-[16px] bg-surface border border-rule overflow-hidden shadow-sm">
 
       {/* ── Section header ──────────────────────────────────────────── */}
@@ -195,5 +207,6 @@ export function QuotationWorkspace({
         totalRupees={totalRupees}
       />
     </div>
+    </>
   );
 }

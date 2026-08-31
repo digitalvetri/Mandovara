@@ -23,6 +23,8 @@ export interface SerializedLine {
 }
 
 export interface SerializedQuotation {
+  /** Edits spent since the last owner unlock — see edit-budget.ts. */
+  editCount: number;
   id: string;
   number: string;
   revision: number;
