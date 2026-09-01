@@ -1164,7 +1164,14 @@ model CalcResult {
   warnings          String[]
   computedAt        DateTime   @default(now())
 
-  item MeasurementItem @relation(fields: [measurementItemId], references: [id])
+  // Cascade: a CalcResult is the engine's OUTPUT for one item, uniquely
+  // owned by it (@unique above). Without this the FK defaulted to
+  // RESTRICT and deleting any measured item — every item with dimensions
+  // has a calc row — failed with a foreign key violation, which the UI
+  // showed as "Something went wrong". An orphaned calc row is
+  // unreachable and meaningless; updateMeasurementItem already deletes
+  // and rewrites it on every edit.
+  item MeasurementItem @relation(fields: [measurementItemId], references: [id], onDelete: Cascade)
 }
 
 // ─── QUOTATION ────────────────────────────────────────────────────────────────
