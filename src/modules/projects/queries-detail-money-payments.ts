@@ -164,13 +164,27 @@ export async function getProjectChosenItems(
   });
   if (!round) return [];
 
+  // Nothing below nests a REQUIRED relation, and that is deliberate.
+  //
+  // MeasurementItem.room, Colourway.design, Design.collection and
+  // Collection.brand are all non-nullable in the schema, so Prisma
+  // asserts a row came back for each one. Under scoped()/RLS a join can
+  // legitimately return nothing — a row outside the caller's org, or one
+  // a policy hides — and Prisma then fails the ENTIRE findMany with
+  // "Inconsistent query result: Field room is required to return data,
+  // got null instead". One unreachable room takes down the whole project
+  // page, which is exactly how the quotations list went down.
+  //
+  // Fetching each level separately by id costs four small indexed
+  // queries and downgrades a missing row from a crashed page to a dash
+  // in one cell.
   const items = await db.measurementItem.findMany({
     where:   { measurementId: round.id },
     orderBy: [{ roomId: "asc" }, { label: "asc" }],
     select: {
       id: true, label: true, family: true, quantity: true,
       widthMm: true, heightMm: true, enteredUnit: true, photoKeys: true,
-      room: { select: { name: true } },
+      roomId: true,
       calc: {
         select: {
           colourwayId: true,
@@ -180,6 +194,11 @@ export async function getProjectChosenItems(
     },
   });
 
+  const roomIds = Array.from(new Set(items.map((i) => i.roomId)));
+  const rooms = roomIds.length === 0 ? [] :
+    await db.room.findMany({ where: { id: { in: roomIds } }, select: { id: true, name: true } });
+  const roomName = new Map(rooms.map((r) => [r.id, r.name] as const));
+
   const colourwayIds = Array.from(new Set(
     items.map((i) => i.calc?.colourwayId).filter((v): v is string => !!v),
   ));
@@ -188,22 +207,40 @@ export async function getProjectChosenItems(
       where:  { id: { in: colourwayIds } },
       select: {
         id: true, code: true, colourName: true, hex: true, imageKey: true,
-        design: {
-          select: {
-            name: true,
-            collection: { select: { brand: { select: { name: true } } } },
-          },
-        },
+        designId: true,
       },
     });
   const byId = new Map(colourways.map((c) => [c.id, c]));
 
+  // design → collection → brand, one level at a time.
+  const designIds = Array.from(new Set(colourways.map((c) => c.designId)));
+  const designs = designIds.length === 0 ? [] :
+    await db.design.findMany({
+      where: { id: { in: designIds } }, select: { id: true, name: true, collectionId: true },
+    });
+  const designById = new Map(designs.map((d) => [d.id, d] as const));
+
+  const collectionIds = Array.from(new Set(designs.map((d) => d.collectionId)));
+  const collections = collectionIds.length === 0 ? [] :
+    await db.collection.findMany({
+      where: { id: { in: collectionIds } }, select: { id: true, brandId: true },
+    });
+  const collectionById = new Map(collections.map((c) => [c.id, c] as const));
+
+  const brandIds = Array.from(new Set(collections.map((c) => c.brandId)));
+  const brands = brandIds.length === 0 ? [] :
+    await db.brand.findMany({ where: { id: { in: brandIds } }, select: { id: true, name: true } });
+  const brandName = new Map(brands.map((b) => [b.id, b.name] as const));
+
   return items.map((i) => {
     const cw = i.calc?.colourwayId ? byId.get(i.calc.colourwayId) : undefined;
+    const design = cw ? designById.get(cw.designId) : undefined;
+    const collection = design ? collectionById.get(design.collectionId) : undefined;
+    const brand = collection ? brandName.get(collection.brandId) : undefined;
     return {
       id:            i.id,
       label:         i.label,
-      roomName:      i.room.name,
+      roomName:      roomName.get(i.roomId) ?? "—",
       family:        i.family,
       enteredUnit:   i.enteredUnit,
       widthMm:       i.widthMm.toString(),
@@ -215,8 +252,8 @@ export async function getProjectChosenItems(
       colourName:    cw?.colourName ?? null,
       hex:           cw?.hex ?? null,
       imageKey:      cw?.imageKey ?? null,
-      designName:    cw?.design.name ?? null,
-      brandName:     cw?.design.collection.brand.name ?? null,
+      designName:    design?.name ?? null,
+      brandName:     brand ?? null,
       materialQty:   i.calc?.materialQty.toString() ?? null,
       materialUnit:  i.calc?.materialUnit ?? null,
     };
