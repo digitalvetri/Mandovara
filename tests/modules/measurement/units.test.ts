@@ -10,8 +10,11 @@ import {
 
 describe("unit round trip", () => {
   const cases: Record<Unit, string[]> = {
-    in: ["60", "96", "7", "7.5", "144", "18.5"],
-    ft: ["7", "8", "12", "7.5", "10.25"],
+    // Fractions are the point. A tape does not read whole inches, and
+    // 60¼ coming back as 60.3 is a different window from the one that
+    // was measured.
+    in: ["60", "96", "7", "7.5", "144", "18.5", "60.25", "60.75", "8.125", "36.375"],
+    ft: ["7", "8", "12", "7.5", "10.25", "6.125", "9.875"],
     mm: ["1524", "2400", "300"],
   };
 
@@ -40,6 +43,25 @@ describe("fromMm", () => {
   it("keeps a real fraction", () => {
     expect(fromMm(190.5, "in")).toBe("7.5");
     expect(fromMm(2286, "ft")).toBe("7.5");
+  });
+
+  it("keeps quarters and eighths of an inch", () => {
+    // These are what a tape actually reads. One decimal place turned
+    // 60.25 into 60.3 — the bug this precision exists to prevent.
+    expect(fromMm(1530.35, "in")).toBe("60.25");
+    expect(fromMm(1543.05, "in")).toBe("60.75");
+    expect(fromMm(206.38,  "in")).toBe("8.125");
+  });
+
+  it("survives every eighth of an inch, whole tape's worth", () => {
+    for (let eighths = 8; eighths <= 200 * 8; eighths++) {
+      const typed = eighths / 8;
+      // Through toMm, then through the Decimal(10,2) mm column.
+      const stored = Math.round((toMm(String(typed), "in") as number) * 100) / 100;
+      expect(fromMm(stored, "in")).toBe(
+        String(typed).includes(".") ? String(typed) : String(typed),
+      );
+    }
   });
 
   it("rounds millimetres to whole numbers", () => {

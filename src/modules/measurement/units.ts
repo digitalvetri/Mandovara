@@ -42,17 +42,23 @@ export function toMm(value: string, unit: Unit): number | null {
 /**
  * Convert millimetres back to a display unit.
  *
- * Trailing zeros are stripped: someone who typed 60 should read 60, not
- * "60.0", which claims a precision they never gave. The rounding is one
- * decimal for inches and two for feet — enough to survive the mm round
- * trip for anything a tape actually reads.
+ * Three decimals, then strip the trailing zeros. Both halves matter:
+ *
+ * - Three, because a tape reads fractions. 60¼ inch is 1530.35 mm, and
+ *   one decimal place hands it back as 60.3 — a different window from
+ *   the one that was measured. Three decimals round-trip every eighth
+ *   of an inch and every eighth of a foot exactly. (A sixteenth does
+ *   not survive, because the mm columns are Decimal(10,2); that is a
+ *   storage limit, not a formatting one.)
+ * - Stripped, because someone who typed 60 should read 60, not
+ *   "60.000", which claims a precision they never gave.
  */
 export function fromMm(mm: number, unit: Unit): string {
   if (!Number.isFinite(mm)) return "";
   const fixed =
     unit === "mm" ? Math.round(mm).toString()
-  : unit === "in" ? (mm / MM_PER_INCH).toFixed(1)
-  :                 (mm / MM_PER_FOOT).toFixed(2);
+  : unit === "in" ? (mm / MM_PER_INCH).toFixed(3)
+  :                 (mm / MM_PER_FOOT).toFixed(3);
   return trimZeros(fixed);
 }
 
