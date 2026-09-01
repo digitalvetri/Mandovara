@@ -128,6 +128,8 @@ export type ProjectChosenItem = {
   label:           string;
   roomName:        string;
   family:          string;
+  /** Unit the measurer typed in; null reads as mm. */
+  enteredUnit:     string | null;
   widthMm:         string;
   heightMm:        string;
   quantity:        number;
@@ -167,7 +169,7 @@ export async function getProjectChosenItems(
     orderBy: [{ roomId: "asc" }, { label: "asc" }],
     select: {
       id: true, label: true, family: true, quantity: true,
-      widthMm: true, heightMm: true, photoKeys: true,
+      widthMm: true, heightMm: true, enteredUnit: true, photoKeys: true,
       room: { select: { name: true } },
       calc: {
         select: {
@@ -203,6 +205,7 @@ export async function getProjectChosenItems(
       label:         i.label,
       roomName:      i.room.name,
       family:        i.family,
+      enteredUnit:   i.enteredUnit,
       widthMm:       i.widthMm.toString(),
       heightMm:      i.heightMm.toString(),
       quantity:      i.quantity,

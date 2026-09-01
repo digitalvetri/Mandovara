@@ -8,6 +8,8 @@ import { deleteMeasurementItem, updateMeasurementItem } from "@/modules/measurem
 import {
   SURFACE_TYPES, HEADING_TYPES, LAY_PATTERNS, MOUNT_TYPES, PRODUCT_FAMILIES,
 } from "@/modules/measurement/schema";
+import { displayDimension } from "@/modules/measurement/units";
+import { EField, ESelect } from "./edit-fields";
 
 interface ItemCardProps {
   item:          ItemDetail;
@@ -133,6 +135,13 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
     );
   }
 
+  // Read the size back in the unit it was measured in. Storage is mm and
+  // stays mm; showing someone "1524 mm" for the 60 inches they wrote on
+  // site makes them re-do the arithmetic to check their own work (owner,
+  // 2026-09-01). Rows measured before we recorded the unit read as mm.
+  const w = displayDimension(item.widthMm,  item.enteredUnit);
+  const h = displayDimension(item.heightMm, item.enteredUnit);
+
   return (
     <article className="grid grid-cols-[3px_1fr] gap-3 rounded-[8px] border border-rule bg-surface-2 overflow-hidden">
       <div className="bg-gold self-stretch" aria-hidden />
@@ -152,7 +161,7 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
 
           <div className="tabular text-[12.5px] text-text-dim mb-1">
             {parseFloat(item.widthMm) > 0 && parseFloat(item.heightMm) > 0 && (
-              <>{formatMm(item.widthMm)} mm × {formatMm(item.heightMm)} mm{" "}</>
+              <>{w.value} {w.unit} × {h.value} {h.unit}{" "}</>
             )}
             {item.quantity > 0 && (
               parseFloat(item.widthMm) > 0
@@ -238,49 +247,6 @@ export function ItemCard({ item, measurementId, editable }: ItemCardProps) {
         )}
       </div>
     </article>
-  );
-}
-
-// ── Inline edit field primitives ──────────────────────────────────────
-function EField({
-  label, value, onChange, placeholder, inputMode, width,
-}: {
-  label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; inputMode?: "decimal" | "numeric"; width?: string;
-}) {
-  return (
-    <label className={`flex flex-col gap-1 ${width ?? ""}`}>
-      <span className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim">{label}</span>
-      <input
-        type="text"
-        inputMode={inputMode}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="h-[36px] rounded-[6px] border border-rule bg-transparent px-2 text-[12.5px] text-text tabular"
-      />
-    </label>
-  );
-}
-
-function ESelect({
-  label, value, onChange, options,
-}: {
-  label: string; value: string; onChange: (v: string) => void; options: readonly string[];
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-[36px] rounded-[6px] border border-rule bg-transparent px-2 pr-8 text-[12.5px] text-text"
-      >
-        {options.map((o) => (
-          <option key={o} value={o}>{o.replace(/_/g, " ")}</option>
-        ))}
-      </select>
-    </label>
   );
 }
 

@@ -3,19 +3,16 @@
 // display unit is a UI concept only.
 
 import type { ItemDraft, Unit } from "./types";
-
-const MM_PER_INCH = 25.4;
-const MM_PER_FOOT = 304.8;
+import { toMm as mmFrom } from "@/modules/measurement/units";
 
 const CURTAIN_FAMILIES = new Set(["CURTAIN_FABRIC", "SHEER"]);
 const WALLPAPER_FAMILIES = new Set(["WALLPAPER"]);
 
+// The shared helper returns null for "not a positive number"; this
+// payload has always sent 0 for a blank dimension, and the server
+// schema is built around that.
 function toMm(value: string, unit: Unit): number {
-  const n = parseFloat(value);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  if (unit === "mm") return n;
-  if (unit === "in") return n * MM_PER_INCH;
-  return n * MM_PER_FOOT;
+  return mmFrom(value, unit) ?? 0;
 }
 
 export function toEnqueuePayload(
@@ -31,6 +28,7 @@ export function toEnqueuePayload(
     surface:       draft.surface,
     widthMm:       toMm(draft.widthMm,  unit),
     heightMm:      toMm(draft.heightMm, unit),
+    enteredUnit:   unit,
     quantity:      parseInt(draft.quantity, 10) || 1,
     family:        draft.family,
   };

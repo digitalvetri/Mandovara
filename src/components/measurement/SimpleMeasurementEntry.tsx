@@ -14,18 +14,16 @@
 //
 // Units follow the field PWA: stored in mm always, entered in whatever
 // the person is holding a tape in. Default is inches, which is what a
-// tape reads on site here; the toggle is one tap away.
+// tape reads on site here; the toggle is one tap away. The chosen unit
+// is saved with the row, so the item card afterwards shows 60 inch
+// rather than the 1524 mm it became (owner, 2026-09-01).
 
 import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { addSimpleMeasurementItem } from "@/modules/measurement/actions-simple";
 import { SIMPLE_FAMILIES, FAMILY_LABEL, type SimpleFamily } from "@/modules/measurement/simple-families";
 import { FIELD_PLAN, asks } from "@/modules/measurement/simple-field-plan";
-import { toMm } from "@/app/(mobile)/m/measure/[projectId]/_components/unit-convert";
-
-type Unit = "mm" | "in" | "ft";
-const UNITS: Unit[] = ["in", "ft", "mm"];
-const UNIT_LABEL: Record<Unit, string> = { mm: "mm", in: "inch", ft: "ft" };
+import { toMm, UNITS, UNIT_LABEL, type Unit } from "@/modules/measurement/units";
 
 interface Props {
   measurementId: string;
@@ -99,6 +97,9 @@ export function SimpleMeasurementEntry({ measurementId, onAdded }: Props) {
         quantity,
         ...(w !== null && { widthMm:  w }),
         ...(h !== null && { heightMm: h }),
+        // Remember the tape, so the card reads back what was typed
+        // instead of the mm it became.
+        ...((w !== null || h !== null) && { enteredUnit: unit }),
         ...(partsN  !== null && { parts:         partsN }),
         ...(metersN !== null && { runningMeters: metersN }),
       });

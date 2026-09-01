@@ -117,7 +117,7 @@ export async function getRoundDetail(
         orderBy: [{ room: { sortOrder: "asc" } }, { label: "asc" }],
         select: {
           id: true, roomId: true, label: true, surface: true, openingType: true,
-          widthMm: true, heightMm: true, depthMm: true, quantity: true,
+          widthMm: true, heightMm: true, depthMm: true, enteredUnit: true, quantity: true,
           deductions: true, family: true, headingType: true, fullness: true,
           layPattern: true, mountType: true, requiresPowerPoint: true,
           photoKeys: true, sketchKey: true, notes: true,
@@ -212,7 +212,7 @@ type ItemRow = {
   id: string; roomId: string; label: string; surface: string;
   openingType: string | null; widthMm: { toString: () => string };
   heightMm: { toString: () => string }; depthMm: { toString: () => string } | null;
-  quantity: number; deductions: unknown; family: string;
+  enteredUnit: string | null; quantity: number; deductions: unknown; family: string;
   headingType: string | null; fullness: { toString: () => string } | null;
   layPattern: string | null; mountType: string | null; requiresPowerPoint: boolean;
   photoKeys: string[]; sketchKey: string | null; notes: string | null;
@@ -243,6 +243,7 @@ function toItemDetail(
     widthMm:            it.widthMm.toString(),
     heightMm:           it.heightMm.toString(),
     depthMm:            it.depthMm?.toString() ?? null,
+    enteredUnit:        it.enteredUnit,
     quantity:           it.quantity,
     deductions:         it.deductions,
     family:             it.family,

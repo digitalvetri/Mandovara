@@ -92,6 +92,11 @@ const itemCoreShape = {
   widthMm:      mmOpt,
   heightMm:     mmOpt,
   depthMm:      mmOpt,
+  // Which tape the numbers above were read off. Storage stays mm; this
+  // is only so the same person reads their own figure back. Optional
+  // because the offline queue can still hold items an older build
+  // serialised without it — those read as mm, which is what they are.
+  enteredUnit:  z.enum(["mm", "in", "ft"]).optional(),
   quantity:     z.number().int().positive().max(200).default(1),
   // Curtain-only, both optional — see simple-field-plan.ts. A wide window
   // is normally split into two panels and the tailor has to be told;

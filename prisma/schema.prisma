@@ -1122,6 +1122,11 @@ model MeasurementItem {
   // calc derive it. Neither is asked for any other family.
   parts              Int?
   runningMeters      Decimal?      @db.Decimal(10, 3)
+  // Which tape the person was holding — "mm" | "in" | "ft". Storage is
+  // still millimetres and always will be; this only says how to read the
+  // number back to whoever wrote it down. Null on every row measured
+  // before 2026-09-01, which reads as mm.
+  enteredUnit        String?       @db.VarChar(4)
   requiresPowerPoint Boolean       @default(false)
   floorLevelDiffMm   Decimal?      @db.Decimal(10, 2)
   photoKeys          String[]

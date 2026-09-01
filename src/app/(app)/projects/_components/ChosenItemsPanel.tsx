@@ -3,6 +3,7 @@
 
 import { Image as ImageIcon } from "lucide-react";
 import type { ProjectChosenItem } from "@/modules/projects/queries";
+import { displayDimension } from "@/modules/measurement/units";
 
 const FAMILY_LABEL: Record<string, string> = {
   CURTAIN_FABRIC:    "Curtains",
@@ -87,10 +88,16 @@ function ItemCard({ it }: { it: ProjectChosenItem }) {
         {/* Fixed measurements */}
         <div className="mt-2 flex items-baseline gap-3 text-[11.5px] tabular-nums text-text-dim">
           <span>
-            <span className="text-text">{trimZeros(it.widthMm)}</span>
+            {/* Shown in the unit it was measured in, not the mm it is
+                stored as — the measurement card does the same, and two
+                screens quoting different numbers for one window is worse
+                than either being inconvenient. */}
+            <span className="text-text">{displayDimension(it.widthMm, it.enteredUnit).value}</span>
             <span className="mx-1 text-text-subtle">×</span>
-            <span className="text-text">{trimZeros(it.heightMm)}</span>
-            <span className="ml-0.5 text-[9.5px] text-text-subtle">mm</span>
+            <span className="text-text">{displayDimension(it.heightMm, it.enteredUnit).value}</span>
+            <span className="ml-0.5 text-[9.5px] text-text-subtle">
+              {displayDimension(it.widthMm, it.enteredUnit).unit}
+            </span>
           </span>
           {it.quantity > 1 && (
             <span className="text-text-subtle">· qty {it.quantity}</span>

@@ -56,6 +56,9 @@ export interface ItemDetail {
   widthMm:            string;
   heightMm:           string;
   depthMm:            string | null;
+  /** The unit the measurer typed the dimensions in. Null on rows written
+   *  before this was recorded — those read as mm. */
+  enteredUnit:        string | null;
   quantity:           number;
   deductions:         unknown;
   family:             string;

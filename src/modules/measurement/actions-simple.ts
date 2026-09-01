@@ -47,6 +47,9 @@ const simpleItemSchema = z.object({
   // the CalcResult write when dimensions are absent.
   widthMm:       z.number().positive().max(100_000).optional(),
   heightMm:      z.number().positive().max(100_000).optional(),
+  // The tape the person was holding. Storage is mm either way — this
+  // only decides what the card reads back to them.
+  enteredUnit:   z.enum(["mm", "in", "ft"]).optional(),
   family:        z.enum(SIMPLE_FAMILIES).default("SERVICE"),
   // Curtain-only. The form only shows them for CURTAIN_FABRIC / SHEER
   // (simple-field-plan.ts); accepted here for any family rather than
@@ -118,6 +121,7 @@ export async function addSimpleMeasurementItem(
     ...familyExtras(d.family),
     ...(d.widthMm  !== undefined && { widthMm:  d.widthMm }),
     ...(d.heightMm !== undefined && { heightMm: d.heightMm }),
+    ...(d.enteredUnit !== undefined && { enteredUnit: d.enteredUnit }),
     ...(d.parts         !== undefined && { parts:         d.parts }),
     ...(d.runningMeters !== undefined && { runningMeters: d.runningMeters }),
   });
