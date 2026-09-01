@@ -138,6 +138,28 @@ RUN chmod +x /app/docker-entrypoint.sh
 USER nextjs
 EXPOSE 3000
 
+# Let the container report its own health.
+#
+# Without this Docker computes no health status, so Coolify shows
+# "Running (no healthcheck)" — an amber dot that means "I cannot tell",
+# not "something is wrong". Declaring it here makes the image correct
+# wherever it runs, with no dashboard configuration to remember.
+#
+# --start-period is deliberately long. docker-entrypoint.sh regenerates
+# the Prisma client, applies migrations, provisions the RLS role and
+# verifies the auth bootstrap BEFORE the server accepts a connection;
+# on a deploy carrying migrations that is comfortably a minute. A short
+# start period marks a perfectly good release unhealthy while it is
+# still migrating, and anything gating on health may then roll it back.
+# Docker ends the start period early on the first success, so being
+# generous costs nothing.
+#
+# busybox wget, because the image has no curl. --spider exits 0 only on
+# 2xx: 404, 500 and 503 all exit 1, so an app that is up but broken
+# fails the check rather than passing it.
+HEALTHCHECK --interval=15s --timeout=10s --start-period=180s --retries=5 \
+  CMD wget --quiet --spider -T 5 "http://127.0.0.1:${PORT:-3000}/api/health" || exit 1
+
 # Entrypoint: apply pending migrations, seed if DB is empty, start Next.
 # All three steps idempotent — safe on every container start.
 CMD ["/app/docker-entrypoint.sh"]
