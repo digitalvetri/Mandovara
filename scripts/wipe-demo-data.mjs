@@ -31,6 +31,7 @@
 // so an accidental invocation on a live prod DB is a no-op.
 
 import { PrismaClient } from "@prisma/client";
+import { assertWipeAllowed } from "./lib/db-target.mjs";
 
 const TABLES_TO_TRUNCATE = [
   // ── CRM: fake customers / referrals ───────────────────────────────
@@ -84,12 +85,21 @@ const TABLES_TO_TRUNCATE = [
 ];
 
 async function main() {
-  if (
-    process.env["NEXT_PUBLIC_APP_URL"]?.includes("mandovara.com") &&
-    process.env["CONFIRM_WIPE"] !== "I_UNDERSTAND"
-  ) {
-    console.error("wipe-demo-data refused: production URL detected without CONFIRM_WIPE=I_UNDERSTAND");
+  // Its own client: the guard runs before the wipe client is built.
+  const db0 = new PrismaClient();
+
+  // Was: NEXT_PUBLIC_APP_URL.includes("mandovara.com") — the marketing
+  // site, not the app, which runs on mandovara.sbs. The check never fired
+  // on production and this script would have truncated a live studio's
+  // work history on any container restart with WIPE_DEMO_DATA=true.
+  // See scripts/lib/db-target.mjs.
+  try {
+    await assertWipeAllowed(() => db0.organization.count(), "wipe-demo-data");
+  } catch (err) {
+    console.error(String(err instanceof Error ? err.message : err));
     process.exit(1);
+  } finally {
+    await db0.$disconnect();
   }
 
   const db = new PrismaClient();

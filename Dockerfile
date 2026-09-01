@@ -103,6 +103,18 @@ COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nextjs:nodejs scripts/check-empty.mjs         /app/check-empty.mjs
 COPY --chown=nextjs:nodejs scripts/wipe-demo-data.mjs      /app/scripts/wipe-demo-data.mjs
 
+# The "am I about to destroy real data?" guard. REQUIRED, not optional:
+# wipe-demo-data.mjs and prisma/seed.ts both import it, and seed.ts runs
+# from the entrypoint whenever the database looks empty. Without this file
+# that import throws and the seed dies at startup.
+COPY --chown=nextjs:nodejs scripts/lib/db-target.mjs       /app/scripts/lib/db-target.mjs
+
+# Diagnostic, safe to run any time — finds rows whose required parent is
+# missing or in another org, which crash a page instead of degrading it.
+#   node /app/scripts/find-broken-relations.mjs
+COPY --chown=nextjs:nodejs scripts/find-broken-relations.mjs /app/scripts/find-broken-relations.mjs
+COPY --chown=nextjs:nodejs scripts/find-cross-org-clients.mjs /app/scripts/find-cross-org-clients.mjs
+
 # §3.2 Row-Level Security. Both are invoked by docker-entrypoint.sh on every
 # boot, so they MUST be in the image — without them the entrypoint aborts.
 #   setup-app-role       creates/rotates the restricted mandovara_app role

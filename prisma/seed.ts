@@ -2,6 +2,7 @@
 // Target: completes under 60 seconds on a Supabase ap-south-1 instance.
 // Run with: pnpm prisma db seed
 import { PrismaClient } from "@prisma/client";
+import { assertWipeAllowed } from "../scripts/lib/db-target.mjs";
 import { seedCatalog } from "./seed/catalog";
 import { seedCustomers } from "./seed/customers";
 import { seedMasters } from "./seed/masters";
@@ -145,12 +146,20 @@ async function bumpNumberSequences(db: PrismaClient, orgId: string): Promise<voi
   }
 }
 
-// Wipe all tables — dev only. Bypasses append-only triggers for TRUNCATE.
-// Never call in production: throws if NEXT_PUBLIC_APP_URL contains "mandovara.com".
+// Wipe all tables. Bypasses append-only triggers for TRUNCATE.
+//
+// main() calls this unconditionally, so it is the last thing standing
+// between `tsx prisma/seed.ts` and an empty studio. The old guard asked
+// whether NEXT_PUBLIC_APP_URL contained "mandovara.com" — the marketing
+// site, not the app, which runs on mandovara.sbs — so it never fired
+// where it mattered. See scripts/lib/db-target.mjs.
+//
+// An EMPTY remote database is still allowed through: that is a fresh
+// deployment seeding itself on first boot, and there is nothing there to
+// lose. A remote database with organizations in it is refused unless a
+// human set CONFIRM_WIPE=I_UNDERSTAND.
 async function wipe(db: PrismaClient): Promise<void> {
-  if (process.env["NEXT_PUBLIC_APP_URL"]?.includes("mandovara.com")) {
-    throw new Error("wipe() refused: production URL detected");
-  }
+  await assertWipeAllowed(() => db.organization.count(), "wipe()");
   await db.$executeRawUnsafe(`
     DO $$
     DECLARE r record;

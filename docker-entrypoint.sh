@@ -48,8 +48,14 @@ fi
 # Coolify env, redeploy, wipe runs, then remove the env var to prevent
 # re-wipe on next container restart. Non-fatal on error (server should
 # still start).
+#
+# On a remote database holding real data the script ALSO requires
+# CONFIRM_WIPE=I_UNDERSTAND — two deliberate env vars, because this
+# destroys a studio's work history and a stale WIPE_DEMO_DATA=true would
+# otherwise fire again on every restart. See scripts/lib/db-target.mjs.
 if [ "${WIPE_DEMO_DATA:-false}" = "true" ]; then
   echo "→ WIPE_DEMO_DATA=true — running scripts/wipe-demo-data.mjs"
+  echo "   (also needs CONFIRM_WIPE=I_UNDERSTAND on a populated remote database)"
   node /app/scripts/wipe-demo-data.mjs || echo "→ wipe failed, continuing anyway"
 fi
 
