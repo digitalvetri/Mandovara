@@ -10,6 +10,7 @@ import { formatDate } from "@/kernel/datetime";
 import { can } from "@/kernel/rbac/guard";
 import { loadSpending, type SpendingPeriod } from "@/modules/accounts/spending";
 import { WhereMoneyGoesBars, type ExpenseHeadUI } from "../_components/WhereMoneyGoesBars";
+import { ModePill } from "../_components/ModePill";
 import {
   NewExpenseSection, NewExpenseButton, NewExpensePanel,
 } from "../_components/NewExpenseForm";
@@ -130,6 +131,15 @@ export async function SpendingTab({ ctx, period, head }: Props) {
                     <span className="mx-1.5 opacity-40">·</span>
                     <span className="tabular">{formatDate(r.date)}</span>
                   </div>
+                  {/* How it was paid. Only overhead expenses carry one —
+                      project expenses and salaries record no tender — so
+                      the row simply omits the pill rather than printing
+                      an em dash on two thirds of the list. */}
+                  {r.mode && (
+                    <div className="mt-1.5">
+                      <ModePill mode={r.mode} />
+                    </div>
+                  )}
                 </div>
                 <div className="tabular text-[13.5px] text-text font-medium whitespace-nowrap">
                   −{formatINR(r.amount)}

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Boxes, ShoppingCart, AlertTriangle } from "lucide-react";
+import { Boxes, ShoppingCart, AlertTriangle, PackageMinus } from "lucide-react";
 
-type Key = "stock" | "purchasing" | "pending";
+type Key = "stock" | "purchasing" | "sold" | "pending";
 
 interface Tab {
   key: Key;
@@ -14,7 +14,10 @@ interface Tab {
 
 const TABS: readonly Tab[] = [
   { key: "stock",      label: "Stock",      href: "/inventory"         as Route, Icon: Boxes         },
-  { key: "purchasing", label: "Purchasing", href: "/purchase"           as Route, Icon: ShoppingCart  },
+  { key: "purchasing", label: "Purchasing", href: "/purchase"          as Route, Icon: ShoppingCart  },
+  // Counter sales (owner, 2026-09-04). Sits next to Stock because it is
+  // the other direction of the same shelf — what came in, what went out.
+  { key: "sold",       label: "Sold out",   href: "/inventory/sold"    as Route, Icon: PackageMinus  },
   { key: "pending",    label: "Pending",    href: "/inventory/pending" as Route, Icon: AlertTriangle },
 ];
 

@@ -41,6 +41,7 @@ import { RightRail } from "../_components/RightRail";
 import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
 import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
 import { ProjectWorkSections } from "../_components/ProjectWorkSections";
+import { MarkCompleteButton } from "../_components/MarkCompleteButton";
 import { getProjectLedger } from "@/modules/projects/queries-ledger";
 import { AttachmentsCard } from "@/components/documents/AttachmentsCard";
 import { listAttachments } from "@/modules/documents/queries";
@@ -142,6 +143,12 @@ export default async function ProjectDetailPage({
               payments?.latestOrderId &&
               (payments.invoices.length === 0) && (
               <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
+            )}
+            {/* Finishing the job. Not a stepper dot — see
+                MarkCompleteButton for why the stepper cannot reach
+                Completed on a project that never had a firm quote. */}
+            {ctx.permissions.has("project.update") && (
+              <MarkCompleteButton projectId={p.id} stage={p.stage} />
             )}
           </div>
         </div>

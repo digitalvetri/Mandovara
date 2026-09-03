@@ -10,14 +10,13 @@ const sel = {
   address:         'input[name="address"]',
   source:          'select[name="source"]',
   priority:        'select[name="priority"]',
-  estimatedBudget: 'input[name="estimatedBudget"]',
   ownerId:         'select[name="ownerId"]',
   requirement:     'textarea[name="requirement"]',
   submit:          'button[type="submit"]',
 };
 
 test.describe("New Lead Form — PDF spec", () => {
-  test("renders with the 10 required fields and no removed fields", async ({ page }) => {
+  test("renders with the 9 expected fields and no removed fields", async ({ page }) => {
     await page.goto("/leads/new");
     await page.waitForLoadState("load");
 
@@ -31,13 +30,18 @@ test.describe("New Lead Form — PDF spec", () => {
     await expect(page.locator(sel.source)).toBeVisible();
     await expect(page.locator(sel.priority)).toBeVisible();
     await expect(page.locator(sel.ownerId)).toBeVisible();
-    await expect(page.locator(sel.estimatedBudget)).toBeVisible();
 
     // ── Fields that must NOT be present ──────────────────────────────
     await expect(page.locator('input[name="altMobile"]')).not.toBeAttached();
     await expect(page.locator('input[name="pincode"]')).not.toBeAttached();
     await expect(page.locator('input[name="projectName"]')).not.toBeAttached();
     await expect(page.locator('select[name="projectType"]')).not.toBeAttached();
+    // Estimated budget was dropped from the CREATE form on 2026-09-04
+    // (owner instruction) — nobody knows the number when a lead is first
+    // taken down, so it was being guessed. It still exists on the lead's
+    // own page, where it can be filled in once there is something real
+    // to write; this asserts only that the create form stopped asking.
+    await expect(page.locator('input[name="estimatedBudget"]')).not.toBeAttached();
   });
 
   test("lead source dropdown includes Facebook, Google, Advertisement", async ({ page }) => {

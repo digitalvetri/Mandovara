@@ -4,12 +4,13 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import {
-  MoreHorizontal, Eye, Pencil, Download, MessageCircle, Copy, Check,
+  MoreHorizontal, Eye, Pencil, Download, MessageCircle, Copy, Check, Trash2,
 } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import type { QuotationRow } from "@/modules/quotations/queries";
 import { StatusPill } from "./StatusPill";
+import { DeleteQuotationDialog } from "./DeleteQuotationDialog";
 
 // ── Status → left accent strip colour ────────────────────────────────────────
 const STATUS_STRIP: Record<string, string> = {
@@ -34,9 +35,13 @@ function ValidUpto({ row }: { row: QuotationRow }) {
 }
 
 // ── MoreMenu ──────────────────────────────────────────────────────────────────
-function MoreMenu({ row }: { row: QuotationRow }) {
+function MoreMenu({ row, canDelete }: { row: QuotationRow; canDelete: boolean }) {
   const [open, setOpen]     = useState(false);
   const [copied, setCopied] = useState(false);
+  // The confirmation's open state lives HERE, not inside the popover —
+  // the click that opens it also closes the popover, which would take
+  // the modal down with it. See DeleteQuotationDialog's header.
+  const [confirming, setConfirming] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -94,14 +99,33 @@ function MoreMenu({ row }: { row: QuotationRow }) {
               ? <><Check size={13} className="text-solid" /> Copied!</>
               : <><Copy size={13} strokeWidth={1.75} /> Copy link</>}
           </button>
+          {canDelete && (
+            <>
+              <div className="my-1 h-px bg-rule" />
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setConfirming(true); }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12.5px] text-fault/90 transition-colors hover:bg-fault/8 hover:text-fault"
+              >
+                <Trash2 size={13} strokeWidth={1.75} /> Delete quotation
+              </button>
+            </>
+          )}
         </div>
       )}
+
+      <DeleteQuotationDialog
+        id={row.id}
+        number={row.number}
+        open={confirming}
+        onClose={() => setConfirming(false)}
+      />
     </div>
   );
 }
 
 // ── Row actions ───────────────────────────────────────────────────────────────
-function RowActions({ row }: { row: QuotationRow }) {
+function RowActions({ row, canDelete }: { row: QuotationRow; canDelete: boolean }) {
   const canEdit = ["DRAFT", "REVISED"].includes(row.status);
   const btn = "flex items-center justify-center w-7 h-7 rounded-[6px] text-text-dim hover:text-text hover:bg-surface-2 transition-colors";
   return (
@@ -116,13 +140,13 @@ function RowActions({ row }: { row: QuotationRow }) {
       ) : (
         <span className={`${btn} opacity-25 cursor-default`}><Pencil size={13} strokeWidth={1.75} /></span>
       )}
-      <MoreMenu row={row} />
+      <MoreMenu row={row} canDelete={canDelete} />
     </div>
   );
 }
 
 // ── Single data row ───────────────────────────────────────────────────────────
-function Row({ r, i }: { r: QuotationRow; i: number }) {
+function Row({ r, i, canDelete }: { r: QuotationRow; i: number; canDelete: boolean }) {
   const strip = STATUS_STRIP[r.status] ?? "bg-border";
   const shortNum = r.number.split("/").pop() ?? r.number;
 
@@ -178,14 +202,14 @@ function Row({ r, i }: { r: QuotationRow; i: number }) {
 
       {/* Actions */}
       <td className="px-2.5 sm:px-4 py-4">
-        <RowActions row={r} />
+        <RowActions row={r} canDelete={canDelete} />
       </td>
     </tr>
   );
 }
 
 // ── Table ─────────────────────────────────────────────────────────────────────
-export function QuotationsTable({ rows }: { rows: QuotationRow[] }) {
+export function QuotationsTable({ rows, canDelete = false }: { rows: QuotationRow[]; canDelete?: boolean }) {
   if (rows.length === 0) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-16 text-center">
@@ -215,7 +239,7 @@ export function QuotationsTable({ rows }: { rows: QuotationRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => <Row key={r.id} r={r} i={i} />)}
+          {rows.map((r, i) => <Row key={r.id} r={r} i={i} canDelete={canDelete} />)}
         </tbody>
       </table>
     </div>

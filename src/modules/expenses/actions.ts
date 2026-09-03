@@ -124,6 +124,7 @@ export async function createExpense(
         incurredAt:     new Date(d.incurredAt),
         billKey:        d.billKey ?? null,
         approvalState,
+        paymentMode:    d.paymentMode ?? null,
         gstRatePct:     gstRatePctVal,
         taxable,
         cgst,

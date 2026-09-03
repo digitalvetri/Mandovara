@@ -115,6 +115,17 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "project.view",
     "order.view",
     "client.view", "client.viewOutstanding",
+    // Read-only procurement + stock (owner, 2026-09-04). Accounts pays
+    // the vendor bills and carries the stock value on the balance
+    // sheet, so it needs to SEE both — but raising a PO, receiving a
+    // GRN and adjusting a quantity stay with Store. Mirrored by
+    // migration 20260904000003_accounts_procurement_access for orgs
+    // that were seeded before today.
+    "vendor.view",
+    "po.view",
+    "requisition.view",
+    "inventory.view",
+    "stock.view",
     "invoice.view", "invoice.create", "invoice.cancel", "invoice.viewMargin", "invoice.irnRegenerate", "invoice.irnCancel",
     "receipt.view", "receipt.create", "receipt.allocate", "receipt.reverse",
     "advance.view", "advance.create", "advance.adjust",

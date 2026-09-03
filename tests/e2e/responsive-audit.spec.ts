@@ -26,6 +26,7 @@ const STATIC_ROUTES = [
   "/", "/accounts", "/accounts/new", "/admin", "/admin/roles",
   "/architects", "/architects/new", "/attendance", "/calendar", "/catalogues",
   "/clients", "/clients/new", "/documents", "/employee", "/inventory",
+  "/inventory/sold",
   "/invoicing", "/invoicing/new", "/leads", "/leads/new", "/make", "/measure",
   "/measurements", "/notifications", "/orders", "/payroll", "/products",
   "/products/new", "/profile", "/projects", "/projects/new", "/purchase",

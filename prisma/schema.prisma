@@ -245,6 +245,12 @@ enum StockMoveType {
   ADJUSTMENT
   SAMPLE_OUT
   SAMPLE_IN
+  // Counter sale — stock leaves the shelf against a customer, not a
+  // project. Deliberately NOT reusing ADJUSTMENT: an adjustment is a
+  // correction to a count that was wrong, a sale is stock that was
+  // right and is now gone. Rolling the two together would make
+  // "how much did we sell" unanswerable from the ledger.
+  SOLD_OUT
 }
 
 enum MakeJobStatus {
@@ -1850,6 +1856,11 @@ model Expense {
   igst           BigInt?                            // inter-state purchase
   vendorGstin    String?
   billRef        String?                            // vendor's invoice number
+  // How the money left the business — cash, UPI, cheque, card, NEFT,
+  // RTGS. Nullable because every Expense written before 2026-09-04 was
+  // recorded without one; backfilling a guess would be worse than an
+  // honest blank.
+  paymentMode    PaymentMode?
 
   @@index([organizationId, incurredAt])
   @@index([organizationId, approvalState, paidAt])

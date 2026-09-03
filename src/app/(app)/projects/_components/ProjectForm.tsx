@@ -39,6 +39,10 @@ export function ProjectForm({ clients, branches, defaultClientId }: Props) {
     defaultValues: {
       name: "", clientId: prefill, branchId: branches[0]?.id ?? "",
       startDate: iso(today), targetEndDate: iso(later),
+      // No "Order value" field any more (owner, 2026-09-04) — a project's
+      // worth comes from the quotations, orders and invoices raised
+      // against it, which is what the project page already displays. An
+      // estimate typed here only ever contradicted them.
       orderValue: "",
     },
   });
@@ -97,9 +101,6 @@ export function ProjectForm({ clients, branches, defaultClientId }: Props) {
       ) : (
         <input type="hidden" {...register("branchId")} />
       )}
-      <EntityForm.Field label="Order value" error={errors.orderValue?.message} required hint="e.g. 500000 or 5L">
-        <input {...register("orderValue")} inputMode="decimal" className={`${EntityForm.fieldCls} tabular`} />
-      </EntityForm.Field>
       <EntityForm.Field label="Start date" error={errors.startDate?.message} required>
         <input {...register("startDate")} type="date" className={`${EntityForm.fieldCls} tabular`} />
       </EntityForm.Field>

@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import {
-  ExternalLink, ArrowLeft, CalendarDays, Clock4,
+  ExternalLink, ArrowLeft, CalendarDays, Clock4, Trash2,
 } from "lucide-react";
 import { StatusPill } from "../../_components/StatusPill";
 import { StatusChanger } from "../../_components/StatusChanger";
+import { StatusMenu } from "../../_components/StatusMenu";
+import { DeleteQuotationDialog } from "../../_components/DeleteQuotationDialog";
 import type { SerializedQuotation } from "../_types";
 import { pToINR, fmtDate, effectiveGstRate } from "./quote-header-utils";
 import { PdfPreviewModal } from "./PdfPreviewModal";
@@ -37,9 +40,13 @@ function ClientAvatar({ name }: { name: string }) {
 interface Props {
   quotation: SerializedQuotation;
   canApprove: boolean;
+  /** The viewer's permission keys — the status picker and Delete both
+   *  hide themselves when the role can't use them. */
+  permissions: string[];
 }
 
-export function QuotationHeader({ quotation }: Props) {
+export function QuotationHeader({ quotation, permissions }: Props) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isIntraState = BigInt(quotation.igstStr) === 0n;
   const total     = pToINR(quotation.totalStr);
   const taxable   = pToINR(quotation.taxableAmountStr);
@@ -77,7 +84,11 @@ export function QuotationHeader({ quotation }: Props) {
           </span>
         )}
 
-        <div className="ml-auto flex items-center gap-2 flex-wrap shrink-0">
+        {/* Actions. On a phone this wraps onto its own line under the
+            number and pill rather than squeezing four controls into the
+            right edge — `w-full sm:w-auto` plus `sm:ml-auto` is the
+            same idiom the project header uses. */}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:shrink-0">
           <StatusChanger
             id={quotation.id}
             current={quotation.status}
@@ -90,11 +101,39 @@ export function QuotationHeader({ quotation }: Props) {
             validUntilIso={quotation.validUntil}
             shareToken={quotation.shareToken}
           />
+          {/* Manual status override. Sits beside Send rather than
+              replacing it: Send is still the one-tap everyday path, this
+              is for saying what actually happened when the quote did not
+              travel down it. */}
+          <StatusMenu
+            id={quotation.id}
+            current={quotation.status}
+            permissions={permissions}
+          />
           <PdfPreviewModal
             quotationId={quotation.id}
             label={quotation.number}
           />
+          {permissions.includes("quotation.delete") && (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              title="Delete this quotation"
+              className="inline-flex h-[30px] items-center gap-1.5 rounded-[6px] border border-rule px-3 text-[11.5px] font-medium text-text-dim transition-colors hover:border-fault/50 hover:text-fault"
+            >
+              <Trash2 size={12} strokeWidth={1.75} />
+              Delete
+            </button>
+          )}
         </div>
+
+        <DeleteQuotationDialog
+          id={quotation.id}
+          number={quotation.number}
+          open={confirmingDelete}
+          onClose={() => setConfirmingDelete(false)}
+          redirectTo="/quotations"
+        />
       </div>
 
       {/* ── Document card ─────────────────────────────────────────── */}

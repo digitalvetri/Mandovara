@@ -114,7 +114,7 @@ export default async function QuotationsPage({
         </div>
       ) : (
         <>
-          <QuotationsTable rows={rows} />
+          <QuotationsTable rows={rows} canDelete={ctx.permissions.has("quotation.delete")} />
           <Pager page={page} pageSize={pageSize} total={total} />
         </>
       )}

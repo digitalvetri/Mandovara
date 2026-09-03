@@ -156,17 +156,60 @@ export async function listProjects(
     db.project.count({ where }),
   ]);
 
-  const clientMap = await resolveClients(db, rows.map((r) => r.clientId));
+  const projectIds = rows.map((r) => r.id);
+
+  // The card's money figure, from the same three sources and in the same
+  // priority order as the project detail header (see [id]/page.tsx —
+  // `headerOrderValue`): confirmed order first, then what has been
+  // quoted, and only then the stored Project.orderValue column.
+  //
+  // The column alone was already unreliable — nothing keeps it current
+  // once orders and invoices start moving, so a live project could show
+  // ₹0 on the card while its own page showed the real total. Since
+  // 2026-09-04 the create form no longer asks for a figure at all, so
+  // every new project would have read ₹0 forever. Two grouped queries
+  // per page (max 200 rows) rather than a per-card lookup.
+  const [orderSums, quoteSums, clientMap] = await Promise.all([
+    projectIds.length === 0 ? [] : db.order.groupBy({
+      by:    ["projectId"],
+      // No status filter, matching getProjectMoney's order aggregate
+      // exactly. Excluding cancelled orders here would arguably be more
+      // correct — and would put the card back to disagreeing with the
+      // page it links to, which is the bug this whole block exists to
+      // fix. If cancelled orders should stop counting, change both
+      // together.
+      where: { projectId: { in: projectIds } },
+      _sum:  { totalValue: true },
+    }),
+    projectIds.length === 0 ? [] : db.quotation.groupBy({
+      by:    ["projectId"],
+      // The same three statuses getProjectLedger counts as "quoted".
+      where: { projectId: { in: projectIds }, status: { in: ["SENT", "ACCEPTED", "REVISED"] } },
+      _sum:  { total: true },
+    }),
+    resolveClients(db, rows.map((r) => r.clientId)),
+  ]);
+
+  const orderedBy = new Map<string, bigint>();
+  for (const o of orderSums) {
+    if (o.projectId) orderedBy.set(o.projectId, o._sum.totalValue ?? 0n);
+  }
+  const quotedBy = new Map<string, bigint>();
+  for (const q2 of quoteSums) {
+    if (q2.projectId) quotedBy.set(q2.projectId, q2._sum.total ?? 0n);
+  }
 
   return {
     rows: rows.map((r) => {
       const done  = r.milestones.filter((m) => m.status === "COMPLETED").length;
       const total = r.milestones.length;
       const next  = r.milestones.find((m) => m.status !== "COMPLETED") ?? null;
+      const ordered = orderedBy.get(r.id) ?? 0n;
+      const quoted  = quotedBy.get(r.id)  ?? 0n;
       return {
         id: r.id, number: r.number, name: r.name, stage: r.stage,
         clientId: r.clientId, clientName: clientMap.get(r.clientId)?.name ?? UNKNOWN_CLIENT,
-        orderValue: r.orderValue,
+        orderValue: ordered > 0n ? ordered : quoted > 0n ? quoted : r.orderValue,
         expectedInstallAt: r.expectedInstallAt,
         createdAt: r.createdAt,
         milestonesDone:    done,

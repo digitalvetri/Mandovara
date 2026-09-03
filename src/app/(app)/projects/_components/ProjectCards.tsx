@@ -36,7 +36,19 @@ export function ProjectCards({ rows, canEditStage = false }: Props) {
 // ── Card ──────────────────────────────────────────────────
 function Card({ r, canEditStage }: { r: ProjectRow; canEditStage: boolean }) {
   const isCancelled = r.stage === "CANCELLED";
-  const milestonePct = r.milestonesTotal > 0
+  const isComplete  = r.stage === "COMPLETED";
+  // A completed project is 100% done, whatever the milestone rows say.
+  //
+  // Milestones are a billing spine seeded at creation; nobody goes back
+  // to tick the last three off once the job is handed over. Reading the
+  // bar off them meant a finished, invoiced, fully paid project showed
+  // "3/7 milestones" — and a project with no milestones at all showed
+  // 20%, because PROJECT is the first of five phases. That 20% is what
+  // the owner reported on 2026-09-04; the same complaint is already
+  // recorded against the detail header, which dropped its own
+  // percentage for exactly this reason.
+  const milestonePct = isComplete ? 100
+    : r.milestonesTotal > 0
     ? Math.round((r.milestonesDone / r.milestonesTotal) * 100)
     : progressForStage(r.stage);
 
@@ -63,14 +75,16 @@ function Card({ r, canEditStage }: { r: ProjectRow; canEditStage: boolean }) {
         {/* Progress */}
         <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-surface-2">
           <div
-            className={`h-full rounded-full ${isCancelled ? "bg-text-dim/40" : "bg-solid"}`}
+            className={`h-full rounded-full transition-[width] ${isCancelled ? "bg-text-dim/40" : "bg-solid"}`}
             style={{ width: `${milestonePct}%` }}
           />
         </div>
 
         <div className="flex items-baseline justify-between gap-2 text-[11px]">
           <span className="text-text-dim tabular-nums">
-            {r.milestonesTotal > 0
+            {isComplete
+              ? "Completed"
+              : r.milestonesTotal > 0
               ? `${r.milestonesDone}/${r.milestonesTotal} milestones`
               : `${milestonePct}% complete`}
           </span>
@@ -79,7 +93,7 @@ function Card({ r, canEditStage }: { r: ProjectRow; canEditStage: boolean }) {
           </span>
         </div>
 
-        {r.nextMilestoneName && !isCancelled && (
+        {r.nextMilestoneName && !isCancelled && !isComplete && (
           <div className="mt-2 truncate text-[11px] text-text-dim">
             Next: <span className="text-text">{r.nextMilestoneName}</span>
           </div>

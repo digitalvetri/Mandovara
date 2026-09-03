@@ -33,10 +33,18 @@ export async function createProject(input: unknown): Promise<ActionResult<{ id: 
   if (!parsed.success) return zodError(parsed.error);
   const d = parsed.data;
 
-  const orderValue = tryParsePaise(d.orderValue);
-  if (orderValue == null) {
-    return { ok: false, error: "Validation failed",
-             fieldErrors: { orderValue: "Could not parse order value" } };
+  // Blank is the normal case now that the form no longer asks (see
+  // createProjectSchema). A value that was supplied but is unreadable is
+  // still an error — silently storing 0 for "5 lakhs" would be worse
+  // than refusing.
+  let orderValue = 0n;
+  if (d.orderValue && d.orderValue.trim()) {
+    const parsed2 = tryParsePaise(d.orderValue);
+    if (parsed2 == null) {
+      return { ok: false, error: "Validation failed",
+               fieldErrors: { orderValue: "Could not parse order value" } };
+    }
+    orderValue = parsed2;
   }
 
   const db = scoped(ctx);

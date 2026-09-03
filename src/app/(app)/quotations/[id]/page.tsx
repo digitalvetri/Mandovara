@@ -92,6 +92,7 @@ export default async function QuotationDetailPage({
       <QuotationHeader
         quotation={serialized}
         canApprove={canApprove}
+        permissions={Array.from(ctx.permissions) as string[]}
       />
       <QuotationWorkspace quotation={serialized} canApprove={canApprove} />
     </>

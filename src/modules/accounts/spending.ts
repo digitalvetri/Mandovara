@@ -18,6 +18,10 @@ export interface SpendingRow {
   projectName: string | null;
   amount:     bigint;
   paidAt:     Date | null;         // Expense.paidAt for expenses; null otherwise
+  /** How the money left — CASH · UPI · NEFT · RTGS · CHEQUE · CARD.
+   *  Null on project expenses and salaries (neither records a tender),
+   *  and on overhead rows written before the field existed. */
+  mode:       string | null;
 }
 
 export interface SpendingBundle {
@@ -52,6 +56,7 @@ export async function loadSpending(
       select:  {
         id: true, amount: true, incurredAt: true, head: true, subHead: true,
         description: true, approvalState: true, paidAt: true,
+        paymentMode: true,
       },
       take: 200,
     }),
@@ -98,6 +103,7 @@ export async function loadSpending(
       projectName: null,
       amount:      e.amount,
       paidAt:      e.paidAt,
+      mode:        e.paymentMode,
     })),
     ...projExps.map((e) => ({
       id:          `prj:${e.id}`,
@@ -108,6 +114,7 @@ export async function loadSpending(
       projectName: e.project.name,
       amount:      e.amount,
       paidAt:      null,
+      mode:        null,
     })),
     ...slips.map((s) => ({
       id:          `pay:${s.id}`,
@@ -118,6 +125,7 @@ export async function loadSpending(
       projectName: null,
       amount:      s.netPay,
       paidAt:      s.run.paidAt,
+      mode:        null,
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 

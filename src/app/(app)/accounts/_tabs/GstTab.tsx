@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
+import { Download } from "lucide-react";
 import { devContext } from "@/lib/dev-context";
 import { can } from "@/kernel/rbac/guard";
 import { formatINR } from "@/kernel/money/format";
@@ -46,8 +47,11 @@ export async function GstTab({ ctx, year, month }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Period picker */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      {/* Period picker + export.
+          The chips wrap freely and Export is pushed to the end of the
+          row on a wide screen; on a phone it drops to its own full-width
+          line under them rather than being squeezed into the last gap. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-2 flex-wrap">
           {periods.map((p) => {
             const active = p.year === year && p.month === month;
@@ -66,6 +70,17 @@ export async function GstTab({ ctx, year, month }: Props) {
             );
           })}
         </div>
+
+        {/* Everything on this tab, as one PDF for the CA. Same month the
+            chips above select — the link carries the period so what
+            downloads is always what is on screen. */}
+        <a
+          href={`/api/accounts/gst/pdf?year=${year}&month=${month}`}
+          className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[8px] border border-rule bg-surface px-3.5 text-[11.5px] font-medium text-text-dim transition-colors hover:border-gold hover:text-text"
+        >
+          <Download size={13} strokeWidth={1.75} />
+          Export {MONTH_NAMES[month - 1]} as PDF
+        </a>
       </div>
 
       {/* Net payable hero */}

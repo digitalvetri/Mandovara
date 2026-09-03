@@ -128,26 +128,20 @@ export function LeadForm({ branches, salesUsers }: LeadFormProps) {
         </select>
       </EntityForm.Field>
 
-      {/* Row 4 — Priority | Budget */}
+      {/* Row 4 — Priority
+          "Estimated Budget" used to sit beside it and was removed on
+          2026-09-04 (owner instruction). Nobody knows the number at the
+          moment a lead is taken down — it was being guessed to get past
+          the form, and a guessed figure then drove the pipeline reports.
+          The field itself survives on the lead's own page
+          (LeadDetailsCard), where it can be filled in once there is
+          something real to write. */}
       <EntityForm.Field label="Lead Priority" error={errors.priority?.message}>
         <select {...register("priority")} className={sc}>
           {LEAD_PRIORITY_OPTIONS.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
           ))}
         </select>
-      </EntityForm.Field>
-
-      <EntityForm.Field label="Estimated Budget" error={errors.estimatedBudget?.message}
-        hint="Optional, in ₹">
-        <div className="flex items-center h-[34px] border border-rule rounded-[6px] bg-surface-2 focus-within:border-accent transition-colors overflow-hidden">
-          <span className="px-3 text-[13px] text-text-dim shrink-0 border-r border-rule h-full flex items-center">₹</span>
-          <input
-            {...register("estimatedBudget")}
-            className="flex-1 h-full px-3 bg-transparent text-[12.5px] text-text tabular-nums outline-none"
-            inputMode="numeric"
-            placeholder="e.g. 2,50,000"
-          />
-        </div>
       </EntityForm.Field>
 
       {/* Row 5 — Assigned To | Site Address */}

@@ -32,6 +32,12 @@ export const createProjectExpenseSchema = z.object({
 export const GST_RATES = [0, 5, 12, 18, 28] as const;
 export type GstRate = (typeof GST_RATES)[number];
 
+/** How the money left the business. Same six values Receipt and Payment
+ *  already use — the Prisma PaymentMode enum — so one pill component
+ *  renders every money row in the accounts screens. */
+export const EXPENSE_PAYMENT_MODES = ["CASH", "UPI", "NEFT", "RTGS", "CHEQUE", "CARD"] as const;
+export type ExpensePaymentMode = (typeof EXPENSE_PAYMENT_MODES)[number];
+
 /** General overhead expense — not tied to a project. Rent, Travel,
  *  Utilities, etc. Head is a free-string so users can type "Petrol
  *  Aug 17" or "Site inspection cab" if none of the presets fit. */
@@ -42,6 +48,11 @@ export const createExpenseSchema = z.object({
   amount:       z.string().regex(/^\d+$/, "Amount must be positive paise integer"),
   incurredAt:   isoDate,
   billKey:      z.string().max(500).optional(),
+  // Tender. Required by the form (the whole point of asking is that the
+  // answer exists), optional in the schema so the importers and any
+  // programmatic caller that genuinely does not know — the PO→expense
+  // bridge, for one — are not forced to invent one.
+  paymentMode:  z.enum(EXPENSE_PAYMENT_MODES).optional(),
   // GST input credit — optional; omit for exempt/unregistered bills
   gstRatePct:   z.number().refine((n) => (GST_RATES as readonly number[]).includes(n), "Invalid GST rate").optional(),
   isInterState: z.boolean().optional(),

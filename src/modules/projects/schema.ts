@@ -30,7 +30,14 @@ export const createProjectSchema = z.object({
   branchId:      z.string().min(1, "Pick a branch"),
   startDate:     isoDate,
   targetEndDate: isoDate.optional(),
-  orderValue:    z.string().trim().min(1, "Order value is required"),
+  // Optional since 2026-09-04 (owner instruction): the create form no
+  // longer asks for an estimated value. A project's worth is whatever
+  // has actually been quoted, ordered and invoiced against it, and the
+  // project page has read it from the ledger since 2026-08-27 — asking
+  // for a figure up front only produced a stored number that disagreed
+  // with the real one. Kept in the schema, not deleted, so importers and
+  // any caller that genuinely knows the value can still supply it.
+  orderValue:    z.string().trim().optional().or(z.literal("")),
 });
 
 export const setProjectStatusSchema = z.object({
