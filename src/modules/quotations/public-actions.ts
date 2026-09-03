@@ -132,11 +132,16 @@ export async function acceptQuotationByToken(
 /**
  * The client taps "Request changes" and types what they want adjusted.
  *
- * Deliberately does NOT set REJECTED: that status has no outgoing
- * transitions, so one tap from a client who merely wanted a different
- * fabric would strand the quotation. The note lands as an inbound
- * message and a follow-up for the quote's owner; the quote stays SENT
- * and revisable.
+ * Deliberately does NOT set REJECTED. The original reason was that
+ * REJECTED had no outgoing transitions, so one tap from a client who
+ * merely wanted a different fabric would strand the quotation. That is
+ * no longer true — REJECTED became recoverable on 2026-09-04 when the
+ * transition table was widened (see ./transitions.ts) — but the
+ * behaviour stays, for a better reason: "send me a different fabric" is
+ * not "no". Recording it as a rejection would put a lost-deal figure in
+ * the reports for a client who is still buying. The note lands as an
+ * inbound message and a follow-up for the quote's owner; the quote stays
+ * SENT and revisable.
  */
 export async function requestQuotationChangesByToken(
   token: string,
