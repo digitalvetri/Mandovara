@@ -8,17 +8,19 @@ import { devContext } from "@/lib/dev-context";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { can } from "@/kernel/rbac/guard";
-import { loadSpending, type SpendingPeriod } from "@/modules/accounts/spending";
+import { loadSpending, type SpendingPeriod, type SpendingApproval } from "@/modules/accounts/spending";
 import { WhereMoneyGoesBars, type ExpenseHeadUI } from "../_components/WhereMoneyGoesBars";
 import { ModePill } from "../_components/ModePill";
+import { DeleteExpenseButton } from "../_components/DeleteExpenseButton";
 import {
   NewExpenseSection, NewExpenseButton, NewExpensePanel,
 } from "../_components/NewExpenseForm";
 
 interface Props {
-  ctx:    Awaited<ReturnType<typeof devContext>>;
-  period: SpendingPeriod;
-  head?:  string;
+  ctx:       Awaited<ReturnType<typeof devContext>>;
+  period:    SpendingPeriod;
+  head?:     string;
+  approval?: SpendingApproval;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -32,7 +34,7 @@ const KIND_TONE: Record<string, string> = {
   SALARY:          "bg-info/10 text-info",
 };
 
-export async function SpendingTab({ ctx, period, head }: Props) {
+export async function SpendingTab({ ctx, period, head, approval = "APPROVED" }: Props) {
   if (!can(ctx, "expense.view")) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule px-6 py-14 text-center">
@@ -44,7 +46,12 @@ export async function SpendingTab({ ctx, period, head }: Props) {
     );
   }
 
-  const bundle = await loadSpending(ctx, { period, ...(head && { head }) });
+  const bundle = await loadSpending(ctx, { period, approval, ...(head && { head }) });
+
+  // Deleting is for a row that should never have been typed. Salaries
+  // are excluded — those come out of a payroll run and are corrected
+  // there, not here.
+  const canDelete = can(ctx, "expense.delete");
 
   // Build the ranked-bars chart from the same rows (so drilling in
   // narrows both the list AND the chart).
@@ -60,7 +67,9 @@ export async function SpendingTab({ ctx, period, head }: Props) {
       <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
         <div>
           <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim mb-0.5">
-            {head ? `Expenses on ${head}` : "Expenses"}
+            {approval === "PENDING"
+              ? (head ? `Waiting for approval — ${head}` : "Waiting for approval")
+              : (head ? `Expenses on ${head}` : "Expenses")}
           </div>
           <div className="font-display text-[26px] font-semibold tabular-nums text-text leading-none">
             {formatINR(bundle.total)}
@@ -71,7 +80,7 @@ export async function SpendingTab({ ctx, period, head }: Props) {
               <>
                 {" · "}
                 <Link
-                  href={`/accounts?tab=spending&period=${period}` as Route}
+                  href={`/accounts?tab=spending&period=${period}${approval === "PENDING" ? "&approval=PENDING" : ""}` as Route}
                   className="text-accent hover:underline"
                 >
                   Clear head filter ×
@@ -81,7 +90,8 @@ export async function SpendingTab({ ctx, period, head }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <PeriodChips active={period} head={head} />
+          <PeriodChips active={period} head={head} approval={approval} />
+          <ApprovalChips active={approval} head={head} period={period} />
           <NewExpenseButton />
         </div>
       </div>
@@ -141,8 +151,13 @@ export async function SpendingTab({ ctx, period, head }: Props) {
                     </div>
                   )}
                 </div>
-                <div className="tabular text-[13.5px] text-text font-medium whitespace-nowrap">
-                  −{formatINR(r.amount)}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="tabular text-[13.5px] text-text font-medium whitespace-nowrap">
+                    −{formatINR(r.amount)}
+                  </div>
+                  {canDelete && r.kind !== "SALARY" && (
+                    <DeleteExpenseButton expenseId={stripKindPrefix(r.id)} label={r.label} />
+                  )}
                 </div>
               </li>
             ))}
@@ -155,13 +170,14 @@ export async function SpendingTab({ ctx, period, head }: Props) {
 
 // ── Chips ────────────────────────────────────────────────────────
 
-function PeriodChips({ active, head }: { active: SpendingPeriod; head?: string }) {
+function PeriodChips({ active, head, approval }: { active: SpendingPeriod; head?: string; approval: SpendingApproval }) {
   const items: Array<{ key: SpendingPeriod; label: string }> = [
     { key: "this-month",    label: "This month" },
     { key: "last-3-months", label: "Last 3 months" },
     { key: "this-year",     label: "This year" },
   ];
-  const suffix = head ? `&head=${encodeURIComponent(head)}` : "";
+  const suffix = (head ? `&head=${encodeURIComponent(head)}` : "")
+    + (approval === "PENDING" ? "&approval=PENDING" : "");
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((it) => {
@@ -183,6 +199,47 @@ function PeriodChips({ active, head }: { active: SpendingPeriod; head?: string }
       })}
     </div>
   );
+}
+
+/** Approved / Waiting for approval. The Attention strip already links
+ *  here with `approval=PENDING`; until now nothing read the parameter,
+ *  so an expense awaiting approval had no screen at all — and therefore
+ *  no way to be deleted if it was typed by mistake. */
+function ApprovalChips({ active, head, period }: { active: SpendingApproval; head?: string; period: SpendingPeriod }) {
+  const items: Array<{ key: SpendingApproval; label: string }> = [
+    { key: "APPROVED", label: "Approved" },
+    { key: "PENDING",  label: "Waiting for approval" },
+  ];
+  const headSuffix = head ? `&head=${encodeURIComponent(head)}` : "";
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((it) => {
+        const isActive = active === it.key;
+        const approvalSuffix = it.key === "PENDING" ? "&approval=PENDING" : "";
+        return (
+          <Link
+            key={it.key}
+            href={`/accounts?tab=spending&period=${period}${headSuffix}${approvalSuffix}` as Route}
+            className={[
+              "inline-flex items-center h-8 px-3 rounded-[8px] text-[11.5px] font-medium transition-colors border",
+              isActive
+                ? "bg-gold/10 border-gold text-text"
+                : "border-rule text-text-dim hover:text-text hover:border-text-dim",
+            ].join(" ")}
+          >
+            {it.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/** loadSpending prefixes row ids `exp:` / `prj:` / `pay:` so one list can
+ *  carry three tables. The delete action wants the bare id. */
+function stripKindPrefix(id: string): string {
+  const i = id.indexOf(":");
+  return i === -1 ? id : id.slice(i + 1);
 }
 
 function periodLabel(p: SpendingPeriod): string {

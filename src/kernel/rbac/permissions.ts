@@ -41,7 +41,7 @@ export const PERMISSIONS = {
   serial:     ["view", "assign"],
 
   // ── Projects ───────────────────────────────────────────────
-  project:    ["view", "create", "update", "materialIssue", "milestoneBill", "handover"],
+  project:    ["view", "create", "update", "delete", "materialIssue", "milestoneBill", "handover"],
   sitelog:    ["view", "create"],
   // Site measurements + persisted CalcResult (§7, Phase 2 gate).
   //
@@ -68,7 +68,7 @@ export const PERMISSIONS = {
   invoice:     ["view", "create", "cancel", "viewMargin", "irnRegenerate", "irnCancel"],
   receipt:     ["view", "create", "allocate", "reverse"],
   advance:     ["view", "create", "adjust"],
-  expense:     ["view", "create", "approve", "reject"],
+  expense:     ["view", "create", "approve", "reject", "delete"],
   pettyCash:   ["view", "manage"],
   employeeAdvance: ["view", "create", "recover"],
 

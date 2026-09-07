@@ -24,16 +24,26 @@ export interface SpendingRow {
   mode:       string | null;
 }
 
+/** Which approval states the list shows. "APPROVED" is the default —
+ *  the tab answers "what did we spend", and an unapproved row has not
+ *  been spent yet. "PENDING" is what the Attention strip's
+ *  "N expenses waiting for approval" link asks for, and is also where a
+ *  wrongly-entered expense sits before anyone approves it, so it has to
+ *  be reachable for the row-level delete to be any use. */
+export type SpendingApproval = "APPROVED" | "PENDING";
+
 export interface SpendingBundle {
   rows:     SpendingRow[];
   total:    bigint;
   period:   SpendingPeriod;
   headFilter: string | null;
+  approval: SpendingApproval;
 }
 
 export interface LoadSpendingOpts {
-  period?: SpendingPeriod;
-  head?:   string;
+  period?:   SpendingPeriod;
+  head?:     string;
+  approval?: SpendingApproval;
 }
 
 export async function loadSpending(
@@ -43,13 +53,14 @@ export async function loadSpending(
   requirePermission(ctx, "expense.view");
   const db = scoped(ctx);
   const period = opts.period ?? "this-month";
+  const approval = opts.approval ?? "APPROVED";
   const { start, end } = periodWindow(period);
 
   const [expenses, projExps, slips] = await Promise.all([
     db.expense.findMany({
       where:   {
         incurredAt: { gte: start, lt: end },
-        approvalState: "APPROVED",
+        approvalState: approval,
         ...(opts.head ? { head: opts.head } : {}),
       },
       orderBy: { incurredAt: "desc" },
@@ -63,7 +74,7 @@ export async function loadSpending(
     db.projectExpense.findMany({
       where: {
         incurredAt: { gte: start, lt: end },
-        approvalState: "APPROVED",
+        approvalState: approval,
         ...(opts.head ? { head: opts.head } : {}),
       },
       orderBy: { incurredAt: "desc" },
@@ -74,7 +85,7 @@ export async function loadSpending(
       take: 200,
     }),
     // Salary rows only when the head filter doesn't exclude them + payroll perm
-    (!opts.head || opts.head === "Salary") && can(ctx, "payroll.view")
+    approval === "APPROVED" && (!opts.head || opts.head === "Salary") && can(ctx, "payroll.view")
       ? db.payslip.findMany({
           where:  { run: { status: "PAID", paidAt: { gte: start, lt: end } } },
           orderBy: { id: "desc" },
@@ -136,6 +147,7 @@ export async function loadSpending(
     total,
     period,
     headFilter: opts.head ?? null,
+    approval,
   };
 }
 

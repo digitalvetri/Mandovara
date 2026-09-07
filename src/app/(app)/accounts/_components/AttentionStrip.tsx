@@ -25,6 +25,9 @@ export function AttentionStrip({ chequesPending, expensesPending, unmatchedRecei
     key:    "expenses",
     label:  `${expensesPending.count} expense${expensesPending.count === 1 ? "" : "s"} waiting for approval`,
     amount: expensesPending.amount,
+    // Lands on the pending list, which opens on the year — see
+    // pickSpendingPeriod in accounts/page.tsx for why the count above
+    // and the list below have to agree.
     href:   "/accounts?tab=spending&approval=PENDING",
   });
   if (unmatchedReceipts.count > 0) items.push({

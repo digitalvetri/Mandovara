@@ -30,7 +30,7 @@ interface SearchParams {
   // To Collect
   bucket?: string;
   // Spending
-  period?: string; head?: string;
+  period?: string; head?: string; approval?: string;
   // GST
   year?: string; gstMonth?: string;
 }
@@ -69,8 +69,9 @@ export default async function AccountsPage({
       {activeTab === "spending"   ? (
         <SpendingTab
           ctx={ctx}
-          period={pickPeriod(params.period)}
+          period={pickSpendingPeriod(params.period, params.approval)}
           {...(params.head && { head: params.head })}
+          {...(params.approval === "PENDING" && { approval: "PENDING" as const })}
         />
       ) : null}
       {activeTab === "gst" ? (
@@ -89,6 +90,20 @@ function parsePositiveInt(v: string | undefined): number | null {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 1) return null;
   return Math.floor(n);
+}
+
+/** The period the Spending tab opens on.
+ *
+ *  Approved spend is a "what did we spend this month" question, so it
+ *  opens on the current month. The pending list is not — the Attention
+ *  strip counts expenses waiting for approval across all time, and an
+ *  owner who clicks "3 expenses waiting" and lands on a month showing
+ *  one has been told two different numbers by the same screen. Pending
+ *  therefore opens on the year. An explicit ?period= always wins.
+ */
+function pickSpendingPeriod(raw: string | undefined, approval: string | undefined): SpendingPeriod {
+  if (raw) return pickPeriod(raw);
+  return approval === "PENDING" ? "this-year" : pickPeriod(raw);
 }
 
 function pickPeriod(v: string | undefined): SpendingPeriod {

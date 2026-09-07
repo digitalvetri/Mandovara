@@ -42,6 +42,9 @@ import { StartMeasurementFlow } from "../_components/StartMeasurementFlow";
 import { CreateInvoiceHeaderButton } from "../_components/CreateInvoiceHeaderButton";
 import { ProjectWorkSections } from "../_components/ProjectWorkSections";
 import { MarkCompleteButton } from "../_components/MarkCompleteButton";
+import { DeleteProjectAction } from "../_components/DeleteProjectAction";
+import { getProjectDeleteBlockers } from "@/modules/projects/actions-delete";
+import type { DeleteBlocker } from "@/modules/projects/delete-shared";
 import { getProjectLedger } from "@/modules/projects/queries-ledger";
 import { AttachmentsCard } from "@/components/documents/AttachmentsCard";
 import { listAttachments } from "@/modules/documents/queries";
@@ -65,6 +68,15 @@ export default async function ProjectDetailPage({
       getProjectLedger(ctx, id),
       listAttachments(ctx, "PROJECT", id),
     ]);
+
+  // What stands in the way of deleting this project — money and stock
+  // rows, chiefly. Loaded here so the confirm dialog can explain the
+  // refusal before the click rather than after it. Only fetched when the
+  // user could act on it; the action re-checks server-side regardless.
+  const canDelete = ctx.permissions.has("project.delete");
+  const deleteBlockers: DeleteBlocker[] = canDelete
+    ? await getProjectDeleteBlockers(id)
+    : [];
 
   const action = resolveNextAction(ctx, {
     id:       p.id,
@@ -149,6 +161,18 @@ export default async function ProjectDetailPage({
                 Completed on a project that never had a firm quote. */}
             {ctx.permissions.has("project.update") && (
               <MarkCompleteButton projectId={p.id} stage={p.stage} />
+            )}
+            {/* Deleting is for a project that should never have existed
+                — a duplicate, or one typed against the wrong client. A
+                project with invoices, receipts or stock behind it
+                refuses and points at Cancel instead; the dialog says so
+                before the click. */}
+            {canDelete && (
+              <DeleteProjectAction
+                projectId={p.id}
+                projectName={p.name}
+                blockers={deleteBlockers}
+              />
             )}
           </div>
         </div>

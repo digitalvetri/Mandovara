@@ -129,7 +129,7 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "invoice.view", "invoice.create", "invoice.cancel", "invoice.viewMargin", "invoice.irnRegenerate", "invoice.irnCancel",
     "receipt.view", "receipt.create", "receipt.allocate", "receipt.reverse",
     "advance.view", "advance.create", "advance.adjust",
-    "expense.view", "expense.create", "expense.approve", "expense.reject",
+    "expense.view", "expense.create", "expense.approve", "expense.reject", "expense.delete",
     "pettyCash.view", "pettyCash.manage",
     "employeeAdvance.view", "employeeAdvance.create", "employeeAdvance.recover",
     "payroll.view",
