@@ -8,6 +8,7 @@ import { listPOs, getPOKPIs } from "@/modules/purchase/queries";
 import { getVendorPayables } from "@/modules/purchase/vendor-ledger";
 import { PO_STATUSES, type POStatus } from "@/modules/purchase/schema";
 import { formatINR } from "@/kernel/money/format";
+import { can } from "@/kernel/rbac/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,11 @@ export default async function PurchasePage({
         <div className="flex gap-1 rounded-[10px] border border-rule bg-surface-2 p-1">
           <TabLink href="/purchase"         label="Purchase Orders" active />
           <TabLink href="/purchase/vendors" label="Vendors"         active={false} />
+          {/* The Items tab reads the catalogue, so it is only offered to
+              someone allowed to see it — the page itself would throw. */}
+          {can(ctx, "catalog.view") && (
+            <TabLink href="/purchase/items" label="Items" active={false} />
+          )}
         </div>
 
         <div className="h-5 w-px bg-rule hidden sm:block" />

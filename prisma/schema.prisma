@@ -1403,7 +1403,12 @@ model POLine {
   id              String        @id @default(cuid())
   organizationId  String
   purchaseOrderId String
-  colourwayId     String
+  // A line names a catalogued colourway, OR carries a typed description for
+  // something not in the catalogue yet. Exactly one of the two, mirroring
+  // PurchaseRequestLine. A freeTextItem line can be ordered but not received:
+  // goods receipt posts stock against a colourway, so it has nothing to post to.
+  colourwayId     String?
+  freeTextItem    String?
   quantity        Decimal       @db.Decimal(12, 3)
   unit            SellUnit
   rate            BigInt

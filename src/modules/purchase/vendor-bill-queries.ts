@@ -78,8 +78,14 @@ export async function getGRNsForBilling(
     }),
   ]);
 
-  const unitByCw   = new Map(poLines.map((l) => [l.colourwayId, l.unit as string]));
-  const gstByCw    = new Map(poLines.map((l) => [l.colourwayId, Number(l.gstRate)]));
+  // Only catalogued lines can be keyed here, and only they are ever looked
+  // up: a GRN line always carries a real colourway. Typed PO lines are
+  // dropped so they cannot collapse into a single null key.
+  const catalogued = poLines.filter(
+    (l): l is typeof l & { colourwayId: string } => l.colourwayId !== null,
+  );
+  const unitByCw   = new Map(catalogued.map((l) => [l.colourwayId, l.unit as string]));
+  const gstByCw    = new Map(catalogued.map((l) => [l.colourwayId, Number(l.gstRate)]));
 
   const allCwIds   = [...new Set(grns.flatMap((g) => g.lines.map((l) => l.colourwayId)))];
   const colourways = allCwIds.length

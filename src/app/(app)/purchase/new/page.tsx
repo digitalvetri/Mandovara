@@ -23,22 +23,30 @@ export default async function NewPOPage({
 
   // Pre-populate lines from an approved purchase request
   type SellUnit = "METRE" | "ROLL" | "SQFT" | "SQM" | "PIECE" | "SET" | "BOX" | "RUNNING_FT";
-  let initialLines: { colourwayId: string; unit: SellUnit; quantity: string; rate: string; gstRate: string }[] | undefined;
+  let initialLines: {
+    colourwayId: string; freeTextItem: string; mode: "catalogue" | "typed";
+    unit: SellUnit; quantity: string; rate: string; gstRate: string;
+  }[] | undefined;
 
   if (params.requestId) {
     const pr = await db.purchaseRequest.findUnique({
       where:  { id: params.requestId },
-      select: { lines: { select: { colourwayId: true, unit: true, quantity: true } } },
+      select: { lines: { select: { colourwayId: true, freeTextItem: true, unit: true, quantity: true } } },
     });
     if (pr) {
+      // A request line that was typed rather than picked used to be dropped
+      // here, because a PO line had to name a colourway. It no longer does,
+      // so the whole request now converts.
       initialLines = pr.lines
-        .filter((l) => l.colourwayId != null)
+        .filter((l) => l.colourwayId != null || l.freeTextItem != null)
         .map((l) => ({
-          colourwayId: l.colourwayId!,
-          unit:        l.unit as SellUnit,
-          quantity:    Number(l.quantity).toString(),
-          rate:        "",
-          gstRate:     "0",
+          colourwayId:  l.colourwayId ?? "",
+          freeTextItem: l.colourwayId ? "" : (l.freeTextItem ?? ""),
+          mode:         (l.colourwayId ? "catalogue" : "typed") as "catalogue" | "typed",
+          unit:         l.unit as SellUnit,
+          quantity:     Number(l.quantity).toString(),
+          rate:         "",
+          gstRate:      "0",
         }));
     }
   }

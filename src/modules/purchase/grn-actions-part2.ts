@@ -62,9 +62,13 @@ export async function postGRN(
     : [];
   const familyByColourway = new Map(cwFamilies.map((c) => [c.id, c.design.family]));
 
-  // Build colourwayId → POLine(s) map (FIFO order preserved from orderBy id asc)
+  // Build colourwayId → POLine(s) map (FIFO order preserved from orderBy id asc).
+  // Typed lines carry no colourway and so are not receivable: they are skipped
+  // here, and a GRN naming an item they cover falls through to the usual
+  // "not on this PO" error rather than posting stock against nothing.
   const linesByColourway = new Map<string, typeof po.lines>();
   for (const l of po.lines) {
+    if (l.colourwayId === null) continue;
     const bucket = linesByColourway.get(l.colourwayId) ?? [];
     bucket.push(l);
     linesByColourway.set(l.colourwayId, bucket);
@@ -216,11 +220,11 @@ export async function postGRN(
     // Re-fetch all POLines and recompute PO status
     const freshLines = await tx.pOLine.findMany({
       where:  { purchaseOrderId: po.id },
-      select: { quantity: true, receivedQty: true },
+      select: { quantity: true, receivedQty: true, colourwayId: true },
     });
     const nextStatus = computePOStatus(
       po.status as "DRAFT" | "SENT" | "PARTIAL" | "RECEIVED" | "CANCELLED",
-      freshLines,
+      freshLines.map((l) => ({ ...l, isFreeText: l.colourwayId === null })),
     );
     if (nextStatus !== po.status) {
       await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: nextStatus } });

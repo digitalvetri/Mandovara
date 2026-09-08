@@ -71,6 +71,33 @@ describe("computePOStatus", () => {
     // The action layer must guard this before calling computePOStatus.
     expect(computePOStatus("RECEIVED", lines)).toBe("RECEIVED");
   });
+
+  // A typed line names something the catalogue does not carry, so goods
+  // receipt has no stock record to post it against and its receivedQty
+  // stays at zero for good. Counting it would strand the PO in PARTIAL.
+  it("reaches RECEIVED once the catalogued lines are in, ignoring a typed line", () => {
+    const lines: POLineStatus[] = [
+      { quantity: dec(10), receivedQty: dec(10) },
+      { quantity: dec(5),  receivedQty: dec(0), isFreeText: true },
+    ];
+    expect(computePOStatus("SENT", lines)).toBe("RECEIVED");
+  });
+
+  it("still reports PARTIAL while a catalogued line is outstanding", () => {
+    const lines: POLineStatus[] = [
+      { quantity: dec(10), receivedQty: dec(4) },
+      { quantity: dec(5),  receivedQty: dec(0), isFreeText: true },
+    ];
+    expect(computePOStatus("SENT", lines)).toBe("PARTIAL");
+  });
+
+  it("leaves a PO of only typed lines at its current status", () => {
+    const lines: POLineStatus[] = [
+      { quantity: dec(5), receivedQty: dec(0), isFreeText: true },
+      { quantity: dec(2), receivedQty: dec(0), isFreeText: true },
+    ];
+    expect(computePOStatus("SENT", lines)).toBe("SENT");
+  });
 });
 
 describe("computePendingQty", () => {

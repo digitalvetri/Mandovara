@@ -25,7 +25,13 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
   const [invoiceRef, setInvoiceRef] = useState<string>("");
   const [stateByLine, setStateByLine] = useState<Record<string, LineState>>({});
 
-  const pendingLines = lines.filter((l) => parseFloat(l.pendingQty) > 0);
+  // Typed lines have no colourway, so there is no stock record to receive
+  // them into. They stay on the PO and print on it; to take them into stock,
+  // add the item to the catalogue and raise a line against it.
+  const pendingLines = lines.filter(
+    (l) => l.colourwayId !== null && parseFloat(l.pendingQty) > 0,
+  );
+  const typedCount = lines.filter((l) => l.colourwayId === null).length;
   if (pendingLines.length === 0) return null;
 
   function lineState(id: string): LineState {
@@ -42,7 +48,7 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
       .map((l) => {
         const st = lineState(l.id);
         const qty = Number(st.quantity ?? 0);
-        if (qty <= 0) return null;
+        if (qty <= 0 || l.colourwayId === null) return null;
         return {
           colourwayId:  l.colourwayId,
           quantity:     qty,
@@ -98,11 +104,20 @@ export function GRNForm({ purchaseOrderId, lines }: Props) {
         </Field>
       </div>
 
+      {typedCount > 0 && (
+        <p className="mb-3 text-[11.5px] text-text-muted leading-snug">
+          {typedCount === 1 ? "One typed item is" : `${typedCount} typed items are`} not
+          listed below. Stock is held against catalogue items, so add
+          {typedCount === 1 ? " it" : " them"} to the catalogue to receive
+          {typedCount === 1 ? " it" : " them"}.
+        </p>
+      )}
+
       <div className="border border-rule rounded-[8px] overflow-x-auto">
         <table className="w-full text-[12.5px]">
           <thead>
             <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
-              <Th>Colourway</Th>
+              <Th>Item</Th>
               <Th align="right">Pending</Th>
               <Th align="right" width={110}>Receive now</Th>
               <Th width={120}>Dye lot</Th>

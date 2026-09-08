@@ -6,22 +6,33 @@ import type { Route } from "next";
 import { Plus, Trash2 } from "lucide-react";
 import { formatINR, parseINR } from "@/kernel/money/format";
 import { createPO } from "@/modules/purchase/actions";
+import { POItemCell } from "./POItemCell";
 import type { VendorPickerRow } from "@/modules/vendors/queries";
 import type { ColourwayPickerRow } from "@/modules/purchase/queries";
-import type { SELL_UNITS } from "@/modules/purchase/schema";
-import { GST_RATES } from "@/modules/purchase/schema";
+import { GST_RATES, SELL_UNITS } from "@/modules/purchase/schema";
 
 type SellUnit = (typeof SELL_UNITS)[number];
 
+// A catalogued line takes its unit from the colourway. A typed one has no
+// colourway to take it from, so the buyer picks.
+const UNIT_OPTIONS = SELL_UNITS;
+
 interface Draft {
   colourwayId: string;
+  /** Typed item name, used when the catalogue does not carry it yet. */
+  freeTextItem: string;
+  /** Which of the two the line is using. Only one is ever sent. */
+  mode: "catalogue" | "typed";
   unit: SellUnit;
   quantity: string;
   rate: string;
   gstRate: string;
 }
 
-const EMPTY: Draft = { colourwayId: "", unit: "METRE", quantity: "1", rate: "", gstRate: "0" };
+const EMPTY: Draft = {
+  colourwayId: "", freeTextItem: "", mode: "catalogue",
+  unit: "METRE", quantity: "1", rate: "", gstRate: "0",
+};
 
 interface Props {
   vendors:      VendorPickerRow[];
@@ -46,7 +57,7 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
   const totalValue = useMemo(() => {
     let total = 0n;
     for (const l of lines) {
-      if (!l.colourwayId) continue;
+      if (l.mode === "typed" ? !l.freeTextItem.trim() : !l.colourwayId) continue;
       const rate = safePaise(l.rate);
       const qty = Number(l.quantity) || 0;
       total += (rate * BigInt(Math.round(qty * 10_000))) / 10_000n;
@@ -65,6 +76,13 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
     const c = colourwayMap.get(id);
     updateLine(i, { colourwayId: id, unit: (c?.sellUnit as SellUnit) ?? "METRE" });
   }
+  /** Flip a line between picking from the catalogue and typing a name.
+   *  Clears the other side so a line can never carry both. */
+  function setMode(i: number, mode: Draft["mode"]) {
+    updateLine(i, mode === "typed"
+      ? { mode, colourwayId: "" }
+      : { mode, freeTextItem: "" });
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,9 +91,11 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
       const payload = {
         vendorId, date, expectedAt,
         lines: lines
-          .filter((l) => l.colourwayId)
+          .filter((l) => (l.mode === "typed" ? l.freeTextItem.trim() : l.colourwayId))
           .map((l) => ({
-            colourwayId: l.colourwayId,
+            ...(l.mode === "typed"
+              ? { freeTextItem: l.freeTextItem.trim() }
+              : { colourwayId: l.colourwayId }),
             unit: l.unit,
             quantity: Number(l.quantity),
             rate: l.rate,
@@ -89,12 +109,12 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
     });
   }
 
-  if (vendors.length === 0 || colourways.length === 0) {
+  // An empty catalogue no longer blocks the form: buying something the
+  // catalogue does not carry is exactly what the typed line is for.
+  if (vendors.length === 0) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-14 text-center">
-        <div className="text-[14px] text-text mb-2">
-          {vendors.length === 0 ? "Add a vendor first." : "No active colourways in catalog."}
-        </div>
+        <div className="text-[14px] text-text mb-2">Add a vendor first.</div>
       </div>
     );
   }
@@ -120,7 +140,7 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
         <table className="min-w-[480px] w-full text-[12.5px]">
           <thead>
             <tr className="border-b border-rule text-[10.5px] uppercase tracking-[0.14em] text-text-dim">
-              <Th>Colourway</Th>
+              <Th>Item</Th>
               <Th align="right" width={110}>Qty</Th>
               <Th align="right" width={140}>Rate (₹)</Th>
               <Th align="right" width={80}>GST %</Th>
@@ -136,22 +156,31 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
               return (
                 <tr key={i} className="border-b border-rule/70 last:border-0 align-top">
                   <Td>
-                    <select value={l.colourwayId} onChange={(e) => onPickColourway(i, e.target.value)}
-                            className={`${cellCls} min-w-[200px]`}>
-                      <option value="">— select colourway —</option>
-                      {colourways.map((cw) => (
-                        <option key={cw.id} value={cw.id}>
-                          {cw.code} — {cw.colourName} ({cw.design.code})
-                        </option>
-                      ))}
-                    </select>
+                    <POItemCell
+                      line={l}
+                      colourways={colourways}
+                      onPick={(id) => onPickColourway(i, id)}
+                      onType={(v) => updateLine(i, { freeTextItem: v })}
+                      onMode={(m) => setMode(i, m)}
+                    />
                   </Td>
                   <Td align="right">
                     <div className="inline-flex items-baseline gap-1">
                       <input inputMode="decimal" value={l.quantity}
                              onChange={(e) => updateLine(i, { quantity: e.target.value })}
                              className={`${cellCls} tabular text-right w-[64px]`} />
-                      <span className="text-[10.5px] text-text-faint">{l.unit.toLowerCase()}</span>
+                      {l.mode === "typed" ? (
+                        <select value={l.unit}
+                                onChange={(e) => updateLine(i, { unit: e.target.value as SellUnit })}
+                                aria-label="Unit"
+                                className={`${cellCls} text-[10.5px] w-[86px]`}>
+                          {UNIT_OPTIONS.map((u) => (
+                            <option key={u} value={u}>{u.toLowerCase().replace("_", " ")}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-[10.5px] text-text-faint">{l.unit.toLowerCase()}</span>
+                      )}
                     </div>
                   </Td>
                   <Td align="right">

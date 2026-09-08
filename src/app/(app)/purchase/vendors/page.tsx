@@ -7,6 +7,7 @@ import { devContext } from "@/lib/dev-context";
 import { listVendors } from "@/modules/vendors/queries";
 import { getVendorPayables, type VendorPayableRow } from "@/modules/purchase/vendor-ledger";
 import { formatINR } from "@/kernel/money/format";
+import { can } from "@/kernel/rbac/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,9 @@ export default async function VendorsPage({
         <div className="flex gap-1 rounded-[10px] border border-rule bg-surface-2 p-1">
           <TabLink href="/purchase" label="Purchase Orders" active={false} />
           <TabLink href="/purchase/vendors" label="Vendors" active />
+          {can(ctx, "catalog.view") && (
+            <TabLink href="/purchase/items" label="Items" active={false} />
+          )}
         </div>
 
         {/* Search */}

@@ -35,14 +35,20 @@ export async function createPO(
     select: { id: true },
   });
 
-  // Validate all colourways belong to org and are active
-  const colourwayIds = d.lines.map((l) => l.colourwayId);
-  const colourways = await db.colourway.findMany({
-    where: { id: { in: colourwayIds }, organizationId: ctx.orgId, isActive: true },
-    select: { id: true },
-  });
-  if (colourways.length !== new Set(colourwayIds).size) {
-    return { ok: false, error: "One or more colourways not found or inactive" };
+  // Validate all colourways belong to org and are active. Typed lines carry
+  // no colourway, so they are simply not part of this check — the schema has
+  // already insisted each line has one or the other.
+  const colourwayIds = d.lines
+    .map((l) => l.colourwayId)
+    .filter((id): id is string => !!id);
+  if (colourwayIds.length > 0) {
+    const colourways = await db.colourway.findMany({
+      where: { id: { in: colourwayIds }, organizationId: ctx.orgId, isActive: true },
+      select: { id: true },
+    });
+    if (colourways.length !== new Set(colourwayIds).size) {
+      return { ok: false, error: "One or more colourways not found or inactive" };
+    }
   }
 
   // Compute totalValue = sum(rate × quantity)
@@ -88,7 +94,8 @@ export async function createPO(
       data: d.lines.map((l) => ({
         organizationId:  ctx.orgId,
         purchaseOrderId: po.id,
-        colourwayId:     l.colourwayId,
+        colourwayId:     l.colourwayId ?? null,
+        freeTextItem:    l.colourwayId ? null : (l.freeTextItem ?? null),
         unit:            l.unit,
         quantity:        new Decimal(l.quantity),
         rate:            parseINR(l.rate),

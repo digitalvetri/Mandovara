@@ -13,12 +13,18 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/);
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const;
 
+// A line either points at a catalogued colourway or carries a typed
+// description — same either/or the purchase request has always allowed,
+// because you cannot always order from the catalogue.
 export const poLineInput = z.object({
-  colourwayId: z.string().min(1, "Pick a colourway"),
-  unit:        z.enum(SELL_UNITS),
-  quantity:    z.number().positive("Quantity must be > 0"),
-  rate:        z.string().trim().min(1, "Rate is required"),   // INR string, parsed server-side
-  gstRate:     z.number().int().refine((v) => (GST_RATES as readonly number[]).includes(v), "Invalid GST rate").default(0),
+  colourwayId:  z.string().min(1).optional(),
+  freeTextItem: z.string().trim().max(300).optional(),
+  unit:         z.enum(SELL_UNITS),
+  quantity:     z.number().positive("Quantity must be > 0"),
+  rate:         z.string().trim().min(1, "Rate is required"),   // INR string, parsed server-side
+  gstRate:      z.number().int().refine((v) => (GST_RATES as readonly number[]).includes(v), "Invalid GST rate").default(0),
+}).refine((d) => d.colourwayId || d.freeTextItem, {
+  message: "Either pick a colourway or enter a description",
 });
 
 export const createPOSchema = z.object({

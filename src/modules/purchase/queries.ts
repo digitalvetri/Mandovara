@@ -89,7 +89,8 @@ export async function listPOs(
 
 export interface POLineRow {
   id: string;
-  colourwayId: string;
+  /** Null on a typed line — the item is not in the catalogue. */
+  colourwayId: string | null;
   colourwayCode: string;
   colourName: string;
   designCode: string;
@@ -132,7 +133,10 @@ export async function getPO(ctx: RequestContext, id: string): Promise<PODetail |
       totalValue: true, vendorId: true,
       lines: {
         orderBy: { id: "asc" },
-        select: { id: true, colourwayId: true, quantity: true, receivedQty: true, unit: true, rate: true },
+        select: {
+          id: true, colourwayId: true, freeTextItem: true,
+          quantity: true, receivedQty: true, unit: true, rate: true,
+        },
       },
       grns: {
         orderBy: { receivedAt: "desc" },
@@ -152,7 +156,9 @@ export async function getPO(ctx: RequestContext, id: string): Promise<PODetail |
   });
 
   // Fetch colourways for lines (no relation on POLine in schema)
-  const colourwayIds = [...new Set(row.lines.map((l) => l.colourwayId))];
+  const colourwayIds = [...new Set(
+    row.lines.map((l) => l.colourwayId).filter((id): id is string => !!id),
+  )];
   const colourways = colourwayIds.length
     ? await db.colourway.findMany({
         where: { id: { in: colourwayIds } },
@@ -171,14 +177,16 @@ export async function getPO(ctx: RequestContext, id: string): Promise<PODetail |
     vendorMobile: vendor?.mobile ?? "—",
     date: row.date, expectedAt: row.expectedAt, totalValue: row.totalValue,
     lines: row.lines.map((l) => {
-      const cw = cwMap.get(l.colourwayId);
+      const cw = l.colourwayId ? cwMap.get(l.colourwayId) : undefined;
       const ordered = l.quantity.toString();
       const received = l.receivedQty.toString();
+      // A typed line has no catalogue entry, so what the buyer wrote IS the
+      // item name. Show it where the code would go rather than an id stub.
       return {
         id: l.id,
         colourwayId: l.colourwayId,
-        colourwayCode: cw?.code ?? l.colourwayId.slice(0, 8),
-        colourName: cw?.colourName ?? "—",
+        colourwayCode: cw?.code ?? l.freeTextItem ?? "—",
+        colourName: cw?.colourName ?? (l.freeTextItem ? "Not in catalogue" : "—"),
         designCode: cw?.design.code ?? "—",
         unit: l.unit,
         orderedQty: ordered,
