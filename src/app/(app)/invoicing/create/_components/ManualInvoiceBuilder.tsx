@@ -8,8 +8,9 @@
 // is editable and lines can be added or removed. Clear the lot and type
 // something else if the job changed.
 //
-// Same five columns as the quotation builder and the printed document:
-// Item, Unit, Qty, Rate, Amount. One vocabulary across the app.
+// Same columns as the quotation builder and the printed document:
+// Item, Unit, Qty, Rate, Disc %, Amount. One vocabulary across the app —
+// including the discount, so what was quoted is what gets billed.
 
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ export interface SeedLine {
   quantity:    string;
   rate:        string;   // rupees, as text
   gstRate:     number;
+  discountPct: string;   // per cent, as text
 }
 
 interface Line extends SeedLine { key: string }
@@ -38,7 +40,16 @@ function newLine(seed?: SeedLine): Line {
     quantity:    seed?.quantity ?? "1",
     rate:        seed?.rate ?? "",
     gstRate:     seed?.gstRate ?? 18,
+    discountPct: seed?.discountPct ?? "0",
   };
+}
+
+/** Qty x rate, less the line discount — the same order the server uses. */
+function lineAmount(l: { quantity: string; rate: string; discountPct: string }): number {
+  const q = parseFloat(l.quantity) || 0;
+  const r = parseFloat(l.rate.replace(/[,\s₹]/g, "")) || 0;
+  const d = parseFloat(l.discountPct) || 0;
+  return q * r * (1 - d / 100);
 }
 
 function money(n: number): string {
@@ -73,9 +84,7 @@ export function ManualInvoiceBuilder({
   const totals = useMemo(() => {
     let taxable = 0, gst = 0;
     for (const l of lines) {
-      const q = parseFloat(l.quantity) || 0;
-      const r = parseFloat(l.rate.replace(/[,\s₹]/g, "")) || 0;
-      const t = q * r;
+      const t = lineAmount(l);
       taxable += t;
       gst += t * (l.gstRate / 100);
     }
@@ -90,6 +99,7 @@ export function ManualInvoiceBuilder({
         lines: lines.map((l) => ({
           description: l.description.trim(),
           unit: l.unit, quantity: l.quantity, rate: l.rate, gstRate: l.gstRate,
+          discountPct: l.discountPct,
         })),
       });
       if (!r.ok || !r.data) { setError(r.error ?? "Could not create the invoice."); return; }
@@ -122,13 +132,14 @@ export function ManualInvoiceBuilder({
       {/* Lines */}
       <div className="overflow-hidden rounded-[14px] border border-rule bg-surface">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse">
+          <table className="w-full min-w-[860px] border-collapse">
             <thead>
               <tr className="border-b border-rule">
                 <Th>Item</Th>
                 <Th width={110}>Unit</Th>
                 <Th width={80} align="right">Qty</Th>
                 <Th width={120} align="right">Rate (₹)</Th>
+                <Th width={80} align="right">Disc %</Th>
                 <Th width={80} align="right">GST %</Th>
                 <Th width={110} align="right">Amount</Th>
                 <th className="w-[40px]" />
@@ -136,7 +147,7 @@ export function ManualInvoiceBuilder({
             </thead>
             <tbody className="divide-y divide-rule/60">
               {lines.map((l, i) => {
-                const amt = (parseFloat(l.quantity) || 0) * (parseFloat(l.rate.replace(/[,\s₹]/g, "")) || 0);
+                const amt = lineAmount(l);
                 return (
                   <tr key={l.key}>
                     <Td>
@@ -156,6 +167,11 @@ export function ManualInvoiceBuilder({
                     <Td>
                       <input value={l.rate} inputMode="decimal" placeholder="0.00"
                              onChange={(e) => patch(i, { rate: e.target.value.replace(/[^0-9.]/g, "") })}
+                             className={`${FIELD} text-right`} />
+                    </Td>
+                    <Td>
+                      <input value={l.discountPct} inputMode="decimal"
+                             onChange={(e) => patch(i, { discountPct: e.target.value.replace(/[^0-9.]/g, "") })}
                              className={`${FIELD} text-right`} />
                     </Td>
                     <Td>

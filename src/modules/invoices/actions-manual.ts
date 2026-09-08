@@ -19,7 +19,7 @@ import { z } from "zod";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
-import { computeLineTax } from "@/kernel/tax/gst";
+import { applyLineDiscount, computeLineTax } from "@/kernel/tax/gst";
 import { SELL_UNITS } from "@/modules/quotations/schema";
 import { createInvoice } from "./actions";
 
@@ -35,6 +35,8 @@ const lineSchema = z.object({
   /** Rupees as typed. Converted to paise here — the one conversion point. */
   rate:        z.string().trim().min(1),
   gstRate:     z.number().min(0).max(28),
+  /** Per cent off the line, as typed. Optional so older callers still parse. */
+  discountPct: z.string().trim().optional(),
 });
 
 const schema = z.object({
@@ -95,7 +97,18 @@ export async function createManualInvoice(
     // Fixed-point: quantity to 4 decimals, so 2.5 × ₹1,099 is exact
     // rather than a float that lands a paisa out.
     const qtyFixed = BigInt(Math.round(qty * 10_000));
-    const taxable  = (ratePaise * qtyFixed) / 10_000n;
+    const gross    = (ratePaise * qtyFixed) / 10_000n;
+
+    // The discount comes across from the quotation, and is editable here.
+    // Billing the list price when the client was quoted 25% off was the
+    // bug this fixes — owner, 2026-09-08. Same helper, same rounding
+    // order as every quotation line, so the two documents agree to the paisa.
+    const discountPct = parseFloat(l.discountPct ?? "0") || 0;
+    if (discountPct < 0 || discountPct > 100) {
+      return { ok: false, error: `"${l.description}" needs a discount between 0 and 100%.` };
+    }
+    const { taxable } = applyLineDiscount(gross, discountPct);
+
     const tax = computeLineTax({
       taxable, gstRate: l.gstRate, supplierStateCode, placeOfSupplyCode,
     });

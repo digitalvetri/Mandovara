@@ -54,7 +54,7 @@ export default async function CreateInvoicePage({
         orderBy: { lineNo: "asc" },
         select: {
           description: true, unit: true, quantity: true,
-          rate: true, gstRate: true,
+          rate: true, gstRate: true, discountPct: true,
         },
       },
     },
@@ -67,6 +67,9 @@ export default async function CreateInvoicePage({
     // Paise → rupees for a field a human types into.
     rate:        (Number(l.rate) / 100).toString(),
     gstRate:     Number(l.gstRate),
+    // The agreed discount travels with the line. Without it the invoice
+    // silently bills the list price — owner, 2026-09-08.
+    discountPct: l.discountPct.toString(),
   }));
 
   return (
