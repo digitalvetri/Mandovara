@@ -9,6 +9,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { parseINR } from "@/kernel/money/format";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
+import { calcPOTotals, scaleQty } from "@/lib/calc/purchase-order";
 import { createPOSchema, setPOStatusSchema, rejectPOSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -51,15 +52,15 @@ export async function createPO(
     }
   }
 
-  // Compute totalValue = sum(rate × quantity)
-  const lineAmounts = d.lines.map((l) => {
-    const ratePaise = parseINR(l.rate);
-    const qty = new Decimal(l.quantity);
-    return { ratePaise, qty };
-  });
-  const totalValue = lineAmounts.reduce((sum, { ratePaise, qty }) => {
-    return sum + (ratePaise * BigInt(Math.round(qty.toNumber() * 10_000))) / 10_000n;
-  }, 0n);
+  // Ordered value is GST-inclusive — it is what the vendor will be paid, and
+  // what the To-Pay list and the vendor ledger read off this column.
+  const { total: totalValue } = calcPOTotals(
+    d.lines.map((l) => ({
+      ratePaise:      parseINR(l.rate),
+      quantityScaled: scaleQty(l.quantity),
+      gstRatePct:     l.gstRate ?? 0,
+    })),
+  );
 
   // Get branch prefix for number generation
   const branch = await db.branch.findFirst({

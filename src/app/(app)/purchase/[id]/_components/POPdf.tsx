@@ -4,6 +4,7 @@
 
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { PODetail, POLineRow } from "@/modules/purchase/queries";
+import { calcPOTotals, scaleQty } from "@/lib/calc/purchase-order";
 
 const TEAL   = "#1B8A7E";
 const WHITE  = "#FFFFFF";
@@ -53,9 +54,13 @@ const s = StyleSheet.create({
   cNo:   { width: 20, paddingHorizontal: 4 },
   cDesc: { flex: 1, paddingHorizontal: 5 },
   cQty:  { width: 70, paddingHorizontal: 4 },
-  cRate: { width: 90, paddingHorizontal: 4 },
+  cRate: { width: 78, paddingHorizontal: 4 },
+  cGst:  { width: 34, paddingHorizontal: 4 },
   cAmt:  { width: 100, paddingHorizontal: 4 },
 
+  sumRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 2, paddingHorizontal: 10, alignSelf: "flex-end", width: 260 },
+  sumLabel: { fontSize: 8, color: MUTED },
+  sumValue: { fontSize: 9, fontFamily: "Courier" },
   grandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: TEAL, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 3, marginTop: 8, alignSelf: "flex-end", width: 260 },
   grandLabel: { fontSize: 8, fontFamily: "Helvetica-Bold", color: WHITE, letterSpacing: 1 },
   grandValue: { fontSize: 13, fontFamily: "Courier-Bold", color: WHITE },
@@ -83,6 +88,14 @@ function fmtMoney(paise: bigint): string {
   return neg ? `(Rs.${grouped})` : `Rs.${grouped}`;
 }
 
+/** Round-off is only ever paise, which fmtMoney truncates away. */
+function fmtPaise(paise: bigint): string {
+  const neg = paise < 0n;
+  const abs = neg ? -paise : paise;
+  const body = `Rs.${abs / 100n}.${(abs % 100n).toString().padStart(2, "0")}`;
+  return neg ? `(${body})` : body;
+}
+
 function lineAmount(l: POLineRow): bigint {
   // rate is paise per unit; quantity is a decimal string.
   const qtyMilli = BigInt(Math.round(Number(l.orderedQty) * 10_000));
@@ -96,6 +109,7 @@ function TableHeader() {
       <View style={s.cDesc}><Text style={s.th}>Colourway</Text></View>
       <View style={s.cQty}><Text style={[s.th, { textAlign: "right" }]}>Qty</Text></View>
       <View style={s.cRate}><Text style={[s.th, { textAlign: "right" }]}>Rate</Text></View>
+      <View style={s.cGst}><Text style={[s.th, { textAlign: "right" }]}>GST</Text></View>
       <View style={s.cAmt}><Text style={[s.th, { textAlign: "right" }]}>Amount</Text></View>
     </View>
   );
@@ -116,12 +130,19 @@ function TableRow({ line, idx }: { line: POLineRow; idx: number }) {
         <Text style={[s.tdRight, { fontFamily: "Courier" }]}>{qty} {unitStr}</Text>
       </View>
       <View style={s.cRate}><Text style={s.tdRight}>{fmtMoney(line.rate)}</Text></View>
+      <View style={s.cGst}><Text style={s.tdRight}>{line.gstRate}%</Text></View>
       <View style={s.cAmt}><Text style={[s.tdRight, { fontFamily: "Courier-Bold" }]}>{fmtMoney(lineAmount(line))}</Text></View>
     </View>
   );
 }
 
 export function POPdf({ po, logoSrc }: { po: PODetail; logoSrc?: string }) {
+  const totals   = calcPOTotals(po.lines.map((l) => ({
+    ratePaise:      l.rate,
+    quantityScaled: scaleQty(Number(l.orderedQty)),
+    gstRatePct:     l.gstRate,
+  })));
+  const gstValue = totals.cgst + totals.sgst + totals.igst;
   return (
     <Document title={`Purchase Order ${po.number}`} author="Mandovara" creator="Mandovara">
       <Page size="A4" style={s.page}>
@@ -173,9 +194,25 @@ export function POPdf({ po, logoSrc }: { po: PODetail; logoSrc?: string }) {
           {po.lines.map((l, i) => <TableRow key={l.id} line={l} idx={i} />)}
         </View>
 
-        <View style={s.grandRow} wrap={false}>
-          <Text style={s.grandLabel}>TOTAL</Text>
-          <Text style={s.grandValue}>{fmtMoney(po.totalValue)}</Text>
+        <View wrap={false}>
+          <View style={s.sumRow}>
+            <Text style={s.sumLabel}>Subtotal</Text>
+            <Text style={s.sumValue}>{fmtMoney(totals.taxableAmount)}</Text>
+          </View>
+          <View style={s.sumRow}>
+            <Text style={s.sumLabel}>GST</Text>
+            <Text style={s.sumValue}>{fmtMoney(gstValue)}</Text>
+          </View>
+          {totals.roundOff !== 0n && (
+            <View style={s.sumRow}>
+              <Text style={s.sumLabel}>Round off</Text>
+              <Text style={s.sumValue}>{fmtPaise(totals.roundOff)}</Text>
+            </View>
+          )}
+          <View style={s.grandRow}>
+            <Text style={s.grandLabel}>TOTAL</Text>
+            <Text style={s.grandValue}>{fmtMoney(po.totalValue)}</Text>
+          </View>
         </View>
 
         <View style={s.footer} fixed>

@@ -10,6 +10,7 @@ import { POItemCell } from "./POItemCell";
 import type { VendorPickerRow } from "@/modules/vendors/queries";
 import type { ColourwayPickerRow } from "@/modules/purchase/queries";
 import { GST_RATES, SELL_UNITS } from "@/modules/purchase/schema";
+import { calcPOTotals, scaleQty } from "@/lib/calc/purchase-order";
 
 type SellUnit = (typeof SELL_UNITS)[number];
 
@@ -54,16 +55,18 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
 
   const colourwayMap = useMemo(() => new Map(colourways.map((c) => [c.id, c])), [colourways]);
 
-  const totalValue = useMemo(() => {
-    let total = 0n;
-    for (const l of lines) {
-      if (l.mode === "typed" ? !l.freeTextItem.trim() : !l.colourwayId) continue;
-      const rate = safePaise(l.rate);
-      const qty = Number(l.quantity) || 0;
-      total += (rate * BigInt(Math.round(qty * 10_000))) / 10_000n;
-    }
-    return total;
-  }, [lines]);
+  // Same pure calculation the server runs, so the figure on screen is the
+  // figure that gets saved.
+  const totals = useMemo(() => calcPOTotals(
+    lines
+      .filter((l) => (l.mode === "typed" ? l.freeTextItem.trim() : l.colourwayId))
+      .map((l) => ({
+        ratePaise:      safePaise(l.rate),
+        quantityScaled: scaleQty(Number(l.quantity) || 0),
+        gstRatePct:     Number(l.gstRate) || 0,
+      })),
+  ), [lines]);
+  const gstValue = totals.cgst + totals.sgst + totals.igst;
 
   function updateLine(i: number, patch: Partial<Draft>) {
     setLines((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
@@ -144,7 +147,7 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
               <Th align="right" width={110}>Qty</Th>
               <Th align="right" width={140}>Rate (₹)</Th>
               <Th align="right" width={80}>GST %</Th>
-              <Th align="right" width={130}>Amount</Th>
+              <Th align="right" width={140}>Amount (ex GST)</Th>
               <Th width={30}></Th>
             </tr>
           </thead>
@@ -220,12 +223,19 @@ export function POBuilder({ vendors, colourways, initialLines }: Props) {
 
       {serverError && <div className="text-[12px] text-bad">{serverError}</div>}
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">Total</span>
-          <span className="font-display text-[22px] font-semibold text-text tabular-nums">
-            {formatINR(totalValue)}
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+          <SumLine label="Subtotal" value={formatINR(totals.taxableAmount)} />
+          <SumLine label="GST" value={formatINR(gstValue)} />
+          {totals.roundOff !== 0n && (
+            <SumLine label="Round off" value={formatINR(totals.roundOff)} />
+          )}
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">Total</span>
+            <span className="font-display text-[22px] font-semibold text-text tabular-nums">
+              {formatINR(totals.total)}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => router.back()}
@@ -276,4 +286,12 @@ function Th({
 }
 function Td({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
   return <td className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>{children}</td>;
+}
+function SumLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">{label}</span>
+      <span className="text-[13px] text-text tabular-nums">{value}</span>
+    </div>
+  );
 }

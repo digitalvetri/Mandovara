@@ -261,18 +261,12 @@ async function autoCreateExpenseForPO(
     where:  { id: poId },
     select: {
       id: true, number: true, totalValue: true, vendorId: true,
-      lines: { select: { rate: true, quantity: true, gstRate: true } },
     },
   });
 
-  // Compute GST-inclusive total from PO lines (totalValue is pre-tax)
-  const totalWithGst = fullPo.lines.reduce((sum, l) => {
-    const qty     = BigInt(Math.round(parseFloat(l.quantity.toString()) * 10_000));
-    const taxable = (l.rate * qty) / 10_000n;
-    const gstPct  = BigInt(Math.round(Number(l.gstRate)));
-    const gst     = (taxable * gstPct) / 100n;
-    return sum + taxable + gst;
-  }, 0n);
+  // totalValue is already the GST-inclusive ordered value — what the vendor
+  // is owed — so the expense is that figure exactly.
+  const totalWithGst = fullPo.totalValue;
   const vendor = await tx.vendor.findUnique({
     where:  { id: fullPo.vendorId },
     select: { name: true },

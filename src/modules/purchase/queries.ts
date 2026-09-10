@@ -99,6 +99,7 @@ export interface POLineRow {
   receivedQty: string;
   pendingQty: string;
   rate: bigint;
+  gstRate: number;   // integer %
 }
 
 export interface GRNRow {
@@ -136,6 +137,7 @@ export async function getPO(ctx: RequestContext, id: string): Promise<PODetail |
         select: {
           id: true, colourwayId: true, freeTextItem: true,
           quantity: true, receivedQty: true, unit: true, rate: true,
+          gstRate: true,
         },
       },
       grns: {
@@ -193,6 +195,7 @@ export async function getPO(ctx: RequestContext, id: string): Promise<PODetail |
         receivedQty: received,
         pendingQty: subDec(ordered, received),
         rate: l.rate,
+        gstRate: Number(l.gstRate),
       };
     }),
     grns: row.grns.map((g) => ({

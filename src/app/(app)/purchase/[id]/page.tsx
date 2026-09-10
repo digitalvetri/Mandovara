@@ -6,7 +6,8 @@ import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
-import { getPO } from "@/modules/purchase/queries";
+import { getPO, type POLineRow } from "@/modules/purchase/queries";
+import { calcPOTotals, scaleQty } from "@/lib/calc/purchase-order";
 import { listVendorBillsForPO, getGRNsForBilling } from "@/modules/purchase/vendor-bill-queries";
 import { POStatusPill } from "../_components/StatusPill";
 import { SendOnWhatsAppButton } from "./_components/SendOnWhatsAppButton";
@@ -34,11 +35,19 @@ export default async function PODetailPage({
   if (!po) notFound();
 
   // ── Financial summary ────────────────────────────────────────────────────
+  // Every figure here is GST-inclusive. Received and Pending are each priced
+  // off their own quantity rather than subtracted from Ordered, so a fully
+  // received PO lands on Pending ₹0 exactly.
+  const valueOf = (qty: (l: POLineRow) => string) => calcPOTotals(
+    po.lines.map((l) => ({
+      ratePaise: l.rate, quantityScaled: scaleQty(Number(qty(l))), gstRatePct: l.gstRate,
+    })),
+  );
+  const orderedTotals = valueOf((l) => l.orderedQty);
+  const orderedGst    = orderedTotals.cgst + orderedTotals.sgst + orderedTotals.igst;
   const orderedValue  = po.totalValue;
-  const receivedValue = po.lines.reduce((s, l) => {
-    return s + BigInt(Math.round(Number(l.rate) * parseFloat(l.receivedQty)));
-  }, 0n);
-  const pendingValue = orderedValue - receivedValue;
+  const receivedValue = valueOf((l) => l.receivedQty).total;
+  const pendingValue  = valueOf((l) => l.pendingQty).total;
   const pendingLineCount = po.lines.filter((l) => parseFloat(l.pendingQty) > 0).length;
 
   // ── Urgency ──────────────────────────────────────────────────────────────
@@ -91,7 +100,8 @@ export default async function PODetailPage({
         {/* ── Financial summary + urgency ─────────────────────────────────── */}
         <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
           <div className="flex divide-x divide-rule">
-            <StatCard label="Ordered" value={formatINR(orderedValue)} />
+            <StatCard label="Ordered" value={formatINR(orderedValue)}
+                      hint={`${formatINR(orderedTotals.taxableAmount)} + ${formatINR(orderedGst)} GST`} />
             <StatCard label="Received" value={formatINR(receivedValue)} highlight={receivedValue > 0n ? "good" : undefined} />
             <StatCard label="Pending"  value={formatINR(pendingValue)}  highlight={pendingValue > 0n ? "warn" : undefined} />
             {urgency && (
@@ -244,12 +254,13 @@ export default async function PODetailPage({
   );
 }
 
-function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: "good" | "warn" }) {
+function StatCard({ label, value, hint, highlight }: { label: string; value: string; hint?: string; highlight?: "good" | "warn" }) {
   const valueClass = highlight === "good" ? "text-good" : highlight === "warn" ? "text-warn" : "text-text";
   return (
     <div className="flex-1 px-6 py-4">
       <div className="text-[11px] uppercase tracking-[0.12em] text-text-dim mb-1.5">{label}</div>
       <div className={`text-[18px] font-semibold tabular ${valueClass}`}>{value}</div>
+      {hint && <div className="text-[11px] text-text-faint mt-1 tabular">{hint}</div>}
     </div>
   );
 }
