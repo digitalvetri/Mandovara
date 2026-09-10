@@ -11,6 +11,8 @@ import { computeLineTax } from "@/kernel/tax/gst";
 import { devContext } from "@/lib/dev-context";
 import { cancelInvoiceSchema } from "./schema";
 import { ActionResult, createInvoice } from "./actions";
+import { checkProjectSettledForInvoice } from "./project-gate";
+import { sweepProjectReceiptsOntoInvoice } from "./sweep-receipts";
 import { CANCEL_WINDOW_HOURS } from "./actions-util";
 import { zodError } from "./actions-part2-util";
 
@@ -62,7 +64,7 @@ export async function cancelInvoice(
 
 /** One-click "Create invoice from order" — auto-derives lines from order data. */
 export async function createInvoiceFromOrder(
-  input: { salesOrderId: string },
+  input: { salesOrderId: string; billEarly?: boolean },
 ): Promise<ActionResult<{ id: string; number: string }>> {
   const ctx = await devContext();
   requirePermission(ctx, "invoice.create");
@@ -93,6 +95,14 @@ export async function createInvoiceFromOrder(
   });
   if (existingCount > 0) {
     return { ok: false, error: "An invoice already exists for this order. View it in the Invoicing module." };
+  }
+
+  // Bill after the money is in — see ./project-gate for why.
+  if (order.projectId) {
+    const refusal = await checkProjectSettledForInvoice(
+      ctx, db, order.projectId, input.billEarly ?? false,
+    );
+    if (refusal) return refusal;
   }
 
   // Determine supply codes for correct CGST/SGST vs IGST routing
@@ -167,11 +177,25 @@ export async function createInvoiceFromOrder(
     });
   }
 
-  return createInvoice({
+  const res = await createInvoice({
     orderId: order.id, branchId: order.branchId,
     type: "TAX", date: toDate(now), dueDate: toDate(due),
     placeOfSupplyCode, lines,
   });
+  if (!res.ok || !res.data) return res;
+
+  // Money already taken against the job becomes money paid against this
+  // bill. Best-effort — a failure must not lose an invoice already written.
+  if (order.projectId) {
+    try {
+      await sweepProjectReceiptsOntoInvoice({ orgId: ctx.orgId, invoiceId: res.data.id });
+      revalidatePath(`/projects/${order.projectId}`);
+    } catch (err) {
+      console.warn("sweepProjectReceiptsOntoInvoice failed (invoice still created):", err);
+    }
+  }
+  revalidatePath("/accounts");
+  return res;
 }
 
 export async function createCreditNote(

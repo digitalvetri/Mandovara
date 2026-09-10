@@ -101,3 +101,46 @@ export function Row({ k, v }: { k: string; v: string }) {
     </div>
   );
 }
+
+// ── Payment targets ──────────────────────────────────────────────
+//
+// A payment is taken against ONE of two things: a job the client agreed a
+// quotation for, or the client's open bills. Jobs come first because under
+// the quotation-first flow that is where nearly all money lands — the bill
+// is raised at the end, once the job is paid off.
+
+export interface OpenProjectWire {
+  id:              string;
+  number:          string;
+  name:            string;
+  quotationNumber: string | null;
+  agreedValue:     string;
+  received:        string;
+  due:             string;
+}
+
+export interface OpenProject {
+  id:              string;
+  number:          string;
+  name:            string;
+  quotationNumber: string | null;
+  agreedValue:     bigint;
+  received:        bigint;
+  due:             bigint;
+}
+
+export function toOpenProjects(rows: OpenProjectWire[]): OpenProject[] {
+  return rows.map((r) => ({
+    id:              r.id,
+    number:          r.number,
+    name:            r.name,
+    quotationNumber: r.quotationNumber,
+    agreedValue:     BigInt(r.agreedValue),
+    received:        BigInt(r.received),
+    due:             BigInt(r.due),
+  }));
+}
+
+/** What the money is being put against. "bills" is the legacy path — a
+ *  client with invoices already raised and still unpaid. */
+export type PaymentTarget = { kind: "project"; projectId: string } | { kind: "bills" };

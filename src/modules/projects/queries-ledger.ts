@@ -10,13 +10,24 @@
 // sequence with a running balance, not four totals.
 //
 // One row per event, oldest first, each carrying the balance as it stood
-// after that event. Debits are what the client owes us (invoices);
-// credits are what they have given us (advances, receipts). A quotation
-// is neither — it is the agreement the money hangs off, so it appears as
-// a reference row with no effect on the balance.
+// after that event. Debits are what the client owes us; credits are what
+// they have given us.
+//
+// What counts as the debit changed on 2026-09-10, to match how the studio
+// actually works. The client agrees a quotation, pays against it over the
+// life of the job, and the tax invoice is raised at the END once the money
+// is in. So the ACCEPTED QUOTATION is the debit — it is the moment the
+// client owes the money — and the invoice that follows is a reference row
+// worth zero, because it bills for a debt already on the ledger. Charging
+// both would double the balance on every settled job.
+//
+// Projects with no accepted quotation keep the old reading: the invoice is
+// the debit, because nothing else on the page says what was owed. The
+// `debtSource` field says which reading a given ledger used.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { getProjectReceivable } from "./receivable";
 import type { RequestContext } from "@/kernel/auth/context";
 
 export type LedgerKind = "QUOTATION" | "ADVANCE" | "INVOICE" | "RECEIPT";
@@ -40,13 +51,18 @@ export interface LedgerRow {
 
 export interface ProjectLedger {
   rows:        LedgerRow[];
+  /** The agreed figure — what the debt is measured against. */
   quoted:      bigint;
   invoiced:    bigint;
   received:    bigint;
-  /** invoiced − received. Negative means the client is in credit. */
+  /** agreed − received. Negative means the client is in credit. */
   balance:     bigint;
-  /** Received before any invoice existed — money on account. */
+  /** Received before any invoice existed — money against the agreement. */
   advances:    bigint;
+  /** Which document the debt is read from. QUOTATION on the normal flow. */
+  debtSource:  "QUOTATION" | "INVOICE";
+  /** True once the agreement is fully paid — the invoice gate. */
+  settled:     boolean;
 }
 
 export async function getProjectLedger(
@@ -58,7 +74,9 @@ export async function getProjectLedger(
 
   const [quotations, advances, invoices] = await Promise.all([
     db.quotation.findMany({
-      where:   { projectId, status: { in: ["SENT", "ACCEPTED", "REVISED"] } },
+      // Same set getProjectReceivable treats as a live agreement, so the
+      // ledger's debit row and the header's agreed value cannot diverge.
+      where:   { projectId, status: { in: ["SENT", "REVISED", "APPROVED", "ACCEPTED"] } },
       orderBy: { date: "asc" },
       select:  { id: true, number: true, revision: true, date: true, total: true, status: true },
     }),
@@ -98,7 +116,8 @@ export async function getProjectLedger(
     },
     orderBy: { date: "asc" },
     select: {
-      id: true, number: true, date: true, amount: true,
+      id: true, number: true, date: true, amount: true, unallocated: true,
+      projectId: true,
       mode: true, reference: true, chequeStatus: true,
       // Only the portion allocated to THIS project's invoices counts. A
       // receipt settling two projects must not credit its full value to
@@ -110,15 +129,38 @@ export async function getProjectLedger(
     },
   });
 
+  // The agreed value and the money against it, from the one module that
+  // knows how to count both (see ./receivable).
+  const receivable = await getProjectReceivable(db, projectId);
+
+  // Which reading applies. A project with a live quotation owes against that
+  // quotation; one with nothing but invoices — an older job, or a bill typed
+  // straight in — still owes against its invoices.
+  const debtSource: "QUOTATION" | "INVOICE" =
+    (receivable?.agreedValue ?? 0n) > 0n && quotations.length > 0 ? "QUOTATION" : "INVOICE";
+
   const rows: LedgerRow[] = [];
 
+  // The agreement the money hangs off. Exactly ONE quotation carries the
+  // debit — the accepted one, or the latest sent one if none is accepted
+  // yet. Every other quotation on the project is a superseded revision and
+  // must stay at zero, or a job re-quoted three times would read as owing
+  // three times its value.
+  const agreementId =
+    quotations.filter((q) => q.status === "ACCEPTED").at(-1)?.id ??
+    quotations.at(-1)?.id ?? null;
+
   for (const q of quotations) {
+    const isAgreement = q.id === agreementId;
     rows.push({
       id: q.id, kind: "QUOTATION", date: q.date,
       ref: q.number + (q.revision > 0 ? ` r${q.revision}` : ""),
       label: q.status === "ACCEPTED" ? "Quotation accepted" : "Quotation sent",
-      debit: 0n, credit: 0n, balance: 0n,
-      note: null,
+      debit: isAgreement && debtSource === "QUOTATION" ? q.total : 0n,
+      credit: 0n, balance: 0n,
+      note: isAgreement
+        ? (q.status === "ACCEPTED" ? "the agreed amount" : "awaiting the client's word")
+        : "superseded",
     });
   }
   for (const a of advances) {
@@ -133,11 +175,16 @@ export async function getProjectLedger(
     rows.push({
       id: i.id, kind: "INVOICE", date: i.date,
       ref: i.number, label: "Invoice raised",
-      // advanceAdjusted is already-received money absorbed at invoice
-      // time. Charging the gross would double-count it against the
-      // advance credit row above.
-      debit: i.total - i.advanceAdjusted, credit: 0n, balance: 0n,
-      note: i.advanceAdjusted > 0n ? "advance adjusted" : i.status.toLowerCase().replace(/_/g, " "),
+      // Zero when the quotation already carries the debt — the invoice bills
+      // for money the ledger has owed since the client agreed the quote.
+      // advanceAdjusted is subtracted in the fallback reading because it is
+      // already-received money absorbed at invoice time; charging the gross
+      // would double-count it against the credit rows.
+      debit: debtSource === "QUOTATION" ? 0n : i.total - i.advanceAdjusted,
+      credit: 0n, balance: 0n,
+      note: debtSource === "QUOTATION"
+        ? "bill for the agreed amount"
+        : (i.advanceAdjusted > 0n ? "advance adjusted" : i.status.toLowerCase().replace(/_/g, " ")),
     });
   }
   for (const r of receipts) {
@@ -145,13 +192,17 @@ export async function getProjectLedger(
     // history explains the balance, but contributes nothing.
     const bounced = r.chequeStatus === "BOUNCED";
 
-    // Credit only what landed on this project. A receipt allocated
-    // across invoices gets its matching slice; one linked by projectId
-    // with no allocations yet is money on account, so it counts whole.
+    // Credit only what landed on THIS project, and count it the same way
+    // getProjectReceivable does so the running balance ties out with the
+    // header: the slice allocated to this project's bills, plus — when the
+    // payment was booked to this project — whatever is not on a bill yet.
+    // A receipt spread across two projects therefore credits each its own
+    // share and never its full value to whichever page you happen to open.
     const allocated = r.allocations.reduce((acc: bigint, a: { amount: bigint }) => acc + a.amount, 0n);
-    const credit = bounced ? 0n : (allocated > 0n ? allocated : r.amount);
+    const onAccount = r.projectId === projectId ? r.unallocated : 0n;
+    const credit = bounced ? 0n : allocated + onAccount;
 
-    const partial = allocated > 0n && allocated !== r.amount;
+    const partial = credit > 0n && credit !== r.amount;
     rows.push({
       id: r.id, kind: "RECEIPT", date: r.date,
       ref: r.number, label: bounced ? "Receipt — cheque bounced" : "Payment received",
@@ -172,16 +223,23 @@ export async function getProjectLedger(
     row.balance = running;
   }
 
-  const quoted   = quotations.reduce((s, q) => s + q.total, 0n);
-  const invoiced = invoices.reduce((s, i) => s + i.total, 0n);
-  const received = rows.reduce((s, r) => s + r.credit, 0n);
+  const invoiced = invoices.reduce((acc, i) => acc + i.total, 0n);
+  const agreed   = receivable?.agreedValue ?? 0n;
+  const received = receivable?.received    ?? 0n;
 
   return {
     rows,
-    quoted,
+    // The agreed figure, not the sum of every revision ever sent.
+    quoted:   agreed,
     invoiced,
+    // Received comes from getProjectReceivable, the one place that counts
+    // money arriving by all three routes. Summing the credit column instead
+    // would miss a payment booked to the project through a path this query
+    // does not look at, and the header and the ledger would then disagree.
     received,
-    balance:  invoiced - received,
-    advances: advances.reduce((s, a) => s + a.amount, 0n),
+    balance:  debtSource === "QUOTATION" ? agreed - received : invoiced - received,
+    advances: advances.reduce((acc, a) => acc + a.amount, 0n),
+    debtSource,
+    settled:  receivable?.settled ?? false,
   };
 }

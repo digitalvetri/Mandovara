@@ -2,12 +2,12 @@
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
-import { computeOutstanding } from "@/kernel/money/outstanding";
 import type { RequestContext } from "@/kernel/auth/context";
 import type {
   AccountsOverview, AgingBucket,
   OutstandingClientRow, OutstandingInvoiceRow,
 } from "./types";
+import { loadReceivables, byClient } from "./receivables";
 import { buildMoneyKpis } from "./kpis";
 import { buildAttentionCounts, buildExpenseHeads, buildMonthlyInOut } from "./charts";
 import { buildMoneyOut, buildPaymentModes, describePurpose } from "./money-out";
@@ -21,17 +21,21 @@ export async function loadAccountsOverview(
   const now = new Date();
   const today = new Date(now); today.setHours(0, 0, 0, 0);
 
-  const [invoices, receiptTotals, recent] = await Promise.all([
-    db.invoice.findMany({
-      where: { status: { in: ["ISSUED", "PARTIALLY_PAID", "PAID"] } },
-      orderBy: { dueDate: "asc" },
-      select: {
-        id: true, number: true, date: true, dueDate: true, status: true,
-        total: true, advanceAdjusted: true, clientId: true, projectId: true,
-      },
+  // What is owed comes from ONE list now — see ./receivables. A project with
+  // an agreed quotation is a receivable in its own right; only bills that
+  // belong to no project are counted separately. Before this, "to collect"
+  // scanned invoices alone, so a job quoted at ₹4 lakh with nothing collected
+  // reported ₹0 to collect, while the advance the client actually paid sat in
+  // Received flagged "not matched to a bill".
+  const [receivables, invoiceTotals, receiptTotals, recent] = await Promise.all([
+    loadReceivables(db, today),
+    db.invoice.aggregate({
+      _sum:   { total: true },
+      _count: { _all: true },
+      where:  { status: { in: ["ISSUED", "PARTIALLY_PAID", "PAID"] } },
     }),
     db.receipt.aggregate({
-      _sum: { amount: true, unallocated: true },
+      _sum: { amount: true },
       _count: { _all: true },
     }),
     db.receipt.findMany({
@@ -39,7 +43,7 @@ export async function loadAccountsOverview(
       take: 8,
       select: {
         id: true, number: true, date: true, mode: true, amount: true,
-        unallocated: true, clientId: true,
+        unallocated: true, clientId: true, projectId: true,
         // ReceiptAllocation has no direct invoice relation — just invoiceId.
         // Resolve numbers via a separate lookup below.
         allocations: { select: { invoiceId: true } },
@@ -59,40 +63,22 @@ export async function loadAccountsOverview(
     : [];
   const allocInvoiceMap = new Map(allocInvoices.map((i) => [i.id, i.number]));
 
-  // Batch-fetch client info
-  const allClientIds = [...new Set([
-    ...invoices.map((i) => i.clientId),
-    ...recent.map((r) => r.clientId),
-  ])];
-  const clients = await db.client.findMany({
-    where: { id: { in: allClientIds } },
-    select: { id: true, name: true, mobile: true },
-  });
-  const clientMap = new Map(clients.map((c) => [c.id, c]));
-
-  // Batch-fetch project names
-  const allProjectIds = [...new Set(invoices.map((i) => i.projectId).filter(Boolean) as string[])];
-  const projects = allProjectIds.length > 0
+  const recentProjectIds = [
+    ...new Set(recent.map((r) => r.projectId).filter((v): v is string => !!v)),
+  ];
+  const recentProjects = recentProjectIds.length > 0
     ? await db.project.findMany({
-        where: { id: { in: allProjectIds } },
+        where:  { id: { in: recentProjectIds } },
         select: { id: true, name: true },
       })
     : [];
-  const projectMap = new Map(projects.map((p) => [p.id, p]));
+  const recentProjectMap = new Map(recentProjects.map((p) => [p.id, p.name]));
 
-  // Batch-fetch allocation sums for all non-cancelled invoices
-  const invoiceIds = invoices.map((i) => i.id);
-  const allocationSums = invoiceIds.length > 0
-    ? await db.receiptAllocation.groupBy({
-        by: ["invoiceId"],
-        where: { invoiceId: { in: invoiceIds } },
-        _sum: { amount: true },
-      })
-    : [];
-  const paidMap = new Map(allocationSums.map((a) => [a.invoiceId, a._sum.amount ?? 0n]));
-
-  let invoiced = 0n, outstandingTotal = 0n, overdue = 0n;
-  let paidCount = 0, overdueCount = 0;
+  const recentClients = await db.client.findMany({
+    where:  { id: { in: [...new Set(recent.map((r) => r.clientId))] } },
+    select: { id: true, name: true },
+  });
+  const clientMap = new Map(recentClients.map((c) => [c.id, c]));
 
   const buckets = new Map<AgingBucket["key"], AgingBucket>([
     ["current", { key: "current", label: "Not yet due",  amount: 0n, count: 0 }],
@@ -102,71 +88,52 @@ export async function loadAccountsOverview(
     ["d90p",    { key: "d90p",    label: "Over 90 days", amount: 0n, count: 0 }],
   ]);
 
+  let outstandingTotal = 0n, overdue = 0n, overdueCount = 0;
   const openRows: OutstandingInvoiceRow[] = [];
-  const perClient = new Map<string, OutstandingClientRow>();
 
-  for (const inv of invoices) {
-    invoiced += inv.total;
-    const paid  = paidMap.get(inv.id) ?? 0n;
-    const open  = computeOutstanding(inv.total, inv.advanceAdjusted, paid);
-    const client  = clientMap.get(inv.clientId);
-    const project = inv.projectId ? projectMap.get(inv.projectId) : undefined;
+  for (const r of receivables) {
+    outstandingTotal += r.outstanding;
+    if (r.daysOverdue > 0) { overdue += r.outstanding; overdueCount += 1; }
 
-    if (open <= 0n) { paidCount += 1; continue; }
-    outstandingTotal += open;
-
-    const days = Math.floor((today.getTime() - inv.dueDate.getTime()) / 86_400_000);
-    if (days > 0) { overdue += open; overdueCount += 1; }
-
-    const bucketKey: AgingBucket["key"] =
-      days <= 0  ? "current" :
-      days <= 30 ? "d1_30"   :
-      days <= 60 ? "d31_60"  :
-      days <= 90 ? "d61_90"  :
-                   "d90p";
-    const b = buckets.get(bucketKey)!;
-    b.amount += open;
+    const b = buckets.get(r.bucketKey)!;
+    b.amount += r.outstanding;
     b.count  += 1;
 
     openRows.push({
-      id: inv.id, number: inv.number, date: inv.date, dueDate: inv.dueDate,
-      daysOverdue: Math.max(0, days),
-      clientId: inv.clientId, clientName: client?.name ?? "—", clientMobile: client?.mobile ?? "",
-      projectId: inv.projectId ?? null,
-      projectName: project?.name ?? null,
-      total: inv.total, paid, outstanding: open,
-      status: inv.status,
-      bucketKey,
+      id: r.id, number: r.ref, date: r.dueDate, dueDate: r.dueDate,
+      daysOverdue: r.daysOverdue,
+      clientId: r.clientId, clientName: r.clientName, clientMobile: r.clientMobile,
+      projectId: r.projectId,
+      projectName: r.projectName,
+      total: r.total, paid: r.paid, outstanding: r.outstanding,
+      status: r.status,
+      bucketKey: r.bucketKey,
     });
-
-    const c = perClient.get(inv.clientId);
-    if (c) {
-      c.invoiceCount += 1;
-      c.outstanding  += open;
-      if (days > c.oldestDays) c.oldestDays = days;
-    } else {
-      perClient.set(inv.clientId, {
-        clientId: inv.clientId,
-        clientName:   client?.name ?? "—",
-        clientMobile: client?.mobile ?? "",
-        invoiceCount: 1,
-        outstanding:  open,
-        oldestDays:   Math.max(0, days),
-      });
-    }
   }
 
-  openRows.sort((a, b) => {
-    if (b.daysOverdue !== a.daysOverdue) return b.daysOverdue - a.daysOverdue;
-    return b.outstanding > a.outstanding ? 1 : b.outstanding < a.outstanding ? -1 : 0;
+  const topClients: OutstandingClientRow[] = byClient(receivables)
+    .slice(0, 8)
+    .map((c) => ({
+      clientId:     c.clientId,
+      clientName:   c.clientName,
+      clientMobile: c.clientMobile,
+      invoiceCount: c.itemCount,
+      outstanding:  c.outstanding,
+      oldestDays:   c.oldestDays,
+    }));
+
+  const invoiced = invoiceTotals._sum.total ?? 0n;
+  const received = receiptTotals._sum.amount ?? 0n;
+  // "Extra amount kept for later bills" is money with no home at all —
+  // neither on a bill nor booked to a job. Payments held against a project
+  // are placed, not stray, so they are excluded here.
+  const creditAgg = await db.receipt.aggregate({
+    _sum:  { unallocated: true },
+    where: { unallocated: { gt: 0n }, projectId: null },
   });
-
-  const topClients = [...perClient.values()]
-    .sort((a, b) => b.outstanding > a.outstanding ? 1 : b.outstanding < a.outstanding ? -1 : 0)
-    .slice(0, 8);
-
-  const received       = receiptTotals._sum.amount ?? 0n;
-  const customerCredit = receiptTotals._sum.unallocated ?? 0n;
+  const customerCredit = creditAgg._sum.unallocated ?? 0n;
+  const paidCount = await db.invoice.count({ where: { status: "PAID" } });
+  const invoiceCount = invoiceTotals._count._all;
 
   const filtered = opts.bucketFilter
     ? openRows.filter((r) => r.bucketKey === opts.bucketFilter)
@@ -194,7 +161,7 @@ export async function loadAccountsOverview(
     outstanding: outstandingTotal,
     overdue,
     customerCredit,
-    invoiceCount: invoices.length,
+    invoiceCount,
     paidCount,
     overdueCount,
     aging: [...buckets.values()],
@@ -208,6 +175,7 @@ export async function loadAccountsOverview(
         r.amount,
         r.unallocated,
         r.allocations.map((a) => allocInvoiceMap.get(a.invoiceId) ?? "—"),
+        r.projectId ? (recentProjectMap.get(r.projectId) ?? null) : null,
       ),
     })),
     activeBucket: opts.bucketFilter ?? null,

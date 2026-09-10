@@ -9,6 +9,8 @@
 
 import type { RequestContext } from "@/kernel/auth/context";
 
+import { resolveMoneyStageAction } from "./next-action-money";
+
 export type NextActionKind =
   | "AWAITING_APPROVAL"
   | "BUILD_QUOTATION"
@@ -44,20 +46,28 @@ export interface ProjectSnapshot {
   stage: string;
   openSnags?: number;
   makeInProgress?: { done: number; total: number };
-  /** Owner canonical flow after quote acceptance: invoice → advance →
-   *  install. When present, drives the ORDERED-stage CTA between
-   *  "Create invoice", "Record advance", and "Book install". */
+  /** Owner canonical flow after quote acceptance (2026-09-10): collect the
+   *  advance → do the work → collect the balance → bill. When present, it
+   *  drives the CTA between "Record payment", "Book install" and
+   *  "Create invoice". */
   money?: {
     invoiceTotal:    bigint;
     advanceReceived: bigint;
     advanceRequired: bigint;
+    /** What the client agreed to. Absent on callers that predate it. */
+    agreedValue?:    bigint;
+    /** Still to collect against that agreement. */
+    outstanding?:    bigint;
   };
+  /** True when the project has a quotation on it worth acting on. */
+  hasQuotation?: boolean;
 }
 
 const PERM_CREATE_INVOICE  = ["invoice.create"] as const;
 const PERM_RECORD_ADVANCE  = ["receipt.create"] as const;
 const PERM_BOOK_INSTALL    = ["sitelog.create", "project.update"] as const;
-function hasAny(ctx: RequestContext, keys: readonly string[]): boolean {
+
+export function hasAny(ctx: RequestContext, keys: readonly string[]): boolean {
   for (const k of keys) if (ctx.permissions.has(k as never)) return true;
   return false;
 }
@@ -75,92 +85,36 @@ export function resolveNextAction(
     // flow: click "Create invoice" → land on /invoicing/new. If the
     // project has no invoiceable order yet, that page shows its
     // standard empty state.
+    // Before the client has agreed a price, the next thing to do is put a
+    // price in front of them — or, if one is already out, collect on it.
+    //
+    // This used to say "Create invoice" at every one of these stages, which
+    // asked the owner to bill a client who had not yet agreed what the job
+    // costs. That is the inversion the 2026-09-10 change removes: the
+    // quotation comes first and the invoice comes last.
+    // The money-driven half of the flow — quote, advance, balance, bill —
+    // lives in ./next-action-money so this file stays inside the §10
+    // 300-line limit and the sequence reads as one piece.
     case "ENQUIRY":
     case "SITE_VISIT":
     case "MEASUREMENT":
-    case "QUOTATION": {
-      const enabled = hasAny(ctx, PERM_CREATE_INVOICE);
-      return {
-        kind:  "CREATE_INVOICE",
-        label: "Create invoice",
-        cta:   "Create invoice",
-        enabled,
-        disabledReason: enabled ? null :
-          "Invoices are raised by the accounts team.",
-        // Was /invoicing/new — the order-backed picker, which reported
-        // "no projects ready to invoice" on a project holding a quotation.
-        // This writes the invoice directly (owner, 2026-08-30).
-        href: `/invoicing/create?project=${id}`,
-      };
-    }
-
-    case "ORDERED": {
-      // Owner canonical flow post-acceptance: Create invoice → collect
-      // advance → book install. Procurement is background; it is not
-      // the primary CTA here anymore. When money snapshot isn't loaded
-      // we fall through to "Create invoice" (safe default; owner still
-      // clicks through to the invoice picker).
-      const m = project.money;
-      const invoiced = m ? m.invoiceTotal > 0n : false;
-      const advanceMet = m
-        ? m.advanceRequired > 0n
-            ? m.advanceReceived >= m.advanceRequired
-            : m.advanceReceived > 0n
-        : false;
-
-      if (!invoiced) {
-        const enabled = hasAny(ctx, PERM_CREATE_INVOICE);
-        return {
-          kind:  "CREATE_INVOICE",
-          label: "Firm quote accepted",
-          cta:   "Create invoice",
-          enabled,
-          disabledReason: enabled ? null :
-            "Invoices are raised by the accounts team.",
-          // Project-scope the picker so the owner doesn't have to find
-          // their project in the global invoiceable-orders list.
-          // Was /invoicing/new — the order-backed picker, which reported
-        // "no projects ready to invoice" on a project holding a quotation.
-        // This writes the invoice directly (owner, 2026-08-30).
-        href: `/invoicing/create?project=${id}`,
-          subLine: "Invoice → advance → install.",
-        };
-      }
-      if (!advanceMet) {
-        const enabled = hasAny(ctx, PERM_RECORD_ADVANCE);
-        return {
-          kind:  "RECORD_ADVANCE",
-          label: "Invoice raised — awaiting advance",
-          cta:   "Record advance receipt",
-          enabled,
-          disabledReason: enabled ? null :
-            "Receipts are recorded by the accounts team.",
-          // Pre-select the client so /accounts/new opens with their
-          // outstanding invoices already loaded and the amount ready.
-          href: clientId ? `/accounts/new?clientId=${clientId}` : `/accounts/new`,
-          subLine: "Install is unlocked once the advance is in.",
-        };
-      }
-      // Advance in. Book install as the next visible step, even before
-      // MAKE catches up — matches owner flow (Task 7).
-      const enabled = hasAny(ctx, PERM_BOOK_INSTALL);
-      return {
-        kind:  "SCHEDULE_INSTALL",
-        label: "Advance received — ready to install",
-        cta:   "Book install visit",
-        enabled,
-        disabledReason: enabled ? null :
-          "Install visits are scheduled by the sales team.",
-        href: `/site-visits/new?projectId=${id}&purpose=HANDOVER`,
-      };
-    }
+    case "QUOTATION":
+    case "ORDERED":
+      return resolveMoneyStageAction(ctx, project);
 
     case "PROCUREMENT": {
       // Owner canonical flow (2026-08-25): after advance is received,
       // the next visible action is Book install visit — procurement
       // happens in the background via the stock-reservation flow and
       // shouldn't force the owner into the stock ledger.
+      //
+      // The balance rides along in the subLine (2026-09-10). The advance
+      // gate moves a project here on the first payment, which is the right
+      // reading of "they get the advance and then the work starts" — but a
+      // job three-quarters unpaid must not present itself as a job that is
+      // simply waiting for a van.
       const enabled = hasAny(ctx, PERM_BOOK_INSTALL);
+      const owed    = project.money?.outstanding ?? 0n;
       return {
         kind:  "SCHEDULE_INSTALL",
         label: "Advance received — ready to install",
@@ -169,6 +123,7 @@ export function resolveNextAction(
         disabledReason: enabled ? null :
           "Install visits are scheduled by the sales team.",
         href: `/site-visits/new?projectId=${id}&purpose=HANDOVER`,
+        ...(owed > 0n ? { subLine: "Balance still to collect." } : {}),
       };
     }
 
@@ -205,7 +160,37 @@ export function resolveNextAction(
       };
     }
 
-    case "COMPLETED":
+    case "COMPLETED": {
+      // The work is done, but the money story may not be. A finished job
+      // with a balance outstanding is the single most expensive thing to
+      // lose sight of, so it keeps a live action instead of going quiet.
+      const m = project.money;
+      const stillOwed = m?.outstanding ?? 0n;
+
+      if (stillOwed > 0n) {
+        const enabled = hasAny(ctx, PERM_RECORD_ADVANCE);
+        return {
+          kind:  "RECORD_ADVANCE",
+          label: "Work done — balance to collect",
+          cta:   "Record payment",
+          enabled,
+          disabledReason: enabled ? null :
+            "Payments are recorded by the accounts team.",
+          href: clientId ? `/accounts/new?clientId=${clientId}` : `/accounts/new`,
+        };
+      }
+      if (m && m.invoiceTotal <= 0n && (m.agreedValue ?? 0n) > 0n) {
+        const enabled = hasAny(ctx, PERM_CREATE_INVOICE);
+        return {
+          kind:  "CREATE_INVOICE",
+          label: "Paid in full — ready to bill",
+          cta:   "Create invoice",
+          enabled,
+          disabledReason: enabled ? null :
+            "Invoices are raised by the accounts team.",
+          href: `/invoicing/create?project=${id}`,
+        };
+      }
       return {
         kind:  "PROJECT_COMPLETED",
         label: "Project completed",
@@ -214,6 +199,7 @@ export function resolveNextAction(
         disabledReason: null,
         href: null,
       };
+    }
 
     case "CANCELLED":
       return {

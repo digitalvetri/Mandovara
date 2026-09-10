@@ -1,7 +1,12 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { computeOutstanding } from "@/kernel/money/outstanding";
+import { loadProjectReceivables, openReceivables } from "@/modules/projects/receivable";
 import type { RequestContext } from "@/kernel/auth/context";
+
+export * from "./queries-targets";
+export type { OpenProjectForReceipt } from "./queries-targets";
+export * from "./queries-invoice-payments";
 
 export interface ReceiptRow {
   id:           string;
@@ -12,7 +17,12 @@ export interface ReceiptRow {
   mode:         string;
   reference:    string | null;
   amount:       bigint;
+  /** Not yet applied to a bill. Under the quotation-first flow this is the
+   *  normal state, not a problem — see `projectName`. */
   unallocated:  bigint;
+  /** The job this payment was taken against, when it was booked to one. */
+  projectId:    string | null;
+  projectName:  string | null;
   chequeStatus: string | null;
 }
 
@@ -43,6 +53,8 @@ export interface ReceiptDetail {
   chequeDate:   Date | null;
   amount:       bigint;
   unallocated:  bigint;
+  projectId:    string | null;
+  projectName:  string | null;
   allocations:  ReceiptAllocationRow[];
 }
 
@@ -68,7 +80,9 @@ export interface ListReceiptsQuery {
   mode?:         string;
   /** Filter by cheque status (PENDING | CLEARED | BOUNCED). */
   chequeStatus?: string;
-  /** Only receipts with money that hasn't been applied to any bill yet. */
+  /** Only payments that were never placed — neither on a bill nor against a
+   *  job. Money sitting against a project is matched; it is waiting for the
+   *  invoice that comes at the end, which is how the studio works. */
   unmatched?:    boolean;
   /** yyyy-mm — receipts dated inside that calendar month (UTC). */
   month?:        string;
@@ -92,7 +106,7 @@ export async function listReceipts(
   if (q.projectId)    where["projectId"]    = q.projectId;
   if (q.mode)         where["mode"]         = q.mode;
   if (q.chequeStatus) where["chequeStatus"] = q.chequeStatus;
-  if (q.unmatched)    where["unallocated"]  = { gt: 0n };
+  if (q.unmatched)    where["AND"] = [{ unallocated: { gt: 0n } }, { projectId: null }];
   if (q.month && /^\d{4}-\d{2}$/.test(q.month)) {
     const [yy, mm] = q.month.split("-").map(Number) as [number, number];
     const start = new Date(Date.UTC(yy, mm - 1, 1));
@@ -111,7 +125,7 @@ export async function listReceipts(
     db.receipt.findMany({
       where, skip, take: pageSize, orderBy,
       select: {
-        id: true, number: true, clientId: true, date: true,
+        id: true, number: true, clientId: true, projectId: true, date: true,
         mode: true, reference: true, amount: true, unallocated: true, chequeStatus: true,
       },
     }),
@@ -120,12 +134,20 @@ export async function listReceipts(
 
   if (receipts.length === 0) return { rows: [], total, page, pageSize };
 
-  const clientIds = [...new Set(receipts.map((r) => r.clientId))];
-  const clients   = await db.client.findMany({
-    where: { id: { in: clientIds } },
-    select: { id: true, name: true },
-  });
-  const clientMap = new Map(clients.map((c) => [c.id, c]));
+  const clientIds  = [...new Set(receipts.map((r) => r.clientId))];
+  const projectIds = [...new Set(receipts.map((r) => r.projectId).filter((v): v is string => !!v))];
+  const [clients, projects] = await Promise.all([
+    db.client.findMany({
+      where: { id: { in: clientIds } },
+      select: { id: true, name: true },
+    }),
+    projectIds.length === 0 ? Promise.resolve([]) : db.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, name: true },
+    }),
+  ]);
+  const clientMap  = new Map(clients.map((c) => [c.id, c]));
+  const projectMap = new Map(projects.map((p) => [p.id, p]));
 
   const rows: ReceiptRow[] = receipts.map((r) => ({
     id: r.id, number: r.number, clientId: r.clientId,
@@ -133,6 +155,8 @@ export async function listReceipts(
     date: r.date, mode: r.mode,
     reference: r.reference,
     amount: r.amount, unallocated: r.unallocated,
+    projectId:   r.projectId,
+    projectName: r.projectId ? (projectMap.get(r.projectId)?.name ?? null) : null,
     chequeStatus: r.chequeStatus,
   }));
 
@@ -149,7 +173,7 @@ export async function getReceipt(
   const row = await db.receipt.findUnique({
     where: { id },
     select: {
-      id: true, number: true, clientId: true, date: true,
+      id: true, number: true, clientId: true, projectId: true, date: true,
       mode: true, reference: true, chequeStatus: true, chequeDate: true,
       amount: true, unallocated: true,
       allocations: { select: { id: true, invoiceId: true, amount: true }, orderBy: { id: "asc" } },
@@ -157,7 +181,7 @@ export async function getReceipt(
   });
   if (!row) return null;
 
-  const [client, invoices] = await Promise.all([
+  const [client, invoices, project] = await Promise.all([
     db.client.findUnique({
       where: { id: row.clientId },
       select: { id: true, name: true, mobile: true },
@@ -166,6 +190,9 @@ export async function getReceipt(
       where: { id: { in: row.allocations.map((a) => a.invoiceId) } },
       select: { id: true, number: true, total: true },
     }),
+    row.projectId
+      ? db.project.findUnique({ where: { id: row.projectId }, select: { id: true, name: true } })
+      : Promise.resolve(null),
   ]);
 
   const invoiceMap = new Map(invoices.map((i) => [i.id, i]));
@@ -177,6 +204,8 @@ export async function getReceipt(
     date: row.date, mode: row.mode, reference: row.reference,
     chequeStatus: row.chequeStatus, chequeDate: row.chequeDate,
     amount: row.amount, unallocated: row.unallocated,
+    projectId:   row.projectId,
+    projectName: project?.name ?? null,
     allocations: row.allocations.map((a) => ({
       id: a.id, invoiceId: a.invoiceId,
       invoiceNumber: invoiceMap.get(a.invoiceId)?.number ?? a.invoiceId,
@@ -218,83 +247,45 @@ export async function listOutstandingInvoicesForClient(
     .filter((i) => i.outstanding > 0n);
 }
 
-/** Clients who have at least one outstanding invoice — used by the receipt recording form. */
+/** Clients a payment can be recorded against — used by the receipt form.
+ *
+ *  Was: clients with an open INVOICE. Under the quotation-first flow that is
+ *  the smaller half of the list and, on a young installation, an empty one —
+ *  the studio invoices at the END of a job, so a client who has just agreed a
+ *  quotation and is about to hand over an advance has no invoice at all. The
+ *  picker went blank and the advance could not be recorded, which is how the
+ *  money ended up entered with nothing to match it to.
+ *
+ *  Now: anyone who owes money on either footing — an open project balance or
+ *  an open bill. */
 export async function listClientsWithOutstanding(
   ctx: RequestContext,
 ): Promise<ClientForReceiptOption[]> {
   requirePermission(ctx, "receipt.create");
   const db = scoped(ctx);
 
-  const openInvoices = await db.invoice.findMany({
-    where: { status: { in: ["ISSUED", "PARTIALLY_PAID"] } },
-    select: { clientId: true },
-    distinct: ["clientId"],
-  });
-  if (openInvoices.length === 0) return [];
+  const [openInvoices, receivables] = await Promise.all([
+    db.invoice.findMany({
+      where: { status: { in: ["ISSUED", "PARTIALLY_PAID"] } },
+      select: { clientId: true },
+      distinct: ["clientId"],
+    }),
+    loadProjectReceivables(db),
+  ]);
+  // openReceivables, not chaseableReceivables: a client paying against a
+  // quotation they have not formally accepted must still be recordable —
+  // the payment IS the acceptance.
 
-  const clientIds = openInvoices.map((i) => i.clientId);
-  const clients   = await db.client.findMany({
+  const clientIds = [...new Set([
+    ...openInvoices.map((i) => i.clientId),
+    ...openReceivables(receivables).map((r) => r.clientId),
+  ])];
+  if (clientIds.length === 0) return [];
+
+  const clients = await db.client.findMany({
     where: { id: { in: clientIds } },
     orderBy: { name: "asc" },
     select: { id: true, name: true, mobile: true },
   });
   return clients;
-}
-
-// ── Payments against one invoice ──────────────────────────────────────
-
-export interface InvoicePaymentRow {
-  receiptId: string;
-  number:    string;
-  date:      Date;
-  mode:      string;
-  reference: string | null;
-  /** Amount of this receipt allocated to the invoice asked about — not
-   *  the receipt's full value, which may be spread across several. */
-  applied:   bigint;
-}
-
-/**
- * Transaction detail for the invoice detail page's Payment Details card
- * (owner, 2026-08-29): payment mode, date and reference number.
- *
- * ReceiptAllocation is the join — a receipt can settle several invoices,
- * so `applied` is the slice belonging to this one. Receipt has no Prisma
- * relation to the allocation (flat schema), hence the two-step read.
- */
-export async function listPaymentsForInvoice(
-  ctx: RequestContext,
-  invoiceId: string,
-): Promise<InvoicePaymentRow[]> {
-  requirePermission(ctx, "receipt.view");
-  const db = scoped(ctx);
-
-  const allocations = await db.receiptAllocation.findMany({
-    where:  { invoiceId },
-    select: { receiptId: true, amount: true },
-  });
-  if (allocations.length === 0) return [];
-
-  const receipts = await db.receipt.findMany({
-    where:   { id: { in: [...new Set(allocations.map((a) => a.receiptId))] } },
-    select:  { id: true, number: true, date: true, mode: true, reference: true },
-    orderBy: { date: "desc" },
-  });
-  const byId = new Map(receipts.map((r) => [r.id, r]));
-
-  return allocations
-    .map((a) => {
-      const r = byId.get(a.receiptId);
-      if (!r) return null;
-      return {
-        receiptId: r.id,
-        number:    r.number,
-        date:      r.date,
-        mode:      r.mode as string,
-        reference: r.reference,
-        applied:   a.amount,
-      };
-    })
-    .filter((r): r is InvoicePaymentRow => r !== null)
-    .sort((a, b) => b.date.getTime() - a.date.getTime());
 }

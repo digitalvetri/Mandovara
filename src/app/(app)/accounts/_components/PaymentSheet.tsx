@@ -1,26 +1,38 @@
 "use client";
 
-// The 3-tap payment recorder per docs/ACCOUNTS-PAGE.md §8.
-// Amount → Mode → Save. Client is picked from the URL (?clientId=X) or
-// via the picker at the top when opened directly.
+// The payment recorder per docs/ACCOUNTS-PAGE.md §8.
+// Client → What for → Amount → Mode → Save. Client is picked from the URL
+// (?clientId=X) or via the picker at the top when opened directly.
 //
-// Auto-allocates oldest-first to that client's open bills and shows in
-// plain English which bills will clear. "Change" toggles an advanced
-// view for per-bill tweaking. Extra beyond the bills is labelled
-// "kept for later bills" — never "unallocated".
+// "What for" was added 2026-09-10 and is the point of the screen. The studio
+// quotes, the client agrees, money arrives against that agreement, and the
+// tax invoice is raised at the end. So the usual target of a payment is a
+// JOB, not a bill — and the sheet, which only ever offered bills, had
+// nothing to attach the money to. Every advance went in unattached and
+// Accounts → Received listed it as "not matched to a bill".
+//
+// When the target is a job the receipt carries its projectId and the money
+// counts straight off that project's balance. When it is the client's open
+// bills, the old behaviour is unchanged: auto-allocate oldest-first, with
+// "Change" for per-bill tweaking.
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { IndianRupee, Loader2 } from "lucide-react";
-import { formatINR } from "@/kernel/money/format";
+import { Loader2 } from "lucide-react";
 import { createReceipt } from "@/modules/receipts/actions";
 import type { PaymentMode } from "@/modules/receipts/schema";
 import type { ClientForReceiptOption } from "@/modules/receipts/queries";
 import type { BranchOption } from "@/modules/branches/queries";
-import { safePaise, iso, type OutstandingInvoiceWire } from "./_receipt-primitives";
+import {
+  safePaise, iso, toOpenProjects,
+  type OutstandingInvoiceWire, type OpenProject, type OpenProjectWire, type PaymentTarget,
+} from "./_receipt-primitives";
 import { PaymentSheetPreview } from "./PaymentSheetPreview";
 import { PaymentSheetMode } from "./PaymentSheetMode";
+import { PaymentSheetTarget } from "./PaymentSheetTarget";
+import { PaymentSheetClient } from "./PaymentSheetClient";
+import { PaymentSheetAmount } from "./PaymentSheetAmount";
 
 interface Props {
   clients:            ClientForReceiptOption[];
@@ -28,6 +40,8 @@ interface Props {
   initialClientId?:   string;
   /** Pre-loaded outstanding rows for the initial client — skips the first fetch. */
   initialOutstanding?: OutstandingInvoiceWire[];
+  /** Pre-loaded open jobs for the initial client — same reason. */
+  initialProjects?:   OpenProjectWire[];
 }
 
 interface OutstandingBills {
@@ -48,7 +62,9 @@ function toWire(rows: OutstandingInvoiceWire[]): OutstandingBills[] {
   }));
 }
 
-export function PaymentSheet({ clients, branches, initialClientId, initialOutstanding }: Props) {
+export function PaymentSheet({
+  clients, branches, initialClientId, initialOutstanding, initialProjects,
+}: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -56,26 +72,53 @@ export function PaymentSheet({ clients, branches, initialClientId, initialOutsta
   const [clientId, setClientId] = useState<string>(initialClientId ?? "");
   const [bills, setBills] = useState<OutstandingBills[]>(() =>
     initialClientId && initialOutstanding ? toWire(initialOutstanding) : []);
+  const [projects, setProjects] = useState<OpenProject[]>(() =>
+    initialClientId && initialProjects ? toOpenProjects(initialProjects) : []);
+  const [target, setTarget] = useState<PaymentTarget | null>(null);
   const [loadingBills, setLoadingBills] = useState(false);
 
-  // Refetch bills whenever the client changes (skip the initial one — already loaded).
+  // Refetch the client's jobs and bills together whenever the client changes
+  // (skip the initial one — already loaded server-side).
   useEffect(() => {
-    if (!clientId) { setBills([]); return; }
-    if (clientId === initialClientId && initialOutstanding) return;
+    if (!clientId) { setBills([]); setProjects([]); setTarget(null); return; }
+    if (clientId === initialClientId && initialProjects && initialOutstanding) return;
     setLoadingBills(true);
-    fetch(`/api/receipts/outstanding?clientId=${clientId}`)
+    fetch(`/api/receipts/targets?clientId=${clientId}`)
       .then((r) => r.json())
-      .then((rows: OutstandingInvoiceWire[]) => setBills(toWire(rows)))
+      .then((d: { bills: OutstandingInvoiceWire[]; projects: OpenProjectWire[] }) => {
+        setBills(toWire(d.bills ?? []));
+        setProjects(toOpenProjects(d.projects ?? []));
+      })
       .finally(() => setLoadingBills(false));
-  }, [clientId, initialClientId, initialOutstanding]);
+  }, [clientId, initialClientId, initialOutstanding, initialProjects]);
 
-  const fullOutstanding = useMemo(() => bills.reduce((s, b) => s + b.outstanding, 0n), [bills]);
+  const billsTotal = useMemo(() => bills.reduce((s, b) => s + b.outstanding, 0n), [bills]);
+
+  // Default to the oldest open job — the one the client is most likely
+  // paying for. Falls back to their bills when there is no open job.
+  useEffect(() => {
+    if (target != null) return;
+    if (projects.length > 0) { setTarget({ kind: "project", projectId: projects[0]!.id }); return; }
+    if (bills.length   > 0) { setTarget({ kind: "bills" }); }
+  }, [projects, bills, target]);
+
+  // Reset the choice when the client changes, so a job belonging to the
+  // previous client can never stay selected.
+  useEffect(() => { setTarget(null); }, [clientId]);
+
+  const selectedProject = target?.kind === "project"
+    ? projects.find((p) => p.id === target.projectId) ?? null
+    : null;
+
+  /** What the chosen target is short by — what "Full" fills in. */
+  const fullOutstanding = selectedProject ? selectedProject.due
+    : target?.kind === "bills" ? billsTotal
+    : 0n;
 
   const [amount, setAmount] = useState<string>("");
   useEffect(() => {
-    // Pre-fill with full outstanding once bills arrive — user can override.
-    // Intentionally only depends on fullOutstanding: we don't want to
-    // re-fill if the user has already typed and then changes amount.
+    // Pre-fill with the target's balance — the user can override. Only keyed
+    // on fullOutstanding so a figure the user has typed is never overwritten.
     if (fullOutstanding > 0n && amount === "") {
       setAmount((Number(fullOutstanding) / 100).toString());
     }
@@ -88,27 +131,33 @@ export function PaymentSheet({ clients, branches, initialClientId, initialOutsta
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [manualAlloc, setManualAlloc] = useState<Record<string, string>>({});
 
-  // Auto-allocate oldest-first — always. Advanced mode overrides per-bill.
+  // Bills only. Money against a job is not split across invoices — it sits
+  // on the job until the invoice is raised at the end, and is swept onto it
+  // then. Auto-allocate oldest-first; advanced mode overrides per-bill.
+  const billsMode = target?.kind === "bills";
+
   const autoAllocation = useMemo(() => {
-    let left = totalPaise;
+    let left = billsMode ? totalPaise : 0n;
     return bills.map((b) => {
       if (left <= 0n) return { bill: b, take: 0n };
       const take = left >= b.outstanding ? b.outstanding : left;
       left -= take;
       return { bill: b, take };
     });
-  }, [bills, totalPaise]);
+  }, [bills, totalPaise, billsMode]);
 
   const effectiveAllocation = useMemo(() => {
+    if (!billsMode) return [];
     if (!showAdvanced) return autoAllocation;
     return bills.map((b) => ({ bill: b, take: safePaise(manualAlloc[b.id] ?? "") }));
-  }, [showAdvanced, autoAllocation, bills, manualAlloc]);
+  }, [billsMode, showAdvanced, autoAllocation, bills, manualAlloc]);
 
   const allocatedTotal = effectiveAllocation.reduce((s, x) => s + x.take, 0n);
   const kept           = totalPaise > allocatedTotal ? totalPaise - allocatedTotal : 0n;
   const over           = allocatedTotal > totalPaise ? allocatedTotal - totalPaise : 0n;
 
-  const canSubmit = clientId && totalPaise > 0n && over === 0n && !pending;
+  const hasTarget = projects.length === 0 && bills.length === 0 ? true : target != null;
+  const canSubmit = clientId && hasTarget && totalPaise > 0n && over === 0n && !pending;
 
   const selectedClient = clients.find((c) => c.id === clientId);
 
@@ -122,6 +171,7 @@ export function PaymentSheet({ clients, branches, initialClientId, initialOutsta
 
       const res = await createReceipt({
         clientId,
+        ...(target?.kind === "project" ? { projectId: target.projectId } : {}),
         branchId:   branches[0]?.id ?? "",
         date:       iso(new Date()),
         mode,
@@ -142,9 +192,10 @@ export function PaymentSheet({ clients, branches, initialClientId, initialOutsta
   if (clients.length === 0) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-14 text-center">
-        <div className="text-[14px] text-text mb-2">Nobody has an open bill right now.</div>
+        <div className="text-[14px] text-text mb-2">Nobody owes you anything right now.</div>
         <p className="text-[12px] text-text-dim">
-          Raise an invoice on a client first — then you can record their payment against it here.
+          Send a quotation and have the client agree it — the job then appears here and you can
+          record what they pay you against it.
         </p>
       </div>
     );
@@ -152,83 +203,42 @@ export function PaymentSheet({ clients, branches, initialClientId, initialOutsta
 
   return (
     <form onSubmit={onSubmit} className="max-w-[560px] mx-auto space-y-5">
-      {/* Header — who is paying */}
-      <div className="rounded-[14px] bg-surface border border-rule p-5">
-        <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim mb-2">
-          Got paid from
-        </div>
-        {selectedClient ? (
-          <div className="flex items-baseline justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[15.5px] text-text font-medium truncate">{selectedClient.name}</div>
-              <div className="text-[11.5px] text-text-dim tabular mt-0.5">{selectedClient.mobile}</div>
-            </div>
-            {clients.length > 1 && (
-              <button type="button"
-                      onClick={() => setClientId("")}
-                      className="text-[11.5px] text-accent hover:underline whitespace-nowrap">
-                Change client
-              </button>
-            )}
-          </div>
-        ) : (
-          <select
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className="w-full h-11 rounded-[10px] border border-rule bg-transparent px-3 text-[13.5px] text-text outline-none focus:border-gold"
-          >
-            <option value="">Pick a client…</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} · {c.mobile}</option>
-            ))}
-          </select>
-        )}
-      </div>
+      <PaymentSheetClient
+        clients={clients}
+        selected={selectedClient ?? null}
+        onChange={setClientId}
+      />
 
       {clientId && (
         <>
-          {/* Step 1 — How much? */}
-          <div className="rounded-[14px] bg-surface border border-rule p-5">
-            <div className="text-[11px] uppercase tracking-[0.14em] text-text-dim mb-2">
-              How much?
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim">
-                <IndianRupee size={17} strokeWidth={2} />
-              </span>
-              <input
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                className="w-full h-14 rounded-[10px] border border-rule bg-transparent pl-10 pr-3 text-[22px] font-display tabular-nums text-text outline-none focus:border-gold"
-              />
-            </div>
-            {fullOutstanding > 0n && (
-              <div className="flex gap-2 mt-2.5">
-                <QuickBtn
-                  active={totalPaise === fullOutstanding}
-                  onClick={() => setAmount((Number(fullOutstanding) / 100).toString())}
-                >
-                  Full · {formatINR(fullOutstanding)}
-                </QuickBtn>
-                <QuickBtn
-                  active={totalPaise > 0n && totalPaise < fullOutstanding}
-                  onClick={() => setAmount("")}
-                >
-                  Part
-                </QuickBtn>
-              </div>
-            )}
-            {loadingBills && (
-              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-text-dim">
-                <Loader2 size={11} className="animate-spin" />
-                Loading their bills…
-              </div>
-            )}
-          </div>
+          {/* Step 1 — What is this for? */}
+          <PaymentSheetTarget
+            projects={projects}
+            billCount={bills.length}
+            billTotal={billsTotal}
+            value={target}
+            onChange={(t) => { setTarget(t); setAmount(""); setManualAlloc({}); }}
+          />
 
-          {/* Step 2 — How? (modes + cheque date + reference) */}
+          {!loadingBills && projects.length === 0 && bills.length === 0 && (
+            <div className="rounded-[14px] border border-rule bg-surface px-5 py-4 text-[12px] text-text-dim">
+              This client has no open job and no unpaid bill. The payment will be recorded
+              against them and can be put towards a job later.
+            </div>
+          )}
+
+          {/* Step 2 — How much? */}
+          <PaymentSheetAmount
+            amount={amount}
+            onAmountChange={setAmount}
+            totalPaise={totalPaise}
+            fullOutstanding={fullOutstanding}
+            loading={loadingBills}
+            projectName={selectedProject?.name ?? null}
+            projectDue={selectedProject?.due ?? null}
+          />
+
+          {/* Step 3 — How? (modes + cheque date + reference) */}
           <PaymentSheetMode
             mode={mode}
             onModeChange={setMode}
@@ -238,8 +248,9 @@ export function PaymentSheet({ clients, branches, initialClientId, initialOutsta
             onReferenceChange={setReference}
           />
 
-          {/* Step 3 — Preview what this clears */}
-          {totalPaise > 0n && bills.length > 0 && (
+          {/* Step 4 — Preview what this clears. Bills only: money on a job
+              clears the job, and the line above already says by how much. */}
+          {billsMode && totalPaise > 0n && bills.length > 0 && (
             <PaymentSheetPreview
               rows={effectiveAllocation}
               kept={kept}
@@ -269,24 +280,5 @@ export function PaymentSheet({ clients, branches, initialClientId, initialOutsta
         </>
       )}
     </form>
-  );
-}
-
-// ── Bits ──────────────────────────────────────────────────────────
-
-function QuickBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "h-9 px-3.5 rounded-[8px] border text-[12px] font-medium transition-colors tabular",
-        active
-          ? "border-gold bg-gold/10 text-text"
-          : "border-rule text-text-dim hover:text-text hover:border-text-dim",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }

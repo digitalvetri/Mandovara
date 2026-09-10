@@ -75,6 +75,11 @@ export function ManualInvoiceBuilder({
   const [date, setDate]       = useState(iso(new Date()));
   const [dueDate, setDueDate] = useState(iso(new Date(Date.now() + 30 * 86_400_000)));
   const [error, setError]     = useState<string | null>(null);
+  // The "bill after the money is in" gate refused, and this viewer is
+  // allowed to step over it. Offering the override only once the server has
+  // said so keeps the rule in one place — the button cannot appear for
+  // someone the server would refuse anyway.
+  const [canBillAnyway, setCanBillAnyway] = useState(false);
   const [pending, start]      = useTransition();
 
   function patch(i: number, next: Partial<Line>) {
@@ -91,18 +96,22 @@ export function ManualInvoiceBuilder({
     return { taxable, gst, total: taxable + gst };
   }, [lines]);
 
-  function save() {
+  function save(billEarly = false) {
     setError(null);
     start(async () => {
       const r = await createManualInvoice({
-        projectId, date, dueDate,
+        projectId, date, dueDate, billEarly,
         lines: lines.map((l) => ({
           description: l.description.trim(),
           unit: l.unit, quantity: l.quantity, rate: l.rate, gstRate: l.gstRate,
           discountPct: l.discountPct,
         })),
       });
-      if (!r.ok || !r.data) { setError(r.error ?? "Could not create the invoice."); return; }
+      if (!r.ok || !r.data) {
+        setError(r.error ?? "Could not create the invoice.");
+        setCanBillAnyway(r.errorCode === "PROJECT_NOT_SETTLED" && r.canOverride === true);
+        return;
+      }
       router.push(`/invoicing/${r.data.id}` as Route);
     });
   }
@@ -208,8 +217,14 @@ export function ManualInvoiceBuilder({
       {/* Totals + save */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          {error && <p className="mb-2 text-[13px] text-heat" role="alert">{error}</p>}
-          <button type="button" onClick={save} disabled={pending}
+          {error && <p className="mb-2 max-w-[420px] text-[13px] text-heat" role="alert">{error}</p>}
+          {canBillAnyway && (
+            <button type="button" onClick={() => save(true)} disabled={pending}
+                    className="mb-2 inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-rule bg-surface-2 px-3 text-[12.5px] text-text-dim transition-colors hover:border-gold hover:text-text">
+              Bill anyway
+            </button>
+          )}
+          <button type="button" onClick={() => save()} disabled={pending}
                   className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-gold px-5 text-[13.5px] font-semibold text-ink transition-colors hover:bg-gold-strong disabled:opacity-50">
             {pending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
             Create invoice

@@ -1,14 +1,20 @@
-// Shared advance-gate helper. When cumulative money received on a
-// project (Advance rows + Receipt rows) meets the order's required
-// advance, auto-advance the project stage ORDERED → PROCUREMENT so the
-// customer-facing "Advance Awaited" phase flips to "Installation".
+// Shared advance-gate helper. When the money received on a project meets
+// the required advance, auto-advance the project stage ORDERED →
+// PROCUREMENT so the customer-facing "Advance Awaited" phase flips to
+// "Installation".
+//
+// "Money received" is whatever getProjectReceivable counts: payments booked
+// against the project's quotation, payments allocated to its invoices, and
+// legacy Advance rows. That breadth matters — the quotation-first flow
+// collects the advance before any invoice exists.
 //
 // Called from both createAdvance (legacy advance table path) and
-// createReceipt (owner's canonical flow: invoice → receipt → install).
-// Best-effort — a failure never blocks the write that triggered it.
+// createReceipt. Best-effort — a failure never blocks the write that
+// triggered it.
 
 import type { scoped } from "@/kernel/db/scoped";
 import type { TxClient } from "@/kernel/db/transaction";
+import { getProjectReceivable } from "./receivable";
 
 // Accepts either the org-scoped app client (from `scoped(ctx)`) or a
 // transaction client. Both expose the model methods the gate needs.
@@ -41,27 +47,14 @@ export async function checkAndAdvanceStage(
   projectId: string,
 ): Promise<{ advanced: boolean; totalReceived: bigint; required: bigint }> {
   try {
-    // ReceiptAllocation has no `invoice` relation in Prisma — grab the
-    // project's invoice IDs first, then aggregate allocations by ID.
-    const invRows = await db.invoice.findMany({
-      where:  { projectId, status: { not: "CANCELLED" } },
-      select: { id: true },
-    });
-    const invIds = invRows.map((i) => i.id);
-
-    const [advAgg, allocAgg, requiredAgg, project] = await Promise.all([
-      db.advance.aggregate({
-        where: { projectId },
-        _sum:  { amount: true },
-      }),
-      // Receipts don't carry projectId (PaymentSheet omits it). The
-      // authoritative link is ReceiptAllocation → Invoice.projectId.
-      invIds.length === 0
-        ? Promise.resolve({ _sum: { amount: 0n } as { amount: bigint | null } })
-        : db.receiptAllocation.aggregate({
-            where: { invoiceId: { in: invIds } },
-            _sum:  { amount: true },
-          }),
+    // Money on the project comes from getProjectReceivable, which is the one
+    // place that knows all three routes it can arrive by. This used to sum
+    // Advance rows plus allocations onto the project's invoices only — and
+    // under the quotation-first flow a project has NO invoice while the
+    // advance is being collected, so a paid advance never opened the gate
+    // and the job sat in "Advance Awaited" with the money already banked.
+    const [receivable, requiredAgg, project] = await Promise.all([
+      getProjectReceivable(db, projectId),
       db.order.aggregate({
         where: { projectId, status: { not: "CANCELLED" } },
         _sum:  { advanceRequired: true },
@@ -72,11 +65,12 @@ export async function checkAndAdvanceStage(
       }),
     ]);
 
-    const advTotal      = advAgg._sum.amount            ?? 0n;
-    const receiptTotal  = allocAgg._sum.amount          ?? 0n;
-    const totalReceived = advTotal + receiptTotal;
+    const totalReceived = receivable?.received ?? 0n;
     const required      = requiredAgg._sum.advanceRequired ?? 0n;
 
+    // With no stated advance requirement — the common case when the job runs
+    // straight off a quotation with no sales order — any money at all means
+    // the client has committed, so work can start.
     const gateOpen = required > 0n
       ? totalReceived >= required
       : totalReceived > 0n;

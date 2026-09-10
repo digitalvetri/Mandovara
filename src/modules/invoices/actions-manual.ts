@@ -21,10 +21,13 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { applyLineDiscount, computeLineTax } from "@/kernel/tax/gst";
 import { SELL_UNITS } from "@/modules/quotations/schema";
+import { revalidatePath } from "next/cache";
 import { createInvoice } from "./actions";
+import { checkProjectSettledForInvoice } from "./project-gate";
+import { sweepProjectReceiptsOntoInvoice } from "./sweep-receipts";
 
 export interface ActionResult<T = unknown> {
-  ok: boolean; data?: T; error?: string;
+  ok: boolean; data?: T; error?: string; errorCode?: string; canOverride?: boolean; due?: string;
 }
 
 const lineSchema = z.object({
@@ -44,6 +47,8 @@ const schema = z.object({
   date:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   lines:     z.array(lineSchema).min(1, "Add at least one line."),
+  /** Owner override for the "bill after the money is in" rule. */
+  billEarly: z.boolean().optional(),
 });
 
 /** Rupees typed by a human → paise, without floating-point drift. */
@@ -74,6 +79,12 @@ export async function createManualInvoice(
     select: { id: true, branchId: true, clientId: true },
   });
   if (!project) return { ok: false, error: "Project not found." };
+
+  // Bill after the money is in — see ./project-gate for why.
+  const refusal = await checkProjectSettledForInvoice(
+    ctx, db, project.id, d.billEarly ?? false,
+  );
+  if (refusal) return refusal;
 
   const [branch, client] = await Promise.all([
     db.branch.findUnique({ where: { id: project.branchId }, select: { stateCode: true } }),
@@ -128,7 +139,7 @@ export async function createManualInvoice(
     });
   }
 
-  return createInvoice({
+  const res = await createInvoice({
     projectId: project.id,
     clientId:  project.clientId,
     branchId:  project.branchId,
@@ -138,4 +149,18 @@ export async function createManualInvoice(
     placeOfSupplyCode,
     lines,
   });
+  if (!res.ok || !res.data) return res;
+
+  // Money already taken against the job becomes money paid against this
+  // bill, so the invoice does not open showing its full value outstanding
+  // on a project that is settled. Best-effort — a failure here must not
+  // lose an invoice that was written successfully.
+  try {
+    await sweepProjectReceiptsOntoInvoice({ orgId: ctx.orgId, invoiceId: res.data.id });
+  } catch (err) {
+    console.warn("sweepProjectReceiptsOntoInvoice failed (invoice still created):", err);
+  }
+  revalidatePath(`/projects/${project.id}`);
+  revalidatePath("/accounts");
+  return res;
 }

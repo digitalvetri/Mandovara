@@ -9,19 +9,23 @@
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
-import { computeOutstanding } from "@/kernel/money/outstanding";
+import { getProjectReceivable } from "./receivable";
 import type { RequestContext } from "@/kernel/auth/context";
 
 // ── Redesign — money block. Loader-gated on permission so the row IDs
 // and paisa values never even leave the DB for roles that shouldn't see
 // them (Rule 8: cost/margin stripped server-side, never CSS-hidden).
 export type ProjectMoney = {
+  /** What the client agreed to — the accepted quotation, normally. */
   orderValue: bigint;
   advanceReceived: bigint;
   advanceRequired: bigint;
+  /** Still to collect on the agreement. */
   outstanding: bigint;
   invoiceTotal: bigint;
   receiptTotal: bigint;
+  /** True once the agreement is paid off — the invoice gate. */
+  settled: boolean;
 };
 
 export function canViewProjectMoney(ctx: RequestContext): boolean {
@@ -39,60 +43,33 @@ export async function getProjectMoney(
   if (!canViewProjectMoney(ctx)) return null;
   const db = scoped(ctx);
 
-  // Fetch non-cancelled invoices first — we need IDs for the allocation join,
-  // and we want to exclude cancelled invoices from the totals.
-  const [order, advances, receipts, invRows] = await Promise.all([
+  // Everything about what is owed comes from getProjectReceivable — the one
+  // place that knows the agreed value and every route money reaches a
+  // project by. This block used to reconstruct it from Order.advanceRequired
+  // and ReceiptAllocation, which reported ₹0 received on a project whose
+  // advance had been paid but never invoiced.
+  const [receivable, order, invRows] = await Promise.all([
+    getProjectReceivable(db, projectId),
     db.order.aggregate({
       where: { projectId },
-      _sum:  { totalValue: true, advanceRequired: true, advanceReceived: true },
+      _sum:  { advanceRequired: true },
     }),
-    db.advance.aggregate({ where: { projectId }, _sum: { amount: true } }),
-    db.receipt.aggregate({ where: { projectId }, _sum: { amount: true } }),
     db.invoice.findMany({
       where:  { projectId, status: { not: "CANCELLED" } },
-      select: { id: true, total: true, advanceAdjusted: true },
+      select: { id: true, total: true },
     }),
   ]);
 
-  const invoiceTotal  = invRows.reduce((s, i) => s + i.total, 0n);
-  const advAdjTotal   = invRows.reduce((s, i) => s + i.advanceAdjusted, 0n);
-  const invIds        = invRows.map((i) => i.id);
-
-  const allocationSum = invIds.length === 0 ? 0n :
-    await db.receiptAllocation.aggregate({
-      where: { invoiceId: { in: invIds } },
-      _sum:  { amount: true },
-    }).then((r) => r._sum.amount ?? 0n);
-
-  const orderValue     = order._sum.totalValue      ?? 0n;
-  const advanceReq     = order._sum.advanceRequired ?? 0n;
-  const advanceRecvOrd = order._sum.advanceReceived ?? 0n;
-  const advanceRecvOwn = advances._sum.amount       ?? 0n;
-  // Legacy receipts._sum.amount only counted receipts whose row-level
-  // projectId was set — PaymentSheet doesn't set it, so this was
-  // effectively unused. Kept as a name-only reference; the real total
-  // now uses allocationSum below.
-  void receipts;
-
-  // Owner canonical flow (2026-08-25): "advance received" spans BOTH
-  // the legacy Advance table AND receipts allocated to this project's
-  // invoices (the modern invoice → payment → install path). Receipts
-  // don't carry projectId directly — the authoritative link is via
-  // ReceiptAllocation → Invoice.projectId, which `allocationSum`
-  // already computes above.
-  const legacyAdvance = advanceRecvOrd > 0n ? advanceRecvOrd : advanceRecvOwn;
-  const advanceReceived = legacyAdvance + allocationSum;
+  const invoiceTotal = invRows.reduce((acc, i) => acc + i.total, 0n);
 
   return {
-    orderValue,
-    advanceReceived,
-    advanceRequired: advanceReq,
-    outstanding:     computeOutstanding(invoiceTotal, advAdjTotal, allocationSum),
+    orderValue:      receivable?.agreedValue ?? 0n,
+    advanceReceived: receivable?.received    ?? 0n,
+    advanceRequired: order._sum.advanceRequired ?? 0n,
+    outstanding:     receivable?.due ?? 0n,
     invoiceTotal,
-    // Surface allocationSum as receiptTotal so the RECEIVED KPI on the
-    // project page reflects money actually landed on this project's
-    // invoices (not a stale receipt.projectId filter that's always 0).
-    receiptTotal:    allocationSum,
+    receiptTotal:    receivable?.received ?? 0n,
+    settled:         receivable?.settled ?? false,
   };
 }
 

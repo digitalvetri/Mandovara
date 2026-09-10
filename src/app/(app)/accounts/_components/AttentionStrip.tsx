@@ -32,7 +32,7 @@ export function AttentionStrip({ chequesPending, expensesPending, unmatchedRecei
   });
   if (unmatchedReceipts.count > 0) items.push({
     key:    "unmatched",
-    label:  `${unmatchedReceipts.count} payment${unmatchedReceipts.count === 1 ? "" : "s"} not matched to any bill`,
+    label:  `${unmatchedReceipts.count} payment${unmatchedReceipts.count === 1 ? "" : "s"} not linked to a job or bill`,
     amount: unmatchedReceipts.amount,
     href:   "/accounts?tab=received&unmatched=1",
   });

@@ -132,10 +132,15 @@ export async function buildAttentionCounts(
           where:  { approvalState: "PENDING" },
         })
       : Promise.resolve({ _sum: { amount: 0n }, _count: { _all: 0 } }),
+    // Only money that was never placed at all. A payment carrying a
+    // projectId is placed — it is sitting against the agreed quotation
+    // waiting for the invoice that comes at the end of the job, which is
+    // the studio's normal sequence. Flagging those made the attention
+    // strip shout about every single advance the studio took.
     db.receipt.aggregate({
       _sum:   { unallocated: true },
       _count: { _all: true },
-      where:  { unallocated: { gt: 0n } },
+      where:  { unallocated: { gt: 0n }, projectId: null },
     }),
   ]);
   return {

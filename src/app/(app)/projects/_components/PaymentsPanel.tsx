@@ -1,10 +1,14 @@
 "use client";
 
-// Payments panel — the main-column money surface. Shows invoiced /
-// received / outstanding at a glance, flags overdue, lists each invoice
-// with its own paid vs outstanding, and offers a "Create invoice" button
-// wired to createInvoiceFromOrder (invoices in this business always mint
-// from an Order — see /orders/_components/CreateInvoiceButton).
+// Payments panel — the main-column money surface.
+//
+// Reads Quoted / Received / Still to collect, and lists whatever bills have
+// been raised beneath. The tiles used to read Invoiced / Received /
+// Outstanding, all three computed from invoices — so on a job quoted at
+// ₹4 lakh with an advance banked and no bill yet, all three read ₹0 while
+// the header on the same screen said otherwise. Under this studio's flow
+// the invoice is the closing act of a job, so the money tiles measure the
+// agreement and the invoice list is what sits underneath.
 //
 // Loader-gated: parent passes null when the user lacks money permissions
 // and this component renders nothing at all (Rule 8 — cost / margin
@@ -39,6 +43,11 @@ export function PaymentsPanel({ payments }: Props) {
         <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
           Payments
         </div>
+        {payments.invoiced > 0n && (
+          <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+            Billed {formatINR(payments.invoiced)}
+          </div>
+        )}
         {/* A third "Create invoice" lived here, gated on there being a
             confirmed order. Removed 2026-08-30: the section header and
             the Quick actions strip both carry one, and three buttons for
@@ -49,8 +58,8 @@ export function PaymentsPanel({ payments }: Props) {
       {/* ── Summary tiles ────────────────────────────────────── */}
       <div className="mb-4 grid grid-cols-3 gap-3">
         <SummaryTile
-          label="Invoiced"
-          value={payments.invoiced}
+          label="Quoted"
+          value={payments.agreedValue}
         />
         <SummaryTile
           label="Received"
@@ -58,7 +67,7 @@ export function PaymentsPanel({ payments }: Props) {
           tone="solid"
         />
         <SummaryTile
-          label="Outstanding"
+          label="Still to collect"
           value={payments.outstanding}
           tone={payments.outstanding > 0n ? "fault" : "muted"}
         />
@@ -108,7 +117,9 @@ export function PaymentsPanel({ payments }: Props) {
         // telling an owner they cannot do the thing the button beside it
         // does is worse than saying nothing.
         <div className="rounded-[10px] border border-dashed border-rule px-4 py-6 text-center text-[11.5px] text-text-dim">
-          No invoices yet. Use <span className="text-text">Create invoice</span> above to bill this project.
+          {payments.outstanding > 0n
+            ? <>No bill yet — the invoice goes out once this job is paid off.</>
+            : <>Paid in full. Use <span className="text-text">Create invoice</span> above to bill it.</>}
         </div>
       )}
 

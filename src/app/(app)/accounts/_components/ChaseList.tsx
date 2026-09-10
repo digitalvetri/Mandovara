@@ -40,7 +40,7 @@ export function ChaseList({ rows, totalCount, orgName }: Props) {
       <div className="rounded-[14px] bg-surface border border-rule px-5 py-8 text-center">
         <div className="text-[13px] text-text mb-1">Nobody to chase today.</div>
         <div className="text-[11.5px] text-text-dim">
-          Every open bill is either recent or already promised — nice work.
+          Every unpaid job and bill is either recent or already promised — nice work.
         </div>
       </div>
     );

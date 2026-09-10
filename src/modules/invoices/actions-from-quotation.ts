@@ -28,17 +28,29 @@
 // always been storable. Nothing could create one.
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { computeLineTax } from "@/kernel/tax/gst";
 import { createInvoice } from "./actions";
+import { checkProjectSettledForInvoice } from "./project-gate";
+import { sweepProjectReceiptsOntoInvoice } from "./sweep-receipts";
 
 export interface ActionResult<T = unknown> {
-  ok: boolean; data?: T; error?: string;
+  ok: boolean; data?: T; error?: string; errorCode?: string;
 }
 
-const schema = z.object({ quotationId: z.string().trim().min(1) });
+const schema = z.object({
+  quotationId: z.string().trim().min(1),
+  // Owner override for the "bill after the money is in" rule below. A
+  // client who needs the tax invoice at supply — a company claiming input
+  // credit, most often — cannot be told to wait for the studio's internal
+  // sequence, so the rule is a default, not a wall. Only someone who can
+  // approve a quotation may step over it, and the balance then rides on the
+  // invoice as a normal outstanding amount.
+  billEarly:   z.boolean().optional(),
+});
 
 function toDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -82,6 +94,14 @@ export async function createInvoiceFromQuotation(
     return { ok: false, error: "This quotation has no lines to invoice." };
   }
 
+  // Bill after the money is in — see ./project-gate for why.
+  if (q.projectId) {
+    const refusal = await checkProjectSettledForInvoice(
+      ctx, db, q.projectId, parsed.data.billEarly ?? false,
+    );
+    if (refusal) return refusal;
+  }
+
   // Same routing rule as the order path: the client's billing state
   // decides CGST+SGST versus IGST, falling back to the branch's own.
   const [branch, client] = await Promise.all([
@@ -117,7 +137,7 @@ export async function createInvoiceFromQuotation(
   const now = new Date();
   const due = new Date(now.getTime() + 30 * 86_400_000);
 
-  return createInvoice({
+  const res = await createInvoice({
     // No orderId: this invoice descends from the quotation directly.
     ...(q.projectId ? { projectId: q.projectId } : {}),
     clientId: q.clientId,
@@ -128,4 +148,21 @@ export async function createInvoiceFromQuotation(
     placeOfSupplyCode,
     lines,
   });
+  if (!res.ok || !res.data) return res;
+
+  // The money the client already paid against the quotation now becomes
+  // money paid against this bill. Without this the invoice would open
+  // showing its full value outstanding on a project that is settled, and
+  // the same rupees would be counted in two places. Best-effort: a failure
+  // here must not lose an invoice that was written successfully.
+  if (q.projectId) {
+    try {
+      await sweepProjectReceiptsOntoInvoice({ orgId: ctx.orgId, invoiceId: res.data.id });
+      revalidatePath(`/projects/${q.projectId}`);
+    } catch (err) {
+      console.warn("sweepProjectReceiptsOntoInvoice failed (invoice still created):", err);
+    }
+  }
+  revalidatePath("/accounts");
+  return res;
 }

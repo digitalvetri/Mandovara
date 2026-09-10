@@ -14,6 +14,10 @@ export interface ActionResult<T = unknown> {
   ok: boolean;
   data?: T;
   error?: string;
+  errorCode?: string;
+  /** Set by the "bill after the money is in" gate — see ./project-gate. */
+  canOverride?: boolean;
+  due?: string;
   fieldErrors?: Record<string, string>;
 }
 

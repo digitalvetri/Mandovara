@@ -44,11 +44,21 @@ export default async function ReceiptDetailPage({
 
           <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
             <div className="px-4 py-2 border-b border-rule text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
-              Allocations ({r.allocations.length})
+              Which bills this covers ({r.allocations.length})
             </div>
             {r.allocations.length === 0 ? (
-              <div className="overflow-x-auto py-8 text-center text-[12px] text-text-faint">
-                Nothing allocated yet. All ₹{Number(r.amount) / 100} sits on account.
+              <div className="overflow-x-auto px-6 py-8 text-center text-[12px] text-text-faint">
+                {r.projectName ? (
+                  <>
+                    No bill yet — the whole {formatINR(r.amount)} counts against{" "}
+                    <Link href={`/projects/${r.projectId}` as Route} className="text-accent hover:underline">
+                      {r.projectName}
+                    </Link>
+                    . It moves onto the invoice when that job is billed.
+                  </>
+                ) : (
+                  <>This payment is not linked to a job or a bill yet.</>
+                )}
               </div>
             ) : (
               <table className="min-w-[480px] w-full text-[12.5px]">
@@ -83,12 +93,21 @@ export default async function ReceiptDetailPage({
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Amounts</div>
             <dl className="space-y-2 text-[12.5px]">
               <Row k="Received" v={formatINR(r.amount)} />
-              <Row k="Applied to invoices" v={formatINR(applied)} />
+              <Row k="On bills" v={formatINR(applied)} />
               <div className="pt-2 mt-2 border-t border-rule flex items-baseline justify-between">
-                <dt className={`uppercase text-[10.5px] tracking-[0.14em] ${r.unallocated > 0n ? "text-warn" : "text-text"}`}>
-                  {r.unallocated > 0n ? "On account" : "Fully applied"}
+                {/* Money against a job is placed, not stray — it is waiting
+                    for the bill raised at the end of that job. Only money
+                    with nothing behind it at all is worth a warning colour. */}
+                <dt className={`uppercase text-[10.5px] tracking-[0.14em] ${
+                  r.unallocated === 0n ? "text-text" : r.projectId ? "text-text" : "text-warn"
+                }`}>
+                  {r.unallocated === 0n ? "All on bills"
+                    : r.projectId       ? "Against the job"
+                    :                     "Not linked yet"}
                 </dt>
-                <dd className={`font-display text-[18px] font-semibold tabular-nums ${r.unallocated > 0n ? "text-warn" : "text-text-faint"}`}>
+                <dd className={`font-display text-[18px] font-semibold tabular-nums ${
+                  r.unallocated === 0n ? "text-text-faint" : r.projectId ? "text-text" : "text-warn"
+                }`}>
                   {r.unallocated > 0n ? formatINR(r.unallocated) : "₹0"}
                 </dd>
               </div>
@@ -99,6 +118,7 @@ export default async function ReceiptDetailPage({
             <div className="text-[10.5px] uppercase tracking-[0.16em] text-text-dim mb-3">Meta</div>
             <dl className="space-y-3 text-[12.5px]">
               <Row k="Reference" v={r.reference ?? "—"} mono />
+              <Row k="Job" v={r.projectName ?? "—"} />
               <Row k="Recorded" v={formatDate(r.date)} />
             </dl>
           </div>

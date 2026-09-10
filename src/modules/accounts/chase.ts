@@ -9,6 +9,7 @@
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
+import { loadReceivables, byClient } from "./receivables";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -17,8 +18,11 @@ export interface ChaseInput {
   clientId:        string;
   clientName:      string;
   clientMobile:    string;
-  outstanding:     bigint;         // sum of unpaid invoice balances
-  oldestDueDate:   Date;           // due date of the client's oldest unpaid bill
+  outstanding:     bigint;         // everything the client owes — see ./receivables
+  /** The day the client's oldest unpaid thing became due. For a bill that is
+   *  its due date; for an agreed quotation with no bill yet, the day the
+   *  client agreed it. */
+  oldestDueDate:   Date;
   doNotChase:      boolean;
   lastContactedAt: Date | null;
   activePromiseDate: Date | null;  // future-dated promise → suppress
@@ -130,40 +134,15 @@ export async function loadChaseList(
   const now = new Date();
   const take = opts.take ?? 5;
 
-  // Pull open invoices + their allocations. ReceiptAllocation has only
-  // invoiceId (no direct invoice relation) so we join in memory after
-  // fetching both — at typical SME scale (~1k open invoices) this stays
-  // fast enough that a materialised view isn't warranted yet.
-  const opens = await db.invoice.findMany({
-    where:  { status: { in: ["ISSUED", "PARTIALLY_PAID"] } },
-    select: { id: true, clientId: true, dueDate: true, total: true, advanceAdjusted: true },
-  });
-  if (opens.length === 0) return [];
+  // Everything owed, from the one receivables list — an agreed quotation
+  // that has not been paid off counts exactly like an unpaid bill. Scanning
+  // invoices alone (as this did) meant the chase list was empty on a studio
+  // that invoices at the END of a job: the clients who genuinely owed money
+  // had no invoice yet, so nobody was ever surfaced to chase.
+  const receivables = await loadReceivables(db, now);
+  if (receivables.length === 0) return [];
 
-  const openIds = opens.map((i) => i.id);
-  const allocGroups = await db.receiptAllocation.groupBy({
-    by:    ["invoiceId"],
-    where: { invoiceId: { in: openIds } },
-    _sum:  { amount: true },
-  });
-  const allocatedById = new Map<string, bigint>();
-  for (const g of allocGroups) allocatedById.set(g.invoiceId, g._sum.amount ?? 0n);
-
-  // Aggregate per client: outstanding sum + oldest due date.
-  interface Agg { outstanding: bigint; oldestDue: Date }
-  const perClient = new Map<string, Agg>();
-  for (const inv of opens) {
-    const allocated = allocatedById.get(inv.id) ?? 0n;
-    const bal = inv.total - inv.advanceAdjusted - allocated;
-    if (bal <= 0n) continue;
-    const cur = perClient.get(inv.clientId);
-    if (!cur) {
-      perClient.set(inv.clientId, { outstanding: bal, oldestDue: inv.dueDate });
-    } else {
-      cur.outstanding += bal;
-      if (inv.dueDate < cur.oldestDue) cur.oldestDue = inv.dueDate;
-    }
-  }
+  const perClient = new Map(byClient(receivables).map((c) => [c.clientId, c]));
   if (perClient.size === 0) return [];
 
   const clientIds = [...perClient.keys()];
@@ -197,7 +176,7 @@ export async function loadChaseList(
       clientName:        c.name,
       clientMobile:      c.mobile,
       outstanding:       agg.outstanding,
-      oldestDueDate:     agg.oldestDue,
+      oldestDueDate:     agg.oldestDueDate,
       doNotChase:        c.doNotChase,
       lastContactedAt:   c.lastContactedAt,
       activePromiseDate: promise,
@@ -209,7 +188,7 @@ export async function loadChaseList(
       clientName:           c.name,
       clientMobile:         c.mobile,
       outstanding:          agg.outstanding,
-      oldestLateDays:       Math.max(0, daysBetween(agg.oldestDue, now)),
+      oldestLateDays:       Math.max(0, daysBetween(agg.oldestDueDate, now)),
       lastContactedDaysAgo: c.lastContactedAt ? daysBetween(c.lastContactedAt, now) : null,
       activePromiseDate:    promise,
       score,

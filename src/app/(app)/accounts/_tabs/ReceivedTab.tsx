@@ -1,6 +1,12 @@
 // "Received" tab — every payment in, newest first. Filter chips for
-// mode, cheque status, unmatched, and per-month drill-in from the
+// mode, cheque status, unplaced payments, and per-month drill-in from the
 // InVsOut chart. Uses the extended listReceipts query.
+//
+// "Not matched" used to mean any payment not sitting on an invoice, which
+// under this studio's flow is most of them: money arrives against an agreed
+// quotation and the bill is raised at the end. It now means what the owner
+// reads it as — a payment attached to nothing at all, neither a job nor a
+// bill. Those are the ones that need a decision.
 
 import Link from "next/link";
 import type { Route } from "next";
@@ -42,7 +48,7 @@ export async function ReceivedTab({
   const activeFilters: Array<{ label: string; clearHref: string }> = [];
   if (mode)         activeFilters.push({ label: MODE_LABELS[mode] ?? mode,           clearHref: dropParam("mode") });
   if (chequeStatus) activeFilters.push({ label: `Cheque · ${chequeStatus.toLowerCase()}`, clearHref: dropParam("status") });
-  if (unmatched)    activeFilters.push({ label: "Not matched to a bill",              clearHref: dropParam("unmatched") });
+  if (unmatched)    activeFilters.push({ label: "Not linked to a job or bill",         clearHref: dropParam("unmatched") });
   if (month)        activeFilters.push({ label: prettyMonth(month),                   clearHref: dropParam("month") });
 
   return (
@@ -119,7 +125,7 @@ function ModeChips({
         active={activeUnmatched}
         href={activeUnmatched ? ("/accounts?tab=received" as Route) : ("/accounts?tab=received&unmatched=1" as Route)}
       >
-        Not matched
+        Not linked
       </Chip>
     </div>
   );
@@ -155,7 +161,7 @@ function EmptyReceipts({ hasFilter }: { hasFilter: boolean }) {
         <>
           <div className="text-[14px] text-text mb-2">No payments received yet.</div>
           <p className="text-[12px] text-text-dim">
-            When you record a payment against a bill it'll show up here — newest first.
+            When you record a payment against a job it'll show up here — newest first.
           </p>
         </>
       )}

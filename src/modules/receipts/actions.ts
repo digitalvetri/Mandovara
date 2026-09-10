@@ -1,6 +1,6 @@
 "use server";
 
-import { z } from "zod";
+import type { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { withTransaction, type TxClient } from "@/kernel/db/transaction";
 import { scoped } from "@/kernel/db/scoped";
@@ -10,7 +10,9 @@ import { allocateReceiptToInvoice } from "@/kernel/accounts/allocate";
 import { computeOutstanding } from "@/kernel/money/outstanding";
 import { devContext } from "@/lib/dev-context";
 import { checkGateForReceipt } from "@/modules/projects/advance-gate";
-import { createReceiptSchema, bounceReceiptSchema, clearChequeSchema } from "./schema";
+import { createReceiptSchema } from "./schema";
+
+export * from "./actions-cheque";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -56,6 +58,38 @@ export async function createReceipt(
     };
   }
   const unallocated = totalPaise - allocatedTotal;
+
+  // A payment against a project is the normal case under the quotation-first
+  // flow: the client pays against the agreed quotation and the tax invoice
+  // comes at the end. `unallocated` then means "against the project, not yet
+  // on a bill" rather than "money we could not place" — the project link is
+  // what stops it reading as unmatched in Accounts → Received.
+  //
+  // The project must belong to the client being credited, or the money lands
+  // on someone else's job. Checked server-side, not just in the picker.
+  if (d.projectId) {
+    const project = await db.project.findUnique({
+      where:  { id: d.projectId },
+      select: { id: true, clientId: true, stage: true },
+    });
+    if (!project) {
+      return { ok: false, error: "Validation failed", fieldErrors: { projectId: "Project not found" } };
+    }
+    if (project.clientId !== d.clientId) {
+      return {
+        ok: false,
+        error: "Validation failed",
+        fieldErrors: { projectId: "That project belongs to another client" },
+      };
+    }
+    if (project.stage === "CANCELLED") {
+      return {
+        ok: false,
+        error: "Validation failed",
+        fieldErrors: { projectId: "That project was cancelled — pick another" },
+      };
+    }
+  }
 
   // Pre-tx outstanding check (non-locking — the kernel does the FOR UPDATE)
   if (allocationPairs.length > 0) {
@@ -164,112 +198,11 @@ export async function createReceipt(
 
   revalidatePath("/receipts");
   revalidatePath("/invoicing");
+  revalidatePath("/accounts");
+  revalidatePath("/projects");
+  if (d.projectId) revalidatePath(`/projects/${d.projectId}`);
   revalidatePath(`/clients/${d.clientId}`);
   return { ok: true, data: { ...created, unallocated } };
-}
-
-export async function bounceReceipt(
-  input: unknown,
-): Promise<ActionResult<{ id: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "receipt.reverse");
-
-  const parsed = bounceReceiptSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
-  const { id } = parsed.data;
-
-  const db  = scoped(ctx);
-  const row = await db.receipt.findUnique({
-    where: { id },
-    select: {
-      id: true, number: true, chequeStatus: true, amount: true,
-      allocations: { select: { id: true, invoiceId: true, amount: true } },
-    },
-  });
-  if (!row) return { ok: false, error: "Receipt not found." };
-  if (row.chequeStatus === "BOUNCED") return { ok: false, error: "Already bounced." };
-  if (row.chequeStatus !== "PENDING") {
-    return { ok: false, error: "Only PENDING cheques can be bounced." };
-  }
-
-  await withTransaction(async (tx: TxClient) => {
-    // Lock affected invoices, then delete allocations
-    const invoiceIds = [...new Set(row.allocations.map((a) => a.invoiceId))];
-    if (invoiceIds.length > 0) {
-      await tx.$queryRaw`
-        SELECT id FROM "Invoice"
-        WHERE id = ANY(${invoiceIds}::text[])
-        FOR UPDATE
-      `;
-    }
-
-    // Delete all ReceiptAllocations for this receipt
-    if (row.allocations.length > 0) {
-      await tx.receiptAllocation.deleteMany({
-        where: { receiptId: id },
-      });
-    }
-
-    // Mark receipt as bounced, restore unallocated to full amount
-    await tx.receipt.update({
-      where: { id },
-      data: { chequeStatus: "BOUNCED", unallocated: row.amount },
-    });
-
-    // Recompute invoice statuses — outstanding restores automatically (computed)
-    for (const invId of invoiceIds) {
-      const allSum = await tx.receiptAllocation.aggregate({
-        where: { invoiceId: invId },
-        _sum:  { amount: true },
-      });
-      const inv = await tx.invoice.findUniqueOrThrow({
-        where: { id: invId },
-        select: { total: true, advanceAdjusted: true, status: true },
-      });
-      const outstanding = computeOutstanding(inv.total, inv.advanceAdjusted, allSum._sum.amount ?? 0n);
-      const nextStatus  = outstanding <= 0n ? "PAID"
-        : (allSum._sum.amount ?? 0n) > 0n   ? "PARTIALLY_PAID"
-        :                                      "ISSUED";
-      if (nextStatus !== inv.status) {
-        await tx.invoice.update({ where: { id: invId }, data: { status: nextStatus } });
-      }
-    }
-  }, { orgId: ctx.orgId });
-
-  revalidatePath("/receipts");
-  revalidatePath("/invoicing");
-  return { ok: true, data: { id } };
-}
-
-export async function clearCheque(
-  input: unknown,
-): Promise<ActionResult<{ id: string }>> {
-  const ctx = await devContext();
-  requirePermission(ctx, "receipt.reverse");
-
-  const parsed = clearChequeSchema.safeParse(input);
-  if (!parsed.success) return zodError(parsed.error);
-  const { id } = parsed.data;
-
-  const db  = scoped(ctx);
-  const row = await db.receipt.findUnique({
-    where:  { id },
-    select: { id: true, chequeStatus: true },
-  });
-  if (!row) return { ok: false, error: "Receipt not found." };
-  if (row.chequeStatus === "CLEARED")  return { ok: false, error: "Already cleared." };
-  if (row.chequeStatus !== "PENDING") {
-    return { ok: false, error: "Only PENDING cheques can be marked cleared." };
-  }
-
-  await db.receipt.update({
-    where: { id },
-    data:  { chequeStatus: "CLEARED" },
-  });
-
-  revalidatePath("/receipts");
-  revalidatePath("/accounts");
-  return { ok: true, data: { id } };
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────

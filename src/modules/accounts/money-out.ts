@@ -10,17 +10,24 @@ export function describePurpose(
   amount: bigint,
   unallocated: bigint,
   invoiceNumbers: string[],
+  projectName?: string | null,
 ): string {
   if (invoiceNumbers.length === 0) {
-    // Nothing tied to an invoice — money is sitting on account.
-    return "Advance received";
+    // No bill behind it. Under the quotation-first flow that is the normal
+    // state for most of a job's life, and the job's name is the honest
+    // answer to "what is this money for?" — far better than the old blanket
+    // "Advance received", which told the owner nothing about which of eight
+    // running projects the payment belonged to.
+    return projectName ? `Towards ${projectName}` : "Payment not linked to a job yet";
   }
   const shown = invoiceNumbers.slice(0, 2).join(", ");
   const more  = invoiceNumbers.length > 2 ? ` +${invoiceNumbers.length - 2} more` : "";
   const base  = `Payment for ${shown}${more}`;
-  // Partial-advance case: applied to some invoices AND still has money left over.
+  // Applied to some bills AND still has money left over.
   if (unallocated > 0n && unallocated < amount) {
-    return `${base} · balance kept as advance`;
+    return projectName
+      ? `${base} · rest towards ${projectName}`
+      : `${base} · balance kept for later bills`;
   }
   return base;
 }

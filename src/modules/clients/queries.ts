@@ -2,10 +2,13 @@
 // Schema reference: Client has `mobile`, `email`, `billingAddress Json`, `creditLimit BigInt`.
 // No status field, no stateCode, no paymentTerms, no addresses relation.
 // contacts ContactPerson[] exists with: id, name, designation, mobile, email, whatsappOptIn.
-// Outstanding is COMPUTED from invoices − receipts, never stored (§11 acceptance).
+// Outstanding is COMPUTED, never stored (§11 acceptance) — from the shared
+// receivables list, so a client's balance is the sum of what their jobs and
+// bills say, and cannot drift from the Money page.
 
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { loadReceivables } from "@/modules/accounts/receivables";
 import type { RequestContext } from "@/kernel/auth/context";
 
 export interface ListClientsQuery {
@@ -222,79 +225,42 @@ async function projectsByClient(ctx: RequestContext, clientIds: string[]): Promi
   return map;
 }
 
-// Valid InvoiceStatus values that represent money still owed — no "OVERDUE" enum value exists.
-const OPEN_INVOICE_STATUSES = ["ISSUED", "PARTIALLY_PAID"] as const;
+// What a client owes now comes from the one receivables list — an agreed
+// quotation that has not been paid off counts exactly like an unpaid bill.
+//
+// Both helpers below used to scan open INVOICES alone. On a studio that
+// bills at the end of a job that reported ₹0 owed by a client sitting on
+// three live quotations and a part-paid advance, and the client list could
+// not be sorted by who owes the most because nearly everyone read zero.
 
 async function outstandingByClient(
   ctx: RequestContext,
   clientIds: string[],
 ): Promise<Map<string, bigint>> {
   if (clientIds.length === 0) return new Map();
-  const db = scoped(ctx);
-
-  // Fetch open invoices for these clients
-  const invoices = await db.invoice.findMany({
-    where: { clientId: { in: clientIds }, status: { in: [...OPEN_INVOICE_STATUSES] } },
-    select: { id: true, clientId: true, total: true, advanceAdjusted: true },
-  });
-  if (invoices.length === 0) return new Map();
-
-  // Fetch receipt allocations for those invoice IDs (no direct relation on Invoice model)
-  const invoiceIds = invoices.map((i) => i.id);
-  const allocs = await db.receiptAllocation.findMany({
-    where: { invoiceId: { in: invoiceIds } },
-    select: { invoiceId: true, amount: true },
-  });
-
-  const paidByInvoice = new Map<string, bigint>();
-  for (const a of allocs) {
-    paidByInvoice.set(a.invoiceId, (paidByInvoice.get(a.invoiceId) ?? 0n) + a.amount);
-  }
+  // Scoped to the clients on the page. Without the filter this pulls every
+  // project in the org — and their quotations, invoices, receipts and
+  // advances — to render twenty-five rows.
+  const rows = await loadReceivables(scoped(ctx), new Date(), { clientIds });
 
   const balanceByClient = new Map<string, bigint>();
-  for (const inv of invoices) {
-    const paid = paidByInvoice.get(inv.id) ?? 0n;
-    const balance = inv.total - inv.advanceAdjusted - paid;
-    if (balance > 0n) {
-      balanceByClient.set(inv.clientId, (balanceByClient.get(inv.clientId) ?? 0n) + balance);
-    }
+  for (const r of rows) {
+    balanceByClient.set(r.clientId, (balanceByClient.get(r.clientId) ?? 0n) + r.outstanding);
   }
   return balanceByClient;
 }
 
 async function computeAgeing(ctx: RequestContext, clientId: string): Promise<AgeingBuckets> {
-  const db = scoped(ctx);
-  const now = new Date();
-
-  const invoices = await db.invoice.findMany({
-    where: { clientId, status: { in: [...OPEN_INVOICE_STATUSES] } },
-    select: { id: true, total: true, advanceAdjusted: true, dueDate: true },
-  });
-  if (invoices.length === 0) {
-    return { bucket0_30: 0n, bucket31_60: 0n, bucket61_90: 0n, bucket90plus: 0n, total: 0n };
-  }
-
-  const invoiceIds = invoices.map((i) => i.id);
-  const allocs = await db.receiptAllocation.findMany({
-    where: { invoiceId: { in: invoiceIds } },
-    select: { invoiceId: true, amount: true },
-  });
-  const paidByInvoice = new Map<string, bigint>();
-  for (const a of allocs) {
-    paidByInvoice.set(a.invoiceId, (paidByInvoice.get(a.invoiceId) ?? 0n) + a.amount);
-  }
+  const rows = await loadReceivables(scoped(ctx), new Date(), { clientIds: [clientId] });
 
   const buckets = { bucket0_30: 0n, bucket31_60: 0n, bucket61_90: 0n, bucket90plus: 0n, total: 0n };
-  for (const inv of invoices) {
-    const paid = paidByInvoice.get(inv.id) ?? 0n;
-    const balance = inv.total - inv.advanceAdjusted - paid;
-    if (balance <= 0n) continue;
-    const days = Math.max(0, Math.floor((now.getTime() - inv.dueDate.getTime()) / 86_400_000));
-    if      (days <= 30) buckets.bucket0_30   += balance;
-    else if (days <= 60) buckets.bucket31_60  += balance;
-    else if (days <= 90) buckets.bucket61_90  += balance;
-    else                 buckets.bucket90plus += balance;
-    buckets.total += balance;
+  for (const r of rows) {
+    const days = r.daysOverdue;
+    if      (days <= 30) buckets.bucket0_30   += r.outstanding;
+    else if (days <= 60) buckets.bucket31_60  += r.outstanding;
+    else if (days <= 90) buckets.bucket61_90  += r.outstanding;
+    else                 buckets.bucket90plus += r.outstanding;
+    buckets.total += r.outstanding;
   }
   return buckets;
 }

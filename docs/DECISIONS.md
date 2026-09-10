@@ -926,3 +926,128 @@ there is no import path for the roughly 1,200 projects and 1,000 clients living
 in the client's current books. A dashboard showing ₹0 reads as broken software
 regardless of how well it is built, and software staff must retype a year of
 history into is software they will quietly stop using.
+
+---
+
+## 2026-09-10 — The quotation is the agreement; the invoice is the last step
+
+### What the owner said
+
+> "they send a quotation and if okay that will be converted to the project and
+> they get the advance based on the quotation and after receiving all the
+> payments only they will generate the invoice … by this we can also solve the
+> not matched to bill in the Accounts & payment module."
+
+### What the software believed instead
+
+The whole money model was invoice-first. A client owed money only once an
+invoice existed; a payment could only be attached to an invoice; the project
+stepper read **Project → Invoice → Advance → Installation**; and the next-action
+card said "Create invoice" at every pre-order stage.
+
+That inversion produced four visible symptoms, all of them the same bug:
+
+| Screen | What it said | What was true |
+|---|---|---|
+| Accounts → Received | "N payments not matched to any bill" | Every advance ever taken |
+| Accounts → To Collect | ₹0, and an empty chase list | Several lakh across live jobs |
+| Project header | "Balance due ₹0" | The quoted value, less what was paid |
+| Project payments panel | Invoiced ₹0 / Received ₹0 | An advance had been banked |
+
+An advance taken against an agreed quotation had, quite literally, nothing in
+the schema to point at. It went in as an unallocated receipt and the software
+flagged its own normal operating state as an exception.
+
+### The model now
+
+Two formulas, and they are never summed for the same money:
+
+- **`computeProjectDue`** (`kernel/money/project-due.ts`) — `agreedValue −
+  received`, where the agreed value is the accepted quotation. This is what a
+  client owes for nearly the whole life of a job.
+- **`computeOutstanding`** — one invoice's balance, unchanged. It applies to a
+  project's invoices, and to standalone bills that belong to no project.
+
+`modules/projects/receivable.ts` assembles the first for any project, counting
+money by all three routes it can arrive (a receipt booked to the project, an
+allocation onto one of its invoices, a legacy `Advance` row) and excluding
+bounced cheques. `modules/accounts/receivables.ts` turns that into the one list
+of everything owed. The project header, the project ledger, the payments panel,
+the client list and balance, Accounts → To Collect, the chase list and the
+payment sheet all read from those two files, so they cannot disagree.
+
+### What changed on screen
+
+- The payment sheet asks **"What is this for?"** first, and offers the client's
+  open jobs before their open bills. That question is the whole fix: the answer
+  is stored as `Receipt.projectId`, which already existed and which nothing was
+  setting.
+- "Not matched" became **"Not linked"** and now means a payment attached to
+  neither a job nor a bill. Money held against a job is placed, not stray.
+- The stepper reads **Project → Quotation → Payment → Installation →
+  Completed**. Billing moved to the end of the job, where it happens.
+- The project header reads **Quoted / Received / Still to collect**.
+- Raising an invoice on a project with a balance is refused
+  (`invoices/project-gate.ts`), by every door — from a quotation, from an order,
+  and from the manual builder. An owner can override with "Bill anyway", because
+  a client claiming input credit needs the document at supply and cannot be made
+  to wait for someone else's internal sequence.
+- Raising the invoice **sweeps the project's receipts onto it** as real
+  `ReceiptAllocation` rows (`invoices/sweep-receipts.ts`) rather than stamping
+  `advanceAdjusted`. One definition of "paid" survives the hand-off, so the
+  invoice does not open showing its full value outstanding on a settled job.
+
+### What was deliberately not done
+
+**No schema change.** `Receipt.projectId` was already there and already
+nullable; making `ReceiptAllocation.invoiceId` nullable so one payment could
+split across two projects would have touched an indexed column on a live table
+for a case this studio barely produces. Two payments is clearer anyway, and the
+sheet says so.
+
+**No second write path.** The legacy `Advance` table is still read — its rows
+still count as money received — but nothing writes new ones. It never surfaced
+in Accounts → Received, which is the complaint being fixed.
+
+**`Payment` / `PaymentAllocation` were left alone.** The live Received tab reads
+`Receipt`. The cutover to the unified model is a separate job and mixing it into
+this one would have made both unreviewable.
+
+### Two traps found in review
+
+**`chequeStatus` is nullable.** `{ not: "BOUNCED" }` renders as
+`chequeStatus <> 'BOUNCED'`, which is UNKNOWN — and therefore false — for the
+NULL that every cash and UPI receipt carries. Written that way, `received`
+would have come back near zero on every project in the system, silently. Both
+places now spell out `OR: [{ chequeStatus: null }, { chequeStatus: { not:
+"BOUNCED" } }]`.
+
+**A bill can exceed the quotation.** Extra work agreed on site, a rate changed
+mid-job. If "what a project owes" were only `agreed − received`, a job quoted at
+₹4 lakh, paid in full, then billed ₹4.5 lakh would show ₹0 owed on every screen
+while ₹50,000 sat unpaid. `due` is therefore
+`max(agreed − received, Σ its invoices' outstanding)` — a maximum, not a sum,
+which is what keeps a bill raised early for the quoted amount from reading as
+double the debt.
+
+### Two assumptions worth stating
+
+**A quotation merely SENT is not a debt.** Only an ACCEPTED one is chased
+(`chaseableReceivables`), or the Money page would tell the owner to chase the
+whole sales pipeline. The payment sheet is deliberately more permissive and
+offers un-accepted jobs too — a client paying against a quotation IS the
+acceptance, and refusing that payment would recreate the bug.
+
+**Work starts on the first payment.** The advance gate moves a project to
+Installation as soon as money arrives, when no advance figure was stated on an
+order — which is now most jobs. That matches the owner's own description, and
+inventing a percentage of the quotation would be inventing a business rule
+nobody stated. The screen is kept honest instead: the next-action card carries
+"Balance still to collect" while money is outstanding. If the owner wants a
+threshold, it belongs on the quotation as a stated advance.
+
+Uninvoiced project debt has no due date — the studio does not put payment terms
+on a quotation. Ageing and the chase list therefore measure from the date the
+client agreed the quotation. A job agreed four months ago with nothing collected
+is exactly the row that should be at the top of the chase list, so this is the
+right default, but it is a choice and not a fact.

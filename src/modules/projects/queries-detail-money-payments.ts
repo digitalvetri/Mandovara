@@ -11,6 +11,7 @@
 
 import { scoped } from "@/kernel/db/scoped";
 import { canViewProjectMoney } from "./queries-detail-money";
+import { getProjectReceivable } from "./receivable";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { computeOutstanding } from "@/kernel/money/outstanding";
 import type { RequestContext } from "@/kernel/auth/context";
@@ -31,10 +32,16 @@ export type ProjectPaymentInvoice = {
 };
 
 export type ProjectPayments = {
+  /** Raised as tax invoices. Zero for most of a job's life — the bill is
+   *  the closing act, not the opening one. */
   invoiced:       bigint;
+  /** Everything received against the job, by any route. */
   received:       bigint;
+  /** Still to collect against the agreed quotation. */
   outstanding:    bigint;
   overdue:        bigint;
+  /** What the client agreed to. */
+  agreedValue:    bigint;
   orderValue:     bigint;
   latestOrderId:  string | null;
   invoices:       ProjectPaymentInvoice[];
@@ -49,7 +56,8 @@ export async function getProjectPayments(
   const db = scoped(ctx);
   const now = new Date();
 
-  const [invoices, order] = await Promise.all([
+  const [receivable, invoices, order] = await Promise.all([
+    getProjectReceivable(db, projectId),
     db.invoice.findMany({
       where:   { projectId, status: { not: "CANCELLED" } },
       orderBy: { date: "desc" },
@@ -97,9 +105,14 @@ export async function getProjectPayments(
     };
   });
 
-  const invoiced    = rows.reduce((s, r) => s + r.total,       0n);
-  const received    = rows.reduce((s, r) => s + r.paid,        0n);
-  const outstanding = rows.reduce((s, r) => s + r.outstanding, 0n);
+  const invoiced    = rows.reduce((s, r) => s + r.total, 0n);
+  // Received and outstanding come from the project's agreement, not from
+  // its invoices. Summing the invoice rows — as this did — reported ₹0
+  // received and ₹0 outstanding on a job that had taken a ₹1 lakh advance
+  // and not been billed yet, directly contradicting the header two hundred
+  // pixels above it.
+  const received    = receivable?.received ?? 0n;
+  const outstanding = receivable?.due      ?? 0n;
   const overdue     = rows.filter((r) => r.isOverdue)
                           .reduce((s, r) => s + r.outstanding, 0n);
   const nextDue     = rows
@@ -111,6 +124,7 @@ export async function getProjectPayments(
     received,
     outstanding,
     overdue,
+    agreedValue:   receivable?.agreedValue ?? 0n,
     orderValue:    order?.totalValue ?? 0n,
     latestOrderId: order?.id ?? null,
     invoices:      rows,

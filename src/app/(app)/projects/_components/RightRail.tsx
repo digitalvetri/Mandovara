@@ -127,20 +127,22 @@ function MoneyCard({ money }: { money: ProjectMoney }) {
   return (
     <Card title="Money">
       <dl className="space-y-2 text-[12.5px]">
-        <MoneyRow k="Order" v={formatINR(money.orderValue)} big />
-        <MoneyRow k="Advance" v={
+        <MoneyRow k="Quoted" v={formatINR(money.orderValue)} big />
+        <MoneyRow k="Received" v={
           <>
-            {formatINR(money.advanceReceived)}
-            {money.advanceRequired > 0n && (
-              <span className="ml-1 text-text-dim">/ {formatINR(money.advanceRequired)}</span>
+            {formatINR(money.receiptTotal)}
+            {money.advanceRequired > 0n && money.receiptTotal < money.advanceRequired && (
+              <span className="ml-1 text-text-dim">/ {formatINR(money.advanceRequired)} advance</span>
             )}
           </>
         } />
-        <MoneyRow k="Invoiced" v={formatINR(money.invoiceTotal)} />
-        <MoneyRow k="Received" v={formatINR(money.receiptTotal)} />
+        {/* Billed sits below the money, not above it: the tax invoice is the
+            last step of a job here, so it is the footnote to the story, not
+            the headline. ₹0 billed on a half-paid job is normal. */}
+        <MoneyRow k="Billed" v={money.invoiceTotal > 0n ? formatINR(money.invoiceTotal) : "Not yet"} />
       </dl>
       <div className="mt-3 border-t border-rule pt-3 flex items-baseline justify-between">
-        <span className="text-[11.5px] text-text-dim">Outstanding</span>
+        <span className="text-[11.5px] text-text-dim">Still to collect</span>
         <span className={[
           "font-display tabular-nums text-[20px] font-semibold",
           money.outstanding > 0n ? "text-fault" : "text-solid",

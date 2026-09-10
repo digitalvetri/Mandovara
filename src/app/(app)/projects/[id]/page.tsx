@@ -82,17 +82,20 @@ export default async function ProjectDetailPage({
     id:       p.id,
     clientId: p.clientId,
     stage:    p.stage,
+    hasQuotation: ledger.quoted > 0n,
     ...(money ? { money: {
       invoiceTotal:    money.invoiceTotal,
       advanceReceived: money.advanceReceived,
       advanceRequired: money.advanceRequired,
+      agreedValue:     money.orderValue,
+      outstanding:     money.outstanding,
     } } : {}),
   });
-  // The order value an owner means is what the client has committed to:
-  // the confirmed order if there is one, otherwise the quoted figure, and
-  // only then the stored column as a last resort. Reading the column
-  // first is what produced "₹0" on a project with a live order.
-  const headerOrderValue =
+  // What the client committed to. Both getProjectMoney and getProjectLedger
+  // now read it from getProjectReceivable, so they agree by construction;
+  // the stored column is the last resort for projects that predate the
+  // quotation-first flow.
+  const headerAgreedValue =
     (money?.orderValue ?? 0n) > 0n ? money!.orderValue
     : ledger.quoted > 0n           ? ledger.quoted
     : p.orderValue;
@@ -146,15 +149,24 @@ export default async function ProjectDetailPage({
                 Create quotation
               </a>
             )}
-            {/* "Create invoice" surfaces here only when all three gates hold:
-                user has invoice.create, project has a confirmed order, AND
-                no active invoice exists yet. Hidden once invoiced to prevent
-                accidental duplicates — the Payments panel below handles
-                further billing actions. */}
+            {/* Billing is the LAST step of a job here, so the invoice button
+                waits for the money: nothing invoiced yet, and the quotation
+                paid off. Before that it is not a missing button but a step
+                that has not arrived, and the row above says why. With an
+                order it bills from the order; without one it opens the
+                builder seeded from the quotation. Both re-check the same
+                rule server-side (invoices/project-gate.ts). */}
             {ctx.permissions.has("invoice.create") &&
-              payments?.latestOrderId &&
-              (payments.invoices.length === 0) && (
-              <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
+              (payments?.invoices.length ?? 0) === 0 &&
+              ledger.settled && (
+              payments?.latestOrderId
+                ? <CreateInvoiceHeaderButton orderId={payments.latestOrderId} />
+                : <a
+                    href={`/invoicing/create?project=${p.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] bg-gold px-4 py-2 text-[12.5px] font-semibold text-ink shadow-sm transition-all hover:bg-gold-strong hover:-translate-y-[1px]"
+                  >
+                    Create invoice
+                  </a>
             )}
             {/* Finishing the job. Not a stepper dot — see
                 MarkCompleteButton for why the stepper cannot reach
@@ -205,11 +217,18 @@ export default async function ProjectDetailPage({
             cannot disagree. "Progress" is replaced by balance due:
             percentage-of-milestones read 0% on a project that was
             invoiced and paid in full, which told nobody anything. */}
+        {/* Quoted → Received → Still to collect. The client agreed a figure;
+            what they have paid comes off it; the rest is what to chase. That
+            is the whole money story of a job in this studio, and it is the
+            same three numbers the Money page counts. This row used to read
+            "Order value / Received / Balance due", where the balance came
+            from invoices — so a job quoted at ₹4 lakh with an advance paid
+            and no invoice yet reported nothing due. */}
         <div className="mt-3.5 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[12.5px] tabular-nums text-text-dim">
-          <HeaderStat k="Order value" v={formatINR(headerOrderValue)} />
+          <HeaderStat k="Quoted" v={formatINR(headerAgreedValue)} />
           <HeaderStat k="Received" v={formatINR(ledger.received)} />
           <HeaderStat
-            k={ledger.balance >= 0n ? "Balance due" : "In credit"}
+            k={ledger.balance >= 0n ? "Still to collect" : "In credit"}
             v={formatINR(ledger.balance >= 0n ? ledger.balance : -ledger.balance)}
           />
         </div>

@@ -2,10 +2,11 @@
 // Covers the spec's UI-contract tests: the CTA the user sees, and whether
 // it's enabled or disabled with the expected explanatory line.
 //
-// Owner redesign (2026-08-26): the pre-order internal stages (ENQUIRY,
-// SITE_VISIT, MEASUREMENT, QUOTATION) all share a single primary CTA
-// "Prepare firm quote". Site visit + measurement are anytime side-actions
-// on the project page and are covered by UI tests, not this resolver.
+// Owner correction (2026-09-10): the resolver used to say "Create invoice"
+// at every pre-order stage and again as the first step after acceptance —
+// it asked the studio to bill before the client had agreed a price, and to
+// bill before collecting. The real order is quote → advance → work →
+// balance → invoice, and these tests pin each hand-off in that order.
 
 import { describe, expect, it } from "vitest";
 import type { RequestContext } from "@/kernel/auth/context";
@@ -28,27 +29,55 @@ function ctxWith(perms: readonly string[]): RequestContext {
 // pre-order stages — it was sending an owner to a page that told them
 // they could not do the thing they had just clicked. /invoicing/create
 // writes the invoice for the project directly.
-describe("resolveNextAction — pre-order stages route to /invoicing/create", () => {
+describe("resolveNextAction — the quotation comes before the invoice", () => {
   it.each(["ENQUIRY", "SITE_VISIT", "MEASUREMENT", "QUOTATION"])(
-    "stage=%s → CREATE_INVOICE routing to /invoicing/create?project=…",
+    "stage=%s with no quotation yet → price the job, not bill it",
     (stage) => {
-      const ctx = ctxWith(["project.view", "invoice.create"]);
+      const ctx = ctxWith(["project.view", "invoice.create", "quotation.create"]);
       const a = resolveNextAction(ctx, { id: "p1", clientId: "c1", stage });
-      expect(a.kind).toBe("CREATE_INVOICE");
-      expect(a.label).toBe("Create invoice");
-      expect(a.href).toBe("/invoicing/create?project=p1");
+      expect(a.kind).toBe("BUILD_QUOTATION");
+      expect(a.cta).toBe("Create quotation");
+      expect(a.href).toBe("/quotations/new?project=p1");
       expect(a.enabled).toBe(true);
-      // The page it must NOT point at — the one that stops on a
-      // pre-order project.
-      expect(a.href).not.toContain("/invoicing/new");
+      // The thing it must never do at this point: bill a client who has not
+      // been told what the job costs.
+      expect(a.href).not.toContain("/invoicing");
     },
   );
 
-  it("is disabled with the accounts-team reason when invoice.create is missing", () => {
+  it("a quotation is out and unpaid → collect on it", () => {
+    const ctx = ctxWith(["project.view", "receipt.create"]);
+    const a = resolveNextAction(ctx, {
+      id: "p1", clientId: "c1", stage: "QUOTATION",
+      hasQuotation: true,
+      money: {
+        invoiceTotal: 0n, advanceReceived: 0n, advanceRequired: 0n,
+        agreedValue: 400_000_00n, outstanding: 400_000_00n,
+      },
+    });
+    expect(a.kind).toBe("RECORD_ADVANCE");
+    expect(a.href).toBe("/accounts/new?clientId=c1");
+  });
+
+  it("part paid → the CTA says so and still points at the payment sheet", () => {
+    const ctx = ctxWith(["project.view", "receipt.create"]);
+    const a = resolveNextAction(ctx, {
+      id: "p1", clientId: "c1", stage: "QUOTATION",
+      hasQuotation: true,
+      money: {
+        invoiceTotal: 0n, advanceReceived: 100_000_00n, advanceRequired: 0n,
+        agreedValue: 400_000_00n, outstanding: 300_000_00n,
+      },
+    });
+    expect(a.kind).toBe("RECORD_ADVANCE");
+    expect(a.label).toContain("Part paid");
+  });
+
+  it("is disabled with the sales-team reason when quotation.create is missing", () => {
     const ctx = ctxWith(["project.view"]);
     const a = resolveNextAction(ctx, { id: "p1", stage: "QUOTATION" });
     expect(a.enabled).toBe(false);
-    expect(a.disabledReason).toContain("accounts team");
+    expect(a.disabledReason).toContain("sales team");
   });
 });
 
@@ -58,10 +87,9 @@ describe("resolveNextAction — post-order stages", () => {
   const ctx = ctxWith([...perms]);
 
   it.each([
-    // Owner canonical flow post-acceptance: invoice → advance → install.
-    // With no money snapshot (test defaults), the ORDERED CTA is "Create
-    // invoice" not the retired "Prepare material" pointing to procurement.
-    ["ORDERED",      "CREATE_INVOICE",     "Firm quote accepted"],
+    // Owner canonical flow post-acceptance: advance → work → balance →
+    // invoice. With no money snapshot the ORDERED CTA is "Record advance".
+    ["ORDERED",      "RECORD_ADVANCE",     "awaiting advance"],
     // Owner canonical flow: after advance is received the project stage
     // moves to PROCUREMENT internally but the visible CTA jumps straight
     // to "Book install visit" (procurement happens in the background).
@@ -73,30 +101,67 @@ describe("resolveNextAction — post-order stages", () => {
     expect(a.label).toContain(label);
   });
 
-  it("stage=ORDERED with money loaded walks invoice → advance → install", () => {
+  it("stage=ORDERED with money loaded walks advance → install → invoice", () => {
     const richCtx = ctxWith(["invoice.create", "receipt.create", "sitelog.create"]);
-    // no invoice yet
+
+    // Nothing received — the advance is the next thing, not a bill.
     const step1 = resolveNextAction(richCtx, {
       id: "p1", stage: "ORDERED",
-      money: { invoiceTotal: 0n, advanceReceived: 0n, advanceRequired: 500_00n },
+      money: {
+        invoiceTotal: 0n, advanceReceived: 0n, advanceRequired: 500_00n,
+        agreedValue: 10_000_00n, outstanding: 10_000_00n,
+      },
     });
-    expect(step1.kind).toBe("CREATE_INVOICE");
+    expect(step1.kind).toBe("RECORD_ADVANCE");
     expect(step1.enabled).toBe(true);
 
-    // invoice raised, no advance yet
+    // Advance in, balance still to come — work can start.
     const step2 = resolveNextAction(richCtx, {
       id: "p1", stage: "ORDERED",
-      money: { invoiceTotal: 10_000_00n, advanceReceived: 0n, advanceRequired: 500_00n },
+      money: {
+        invoiceTotal: 0n, advanceReceived: 500_00n, advanceRequired: 500_00n,
+        agreedValue: 10_000_00n, outstanding: 9_500_00n,
+      },
     });
-    expect(step2.kind).toBe("RECORD_ADVANCE");
+    expect(step2.kind).toBe("SCHEDULE_INSTALL");
+    expect(step2.cta).toBe("Book install visit");
+    expect(step2.subLine).toContain("Balance");
 
-    // advance met — install unlocks without waiting on MAKE
+    // Paid in full and not billed — now, and only now, the invoice.
     const step3 = resolveNextAction(richCtx, {
       id: "p1", stage: "ORDERED",
-      money: { invoiceTotal: 10_000_00n, advanceReceived: 500_00n, advanceRequired: 500_00n },
+      money: {
+        invoiceTotal: 0n, advanceReceived: 10_000_00n, advanceRequired: 500_00n,
+        agreedValue: 10_000_00n, outstanding: 0n,
+      },
     });
-    expect(step3.kind).toBe("SCHEDULE_INSTALL");
-    expect(step3.cta).toBe("Book install visit");
+    expect(step3.kind).toBe("CREATE_INVOICE");
+    expect(step3.href).toBe("/invoicing/create?project=p1");
+  });
+
+  it("a completed job with a balance keeps chasing it", () => {
+    const richCtx = ctxWith(["invoice.create", "receipt.create"]);
+    const a = resolveNextAction(richCtx, {
+      id: "p1", clientId: "c1", stage: "COMPLETED",
+      money: {
+        invoiceTotal: 0n, advanceReceived: 1_000_00n, advanceRequired: 0n,
+        agreedValue: 10_000_00n, outstanding: 9_000_00n,
+      },
+    });
+    expect(a.kind).toBe("RECORD_ADVANCE");
+    expect(a.label).toContain("balance to collect");
+  });
+
+  it("a completed job paid in full and unbilled offers the invoice", () => {
+    const richCtx = ctxWith(["invoice.create", "receipt.create"]);
+    const a = resolveNextAction(richCtx, {
+      id: "p1", clientId: "c1", stage: "COMPLETED",
+      money: {
+        invoiceTotal: 0n, advanceReceived: 10_000_00n, advanceRequired: 0n,
+        agreedValue: 10_000_00n, outstanding: 0n,
+      },
+    });
+    expect(a.kind).toBe("CREATE_INVOICE");
   });
 
   it("stage=MAKE reflects make progress in subLine", () => {
@@ -123,24 +188,25 @@ describe("resolveNextAction — disabled fallbacks", () => {
   });
 });
 
-describe("phaseForStageWithMoney — INVOICE vs ADVANCE split", () => {
-  it("ORDERED with no money snapshot → INVOICE", () => {
-    expect(phaseForStageWithMoney("ORDERED", null)).toBe("INVOICE");
-  });
-
-  it("ORDERED with invoiceTotal 0 → INVOICE", () => {
+describe("phaseForStageWithMoney — the stepper reads in the real order", () => {
+  it("ORDERED means the quotation was agreed and money is awaited", () => {
+    expect(phaseForStageWithMoney("ORDERED", null)).toBe("ADVANCE");
     expect(phaseForStageWithMoney("ORDERED", {
       invoiceTotal: 0n, advanceReceived: 0n, advanceRequired: 500_00n,
-    })).toBe("INVOICE");
-  });
-
-  it("ORDERED with invoiceTotal > 0 → ADVANCE", () => {
-    expect(phaseForStageWithMoney("ORDERED", {
-      invoiceTotal: 10_000_00n, advanceReceived: 0n, advanceRequired: 500_00n,
     })).toBe("ADVANCE");
   });
 
-  it("non-ORDERED stages ignore money and delegate to phaseForStage", () => {
+  it("the internal QUOTATION stage has a phase of its own", () => {
+    expect(phaseForStageWithMoney("QUOTATION", null)).toBe("QUOTATION");
+  });
+
+  it("money already received moves it on, whatever the stage still says", () => {
+    expect(phaseForStageWithMoney("QUOTATION", {
+      invoiceTotal: 0n, advanceReceived: 100_00n, advanceRequired: 0n,
+    })).toBe("ADVANCE");
+  });
+
+  it("non-quotation stages ignore money and delegate to phaseForStage", () => {
     const m = { invoiceTotal: 10_000_00n, advanceReceived: 0n, advanceRequired: 500_00n };
     expect(phaseForStageWithMoney("ENQUIRY", m)).toBe("PROJECT");
     expect(phaseForStageWithMoney("PROCUREMENT", m)).toBe("INSTALLATION");
