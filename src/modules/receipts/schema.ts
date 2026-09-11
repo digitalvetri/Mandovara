@@ -25,6 +25,13 @@ export const createReceiptSchema = z.object({
   allocations: z.array(receiptAllocationInput).default([]),
 });
 
+/** Attach an already-recorded payment to the job whose quotation it was
+ *  paid against. projectId null detaches it again. */
+export const linkReceiptSchema = z.object({
+  id:        z.string().min(1),
+  projectId: z.string().min(1).nullable(),
+});
+
 export const bounceReceiptSchema = z.object({
   id: z.string().min(1),
 });
@@ -34,5 +41,6 @@ export const clearChequeSchema = z.object({
 });
 
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>;
+export type LinkReceiptInput   = z.infer<typeof linkReceiptSchema>;
 export type BounceReceiptInput = z.infer<typeof bounceReceiptSchema>;
 export type ClearChequeInput   = z.infer<typeof clearChequeSchema>;

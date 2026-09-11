@@ -5,9 +5,11 @@ import { Topbar } from "@/components/layout/Topbar";
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import { devContext } from "@/lib/dev-context";
-import { getReceipt } from "@/modules/receipts/queries";
+import { can } from "@/kernel/rbac/guard";
+import { getReceipt, listOpenProjectsForClient } from "@/modules/receipts/queries";
 import { ModePill } from "../_components/ModePill";
 import { ChequeActionButtons } from "../_components/ChequeActionButtons";
+import { LinkReceiptCard } from "./_components/LinkReceiptCard";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,27 @@ export default async function ReceiptDetailPage({
   if (!r) notFound();
 
   const applied = r.amount - r.unallocated;
+
+  // Offer the "what was this for?" picker only for money with no job behind
+  // it. listOpenProjectsForClient requires receipt.create as well as the
+  // allocate right the action itself checks, so both are tested here rather
+  // than letting the query throw the page away for a role holding only one.
+  const canLink =
+    !r.projectId &&
+    r.chequeStatus !== "BOUNCED" &&
+    can(ctx, "receipt.allocate") &&
+    can(ctx, "receipt.create");
+  const openProjects = canLink
+    ? (await listOpenProjectsForClient(ctx, r.clientId)).map((p) => ({
+        id:              p.id,
+        number:          p.number,
+        name:            p.name,
+        quotationNumber: p.quotationNumber,
+        agreedValue:     p.agreedValue.toString(),
+        received:        p.received.toString(),
+        due:             p.due.toString(),
+      }))
+    : [];
 
   return (
     <>
@@ -57,7 +80,10 @@ export default async function ReceiptDetailPage({
                     . It moves onto the invoice when that job is billed.
                   </>
                 ) : (
-                  <>This payment is not linked to a job or a bill yet.</>
+                  <>
+                    This payment is not linked to a job or a bill yet.
+                    {canLink && " Say what it was for below."}
+                  </>
                 )}
               </div>
             ) : (
@@ -86,6 +112,8 @@ export default async function ReceiptDetailPage({
               </table>
             )}
           </div>
+
+          {canLink && <LinkReceiptCard receiptId={r.id} projects={openProjects} />}
         </div>
 
         <aside className="space-y-4 h-fit">

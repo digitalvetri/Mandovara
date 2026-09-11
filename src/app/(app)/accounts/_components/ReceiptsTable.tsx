@@ -23,7 +23,9 @@ const COLUMNS: readonly Column<ReceiptRow>[] = [
         ? <span className="text-text">{r.projectName}</span>
         : r.unallocated < r.amount
           ? <span className="text-text-dim">Bills</span>
-          : <span className="text-warn">Not linked yet</span>,
+          // The row opens the receipt, where it can be put against a job.
+          // Dotted underline so it reads as somewhere to go, not just a label.
+          : <span className="text-warn underline decoration-dotted underline-offset-2">Not linked yet</span>,
   },
   { key: "mode",   header: "Mode",   render: (r) => <ModePill mode={r.mode} /> },
   { key: "ref",    header: "Reference", cellClassName: "text-text-dim tabular text-[11.5px]",

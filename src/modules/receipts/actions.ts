@@ -196,7 +196,6 @@ export async function createReceipt(
 
   revalidatePath("/accounts");
   revalidatePath("/invoicing");
-  revalidatePath("/accounts");
   revalidatePath("/projects");
   if (d.projectId) revalidatePath(`/projects/${d.projectId}`);
   revalidatePath(`/clients/${d.clientId}`);
