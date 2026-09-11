@@ -12,8 +12,6 @@ import { devContext } from "@/lib/dev-context";
 import { checkGateForReceipt } from "@/modules/projects/advance-gate";
 import { createReceiptSchema } from "./schema";
 
-export * from "./actions-cheque";
-
 export interface ActionResult<T = unknown> {
   ok: boolean;
   data?: T;

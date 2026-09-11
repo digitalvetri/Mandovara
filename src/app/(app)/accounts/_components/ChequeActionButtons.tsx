@@ -2,8 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { clearCheque } from "@/modules/receipts/actions";
-import { bounceReceipt } from "@/modules/receipts/actions";
+import { clearCheque, bounceReceipt } from "@/modules/receipts/actions-cheque";
 
 export function ChequeActionButtons({
   receiptId,

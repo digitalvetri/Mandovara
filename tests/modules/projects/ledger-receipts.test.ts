@@ -94,11 +94,15 @@ describe("project ledger — receipts", () => {
 
   it("counts a receipt linked ONLY by projectId, with no allocation yet", async () => {
     // Money on account — taken against the project before any invoice.
+    // unallocated is what receivable.ts reads for this route (see its header
+    // comment) and, unlike amount, has no default that tracks it — real
+    // receipt creation (receipts/actions.ts) always sets it explicitly, so
+    // the fixture must too.
     const { projectId, clientId } = await makeProject(A);
     await db.receipt.create({
       data: {
         organizationId: A.orgId, number: `RCT-${rand()}`, clientId, projectId,
-        date: new Date(), mode: "CASH", amount: 50_000n,
+        date: new Date(), mode: "CASH", amount: 50_000n, unallocated: 50_000n,
       },
     });
 
