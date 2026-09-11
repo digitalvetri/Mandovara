@@ -97,7 +97,11 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
         take: LIMIT_PER_KIND,
         select: {
           id: true, name: true, code: true,
-          collection: { select: { brand: { select: { name: true } } } },
+          // /products/[id] resolves a COLOURWAY, not a design, so a hit needs
+          // one to point at. Falling back to the brand page keeps a design
+          // with no active colourway clickable rather than dead.
+          colourways: { where: { isActive: true }, orderBy: { code: "asc" }, take: 1, select: { id: true } },
+          collection: { select: { brand: { select: { id: true, name: true } } } },
         },
       }),
       db.vendor.findMany({
@@ -155,7 +159,9 @@ export async function searchAll(q: string): Promise<SearchHit[]> {
     ...designs.map((d): SearchHit => ({
       kind: "design", id: d.id, title: d.name,
       subtitle: `${d.collection.brand.name} · ${d.code}`,
-      href: `/catalog/design/${d.id}`,
+      href: d.colourways[0]
+        ? `/products/${d.colourways[0].id}`
+        : `/products/brand/${d.collection.brand.id}`,
     })),
     ...vendors.map((v): SearchHit => ({
       kind: "vendor", id: v.id, title: v.name,

@@ -20,7 +20,7 @@ function projectMenuItems(r: ProjectRow): MenuItem[] {
     { key: "edit",     label: "Edit",             icon: PencilLine, href: `/projects/${r.id}/edit` },
     { key: "stage",    label: "Change Stage",      icon: RefreshCw,  href: `/projects/${r.id}` },
     { key: "followup", label: "Add Follow-up",     icon: BellPlus,   href: `/projects/${r.id}` },
-    { key: "quote",    label: "Create Quotation",  icon: FileText,   href: `/projects/${r.id}/quote/new` },
+    { key: "quote",    label: "Create Quotation",  icon: FileText,   href: `/quotations/new?project=${r.id}` },
     ...(!isArchived ? [{
       key:          "archive",
       label:        "Archive Project",

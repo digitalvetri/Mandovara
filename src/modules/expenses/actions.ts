@@ -53,7 +53,7 @@ export async function createProjectExpense(
   });
 
   revalidatePath(`/projects/${d.projectId}`);
-  revalidatePath("/expenses");
+  revalidatePath("/accounts");
   return { ok: true, data: { id: expense.id } };
 }
 

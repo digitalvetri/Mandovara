@@ -163,7 +163,7 @@ export async function importDesigns(
     skippedDuplicates = toInsert.length - result.count;
   }
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return {
     ok: true,
     data: { imported, skippedDuplicates, errors: allErrors },

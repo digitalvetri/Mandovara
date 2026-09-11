@@ -90,7 +90,7 @@ export async function bounceReceipt(
     }
   }, { orgId: ctx.orgId });
 
-  revalidatePath("/receipts");
+  revalidatePath("/accounts");
   revalidatePath("/invoicing");
   return { ok: true, data: { id } };
 }
@@ -121,7 +121,6 @@ export async function clearCheque(
     data:  { chequeStatus: "CLEARED" },
   });
 
-  revalidatePath("/receipts");
   revalidatePath("/accounts");
   return { ok: true, data: { id } };
 }

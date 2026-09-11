@@ -50,7 +50,8 @@ export async function createFollowUp(input: unknown): Promise<ActionResult<{ id:
     },
     select: { id: true },
   });
-  revalidatePath("/followups");
+  revalidatePath("/tasks");
+  revalidatePath("/calendar");
   return { ok: true, data: created };
 }
 
@@ -74,7 +75,8 @@ export async function completeFollowUp(input: unknown): Promise<ActionResult<{ i
       ...(note != null && note.trim() !== "" && { note: note.trim() }),
     },
   });
-  revalidatePath("/followups");
+  revalidatePath("/tasks");
+  revalidatePath("/calendar");
   return { ok: true, data: { id } };
 }
 
@@ -93,7 +95,8 @@ export async function rescheduleFollowUp(input: unknown): Promise<ActionResult<{
       ...(note != null && note.trim() !== "" && { note: note.trim() }),
     },
   });
-  revalidatePath("/followups");
+  revalidatePath("/tasks");
+  revalidatePath("/calendar");
   return { ok: true, data: { id } };
 }
 

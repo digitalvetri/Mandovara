@@ -129,7 +129,6 @@ export async function deleteBrand(
   }
 
   revalidatePath("/products");
-  revalidatePath("/catalog");
   return { ok: true };
 }
 
@@ -205,7 +204,6 @@ export async function wipeBrandCollections(
   }
 
   revalidatePath("/products");
-  revalidatePath("/catalog");
   revalidatePath(`/products/brand/${brandId}`);
   return {
     ok:    true,

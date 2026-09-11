@@ -134,7 +134,7 @@ function RowActions({ row, canDelete }: { row: QuotationRow; canDelete: boolean 
         <Eye size={14} strokeWidth={1.75} />
       </Link>
       {canEdit ? (
-        <Link href={`/quotations/${row.id}/edit` as Route} title="Edit" className={btn} onClick={(e) => e.stopPropagation()}>
+        <Link href={`/quotations/${row.id}` as Route} title="Edit" className={btn} onClick={(e) => e.stopPropagation()}>
           <Pencil size={13} strokeWidth={1.75} />
         </Link>
       ) : (

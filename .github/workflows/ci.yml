@@ -72,17 +72,59 @@ jobs:
       - name: Validate GitHub Actions workflows
         run: pnpm check:workflows
 
+      # The four fast gates each run even when an earlier one failed.
+      #
+      # A step with no `if:` is implicitly `if: success()`, so the default
+      # pipeline stops dead at the first red step. On 2026-09-09 a single
+      # broken unit-test fixture therefore skipped Build for two days, hiding
+      # a circular "use server" re-export that broke `next build` outright.
+      # Two separate bugs, discovered one push at a time, deploys stopped the
+      # whole while — and the second was invisible until the first was fixed.
+      #
+      # `!cancelled()` means one run now reports EVERY fast failure at once.
+      # They are independent checks and together cost ~3 minutes, so there is
+      # nothing to be saved by stopping early.
+      #
+      # The E2E steps below deliberately keep the default `success()`: they
+      # cost ~8 minutes and cannot tell you anything useful about a tree that
+      # does not compile.
       - name: Typecheck
+        id: typecheck
+        if: ${{ !cancelled() }}
         run: pnpm typecheck
 
       - name: Lint
+        id: lint
+        if: ${{ !cancelled() }}
         run: pnpm lint
 
       - name: Unit tests
+        id: unit
+        if: ${{ !cancelled() }}
         run: pnpm test
 
       - name: Build
+        id: build
+        if: ${{ !cancelled() }}
         run: pnpm build
+
+      # Which gate broke, on the run's own page. Actions logs need auth to
+      # download, so without this "CI is red" is all anyone outside the repo
+      # can see — and that was the whole experience of the 2026-09-09 outage.
+      - name: Summarise gates
+        if: ${{ !cancelled() }}
+        run: |
+          icon() { [ "$1" = "success" ] && echo "✅" || { [ "$1" = "skipped" ] && echo "⏭️" || echo "❌"; }; }
+          {
+            echo "### Fast gates"
+            echo ""
+            echo "| Gate | Result |"
+            echo "| --- | --- |"
+            echo "| Typecheck | $(icon "${{ steps.typecheck.outcome }}") ${{ steps.typecheck.outcome }} |"
+            echo "| Lint | $(icon "${{ steps.lint.outcome }}") ${{ steps.lint.outcome }} |"
+            echo "| Unit tests | $(icon "${{ steps.unit.outcome }}") ${{ steps.unit.outcome }} |"
+            echo "| Build | $(icon "${{ steps.build.outcome }}") ${{ steps.build.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Browser binaries only — deliberately NOT `--with-deps`.
       #

@@ -194,7 +194,7 @@ export async function createReceipt(
   });
   for (const pid of gated) revalidatePath(`/projects/${pid}`);
 
-  revalidatePath("/receipts");
+  revalidatePath("/accounts");
   revalidatePath("/invoicing");
   revalidatePath("/accounts");
   revalidatePath("/projects");

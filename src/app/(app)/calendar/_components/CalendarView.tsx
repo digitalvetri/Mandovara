@@ -277,7 +277,7 @@ export function CalendarView() {
       )}
 
       <div className="text-right">
-        <Link href={"/followups" as Route} className="text-[12px] text-text-dim hover:text-accent transition-colors">
+        <Link href={"/tasks" as Route} className="text-[12px] text-text-dim hover:text-accent transition-colors">
           All follow-ups →
         </Link>
       </div>

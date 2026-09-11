@@ -61,7 +61,6 @@ export async function createBrand(input: unknown): Promise<ActionResult<{ id: st
       select: { id: true },
     });
 
-    revalidatePath("/catalog");
     revalidatePath("/products");
     return { ok: true, data: { id: row.id } };
   } catch (err) {
@@ -86,7 +85,7 @@ export async function updateBrand(
     select: { id: true },
   });
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 
@@ -108,7 +107,6 @@ export async function createCollection(
       select: { id: true },
     });
 
-    revalidatePath("/catalog");
     revalidatePath("/products");
     revalidatePath(`/products/brand/${parsed.data.brandId}`);
     return { ok: true, data: { id: row.id } };
@@ -134,7 +132,7 @@ export async function updateCollection(
     select: { id: true },
   });
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 
@@ -159,7 +157,7 @@ export async function createDesign(
     select: { id: true },
   });
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 
@@ -180,7 +178,7 @@ export async function updateDesign(
     select: { id: true },
   });
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 
@@ -201,7 +199,7 @@ export async function createColourway(
     select: { id: true },
   });
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 
@@ -222,7 +220,7 @@ export async function updateColourway(
     select: { id: true },
   });
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 
@@ -254,7 +252,7 @@ export async function setPrice(input: unknown): Promise<ActionResult<{ id: strin
     select: { id: true },
   });
 
-  revalidatePath("/catalog");
+  revalidatePath("/products");
   return { ok: true, data: { id: row.id } };
 }
 

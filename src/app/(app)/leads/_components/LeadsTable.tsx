@@ -69,7 +69,7 @@ function fmtDate(d: Date): string {
 function leadMenuItems(r: LeadRow): MenuItem[] {
   const isTerminal = r.stage === "WON" || r.stage === "LOST";
   return [
-    { key: "edit",     label: "Edit",             icon: PencilLine, href: `/leads/${r.id}/edit` },
+    { key: "edit",     label: "Edit",             icon: PencilLine, href: `/leads/${r.id}` },
     { key: "status",   label: "Change Status",     icon: RefreshCw,  href: `/leads/${r.id}` },
     { key: "followup", label: "Add Follow-up",     icon: BellPlus,   href: `/leads/${r.id}` },
     ...(!isTerminal
