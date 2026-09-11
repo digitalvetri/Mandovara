@@ -12,9 +12,11 @@
 // the table into its own block. Same content throughout.
 //
 // Everything structural is decided in the PDF and copied here — the
-// columns, the "LESS DIS. 25%" run behaviour, and the TOTAL being the
-// taxable sum so the column adds up on a page that shows no tax. Change
-// one, change the other.
+// columns and the "LESS DIS. 25%" run behaviour.
+//
+// TAX: 2026-09-11 — mirrors QuotePdf.tsx's restored GST block: Taxable
+// Amount, then CGST+SGST or IGST, then Round-off, above a TOTAL that is
+// GST-inclusive. Change one, change the other.
 
 import type { SerializedQuotation } from "../_types";
 import { isEstimate } from "@/modules/quotations/lib";
@@ -159,16 +161,19 @@ interface Props {
   quotation: SerializedQuotation;
   lines: EditLine[];
   totals: PreviewTotals;
-  /** Still accepted so callers need no change, but no longer read: the
-   *  sheet shows no tax, so CGST+SGST vs IGST makes no difference to it.
-   *  The operator-facing summary bar still breaks tax out. */
-  isIntraState?: boolean;
 }
 
 export function QuotePreviewA4({ quotation, lines, totals }: Props) {
   const rows = layout(lines);
-  // Same figure the PDF prints: the AMT column added up, tax excluded.
-  const printedTotal = totals.taxable;
+  // Same figures the PDF prints: GST-inclusive total, split shown above it.
+  const isIntra = totals.igst === 0;
+  const taxRows: Array<{ label: string; value: number }> = [
+    { label: "Taxable Amount", value: totals.taxable },
+    ...(isIntra
+      ? [{ label: "CGST", value: totals.cgst }, { label: "SGST", value: totals.sgst }]
+      : [{ label: "IGST", value: totals.igst }]),
+    ...(totals.roundOff !== 0 ? [{ label: "Round-off", value: totals.roundOff }] : []),
+  ];
   const area = quotation.siteArea ?? quotation.projectName ?? "";
   const customTerms = quotation.termsText
     ? quotation.termsText.split("\n").map((t) => t.trim()).filter(Boolean)
@@ -265,7 +270,15 @@ export function QuotePreviewA4({ quotation, lines, totals }: Props) {
         </table>
 
         {/* ── Total ── */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px", marginBottom: "15px" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "10px", marginBottom: "15px" }}>
+          <div style={{ width: "45%", marginBottom: "3px" }}>
+            {taxRows.map(({ label, value }) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "1.4px 0" }}>
+                <span style={{ fontSize: "7.6px", color: INK_SOFT }}>{label}</span>
+                <span style={{ fontSize: "7.6px", color: INK }}>{fmtAmt(value)}</span>
+              </div>
+            ))}
+          </div>
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             width: "45%", background: BRAND_TINT, borderTop: `1.5px solid ${BRAND}`,
@@ -275,7 +288,7 @@ export function QuotePreviewA4({ quotation, lines, totals }: Props) {
               TOTAL
             </span>
             <span style={{ fontSize: "14px", fontWeight: 700, color: BRAND_DEEP }}>
-              {fmtAmt(printedTotal)}
+              {fmtAmt(totals.total)}
             </span>
           </div>
         </div>

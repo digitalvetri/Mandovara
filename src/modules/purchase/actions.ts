@@ -10,6 +10,7 @@ import { parseINR } from "@/kernel/money/format";
 import { allocateNumber, yymmFromDate } from "@/kernel/numbering/series";
 import { devContext } from "@/lib/dev-context";
 import { calcPOTotals, scaleQty } from "@/lib/calc/purchase-order";
+import { createVendorPaymentExpense } from "./expense";
 import { createPOSchema, setPOStatusSchema, rejectPOSchema } from "./schema";
 
 export interface ActionResult<T = unknown> {
@@ -133,7 +134,7 @@ export async function setPOStatus(
       status: true,
       number: true,
       vendorId: true,
-      lines: { select: { receivedQty: true, rate: true } },
+      lines: { select: { receivedQty: true, rate: true, gstRate: true } },
     },
   });
 
@@ -172,19 +173,23 @@ export async function setPOStatus(
     });
 
     // A PARTIAL PO that gets cancelled still owes the vendor for goods already
-    // received. Auto-create an Expense for the received value so it surfaces in
-    // accounts payable. Guarded by sourcePoId unique constraint for idempotency.
+    // received. Auto-create an Expense for the received value — GST-inclusive,
+    // same as a normal receipt — so it surfaces in accounts payable and in the
+    // GST tab's input credit. createVendorPaymentExpense() is idempotent via
+    // Expense.sourcePoId.
     if (status === "CANCELLED" && po.status === "PARTIAL") {
-      const receivedValue = po.lines.reduce((sum, l) => {
-        const qty = parseFloat(l.receivedQty.toString());
-        return sum + (l.rate * BigInt(Math.round(qty * 10_000))) / 10_000n;
-      }, 0n);
-      if (receivedValue > 0n) {
+      const receivedTotals = calcPOTotals(
+        po.lines.map((l) => ({
+          ratePaise:      l.rate,
+          quantityScaled: scaleQty(parseFloat(l.receivedQty.toString())),
+          gstRatePct:     Number(l.gstRate),
+        })),
+      );
+      if (receivedTotals.total > 0n) {
         const vendor = await tx.vendor.findUnique({
           where: { id: po.vendorId },
-          select: { name: true },
+          select: { name: true, gstin: true },
         });
-        const vendorName = vendor?.name ?? "Vendor";
         let branchId = ctx.branchIds[0];
         if (!branchId) {
           const anyBranch = await tx.branch.findFirst({
@@ -193,33 +198,27 @@ export async function setPOStatus(
           });
           branchId = anyBranch?.id;
         }
-        if (branchId) {
-          try {
-            await tx.expense.create({
-              data: {
-                organizationId: ctx.orgId,
-                branchId,
-                head:          "Vendor payment",
-                subHead:       vendorName,
-                description:   `${po.number} — ${vendorName} (partial receipt, PO cancelled)`,
-                amount:        receivedValue,
-                incurredAt:    new Date(),
-                approvalState: "APPROVED",
-                paidAt:        null,
-                sourcePoId:    id,
-              },
-            });
-          } catch (e) {
-            const code = (e as { code?: string } | null)?.code;
-            if (code !== "P2002") throw e;
-          }
-        }
+        await createVendorPaymentExpense(tx, {
+          organizationId:    ctx.orgId,
+          branchId,
+          poId:              id,
+          poNumber:          po.number,
+          vendorName:        vendor?.name ?? "Vendor",
+          vendorGstin:       vendor?.gstin ?? null,
+          descriptionSuffix: "partial receipt, PO cancelled",
+          amount:            receivedTotals.total,
+          taxable:           receivedTotals.taxableAmount,
+          cgst:              receivedTotals.cgst,
+          sgst:              receivedTotals.sgst,
+          igst:              receivedTotals.igst,
+        });
       }
     }
   }, { orgId: ctx.orgId });
 
   revalidatePath("/purchase");
   revalidatePath(`/purchase/${id}`);
+  if (status === "CANCELLED") revalidatePath("/accounts"); // may have just raised a vendor-payment expense
   return { ok: true, data: { id } };
 }
 

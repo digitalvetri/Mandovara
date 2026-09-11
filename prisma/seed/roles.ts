@@ -86,7 +86,7 @@ const ROLE_PERMISSIONS: Record<Exclude<RoleKey, "OWNER">, string[]> = {
     "catalog.view",
     "vendor.view", "vendor.create", "vendor.update", "vendor.viewRates",
     "requisition.view", "requisition.create", "requisition.approve",
-    "po.view", "po.create",
+    "po.view", "po.create", "po.delete",
     "grn.view", "grn.create",
     "inventory.view", "inventory.adjust", "inventory.transfer", "inventory.stockTake",
     "stock.view",

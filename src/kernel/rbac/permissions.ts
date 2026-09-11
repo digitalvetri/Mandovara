@@ -29,7 +29,7 @@ export const PERMISSIONS = {
   // ── Procurement ────────────────────────────────────────────
   vendor:      ["view", "create", "update", "block", "viewRates"],
   requisition: ["view", "create", "approve"],
-  po:          ["view", "create", "approve", "cancel"],
+  po:          ["view", "create", "approve", "cancel", "delete"],
   grn:         ["view", "create", "cancel"],
   vendorPayment: ["view", "create", "cancel"],
 

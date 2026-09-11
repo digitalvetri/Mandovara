@@ -22,6 +22,8 @@ import { devContext } from "@/lib/dev-context";
 import { postGRNSchema } from "./schema";
 import { computePOStatus, MANDATORY_DYE_LOT_FAMILIES } from "./lib";
 import { postGrnToBalance } from "@/kernel/stock/balance";
+import { calcPOTotals, scaleQty } from "@/lib/calc/purchase-order";
+import { createVendorPaymentExpense } from "./expense";
 import { ActionResult } from "./grn-actions";
 import { emptyToNull, zodError } from "./grn-actions-part2-helpers";
 
@@ -235,22 +237,23 @@ export async function postGRN(
     // by Expense.sourcePoId's unique constraint — a second GRN that flips the
     // status back and forth can't spawn duplicates. Owner still pays it via
     // the "Mark paid" button on the To Pay tab.
-    if (nextStatus === "RECEIVED" && po.status !== "RECEIVED") {
+    const justReceived = nextStatus === "RECEIVED" && po.status !== "RECEIVED";
+    if (justReceived) {
       await autoCreateExpenseForPO(tx, ctx.orgId, po.id, ctx.branchIds[0]);
     }
 
-    return grn;
+    return { ...grn, justReceived };
   }, { orgId: ctx.orgId });
 
   revalidatePath("/purchase");
   revalidatePath(`/purchase/${po.id}`);
+  if (created.justReceived) revalidatePath("/accounts"); // just raised a vendor-payment expense
   return { ok: true, data: created };
 }
 
-/** Create a matching Expense when a PO reaches RECEIVED. Uses
- *  Expense.sourcePoId's unique constraint for idempotency — a duplicate
- *  attempt on the same PO throws a Prisma P2002 which we swallow (the
- *  expense already exists; nothing to do). */
+/** Create a matching Expense when a PO reaches RECEIVED. GST-splitting and
+ *  idempotency now live in expense.ts, shared with receivePO() and the
+ *  cancel-a-partial-PO path in actions.ts. */
 async function autoCreateExpenseForPO(
   tx:            TxClient,
   orgId:         string,
@@ -261,17 +264,22 @@ async function autoCreateExpenseForPO(
     where:  { id: poId },
     select: {
       id: true, number: true, totalValue: true, vendorId: true,
+      lines: { select: { rate: true, quantity: true, gstRate: true } },
     },
   });
 
-  // totalValue is already the GST-inclusive ordered value — what the vendor
-  // is owed — so the expense is that figure exactly.
-  const totalWithGst = fullPo.totalValue;
   const vendor = await tx.vendor.findUnique({
     where:  { id: fullPo.vendorId },
-    select: { name: true },
+    select: { name: true, gstin: true },
   });
-  const vendorName = vendor?.name ?? "Vendor";
+
+  const totals = calcPOTotals(
+    fullPo.lines.map((l) => ({
+      ratePaise:      l.rate,
+      quantityScaled: scaleQty(Number(l.quantity)),
+      gstRatePct:     Number(l.gstRate),
+    })),
+  );
 
   // PurchaseOrder has no branchId in the schema — resolve from the caller's
   // context, or fall back to any branch of this org so a broken caller still
@@ -284,29 +292,22 @@ async function autoCreateExpenseForPO(
     });
     branchId = anyBranch?.id;
   }
-  if (!branchId) return; // no branch anywhere — silently skip
 
-  try {
-    await tx.expense.create({
-      data: {
-        organizationId: orgId,
-        branchId,
-        head:           "Vendor payment",
-        subHead:        vendorName,
-        description:    `${fullPo.number} — ${vendorName}`,
-        amount:         totalWithGst,
-        incurredAt:     new Date(),
-        approvalState:  "APPROVED",   // PO already went through its own approval; skip a second loop
-        paidAt:         null,          // still owes vendor — shows up in To Pay
-        sourcePoId:     fullPo.id,
-      },
-    });
-  } catch (e) {
-    // P2002 unique-constraint violation on sourcePoId = an Expense already
-    // exists for this PO. That's exactly the idempotency case; no-op.
-    const code = (e as { code?: string } | null)?.code;
-    if (code === "P2002") return;
-    throw e;
-  }
+  await createVendorPaymentExpense(tx, {
+    organizationId: orgId,
+    branchId,
+    poId:           fullPo.id,
+    poNumber:       fullPo.number,
+    vendorName:     vendor?.name ?? "Vendor",
+    vendorGstin:    vendor?.gstin ?? null,
+    // totalValue is already the GST-inclusive ordered value; the taxable/
+    // cgst/sgst split is recomputed from the lines for the input-credit
+    // fields, and matches it — same calcPOTotals, same lines.
+    amount:  fullPo.totalValue,
+    taxable: totals.taxableAmount,
+    cgst:    totals.cgst,
+    sgst:    totals.sgst,
+    igst:    totals.igst,
+  });
 }
 

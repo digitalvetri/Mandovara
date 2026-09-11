@@ -103,7 +103,7 @@ export default async function PurchasePage({
         </div>
       </div>
 
-      <POTable rows={rows} />
+      <POTable rows={rows} canDelete={can(ctx, "po.delete")} />
       <Pager page={page} pageSize={pageSize} total={total} />
     </>
   );

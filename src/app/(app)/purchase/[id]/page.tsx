@@ -12,7 +12,7 @@ import { listVendorBillsForPO, getGRNsForBilling } from "@/modules/purchase/vend
 import { POStatusPill } from "../_components/StatusPill";
 import { SendOnWhatsAppButton } from "./_components/SendOnWhatsAppButton";
 import { POStatusActions } from "./_components/POStatusActions";
-import { GRNForm } from "../_components/GRNForm";
+import { ReceivePOButton } from "./_components/ReceivePOButton";
 import { MarkPaidButton } from "@/app/(app)/accounts/_components/MarkPaidButton";
 import { ApproveBillButton } from "./_components/ApproveBillButton";
 
@@ -48,7 +48,6 @@ export default async function PODetailPage({
   const orderedValue  = po.totalValue;
   const receivedValue = valueOf((l) => l.receivedQty).total;
   const pendingValue  = valueOf((l) => l.pendingQty).total;
-  const pendingLineCount = po.lines.filter((l) => parseFloat(l.pendingQty) > 0).length;
 
   // ── Urgency ──────────────────────────────────────────────────────────────
   let urgency: { label: string; level: "ok" | "warn" | "bad" } | null = null;
@@ -159,13 +158,13 @@ export default async function PODetailPage({
           </table>
         </div>
 
-        {/* ── GRN form (only when PO is active and has pending lines) ─────── */}
+        {/* ── Receive (only when the PO is out with the vendor) ────────────── */}
         {(po.status === "SENT" || po.status === "PARTIAL") && (
-          <GRNForm purchaseOrderId={po.id} lines={po.lines} />
+          <ReceivePOButton poId={po.id} vendorName={po.vendorName} />
         )}
 
         {/* ── Status actions ──────────────────────────────────────────────── */}
-        <POStatusActions poId={po.id} status={po.status} vendorName={po.vendorName} pendingLineCount={pendingLineCount} />
+        <POStatusActions poId={po.id} status={po.status} vendorName={po.vendorName} />
 
         {/* ── Vendor payment ──────────────────────────────────────────────── */}
         {vendorExpense && (

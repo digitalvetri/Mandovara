@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { formatINR } from "@/kernel/money/format";
 import type { PORow } from "@/modules/purchase/queries";
 import { POStatusPill } from "./StatusPill";
+import { DeletePOButton } from "./DeletePOButton";
 import type { POStatus } from "@/modules/purchase/schema";
 
 const STATUS_STRIP: Record<POStatus, string> = {
@@ -15,7 +16,7 @@ const STATUS_STRIP: Record<POStatus, string> = {
   CANCELLED:        "bg-fault/40",
 };
 
-export function POTable({ rows }: { rows: PORow[] }) {
+export function POTable({ rows, canDelete = false }: { rows: PORow[]; canDelete?: boolean }) {
   if (rows.length === 0) {
     return (
       <div className="rounded-[14px] bg-surface border border-rule py-10 text-center">
@@ -40,6 +41,7 @@ export function POTable({ rows }: { rows: PORow[] }) {
             <th className="px-4 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Total</th>
             <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim hidden md:table-cell">Expected by</th>
             <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Status</th>
+            {canDelete && <th className="px-4 py-3 w-[44px]" aria-hidden />}
           </tr>
         </thead>
         <tbody>
@@ -97,6 +99,12 @@ export function POTable({ rows }: { rows: PORow[] }) {
                 <td className="px-4 py-4">
                   <POStatusPill status={r.status} />
                 </td>
+
+                {canDelete && (
+                  <td className="px-4 py-4 text-right">
+                    <DeletePOButton poId={r.id} label={r.number.split("/").pop() ?? r.number} />
+                  </td>
+                )}
               </tr>
             );
           })}

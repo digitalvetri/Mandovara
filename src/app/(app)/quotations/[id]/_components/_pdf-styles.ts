@@ -174,7 +174,13 @@ export const pdfStyles = StyleSheet.create({
   // ── Total ─────────────────────────────────────────────────────────
   // Its own block below the table rather than one more row inside it.
   // The number a client looks for first should not be just another cell.
-  totalWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 10, marginBottom: 15 },
+  totalWrap: { flexDirection: "column", alignItems: "flex-end", marginTop: 10, marginBottom: 15 },
+  // GST rows sit above the total box, in the same 45%-width column, so the
+  // reader can see Taxable + CGST/SGST (or IGST) add up to the figure below.
+  taxRowsWrap: { width: "45%", marginBottom: 3 },
+  taxRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.4 },
+  taxLabel: { fontSize: 7.6, color: INK_SOFT },
+  taxValue: { fontSize: 7.6, color: INK, textAlign: "right" },
   totalBox: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: BRAND_TINT,
