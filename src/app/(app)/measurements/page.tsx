@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { Ruler } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
+import { can } from "@/kernel/rbac/guard";
 import { listOrgRounds } from "@/modules/measurement/org-queries";
 import { roundHref } from "@/modules/measurement/subject";
 import type { MeasurementStatusStr } from "@/modules/measurement/queries-types";
@@ -53,7 +54,7 @@ export default async function MeasurementsIndexPage({ searchParams }: PageProps)
       ...(status && { status }), ...(search && { search }),
       ...(clientId && { clientId }), page,
     }),
-    listProjectsForSelect(ctx),
+    can(ctx, "project.view") ? listProjectsForSelect(ctx) : Promise.resolve([]),
   ]);
 
   const totalActive = totalCounts.DRAFT + totalCounts.SUBMITTED + totalCounts.APPROVED;

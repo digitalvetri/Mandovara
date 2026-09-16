@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
+import { can } from "@/kernel/rbac/guard";
 import { getVendor } from "@/modules/vendors/queries";
 import { getVendorLedger } from "@/modules/purchase/vendor-ledger";
 import { VendorLedgerPanel } from "./_components/VendorLedgerPanel";
@@ -16,7 +17,7 @@ export default async function VendorDetailPage({
   const v = await getVendor(ctx, id);
   if (!v) notFound();
 
-  const ledger = await getVendorLedger(ctx, id);
+  const ledger = can(ctx, "po.view") ? await getVendorLedger(ctx, id) : null;
   return (
     <>
       <Topbar

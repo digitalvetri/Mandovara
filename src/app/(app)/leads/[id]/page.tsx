@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { formatINR } from "@/kernel/money/format";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
+import { can } from "@/kernel/rbac/guard";
 import { getLead } from "@/modules/leads/queries";
 import { listFollowUpsForLead } from "@/modules/followups/queries";
 import { listQuotationsForClient, listLeadScopedQuotations } from "@/modules/quotations/queries";
@@ -41,12 +42,24 @@ export default async function LeadDetailPage({
   const ctx = await devContext();
 
   const db = scoped(ctx);
+  // lead.view is the page's own permission — getLead throws without it.
+  // Every panel below needs a permission of its own, and not every role
+  // that can open a lead has all of them (the employee baseline has no
+  // followup.view or measurement.view). Letting those queries throw took
+  // the WHOLE page down, and in production a thrown ForbiddenError reaches
+  // the error boundary stripped of its message — so it looked like a crash
+  // rather than a 403. Skip the query and render the panel empty instead;
+  // the decision is still made here, on the server.
+  const canFollowUps    = can(ctx, "followup.view");
+  const canSiteVisits   = can(ctx, "sitelog.view");
+  const canMeasurements = can(ctx, "measurement.view");
+  const canQuotations   = can(ctx, "quotation.view");
   const [lead, followUps, siteVisits, rounds, isMeasured] = await Promise.all([
     getLead(ctx, id),
-    listFollowUpsForLead(ctx, id),
-    listSiteVisitsForLead(ctx, id),
-    listRoundsForLead(ctx, id),
-    leadHasApprovedMeasurement(ctx, id),
+    canFollowUps    ? listFollowUpsForLead(ctx, id)        : Promise.resolve([]),
+    canSiteVisits   ? listSiteVisitsForLead(ctx, id)       : Promise.resolve([]),
+    canMeasurements ? listRoundsForLead(ctx, id)           : Promise.resolve([]),
+    canMeasurements ? leadHasApprovedMeasurement(ctx, id)  : Promise.resolve(false),
   ]);
   if (!lead) notFound();
 
@@ -65,9 +78,11 @@ export default async function LeadDetailPage({
   // A second query used to run beside this one, pulling
   // ownerConvertApprovedAt for the two-approval Convert-to-Client card.
   // That card is gone (2026-08-28) and so is the query.
-  const quotations = lead.convertedClientId
-    ? await listQuotationsForClient(ctx, lead.convertedClientId)
-    : await listLeadScopedQuotations(ctx, id);
+  const quotations = !canQuotations
+    ? []
+    : lead.convertedClientId
+      ? await listQuotationsForClient(ctx, lead.convertedClientId)
+      : await listLeadScopedQuotations(ctx, id);
   // Every still-sendable quote needs a live share token before render —
   // the lead page's inline Send builds the client's link from it.
   if (!lead.convertedClientId) await ensureShareTokensForSending(ctx, quotations);

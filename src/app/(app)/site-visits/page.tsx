@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { Eye } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
+import { can } from "@/kernel/rbac/guard";
 import { listSiteVisits } from "@/modules/site-visits/queries";
 import { listProjectsForSelect } from "@/modules/projects/queries";
 import { formatDate } from "@/kernel/datetime";
@@ -31,7 +32,7 @@ export default async function SiteVisitsPage() {
   const ctx = await devContext();
   const [visits, projects] = await Promise.all([
     listSiteVisits(ctx, { limit: 100 }),
-    listProjectsForSelect(ctx),
+    can(ctx, "project.view") ? listProjectsForSelect(ctx) : Promise.resolve([]),
   ]);
 
   const th  = "px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim";

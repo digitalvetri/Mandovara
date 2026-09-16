@@ -49,7 +49,9 @@ export default async function ClientDetailPage({
   const canViewMeasurement = ctx.permissions.has("measurement.view");
 
   const [quotations, measurementRounds, attachments] = await Promise.all([
-    listQuotationsForClient(ctx, client.id),
+    ctx.permissions.has("quotation.view")
+      ? listQuotationsForClient(ctx, client.id)
+      : Promise.resolve([]),
     canViewMeasurement
       ? listRoundsForClient(ctx, client.id, 10).catch((): ClientRoundRow[] => [])
       : Promise.resolve<ClientRoundRow[]>([]),

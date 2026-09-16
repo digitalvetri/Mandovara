@@ -43,9 +43,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       // the operator happens to be looking at.
       getComparatives(ctx),
       leadsBySource(ctx),
-      invoiceAgeing(ctx),
+      // Separate report permissions — a Sales role holds report.view.sales
+      // only, and must still get the rest of the page.
+      can(ctx, "report.view.accounts") ? invoiceAgeing(ctx) : Promise.resolve([]),
       topClientsByRevenue(ctx, 10),
-      projectMarginTop(ctx, 10),
+      can(ctx, "report.view.projects") ? projectMarginTop(ctx, 10) : Promise.resolve([]),
     ]);
 
   const totalLeads      = leads.reduce((s, r) => s + r.total, 0);

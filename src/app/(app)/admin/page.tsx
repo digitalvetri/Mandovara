@@ -16,7 +16,9 @@ export default async function AdminPage() {
   const ctx = await devContext();
   const [a, employees, retentionDays, rls] = await Promise.all([
     loadAdmin(ctx),
-    listEmployees(ctx, { includeTerminated: true }),
+    ctx.permissions.has("employee.view")
+      ? listEmployees(ctx, { includeTerminated: true })
+      : Promise.resolve({ rows: [], activeCount: 0, totalCount: 0 }),
     getAuditRetentionDays(),
     getRlsStatus(),
   ]);

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { RequestContext } from "@/kernel/auth/context";
-import { can, ForbiddenError, requirePermission } from "@/kernel/rbac/guard";
+import { can, FORBIDDEN_DIGEST_PREFIX, ForbiddenError, requirePermission } from "@/kernel/rbac/guard";
 import { ALL_PERMISSION_KEYS } from "@/kernel/rbac/permissions";
 
 function makeCtx(perms: string[]): RequestContext {
@@ -35,6 +35,13 @@ describe("requirePermission", () => {
       expect(err.status).toBe(403);
       expect(err.message).toContain("payroll.run");
     }
+  });
+
+  it("carries a digest so production error boundaries can still recognise a 403", () => {
+    // Next strips message + name from Server Component errors in production
+    // but keeps a pre-set digest — error.tsx keys the Access denied screen off it.
+    const err = new ForbiddenError("lead.view");
+    expect(err.digest).toBe(`${FORBIDDEN_DIGEST_PREFIX}lead.view`);
   });
 
   it("can() is non-throwing and mirrors the guard", () => {

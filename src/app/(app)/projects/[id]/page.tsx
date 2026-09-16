@@ -63,7 +63,9 @@ export default async function ProjectDetailPage({
     await Promise.all([
       getProjectMeasurements(ctx, id),
       getProjectMoney(ctx, id),
-      listSiteVisits(ctx, { projectId: id, limit: 10 }),
+      ctx.permissions.has("sitelog.view")
+        ? listSiteVisits(ctx, { projectId: id, limit: 10 })
+        : Promise.resolve([]),
       getProjectPayments(ctx, id),
       getProjectLedger(ctx, id),
       listAttachments(ctx, "PROJECT", id),

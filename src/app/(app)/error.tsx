@@ -1,23 +1,53 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
+import { FORBIDDEN_DIGEST_PREFIX } from "@/kernel/rbac/guard";
 
 interface Props {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
+// Most crashes seen in production are transient: while the container
+// restarts (deploy, crash recovery) the proxy answers 502, a JS chunk or
+// the Server Component payload fails to load, and this boundary renders.
+// A full reload a few seconds later succeeds. So reload once, automatically.
+// The timestamp in sessionStorage stops a real, repeatable bug from
+// looping — the second failure inside the window stays on this screen.
+const AUTO_RELOAD_KEY = "mandovara:error-auto-reload";
+const AUTO_RELOAD_DELAY_MS = 3000;
+const AUTO_RELOAD_WINDOW_MS = 60_000;
+
+function claimAutoReload(): boolean {
+  try {
+    // Per page, so a blip on one page doesn't disable recovery on the next.
+    const key = `${AUTO_RELOAD_KEY}:${window.location.pathname}`;
+    const last = Number(sessionStorage.getItem(key) ?? 0);
+    if (Date.now() - last < AUTO_RELOAD_WINDOW_MS) return false;
+    sessionStorage.setItem(key, String(Date.now()));
+    return true;
+  } catch {
+    return false; // storage blocked — never risk a reload loop
+  }
+}
+
 export default function AppError({ error, reset }: Props) {
+  const isForbidden =
+    error.digest?.startsWith(FORBIDDEN_DIGEST_PREFIX) ||
+    error.name === "ForbiddenError" || error.message.includes("Missing permission");
+  const [reloading, setReloading] = useState(false);
+
   useEffect(() => {
     // Only log unexpected errors — not permission denials
-    if (!error.name.includes("ForbiddenError")) {
-      console.error("[AppError boundary]", error);
-    }
-  }, [error]);
-
-  const isForbidden = error.name === "ForbiddenError" || error.message.includes("Missing permission");
+    if (isForbidden) return;
+    console.error("[AppError boundary]", error);
+    if (!claimAutoReload()) return;
+    setReloading(true);
+    const t = setTimeout(() => window.location.reload(), AUTO_RELOAD_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [error, isForbidden]);
 
   if (isForbidden) {
     return (
@@ -48,13 +78,17 @@ export default function AppError({ error, reset }: Props) {
       <div className="space-y-1">
         <p className="text-[16px] font-medium text-text">Something went wrong</p>
         <p className="text-[13px] text-text-dim max-w-xs">
-          An unexpected error occurred. Try refreshing, or go back to the dashboard.
+          {reloading
+            ? "Reconnecting — this page will reload in a moment."
+            : "An unexpected error occurred. Try refreshing, or go back to the dashboard."}
         </p>
       </div>
       <div className="flex gap-3">
         <button
           type="button"
-          onClick={reset}
+          // A full reload, not just reset(): reset() re-renders with the
+          // same failed chunk / payload and usually fails again.
+          onClick={() => { reset(); window.location.reload(); }}
           className="h-9 px-4 rounded-[8px] text-[13px] font-medium bg-accent text-ink hover:bg-accent-strong transition-colors"
         >
           Try again

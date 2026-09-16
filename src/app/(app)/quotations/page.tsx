@@ -43,7 +43,7 @@ export default async function QuotationsPage({
       dateTo,
       page,
     }),
-    projectId ? getProject(ctx, projectId) : null,
+    projectId && ctx.permissions.has("project.view") ? getProject(ctx, projectId) : null,
   ]);
 
   const newQuotationHref = projectId

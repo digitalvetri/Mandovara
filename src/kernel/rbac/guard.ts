@@ -5,9 +5,16 @@
 import type { RequestContext } from "@/kernel/auth/context";
 import type { PermissionKey } from "./permissions";
 
+export const FORBIDDEN_DIGEST_PREFIX = "MANDOVARA_FORBIDDEN:";
+
 export class ForbiddenError extends Error {
   readonly status = 403 as const;
   readonly permission: PermissionKey;
+  /** Production builds strip a Server Component error down to its digest
+   *  before it reaches the error boundary — name and message are gone.
+   *  Next keeps a digest the error already carries, so this is how
+   *  error.tsx still tells "access denied" apart from a real crash. */
+  readonly digest: string;
 
   constructor(permission: PermissionKey, message?: string) {
     super(
@@ -16,6 +23,7 @@ export class ForbiddenError extends Error {
     );
     this.name = "ForbiddenError";
     this.permission = permission;
+    this.digest = `${FORBIDDEN_DIGEST_PREFIX}${permission}`;
   }
 }
 

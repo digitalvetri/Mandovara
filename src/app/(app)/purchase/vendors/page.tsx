@@ -22,7 +22,9 @@ export default async function VendorsPage({
   const page = parsePositiveInt(params.page) ?? 1;
   // Balances alongside the list so "who do I pay next" is answerable
   // without opening every vendor in turn (2026-08-27, owner instruction).
-  const payables = await getVendorPayables(ctx);
+  const payables = can(ctx, "po.view")
+    ? await getVendorPayables(ctx)
+    : { totalPayable: 0n, totalAdvances: 0n, vendorCount: 0, committed: 0n, rows: [] };
   const payableBy = new Map(payables.rows.map((r) => [r.vendorId, r] as const));
 
   const { rows, total, pageSize } = await listVendors(ctx, {
