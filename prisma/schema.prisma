@@ -65,6 +65,8 @@ enum SellUnit {
   SET
   BOX
   RUNNING_FT
+  KG
+  PART
 }
 
 enum PatternMatch {

@@ -14,7 +14,7 @@ export const IRN_STATUSES = [
 export type IrnStatus = (typeof IRN_STATUSES)[number];
 
 export const SELL_UNITS = [
-  "METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT",
+  "METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT", "KG", "PART",
 ] as const;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Must be YYYY-MM-DD");

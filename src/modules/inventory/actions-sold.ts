@@ -35,7 +35,7 @@ import {
 import { computeReservations } from "@/modules/stock/reservations";
 import { devContext } from "@/lib/dev-context";
 import { saleCeiling } from "./sold-availability";
-import { recordStockSaleSchema } from "./schema-sold";
+import { fieldErrorsOf, recordStockSaleSchema } from "./schema-sold";
 import type { ActionResult } from "./actions";
 
 export async function recordStockSale(
@@ -205,17 +205,4 @@ export async function recordStockSale(
 function buildRef(soldTo?: string, note?: string): string {
   const parts = [soldTo?.trim(), note?.trim()].filter(Boolean);
   return parts.length > 0 ? parts.join(" — ").slice(0, 300) : "counter-sale";
-}
-
-function fieldErrorsOf(
-  issues: readonly { path: PropertyKey[]; message: string }[],
-): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const iss of issues) {
-    const p = iss.path
-      .filter((s): s is string | number => typeof s === "string" || typeof s === "number")
-      .join(".");
-    if (!out[p]) out[p] = iss.message;
-  }
-  return out;
 }

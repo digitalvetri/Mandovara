@@ -81,3 +81,23 @@ export function saleCeiling(
     blockedByCommitment: reserved > 0 && available.equals(skuUncommitted),
   };
 }
+
+/**
+ * The ceiling for CORRECTING a sale already recorded.
+ *
+ * The sale being edited has already come off the shelf, so the stock it
+ * took is not "gone" as far as the correction is concerned — it goes
+ * back on the lot it came from before the new quantity is measured
+ * against the two ceilings. Without that credit, a sale that took the
+ * last 5m on a lot could not be re-saved at 5m — the shelf reads zero.
+ *
+ * @param originalQty what the sale being edited recorded.
+ */
+export function editSaleCeiling(
+  balances:    readonly LotBalance[],
+  dyeLot:      string | null,
+  reserved:    number,
+  originalQty: Decimal | string | number,
+): SaleCeiling {
+  return saleCeiling([...balances, { dyeLot, quantity: originalQty }], dyeLot, reserved);
+}

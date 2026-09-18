@@ -12,6 +12,7 @@ import type { Route } from "next";
 import { Plus, Loader2 } from "lucide-react";
 import { formatINR, parseINR } from "@/kernel/money/format";
 import { createQuickQuote } from "@/modules/quotations/quick-actions";
+import { moveItem } from "@/lib/move-item";
 import { LineRow } from "./LineRow";
 import { type LineDraft, emptyLine, runningTotals } from "./line-utils";
 
@@ -55,6 +56,16 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
   }
   function addLine(): void { setLines((prev) => [...prev, emptyLine()]); }
   function removeLine(i: number): void { setLines((prev) => prev.filter((_, idx) => idx !== i)); }
+  // Line order here is the order on the quotation — createQuickQuote
+  // numbers lines from the array it is sent.
+  function moveLine(from: number, to: number): void { setLines((prev) => moveItem(prev, from, to)); }
+
+  // Drag-to-reorder. A card is only draggable while its grip is held, so
+  // selecting text inside its inputs still works.
+  const [armed, setArmed]       = useState<number | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  function endDrag(): void { setArmed(null); setDragFrom(null); setDragOver(null); }
 
   function generate(): void {
     setError(null);
@@ -70,7 +81,7 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
           label:       l.label.trim(),
           quantity:    parseFloat(l.quantity) || 1,
           gstRate:     l.gstRate ?? 18,
-          unit:        (l.sellUnit ?? "METRE") as "METRE"|"ROLL"|"SQFT"|"SQM"|"PIECE"|"SET"|"BOX"|"RUNNING_FT",
+          unit:        (l.sellUnit ?? "METRE") as "METRE"|"ROLL"|"SQFT"|"SQM"|"PIECE"|"SET"|"BOX"|"RUNNING_FT"|"KG"|"PART",
           ratePaise:   parseINR(l.rateEditable ?? "0").toString(),
           discountPct: parseFloat(l.discountPct) || 0,
         })),
@@ -136,14 +147,46 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
         )}
 
         <div className="space-y-2">
-          {lines.map((l, i) => (
-            <LineRow
-              key={l.key}
-              line={l}
-              onChange={(next) => patch(i, next)}
-              {...(lines.length > 1 ? { onRemove: () => removeLine(i) } : {})}
-            />
-          ))}
+          {lines.length > 1 && (
+            <div className="text-[11px] text-text-dim px-1">
+              Drag a line by its handle, or use the arrows, to change the order.
+            </div>
+          )}
+          {lines.map((l, i) => {
+            const showDrop = dragFrom !== null && dragOver === i && dragFrom !== i;
+            return (
+              <div
+                key={l.key}
+                draggable={armed === i}
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", String(i));
+                  setDragFrom(i);
+                }}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver(i); }}
+                onDrop={(e) => { e.preventDefault(); if (dragFrom !== null) moveLine(dragFrom, i); endDrag(); }}
+                onDragEnd={endDrag}
+                onPointerUp={() => setArmed(null)}
+                className={`rounded-[10px] transition-shadow ${
+                  showDrop ? (dragFrom! < i ? "shadow-[0_3px_0_0_var(--color-accent)]" : "shadow-[0_-3px_0_0_var(--color-accent)]") : ""
+                } ${dragFrom === i ? "opacity-50" : ""}`}
+              >
+                <LineRow
+                  line={l}
+                  onChange={(next) => patch(i, next)}
+                  {...(lines.length > 1 ? {
+                    onRemove: () => removeLine(i),
+                    reorder: {
+                      position:   i + 1,
+                      onGripDown: () => setArmed(i),
+                      ...(i > 0                ? { onMoveUp:   () => moveLine(i, i - 1) } : {}),
+                      ...(i < lines.length - 1 ? { onMoveDown: () => moveLine(i, i + 1) } : {}),
+                    },
+                  } : {})}
+                />
+              </div>
+            );
+          })}
           <button
             type="button"
             onClick={addLine}

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createPurchaseRequest } from "@/modules/purchase-requests/actions";
 
-const UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT"] as const;
+const UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT", "KG", "PART"] as const;
 
 export function NewRequestButton() {
   const [open, setOpen]       = useState(false);

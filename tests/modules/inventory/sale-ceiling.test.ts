@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "vitest";
 import { Decimal } from "@prisma/client/runtime/library";
-import { saleCeiling, type LotBalance } from "../../../src/modules/inventory/sold-availability";
+import { saleCeiling, editSaleCeiling, type LotBalance } from "../../../src/modules/inventory/sold-availability";
 
 const lots = (...rows: [string | null, string][]): LotBalance[] =>
   rows.map(([dyeLot, quantity]) => ({ dyeLot, quantity }));
@@ -116,5 +116,35 @@ describe("which sentence the operator is shown", () => {
 
   it("blames the commitment when that is what bound the number", () => {
     expect(saleCeiling(lots([null, "4"]), null, 1).blockedByCommitment).toBe(true);
+  });
+});
+
+// Correcting a sale already on the books: the quantity it took comes
+// back before the new figure is measured.
+describe("editing a recorded sale", () => {
+  it("lets a sale that emptied the shelf be kept at the same quantity", () => {
+    // 5m sold, 0m left. Re-saving 5m must not be refused.
+    const c = editSaleCeiling(lots([null, "0"]), null, 0, "5");
+    expect(n(c.available)).toBe("5");
+  });
+
+  it("allows raising the quantity only by what is actually spare", () => {
+    // 5m sold, 3m still on the shelf → at most 8m in total.
+    const c = editSaleCeiling(lots([null, "3"]), null, 0, "5");
+    expect(n(c.available)).toBe("8");
+  });
+
+  it("still respects live commitments when raising", () => {
+    // 5m sold, 10m left, 8m promised → 7m spare after the credit-back.
+    const c = editSaleCeiling(lots([null, "10"]), null, 8, "5");
+    expect(n(c.available)).toBe("7");
+    expect(c.blockedByCommitment).toBe(true);
+  });
+
+  it("credits the quantity back to the lot it came from, not another", () => {
+    // 4m sold off lot A (now 1m); lot B has 20m. Lot A tops out at 5m.
+    const c = editSaleCeiling(lots(["A", "1"], ["B", "20"]), "A", 0, "4");
+    expect(n(c.available)).toBe("5");
+    expect(n(c.onHand)).toBe("5");
   });
 });

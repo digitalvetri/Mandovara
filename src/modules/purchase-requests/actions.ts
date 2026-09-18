@@ -13,7 +13,7 @@ export interface ActionResult<T = unknown> {
   ok: boolean; data?: T; error?: string; fieldErrors?: Record<string, string>;
 }
 
-const SELL_UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT"] as const;
+const SELL_UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT", "KG", "PART"] as const;
 
 const requestLineInput = z.object({
   colourwayId:  z.string().min(1).optional(),

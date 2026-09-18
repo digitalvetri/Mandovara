@@ -35,6 +35,8 @@ export const SellUnitEnum = z.enum([
   "SET",
   "BOX",
   "RUNNING_FT",
+  "KG",
+  "PART",
 ]);
 
 export const BrandSchema = z.object({

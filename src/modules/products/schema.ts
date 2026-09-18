@@ -47,7 +47,7 @@ export const FAMILY_OPTIONS: ReadonlyArray<{ value: ProductFamilyKey; label: str
 
 // Mirrors the Prisma SellUnit enum.
 export const SELL_UNITS = [
-  "METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT",
+  "METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT", "KG", "PART",
 ] as const;
 export type SellUnitKey = (typeof SELL_UNITS)[number];
 
@@ -60,6 +60,8 @@ export const SELL_UNIT_OPTIONS: ReadonlyArray<{ value: SellUnitKey; label: strin
   { value: "SET",        label: "Set" },
   { value: "BOX",        label: "Box" },
   { value: "RUNNING_FT", label: "Running Foot" },
+  { value: "KG",         label: "Kilogram" },
+  { value: "PART",       label: "Part" },
 ];
 
 // GST slabs shown in the picker. Server accepts any 0–28% for exotic HSNs.

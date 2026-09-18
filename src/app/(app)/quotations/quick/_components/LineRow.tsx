@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import { type LineDraft, lineAmount } from "./line-utils";
 
@@ -8,7 +8,18 @@ interface LineRowProps {
   line:      LineDraft;
   onChange:  (next: Partial<LineDraft>) => void;
   onRemove?: () => void;
+  /** Reorder controls — shown once there is more than one line. */
+  reorder?: {
+    position:    number;          // 1-based, as printed on the quotation
+    onMoveUp?:   () => void;      // absent on the first line
+    onMoveDown?: () => void;      // absent on the last line
+    /** Hold to make the card draggable (see QuickQuoteBuilder). */
+    onGripDown:  () => void;
+  };
 }
+
+const MOVE_BTN =
+  "h-[36px] w-[30px] grid place-items-center rounded-[6px] text-text-dim hover:text-text hover:bg-ink/10 disabled:opacity-25 disabled:hover:bg-transparent";
 
 const GST_RATES = [0, 5, 12, 18, 28] as const;
 
@@ -25,13 +36,28 @@ const UNITS: { value: string; label: string }[] = [
   { value: "BOX",         label: "BOX" },
   { value: "SQFT",        label: "SQFT" },
   { value: "SQM",         label: "SQM" },
+  { value: "KG",          label: "KG (Kilograms)" },
+  { value: "PART",        label: "PART" },
 ];
 
-export function LineRow({ line, onChange, onRemove }: LineRowProps) {
+export function LineRow({ line, onChange, onRemove, reorder }: LineRowProps) {
   return (
     <div className="rounded-[10px] border border-rule bg-surface overflow-hidden">
       <div className="p-3">
         <div className="flex items-start gap-2 mb-2">
+          {reorder && (
+            <div className="mt-5 flex items-center shrink-0">
+              <span
+                className="h-[36px] w-[22px] grid place-items-center cursor-grab active:cursor-grabbing text-text-dim hover:text-text"
+                title="Drag to reorder"
+                aria-hidden
+                onPointerDown={reorder.onGripDown}
+              >
+                <GripVertical size={14} />
+              </span>
+              <span className="w-5 text-center text-[12px] tabular text-text-dim">{reorder.position}</span>
+            </div>
+          )}
           <Input
             label="Item"
             value={line.label}
@@ -39,6 +65,30 @@ export function LineRow({ line, onChange, onRemove }: LineRowProps) {
             placeholder="e.g. MBR Main, Track, Stitching charge"
             className="flex-1"
           />
+          {reorder && (
+            <div className="mt-5 flex items-center shrink-0">
+              <button
+                type="button"
+                className={MOVE_BTN}
+                disabled={!reorder.onMoveUp}
+                onClick={reorder.onMoveUp}
+                aria-label={`Move line ${reorder.position} up`}
+                title="Move up"
+              >
+                <ChevronUp size={15} />
+              </button>
+              <button
+                type="button"
+                className={MOVE_BTN}
+                disabled={!reorder.onMoveDown}
+                onClick={reorder.onMoveDown}
+                aria-label={`Move line ${reorder.position} down`}
+                title="Move down"
+              >
+                <ChevronDown size={15} />
+              </button>
+            </div>
+          )}
           {onRemove && (
             <button
               type="button"

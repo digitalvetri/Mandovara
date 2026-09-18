@@ -247,7 +247,7 @@ function formatQty(q: string): string {
 function unitLabel(u: string): string {
   const map: Record<string, string> = {
     METRE: "m", ROLL: "rl", SQFT: "sqft", SQM: "sqm",
-    PIECE: "pc", SET: "set", BOX: "bx", RUNNING_FT: "rft",
+    PIECE: "pc", SET: "set", BOX: "bx", RUNNING_FT: "rft", KG: "kg", PART: "part",
   };
   return map[u] ?? u.toLowerCase();
 }

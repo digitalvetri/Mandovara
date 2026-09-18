@@ -192,6 +192,8 @@ export function shortUom(uom: string): string {
     case "PIECE":       return "pc";
     case "SET":         return "set";
     case "RUNNING_FT":  return "rft";
+    case "KG":          return "kg";
+    case "PART":        return "part";
     default:            return uom.toLowerCase();
   }
 }

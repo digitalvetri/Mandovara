@@ -10,7 +10,7 @@ interface Props {
 
 const UNIT_SHORT: Record<string, string> = {
   METRE: "m", ROLL: "roll", SQFT: "sqft", SQM: "sqm",
-  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft",
+  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft", KG: "kg", PART: "part",
 };
 
 export function SendOnWhatsAppButton({ po }: Props) {

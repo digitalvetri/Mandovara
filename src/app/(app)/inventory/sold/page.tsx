@@ -10,7 +10,7 @@
 //   ├ tab row (Stock · Purchasing · Sold out · Pending)
 //   ├ three totals for what is listed below
 //   ├ "Record a sale" form   (inventory.adjust only)
-//   └ recent sales, newest first
+//   └ recent sales, newest first — each with an edit pencil (inventory.adjust only)
 
 import { notFound } from "next/navigation";
 import { PackageMinus } from "lucide-react";
@@ -24,6 +24,7 @@ import {
 } from "@/modules/inventory/queries-sold";
 import { InventoryTabs } from "../_components/InventoryTabs";
 import { SellStockForm } from "./_components/SellStockForm";
+import { EditSaleButton } from "./_components/EditSaleButton";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,12 @@ export default async function SoldOutPage() {
     countPendingStock(ctx),
   ]);
   const totals = summariseSoldOut(rows);
+
+  // Edit column only for someone who can change stock — updateStockSale
+  // enforces inventory.adjust server-side as well.
+  const cols = canSell
+    ? "md:grid-cols-[minmax(0,2fr)_90px_100px_110px_minmax(0,1fr)_36px]"
+    : "md:grid-cols-[minmax(0,2fr)_90px_100px_110px_minmax(0,1fr)]";
 
   return (
     <>
@@ -92,19 +99,20 @@ export default async function SoldOutPage() {
           <>
             {/* Header row, desktop only — the phone layout stacks each
                 sale into its own block instead. */}
-            <div className="hidden grid-cols-[minmax(0,2fr)_90px_100px_110px_minmax(0,1fr)] items-center gap-3 border-b border-rule px-5 py-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-text-dim md:grid">
+            <div className={`hidden ${cols} items-center gap-3 border-b border-rule px-5 py-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-text-dim md:grid`}>
               <span>Item</span>
               <span className="text-right">Sold</span>
               <span className="text-right">Rate</span>
               <span className="text-right">Value</span>
               <span>Sold to · date</span>
+              {canSell && <span className="sr-only">Edit</span>}
             </div>
 
             <ul className="divide-y divide-rule">
               {rows.map((r) => (
                 <li
                   key={r.id}
-                  className="grid grid-cols-1 gap-1.5 px-5 py-3.5 md:grid-cols-[minmax(0,2fr)_90px_100px_110px_minmax(0,1fr)] md:items-center md:gap-3"
+                  className={`relative grid grid-cols-1 gap-1.5 px-5 py-3.5 ${cols} md:items-center md:gap-3 ${canSell ? "pr-14 md:pr-5" : ""}`}
                 >
                   <div className="min-w-0">
                     <div className="truncate text-[13px] text-text">{r.label}</div>
@@ -136,6 +144,25 @@ export default async function SoldOutPage() {
                     <span className="mx-1.5 opacity-40">·</span>
                     <span className="tabular-nums">{formatDate(r.occurredAt)}</span>
                   </div>
+
+                  {canSell && (
+                    // Phone: pinned top-right of the stacked block. Desktop: its own column.
+                    <div className="absolute right-3 top-2.5 md:static md:justify-self-end">
+                      <EditSaleButton
+                        sale={{
+                          id:        r.id,
+                          label:     r.label,
+                          code:      r.code,
+                          dyeLot:    r.dyeLot,
+                          quantity:  r.quantity,
+                          sellUnit:  r.sellUnit,
+                          ratePaise: r.ratePaise.toString(),
+                          soldTo:    r.soldTo,
+                          soldOn:    r.occurredAt.toISOString().slice(0, 10),
+                        }}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

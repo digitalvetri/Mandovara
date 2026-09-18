@@ -6,7 +6,7 @@ export const QUOTATION_STATUSES = [
 export type QuotationStatus = (typeof QUOTATION_STATUSES)[number];
 
 export const SELL_UNITS = [
-  "METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT",
+  "METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT", "KG", "PART",
 ] as const;
 export type SellUnit = (typeof SELL_UNITS)[number];
 

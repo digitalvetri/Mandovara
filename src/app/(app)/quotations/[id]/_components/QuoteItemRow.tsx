@@ -1,6 +1,7 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, GripVertical, Trash2 } from "lucide-react";
 import type { EditLine } from "./QuotePreviewA4";
 import { SELL_UNITS, UNIT_SHORT, INPUT, INPUT_SM, INPUT_NUM, GST_SLABS, fmtRupee, lineAmt } from "./workspace-helpers";
 
@@ -10,21 +11,95 @@ interface Props {
   showDiscCol: boolean;
   hasColourway: boolean;
   index: number;
+  count: number;
   onUpdate: (key: string, patch: Partial<EditLine>) => void;
   onRemove: (key: string) => void;
+  onMove: (from: number, to: number) => void;
+  /** Where the dragged row would land relative to this one, if anywhere. */
+  dropTarget: "above" | "below" | null;
+  onDragStartRow: (index: number) => void;
+  onDragOverRow: (index: number) => void;
+  onDropRow: (index: number) => void;
+  onDragEndRow: () => void;
 }
 
+const MOVE_BTN =
+  "h-5 w-5 grid place-items-center rounded-[4px] text-text-dim hover:text-accent hover:bg-accent/10 disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-text-dim";
+
 export function QuoteItemRow({
-  line: l, isDraft, showDiscCol, hasColourway, index, onUpdate, onRemove,
+  line: l, isDraft, showDiscCol, hasColourway, index, count, onUpdate, onRemove,
+  onMove, dropTarget, onDragStartRow, onDragOverRow, onDropRow, onDragEndRow,
 }: Props) {
   const { amount } = lineAmt(l);
+  // The row is only draggable while the grip is held. A permanently
+  // draggable <tr> would swallow text selection inside its inputs.
+  const [armed, setArmed] = useState(false);
+
+  const dropLine =
+    dropTarget === "above" ? "shadow-[inset_0_2px_0_0_var(--color-accent)]" :
+    dropTarget === "below" ? "shadow-[inset_0_-2px_0_0_var(--color-accent)]" : "";
 
   return (
-    <tr className="border-b border-rule/40 group hover:bg-ink/10 transition-colors">
+    <tr
+      className={`border-b border-rule/40 group hover:bg-ink/10 transition-colors ${dropLine}`}
+      draggable={isDraft && armed}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        // Firefox will not start a drag without some payload.
+        e.dataTransfer.setData("text/plain", String(index));
+        onDragStartRow(index);
+      }}
+      onDragOver={(e) => {
+        if (!isDraft) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        onDragOverRow(index);
+      }}
+      onDrop={(e) => { e.preventDefault(); onDropRow(index); }}
+      onDragEnd={() => { setArmed(false); onDragEndRow(); }}
+      onPointerUp={() => setArmed(false)}
+    >
 
-      {/* # */}
+      {/* # — in a draft, also the reorder handle */}
       <td className="py-3 px-4 align-top">
-        <span className="tabular text-text-dim text-[12px]">{index + 1}</span>
+        {isDraft ? (
+          <div className="flex items-center gap-1">
+            <span
+              className="cursor-grab active:cursor-grabbing text-text-dim hover:text-text -ml-1.5"
+              title="Drag to reorder"
+              aria-hidden
+              onPointerDown={() => setArmed(true)}
+              onPointerUp={() => setArmed(false)}
+            >
+              <GripVertical size={14} />
+            </span>
+            <span className="tabular text-text-dim text-[12px] w-4 text-center">{index + 1}</span>
+            <div className="flex flex-col">
+              <button
+                type="button"
+                className={MOVE_BTN}
+                disabled={index === 0}
+                onClick={() => onMove(index, index - 1)}
+                aria-label={`Move item ${index + 1} up`}
+                title="Move up"
+              >
+                <ChevronUp size={13} strokeWidth={2.2} />
+              </button>
+              <button
+                type="button"
+                className={MOVE_BTN}
+                disabled={index === count - 1}
+                onClick={() => onMove(index, index + 1)}
+                aria-label={`Move item ${index + 1} down`}
+                title="Move down"
+              >
+                <ChevronDown size={13} strokeWidth={2.2} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <span className="tabular text-text-dim text-[12px]">{index + 1}</span>
+        )}
       </td>
 
       {/* Item & Room */}

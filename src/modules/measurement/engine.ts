@@ -27,7 +27,7 @@ export type EngineItemInput =
 export interface CalcResultRow {
   engineVersion:    string;
   materialQty:      number;
-  materialUnit:     "METRE" | "ROLL" | "SQFT" | "SQM" | "PIECE" | "SET" | "BOX" | "RUNNING_FT";
+  materialUnit:     "METRE" | "ROLL" | "SQFT" | "SQM" | "PIECE" | "SET" | "BOX" | "RUNNING_FT" | "KG" | "PART";
   widthsRequired?:  number;
   cutLengthMm?:     number;
   rollsRequired?:   number;

@@ -2,7 +2,7 @@ import type { SerializedInvoice } from "./InvoicePDFPreviewButton";
 
 const UNIT_SHORT: Record<string, string> = {
   METRE: "m", ROLL: "roll", SQFT: "sqft", SQM: "sqm",
-  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft",
+  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft", KG: "kg", PART: "part",
 };
 
 function e(s: string): string {

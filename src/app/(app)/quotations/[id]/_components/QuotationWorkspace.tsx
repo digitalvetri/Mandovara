@@ -7,6 +7,7 @@ import { updateQuotationLines } from "@/modules/quotations/actions-status";
 import { EditBudgetBar } from "./EditBudgetBar";
 import type { EditLine } from "./QuotePreviewA4";
 import type { SerializedQuotation } from "../_types";
+import { moveItem } from "@/lib/move-item";
 import { SELL_UNITS, newKey, computeTotals, initLines } from "./workspace-helpers";
 import { QuotationSummaryBar } from "./QuotationSummaryBar";
 import { QuoteItemRow } from "./QuoteItemRow";
@@ -24,6 +25,10 @@ export function QuotationWorkspace({
   const [saving, startSave] = useTransition();
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saved, setSaved]     = useState(false);
+  // Row being dragged, and the row it is currently over — drives the
+  // drop indicator. Both null when no drag is in progress.
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   // colourwayId lookup for swatch strip — stripped from EditLine by initLines
   const colourwayMap = useMemo(() => {
@@ -53,6 +58,22 @@ export function QuotationWorkspace({
         rate: "0", gstRate: "18", discountPct: "0", isOptional: false },
     ]);
     setSaved(false);
+  }
+
+  // Reorder. Line order is the order on the quotation: updateQuotationLines
+  // numbers lines from the array it is sent, so moving here and pressing
+  // Save is all it takes to change the PDF.
+  function moveLine(from: number, to: number) {
+    setLines((p) => {
+      const next = moveItem(p, from, to);
+      if (next !== p) setSaved(false);
+      return next;
+    });
+  }
+
+  function endDrag() {
+    setDragFrom(null);
+    setDragOver(null);
   }
 
   function removeLine(key: string) {
@@ -110,6 +131,11 @@ export function QuotationWorkspace({
               {lines.length}
             </span>
           )}
+          {isDraft && lines.length > 1 && (
+            <span className="hidden sm:inline text-[11px] text-text-dim">
+              · Drag or use the arrows to change the order
+            </span>
+          )}
         </div>
         {isDraft && (
           <button
@@ -131,7 +157,7 @@ export function QuotationWorkspace({
         >
           <thead>
             <tr className="text-[10px] uppercase tracking-[0.12em] text-text-dim bg-ink/20 border-b border-rule">
-              <th className="text-left py-2.5 px-4 w-[36px]">#</th>
+              <th className={`text-left py-2.5 px-4 ${isDraft ? "w-[76px]" : "w-[36px]"}`}>#</th>
               <th className="text-left py-2.5 px-3">Item</th>
               {isDraft && <>
                 <th className="text-right py-2.5 px-3 w-[90px]">Qty</th>
@@ -158,8 +184,17 @@ export function QuotationWorkspace({
                 showDiscCol={showDiscCol}
                 hasColourway={!!colourwayMap.get(l._key)}
                 index={idx}
+                count={lines.length}
                 onUpdate={update}
                 onRemove={removeLine}
+                onMove={moveLine}
+                dropTarget={dragFrom !== null && dragOver === idx && dragFrom !== idx
+                  ? (dragFrom < idx ? "below" : "above")
+                  : null}
+                onDragStartRow={setDragFrom}
+                onDragOverRow={setDragOver}
+                onDropRow={(to) => { if (dragFrom !== null) moveLine(dragFrom, to); endDrag(); }}
+                onDragEndRow={endDrag}
               />
             ))}
             {lines.length === 0 && (

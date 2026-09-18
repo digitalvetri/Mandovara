@@ -5,7 +5,7 @@ export const PO_STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "PA
 export type POStatus = (typeof PO_STATUSES)[number];
 
 // SellUnit enum values (subset used in POs)
-export const SELL_UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT"] as const;
+export const SELL_UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT", "KG", "PART"] as const;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/);
 

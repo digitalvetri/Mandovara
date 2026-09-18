@@ -31,3 +31,34 @@ export const recordStockSaleSchema = z.object({
 });
 
 export type RecordStockSaleInput = z.infer<typeof recordStockSaleSchema>;
+
+/**
+ * Correcting a sale already recorded. The item and the dye lot are
+ * fixed: a different item or lot is a different physical movement, and
+ * is a new sale, not an edit of this one.
+ */
+export const updateStockSaleSchema = z.object({
+  id:       idField,
+  quantity: z.number().positive("Enter how many were sold"),
+  rate:     z.string().trim().max(20).optional().or(z.literal("")),
+  /** Buyer and note as one line — that is how the ledger row stores them
+   *  (StockMove.refId), so the edit shows them the same way. */
+  soldTo:   z.string().trim().max(300).optional().or(z.literal("")),
+  soldOn:   z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Must be YYYY-MM-DD"),
+});
+
+export type UpdateStockSaleInput = z.infer<typeof updateStockSaleSchema>;
+
+/** Zod issues → { "field.path": first message }, for the forms. */
+export function fieldErrorsOf(
+  issues: readonly { path: PropertyKey[]; message: string }[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const iss of issues) {
+    const p = iss.path
+      .filter((s): s is string | number => typeof s === "string" || typeof s === "number")
+      .join(".");
+    if (!out[p]) out[p] = iss.message;
+  }
+  return out;
+}

@@ -22,7 +22,7 @@ export default async function NewPOPage({
   ]);
 
   // Pre-populate lines from an approved purchase request
-  type SellUnit = "METRE" | "ROLL" | "SQFT" | "SQM" | "PIECE" | "SET" | "BOX" | "RUNNING_FT";
+  type SellUnit = "METRE" | "ROLL" | "SQFT" | "SQM" | "PIECE" | "SET" | "BOX" | "RUNNING_FT" | "KG" | "PART";
   let initialLines: {
     colourwayId: string; freeTextItem: string; mode: "catalogue" | "typed";
     unit: SellUnit; quantity: string; rate: string; gstRate: string;

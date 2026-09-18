@@ -1,9 +1,9 @@
 "use client";
 
-export const SELL_UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT"] as const;
+export const SELL_UNITS = ["METRE", "ROLL", "SQFT", "SQM", "PIECE", "SET", "BOX", "RUNNING_FT", "KG", "PART"] as const;
 export const UNIT_SHORT: Record<string, string> = {
   METRE: "m", ROLL: "roll", SQFT: "sqft", SQM: "sqm",
-  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft",
+  PIECE: "pc", SET: "set", BOX: "box", RUNNING_FT: "rft", KG: "kg", PART: "part",
 };
 
 let _keyN = 0;

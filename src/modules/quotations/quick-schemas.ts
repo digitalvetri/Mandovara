@@ -24,7 +24,7 @@ export const quickLineSchema = z.object({
   quantity:    z.number().positive().max(999),
   colourwayId: idField.optional(),
   gstRate:     z.number().min(0).max(28).default(18),
-  unit:        z.enum(["METRE","ROLL","SQFT","SQM","PIECE","SET","BOX","RUNNING_FT"]).default("METRE"),
+  unit:        z.enum(["METRE","ROLL","SQFT","SQM","PIECE","SET","BOX","RUNNING_FT","KG","PART"]).default("METRE"),
   ratePaise:   z.string().min(1),
   discountPct: z.number().min(0).max(100).default(0),
   description: z.string().trim().max(240).optional(),
