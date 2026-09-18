@@ -266,6 +266,7 @@ export default async function ProjectDetailPage({
             clientId={p.clientId}
             branchId={p.branchId}
             canCreateInvoice={ctx.permissions.has("invoice.create")}
+            canDiscount={ctx.permissions.has("project.discount")}
             canUpdate={ctx.permissions.has("project.update")}
           />
 

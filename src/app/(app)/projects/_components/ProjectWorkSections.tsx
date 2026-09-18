@@ -30,6 +30,7 @@ import { PaymentsPanel } from "./PaymentsPanel";
 import { UpcomingVisitsCard } from "./UpcomingVisitsCard";
 import { RecordPaymentFromProject } from "./RecordPaymentFromProject";
 import { CreateInvoiceLink } from "./CreateInvoiceLink";
+import { SettlementDiscountButton } from "./SettlementDiscountButton";
 
 interface Props {
   projectId:        string;
@@ -41,6 +42,8 @@ interface Props {
   clientId:         string;
   branchId:         string;
   canCreateInvoice: boolean;
+  /** project.discount — the Owner, or whoever has been granted it. */
+  canDiscount?:     boolean;
   /** Accepted so the page needs no change; unread since the Installation
    *  section (its only consumer) left on 2026-08-30. */
   canUpdate?:       boolean;
@@ -48,7 +51,7 @@ interface Props {
 
 export function ProjectWorkSections({
   projectId, rounds, ledger, payments, visits, clientId, branchId,
-  canCreateInvoice,
+  canCreateInvoice, canDiscount = false,
 }: Props) {
   // Each section states where it stands without being opened. These
   // carry real numbers — never a placeholder like "view details".
@@ -109,6 +112,19 @@ export function ProjectWorkSections({
               )}
               {/* One control, always the same: write the invoice. An
                   order-backed one-click still exists on the order page. */}
+              {/* Settle for less: only before the job is billed — after that
+                  it is a credit note — and only while there is something
+                  left to let go, or a discount to take back. */}
+              {canDiscount && ledger.invoiced === 0n && ledger.quoted > 0n &&
+                (ledger.balance > 0n || ledger.discount > 0n) && (
+                <SettlementDiscountButton
+                  projectId={projectId}
+                  quoted={ledger.quoted.toString()}
+                  received={ledger.received.toString()}
+                  discount={ledger.discount.toString()}
+                  reason={ledger.discountReason}
+                />
+              )}
               {canCreateInvoice && <CreateInvoiceLink projectId={projectId} />}
             </div>
           }

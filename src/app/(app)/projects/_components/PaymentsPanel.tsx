@@ -73,6 +73,13 @@ export function PaymentsPanel({ payments }: Props) {
         />
       </div>
 
+      {payments.discount > 0n && (
+        <div className="mb-4 flex items-baseline justify-between gap-3 rounded-[10px] border border-gold/40 bg-gold/5 px-3 py-2 text-[11.5px]">
+          <span className="text-text-dim">Discount given to close the account</span>
+          <span className="tabular-nums text-gold">− {formatINR(payments.discount)}</span>
+        </div>
+      )}
+
       {payments.overdue > 0n && (
         <div className="mb-4 flex items-start gap-2 rounded-[10px] border border-fault/40 bg-fault/5 px-3 py-2 text-[11.5px] leading-relaxed text-fault">
           <AlertCircle size={13} className="mt-[2px] shrink-0" />

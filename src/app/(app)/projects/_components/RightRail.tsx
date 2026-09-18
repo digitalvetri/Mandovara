@@ -128,6 +128,9 @@ function MoneyCard({ money }: { money: ProjectMoney }) {
     <Card title="Money">
       <dl className="space-y-2 text-[12.5px]">
         <MoneyRow k="Quoted" v={formatINR(money.orderValue)} big />
+        {money.discount > 0n && (
+          <MoneyRow k="Discount given" v={<span className="text-gold">− {formatINR(money.discount)}</span>} />
+        )}
         <MoneyRow k="Received" v={
           <>
             {formatINR(money.receiptTotal)}

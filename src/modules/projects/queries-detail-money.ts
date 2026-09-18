@@ -20,7 +20,9 @@ export type ProjectMoney = {
   orderValue: bigint;
   advanceReceived: bigint;
   advanceRequired: bigint;
-  /** Still to collect on the agreement. */
+  /** Settlement discount given on the job — not money received. */
+  discount: bigint;
+  /** Still to collect on the agreement, after any settlement discount. */
   outstanding: bigint;
   invoiceTotal: bigint;
   receiptTotal: bigint;
@@ -66,6 +68,7 @@ export async function getProjectMoney(
     orderValue:      receivable?.agreedValue ?? 0n,
     advanceReceived: receivable?.received    ?? 0n,
     advanceRequired: order._sum.advanceRequired ?? 0n,
+    discount:        receivable?.discount ?? 0n,
     outstanding:     receivable?.due ?? 0n,
     invoiceTotal,
     receiptTotal:    receivable?.received ?? 0n,

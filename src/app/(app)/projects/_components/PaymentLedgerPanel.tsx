@@ -18,6 +18,7 @@ const KIND_TONE: Record<LedgerKind, string> = {
   ADVANCE:   "bg-good/12 text-good",
   INVOICE:   "bg-accent/12 text-accent",
   RECEIPT:   "bg-good/12 text-good",
+  DISCOUNT:  "bg-gold/12 text-gold",
 };
 
 const KIND_LABEL: Record<LedgerKind, string> = {
@@ -25,6 +26,7 @@ const KIND_LABEL: Record<LedgerKind, string> = {
   ADVANCE:   "Advance",
   INVOICE:   "Invoice",
   RECEIPT:   "Receipt",
+  DISCOUNT:  "Discount",
 };
 
 export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
@@ -42,10 +44,13 @@ export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
   return (
     <div className="space-y-4">
       {/* Totals — the four numbers, before the story that explains them. */}
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-rule bg-rule sm:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-rule bg-rule ${ledger.discount > 0n ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
         <Total k="Quoted"   v={formatINR(ledger.quoted)} />
         <Total k="Invoiced" v={formatINR(ledger.invoiced)} />
         <Total k="Received" v={formatINR(ledger.received)} tone="text-good" />
+        {ledger.discount > 0n && (
+          <Total k="Discount" v={formatINR(ledger.discount)} tone="text-gold" />
+        )}
         <Total
           k={owed >= 0n ? "Balance due" : "In credit"}
           v={formatINR(owed >= 0n ? owed : -owed)}
@@ -85,8 +90,10 @@ export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
                 <td className="tabular whitespace-nowrap px-3 py-2.5 text-right text-[12px] text-text">
                   {r.debit > 0n ? formatINR(r.debit) : "—"}
                 </td>
-                <td className="tabular whitespace-nowrap px-3 py-2.5 text-right text-[12px] text-good">
-                  {r.credit > 0n ? formatINR(r.credit) : "—"}
+                <td className={`tabular whitespace-nowrap px-3 py-2.5 text-right text-[12px] ${r.kind === "DISCOUNT" ? "text-gold" : "text-good"}`}>
+                  {r.credit > 0n
+                    ? (r.kind === "DISCOUNT" ? `${formatINR(r.credit)} off` : formatINR(r.credit))
+                    : "—"}
                 </td>
                 <td className="tabular whitespace-nowrap px-3 py-2.5 text-right text-[12px] font-medium text-text">
                   {formatINR(r.balance)}

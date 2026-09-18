@@ -137,7 +137,8 @@ export async function loadReceivables(
       clientMobile: client?.mobile ?? "",
       projectId:    r.projectId,
       projectName:  r.projectName,
-      total:        r.agreedValue,
+      // Net of any settlement discount, so total − paid = outstanding.
+      total:        r.agreedValue - r.discount,
       paid:         r.received,
       outstanding:  r.due,
       dueDate:      r.agreementDate,

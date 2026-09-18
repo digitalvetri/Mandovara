@@ -33,6 +33,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import { devContext } from "@/lib/dev-context";
 import { computeLineTax } from "@/kernel/tax/gst";
+import { spreadDiscount } from "@/kernel/money/settlement";
 import { createInvoice } from "./actions";
 import { checkProjectSettledForInvoice } from "./project-gate";
 import { sweepProjectReceiptsOntoInvoice } from "./sweep-receipts";
@@ -112,11 +113,21 @@ export async function createInvoiceFromQuotation(
   const billing = client?.billingAddress as Record<string, string> | null | undefined;
   const placeOfSupplyCode = billing?.["stateCode"] ?? supplierStateCode;
 
-  const lines = q.lines.map((l) => {
+  // A settlement discount agreed on the project before billing comes off
+  // the invoice, spread across the lines in proportion (GST-inclusive).
+  const project = q.projectId
+    ? await db.project.findUnique({ where: { id: q.projectId }, select: { settlementDiscount: true } })
+    : null;
+  const taxables = spreadDiscount(
+    q.lines.map((l) => ({ taxable: l.taxable, gstRate: parseFloat(l.gstRate.toString()) })),
+    project?.settlementDiscount ?? 0n,
+  );
+
+  const lines = q.lines.map((l, i) => {
     // QuotationLine.taxable is already net of its discount, which is the
     // figure the client agreed to. Recomputing from rate × qty here would
     // quietly bill more than the quotation said.
-    const taxable = l.taxable;
+    const taxable = taxables[i]!;
     const gstRate = parseFloat(l.gstRate.toString());
     const tax = computeLineTax({ taxable, gstRate, supplierStateCode, placeOfSupplyCode });
     return {

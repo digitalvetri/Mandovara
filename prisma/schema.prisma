@@ -925,6 +925,14 @@ model Project {
   expectedInstallAt DateTime?
   ownerId           String
   orderValue        BigInt       @default(0)
+  // Settlement discount — money the studio agreed to let go when the client
+  // closed the account for less than the quote (owner, 2026-09-18). Paise,
+  // GST-inclusive. Reduces what is owed (modules/projects/receivable.ts) and
+  // the tax invoice raised afterwards; never counted as money received.
+  settlementDiscount   BigInt    @default(0)
+  settlementReason     String?
+  settlementAt         DateTime?
+  settlementById       String?
   createdAt         DateTime     @default(now())
 
   client       Client                @relation(fields: [clientId], references: [id])

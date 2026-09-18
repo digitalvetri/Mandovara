@@ -40,8 +40,8 @@ export type ProjectPayments = {
   /** Still to collect against the agreed quotation. */
   outstanding:    bigint;
   overdue:        bigint;
-  /** What the client agreed to. */
-  agreedValue:    bigint;
+  /** What the client agreed to, and any settlement discount let go on it. */
+  agreedValue:    bigint; discount: bigint;
   orderValue:     bigint;
   latestOrderId:  string | null;
   invoices:       ProjectPaymentInvoice[];
@@ -124,7 +124,7 @@ export async function getProjectPayments(
     received,
     outstanding,
     overdue,
-    agreedValue:   receivable?.agreedValue ?? 0n,
+    agreedValue:   receivable?.agreedValue ?? 0n, discount: receivable?.discount ?? 0n,
     orderValue:    order?.totalValue ?? 0n,
     latestOrderId: order?.id ?? null,
     invoices:      rows,

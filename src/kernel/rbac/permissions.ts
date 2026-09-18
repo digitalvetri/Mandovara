@@ -41,7 +41,7 @@ export const PERMISSIONS = {
   serial:     ["view", "assign"],
 
   // ── Projects ───────────────────────────────────────────────
-  project:    ["view", "create", "update", "delete", "materialIssue", "milestoneBill", "handover"],
+  project:    ["view", "create", "update", "delete", "materialIssue", "milestoneBill", "handover", "discount"],
   sitelog:    ["view", "create"],
   // Site measurements + persisted CalcResult (§7, Phase 2 gate).
   //

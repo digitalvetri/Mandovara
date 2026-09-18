@@ -60,13 +60,15 @@ function money(n: number): string {
 function iso(d: Date): string { return d.toISOString().slice(0, 10); }
 
 export function ManualInvoiceBuilder({
-  projectId, projectName, clientName, seed, seededFrom,
+  projectId, projectName, clientName, seed, seededFrom, settlementDiscount,
 }: {
   projectId: string;
   projectName: string;
   clientName: string;
   seed: SeedLine[];
   seededFrom: string | null;
+  /** "₹7,410" when the seed was reduced for a settlement discount. */
+  settlementDiscount?: string | null;
 }) {
   const router = useRouter();
   const [lines, setLines] = useState<Line[]>(
@@ -135,6 +137,12 @@ export function ManualInvoiceBuilder({
       {seededFrom && (
         <p className="text-[12.5px] text-text-dim">
           Lines start from <span className="text-text">{seededFrom}</span> — edit anything, or clear them and type your own.
+        </p>
+      )}
+      {seededFrom && settlementDiscount && (
+        <p className="rounded-[10px] border border-gold/40 bg-gold/5 px-3 py-2 text-[12.5px] text-text-dim">
+          A settlement discount of <span className="text-text">{settlementDiscount}</span> was given on this job,
+          so each line&apos;s rate has been reduced in proportion — the bill comes to what the client agreed to pay.
         </p>
       )}
 

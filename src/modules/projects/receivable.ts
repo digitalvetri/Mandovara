@@ -37,6 +37,7 @@ import {
   accumulateReceived,
   isProjectFullySettled,
 } from "@/kernel/money/project-due";
+import { netAgreedValue } from "@/kernel/money/settlement";
 import { computeOutstanding } from "@/kernel/money/outstanding";
 
 type Db = ReturnType<typeof scoped> | TxClient;
@@ -54,6 +55,8 @@ export interface ProjectReceivable {
   stage:        string;
   /** What the client committed to — the accepted quotation, normally. */
   agreedValue:  bigint;
+  /** Settlement discount let go; due/credit/settled use agreedValue − this. */
+  discount:     bigint;
   /** Everything received against the project, by any of the three routes. */
   received:     bigint;
   /** What is owed: normally agreedValue − received, but never less than the
@@ -110,7 +113,7 @@ export async function loadProjectReceivables(
     where,
     select: {
       id: true, number: true, name: true, clientId: true,
-      stage: true, orderValue: true, createdAt: true,
+      stage: true, orderValue: true, createdAt: true, settlementDiscount: true,
     },
   });
   if (projects.length === 0) return [];
@@ -236,7 +239,8 @@ export async function loadProjectReceivables(
     const bucket  = buckets.get(p.id);
     const got     = bucket ? accumulateReceived(bucket) : 0n;
     const invDue  = invoiceDue.get(p.id) ?? 0n;
-    const due     = combineProjectDue(computeProjectDue(agreedValue, got), invDue);
+    const held    = netAgreedValue(agreedValue, p.settlementDiscount); // after any discount
+    const due     = combineProjectDue(computeProjectDue(held, got), invDue);
 
     return {
       projectId:     p.id,
@@ -245,11 +249,12 @@ export async function loadProjectReceivables(
       clientId:      p.clientId,
       stage:         p.stage as string,
       agreedValue,
+      discount:      p.settlementDiscount,
       received:      got,
       due,
       invoiceDue:    invDue,
-      credit:        computeProjectCredit(agreedValue, got),
-      settled:       isProjectFullySettled(agreedValue, got, invDue),
+      credit:        computeProjectCredit(held, got),
+      settled:       isProjectFullySettled(held, got, invDue),
       quotationId:     agreement?.id ?? null,
       quotationNumber: agreement?.number ?? null,
       agreementAccepted: accepted != null,

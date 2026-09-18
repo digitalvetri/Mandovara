@@ -30,7 +30,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import { getProjectReceivable } from "./receivable";
 import type { RequestContext } from "@/kernel/auth/context";
 
-export type LedgerKind = "QUOTATION" | "ADVANCE" | "INVOICE" | "RECEIPT";
+export type LedgerKind = "QUOTATION" | "ADVANCE" | "INVOICE" | "RECEIPT" | "DISCOUNT";
 
 export interface LedgerRow {
   id:      string;
@@ -41,7 +41,8 @@ export interface LedgerRow {
   label:   string;
   /** Money the client owes as a result of this row (invoices). */
   debit:   bigint;
-  /** Money the client has given us (advances, receipts). */
+  /** Money the client has given us (advances, receipts) — or, on the
+   *  DISCOUNT row, the amount the studio agreed to let go. */
   credit:  bigint;
   /** Balance owed after this row. Reference rows repeat the prior value. */
   balance: bigint;
@@ -55,7 +56,11 @@ export interface ProjectLedger {
   quoted:      bigint;
   invoiced:    bigint;
   received:    bigint;
-  /** agreed − received. Negative means the client is in credit. */
+  /** Settlement discount given on the job. Not money received. */
+  discount:    bigint;
+  /** Why it was given, as the admin typed it. */
+  discountReason: string | null;
+  /** agreed − discount − received. Negative means the client is in credit. */
   balance:     bigint;
   /** Received before any invoice existed — money against the agreement. */
   advances:    bigint;
@@ -89,8 +94,12 @@ export async function getProjectLedger(
       where:   { projectId, status: { not: "CANCELLED" } },
       orderBy: { date: "asc" },
       select:  { id: true, number: true, date: true, total: true, status: true, advanceAdjusted: true },
-    })
+    }),
   ]);
+  const settlement = await db.project.findUnique({
+    where:  { id: projectId },
+    select: { settlementDiscount: true, settlementReason: true, settlementAt: true },
+  });
 
   // Receipts reach a project by TWO routes and both must be counted.
   //
@@ -215,6 +224,18 @@ export async function getProjectLedger(
     });
   }
 
+  // The settlement discount, when one was given: it takes the balance down
+  // like a payment does, but it is labelled for what it is — money let go,
+  // not money in.
+  if (settlement && settlement.settlementDiscount > 0n) {
+    rows.push({
+      id: projectId, kind: "DISCOUNT", date: settlement.settlementAt ?? new Date(),
+      ref: "Settlement", label: "Discount given",
+      debit: 0n, credit: settlement.settlementDiscount, balance: 0n,
+      note: settlement.settlementReason,
+    });
+  }
+
   rows.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   let running = 0n;
@@ -226,6 +247,7 @@ export async function getProjectLedger(
   const invoiced = invoices.reduce((acc, i) => acc + i.total, 0n);
   const agreed   = receivable?.agreedValue ?? 0n;
   const received = receivable?.received    ?? 0n;
+  const discount = receivable?.discount    ?? 0n;
 
   return {
     rows,
@@ -237,7 +259,9 @@ export async function getProjectLedger(
     // would miss a payment booked to the project through a path this query
     // does not look at, and the header and the ledger would then disagree.
     received,
-    balance:  debtSource === "QUOTATION" ? agreed - received : invoiced - received,
+    discount,
+    discountReason: settlement?.settlementReason ?? null,
+    balance:  debtSource === "QUOTATION" ? agreed - discount - received : invoiced - received,
     advances: advances.reduce((acc, a) => acc + a.amount, 0n),
     debtSource,
     settled:  receivable?.settled ?? false,

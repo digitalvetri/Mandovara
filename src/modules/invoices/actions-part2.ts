@@ -7,6 +7,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { spreadDiscount } from "@/kernel/money/settlement";
 import { computeLineTax } from "@/kernel/tax/gst";
 import { devContext } from "@/lib/dev-context";
 import { cancelInvoiceSchema } from "./schema";
@@ -174,6 +175,26 @@ export async function createInvoiceFromOrder(
       gstRate: "18",
       cgst: tax.cgst.toString(), sgst: tax.sgst.toString(), igst: tax.igst.toString(),
       amount: (order.totalValue + tax.cgst + tax.sgst + tax.igst).toString(),
+    });
+  }
+
+  // A settlement discount agreed on the project comes off this bill too —
+  // same proportional, GST-inclusive spread as the quotation paths.
+  const settlement = order.projectId
+    ? (await db.project.findUnique({ where: { id: order.projectId }, select: { settlementDiscount: true } }))
+        ?.settlementDiscount ?? 0n
+    : 0n;
+  if (settlement > 0n) {
+    const spread = spreadDiscount(
+      lines.map((l) => ({ taxable: BigInt(l.taxable), gstRate: parseFloat(l.gstRate) })), settlement,
+    );
+    lines.forEach((l, i) => {
+      const taxable = spread[i]!;
+      const tax = computeLineTax({ taxable, gstRate: parseFloat(l.gstRate), supplierStateCode, placeOfSupplyCode });
+      Object.assign(l, {
+        taxable: taxable.toString(), cgst: tax.cgst.toString(), sgst: tax.sgst.toString(),
+        igst: tax.igst.toString(), amount: (taxable + tax.cgst + tax.sgst + tax.igst).toString(),
+      });
     });
   }
 

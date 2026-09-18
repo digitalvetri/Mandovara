@@ -17,6 +17,8 @@ import { Topbar } from "@/components/layout/Topbar";
 import { devContext } from "@/lib/dev-context";
 import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
+import { formatINR } from "@/kernel/money/format";
+import { rateForTaxable, spreadDiscount } from "@/kernel/money/settlement";
 import { ManualInvoiceBuilder, type SeedLine } from "./_components/ManualInvoiceBuilder";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +38,7 @@ export default async function CreateInvoicePage({
   const db = scoped(ctx);
   const project = await db.project.findUnique({
     where:  { id: projectId },
-    select: { id: true, name: true, number: true, clientId: true },
+    select: { id: true, name: true, number: true, clientId: true, settlementDiscount: true },
   });
   if (!project) notFound();
 
@@ -54,18 +56,31 @@ export default async function CreateInvoicePage({
         orderBy: { lineNo: "asc" },
         select: {
           description: true, unit: true, quantity: true,
-          rate: true, gstRate: true, discountPct: true,
+          rate: true, gstRate: true, discountPct: true, taxable: true,
         },
       },
     },
   });
 
-  const seed: SeedLine[] = (quote?.lines ?? []).map((l) => ({
+  // A settlement discount agreed before billing comes off the invoice: each
+  // line's taxable value shrinks in proportion (GST-inclusive), and the rate
+  // seeded below is the one that bills that smaller figure. Owner, 2026-09-18.
+  const quoteLines = quote?.lines ?? [];
+  const discounted = project.settlementDiscount > 0n
+    ? spreadDiscount(
+        quoteLines.map((l) => ({ taxable: l.taxable, gstRate: Number(l.gstRate) })),
+        project.settlementDiscount,
+      )
+    : null;
+
+  const seed: SeedLine[] = quoteLines.map((l, i) => ({
     description: l.description,
     unit:        l.unit as string,
     quantity:    l.quantity.toString(),
     // Paise → rupees for a field a human types into.
-    rate:        (Number(l.rate) / 100).toString(),
+    rate:        discounted
+      ? paiseToRupeeText(rateForTaxable(discounted[i]!, Number(l.quantity), Number(l.discountPct)))
+      : (Number(l.rate) / 100).toString(),
     gstRate:     Number(l.gstRate),
     // The agreed discount travels with the line. Without it the invoice
     // silently bills the list price — owner, 2026-09-08.
@@ -97,7 +112,15 @@ export default async function CreateInvoicePage({
         clientName={client?.name ?? "—"}
         seed={seed}
         seededFrom={seed.length > 0 ? (quote?.number ?? null) : null}
+        settlementDiscount={discounted ? formatINR(project.settlementDiscount) : null}
       />
     </>
   );
+}
+
+/** 1234567n → "12345.67" — BigInt, no float, for a typed rupee field. */
+function paiseToRupeeText(p: bigint): string {
+  const r = p / 100n;
+  const f = p % 100n;
+  return f === 0n ? r.toString() : `${r}.${f.toString().padStart(2, "0")}`;
 }
