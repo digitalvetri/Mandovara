@@ -51,12 +51,10 @@ export async function listQuotationsForClient(
       _count:  { select: { lines: true } },
     },
   });
-  // Filter out lead-scoped (no project) — this helper is called with a
-  // clientId, and lead-scoped quotes shouldn't appear here anyway (they
-  // have leadId set, clientId null, so wouldn't match the where clause).
-  // Defensive filter in case of legacy data.
+  // A client quotation with no project yet is listed too — Client 360
+  // offers to assign it to one of the client's projects (2026-09-18).
+  // It used to be filtered out, which hid it with no way to fix it.
   return rows
-    .filter((r): r is typeof r & { project: { id: string; name: string } } => r.project !== null)
     .map((r) => ({
       id:          r.id,
       number:      r.number,
@@ -65,8 +63,8 @@ export async function listQuotationsForClient(
       status:      r.status,
       total:       r.total,
       lineCount:   r._count.lines,
-      projectId:   r.project.id,
-      projectName: r.project.name,
+      projectId:   r.project?.id ?? null,
+      projectName: r.project?.name ?? null,
       validUntil:  r.validUntil,
       shareToken:  r.shareToken,
       shareTokenExpiresAt: r.shareTokenExpiresAt,

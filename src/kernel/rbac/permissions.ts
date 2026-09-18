@@ -66,7 +66,7 @@ export const PERMISSIONS = {
 
   // ── Finance ────────────────────────────────────────────────
   invoice:     ["view", "create", "cancel", "viewMargin", "irnRegenerate", "irnCancel"],
-  receipt:     ["view", "create", "allocate", "reverse"],
+  receipt:     ["view", "create", "allocate", "reverse", "delete"],
   advance:     ["view", "create", "adjust"],
   expense:     ["view", "create", "approve", "reject", "delete"],
   pettyCash:   ["view", "manage"],

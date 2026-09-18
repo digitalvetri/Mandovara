@@ -8,6 +8,7 @@ import type { Route } from "next";
 import { FileText, Plus } from "lucide-react";
 import { formatINR } from "@/kernel/money/format";
 import type { QuotationInlineRow } from "@/modules/quotations/queries";
+import { QuotationProjectSelect, type ProjectChoice } from "./QuotationProjectSelect";
 
 interface QuotationsInlineTableProps {
   rows:  QuotationInlineRow[];
@@ -21,9 +22,13 @@ interface QuotationsInlineTableProps {
    * landing page is the canonical list.
    */
   seeAllHref?: Route;
+  /** When given, the Project column becomes a picker over these — the
+   *  client's own projects. Pass only for someone with quotation.update;
+   *  the action enforces it regardless. */
+  assignableProjects?: ProjectChoice[];
 }
 
-export function QuotationsInlineTable({ rows, newHref, emptyHint }: QuotationsInlineTableProps) {
+export function QuotationsInlineTable({ rows, newHref, emptyHint, assignableProjects }: QuotationsInlineTableProps) {
   const hasRows = rows.length > 0;
   return (
     <div className="rounded-[14px] bg-surface border border-rule overflow-hidden">
@@ -91,7 +96,17 @@ export function QuotationsInlineTable({ rows, newHref, emptyHint }: QuotationsIn
                     )}
                   </Link>
                 </td>
-                <td className="px-3 py-2.5 text-text-dim truncate max-w-[220px]">{r.projectName ?? "—"}</td>
+                {assignableProjects && assignableProjects.length > 0 ? (
+                  <td className="px-3 py-1.5">
+                    <QuotationProjectSelect
+                      quotationId={r.id}
+                      projectId={r.projectId}
+                      projects={assignableProjects}
+                    />
+                  </td>
+                ) : (
+                  <td className="px-3 py-2.5 text-text-dim truncate max-w-[220px]">{r.projectName ?? "Not assigned"}</td>
+                )}
                 <td className="px-3 py-2.5 tabular text-text-dim">{formatDate(r.date)}</td>
                 <td className="px-3 py-2.5"><QuoteStatusPill status={r.status} /></td>
                 <td className="px-3 py-2.5 text-right tabular text-text-dim">{r.lineCount}</td>

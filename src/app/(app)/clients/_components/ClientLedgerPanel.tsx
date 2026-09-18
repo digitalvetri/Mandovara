@@ -17,6 +17,8 @@
 import { useState } from "react";
 import { ReceiptText, Plus, CheckCircle2 } from "lucide-react";
 import { RecordPaymentModal } from "./RecordPaymentModal";
+import { DeletePaymentButton } from "./DeletePaymentButton";
+import type { OpenProjectWire } from "../../accounts/_components/_receipt-primitives";
 
 export interface InvoiceLedgerRow {
   id: string;
@@ -35,6 +37,8 @@ export interface ReceiptLedgerRow {
   amount: string;      // paise
   reference: string | null;
   chequeStatus: string | null;
+  /** The job the payment was taken against, when there is one. */
+  projectName: string | null;
 }
 
 interface Props {
@@ -42,7 +46,11 @@ interface Props {
   branchId: string;
   openInvoices: InvoiceLedgerRow[];
   receipts: ReceiptLedgerRow[];
+  /** Jobs with money still to come — the "What is this for?" choices. */
+  openProjects: OpenProjectWire[];
   canRecord: boolean;
+  /** receipt.delete — the Owner, or whoever has been granted it. */
+  canDelete: boolean;
 }
 
 const MODE_CHIP: Record<string, string> = {
@@ -83,7 +91,7 @@ function daysLate(dueDateIso: string): number {
 }
 
 export function ClientLedgerPanel({
-  clientId, branchId, openInvoices, receipts, canRecord,
+  clientId, branchId, openInvoices, receipts, openProjects, canRecord, canDelete,
 }: Props) {
   const [showModal, setShowModal] = useState(false);
 
@@ -205,11 +213,18 @@ export function ClientLedgerPanel({
                   <div className="mt-0.5 text-[13px] text-text-dim">
                     {fmtDate(r.date)}
                     {r.reference ? ` · ${r.reference}` : ""}
+                    {r.projectName && (
+                      <>
+                        <span className="mx-1 text-text-faint">·</span>
+                        for <span className="text-text">{r.projectName}</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <span className={`shrink-0 text-[15px] font-semibold tabular-nums ${bounced ? "text-fault line-through" : "text-good"}`}>
                   +{rsFromPaise(r.amount)}
                 </span>
+                {canDelete && <DeletePaymentButton id={r.id} number={r.number} />}
               </div>
             );
           })}
@@ -226,6 +241,7 @@ export function ClientLedgerPanel({
           number: inv.number,
           outstanding: inv.outstanding,
         }))}
+        openProjects={openProjects}
       />
     </div>
   );

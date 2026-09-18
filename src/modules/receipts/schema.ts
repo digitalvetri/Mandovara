@@ -44,3 +44,7 @@ export type CreateReceiptInput = z.infer<typeof createReceiptSchema>;
 export type LinkReceiptInput   = z.infer<typeof linkReceiptSchema>;
 export type BounceReceiptInput = z.infer<typeof bounceReceiptSchema>;
 export type ClearChequeInput   = z.infer<typeof clearChequeSchema>;
+
+export const deleteReceiptSchema = z.object({
+  id: z.string().min(1),
+});

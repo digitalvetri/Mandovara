@@ -12,6 +12,7 @@ import { getClient } from "@/modules/clients/queries";
 import { listQuotationsForClient } from "@/modules/quotations/queries";
 import { listRoundsForClient, type ClientRoundRow } from "@/modules/measurement/queries-client";
 import { listOutstandingInvoicesForClient, listReceipts, type OutstandingInvoice, type ReceiptRow } from "@/modules/receipts/queries";
+import { listOpenProjectsForClient, type OpenProjectForReceipt } from "@/modules/receipts/queries-targets";
 import { ClientFollowUpForm } from "../_components/ClientFollowUpForm";
 import { BillingAddressCard } from "../_components/BillingAddressCard";
 import { StartMeasurementFromClientButton } from "../_components/StartMeasurementFromClientButton";
@@ -64,9 +65,10 @@ export default async function ClientDetailPage({
   let openInvoicesRaw: OutstandingInvoice[] = [];
   let receiptsRaw: { rows: ReceiptRow[] }   = { rows: [] };
   let defaultBranch: { id: string } | null  = null;
+  let openProjectsRaw: OpenProjectForReceipt[] = [];
 
   if (canCreateReceipt || canViewReceipt) {
-    [openInvoicesRaw, receiptsRaw, defaultBranch] = await Promise.all([
+    [openInvoicesRaw, receiptsRaw, defaultBranch, openProjectsRaw] = await Promise.all([
       canCreateReceipt
         ? listOutstandingInvoicesForClient(ctx, client.id).catch((): OutstandingInvoice[] => [])
         : Promise.resolve<OutstandingInvoice[]>([]),
@@ -74,6 +76,10 @@ export default async function ClientDetailPage({
         ? listReceipts(ctx, { clientId: client.id, pageSize: 15 }).catch(() => ({ rows: [] as ReceiptRow[] }))
         : Promise.resolve({ rows: [] as ReceiptRow[] }),
       scoped(ctx).branch.findFirst({ where: { organizationId: ctx.orgId }, select: { id: true } }).catch(() => null),
+      // "What is this payment for?" — needs receipt.create, like the bills.
+      canCreateReceipt
+        ? listOpenProjectsForClient(ctx, client.id).catch((): OpenProjectForReceipt[] => [])
+        : Promise.resolve<OpenProjectForReceipt[]>([]),
     ]);
   }
 
@@ -88,6 +94,14 @@ export default async function ClientDetailPage({
     date: r.date.toISOString(),
     mode: r.mode, amount: r.amount.toString(),
     reference: r.reference, chequeStatus: r.chequeStatus,
+    projectName: r.projectName,
+  }));
+
+  const openProjectRows = openProjectsRaw.map((p) => ({
+    id: p.id, number: p.number, name: p.name, quotationNumber: p.quotationNumber,
+    agreedValue: p.agreedValue.toString(),
+    received:    p.received.toString(),
+    due:         p.due.toString(),
   }));
 
   return (
@@ -211,6 +225,13 @@ export default async function ClientDetailPage({
             rows={quotations}
             seeAllHref="/quotations"
             newHref="/quotations/new"
+            {...(ctx.permissions.has("quotation.update")
+              ? {
+                  assignableProjects: client.projects
+                    .filter((p) => p.stage !== "CANCELLED")
+                    .map((p) => ({ id: p.id, name: p.name })),
+                }
+              : {})}
           />
 
           {(canCreateReceipt || canViewReceipt) && (
@@ -219,7 +240,9 @@ export default async function ClientDetailPage({
               branchId={defaultBranch?.id ?? ""}
               openInvoices={invoiceLedgerRows}
               receipts={receiptLedgerRows}
+              openProjects={openProjectRows}
               canRecord={canCreateReceipt && !!defaultBranch}
+              canDelete={ctx.permissions.has("receipt.delete")}
             />
           )}
 

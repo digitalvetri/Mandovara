@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { X, IndianRupee } from "lucide-react";
 import { createReceipt } from "@/modules/receipts/actions";
 import { PAYMENT_MODES } from "@/modules/receipts/schema";
+// The same "What is this for?" picker the Accounts payment sheet uses, so
+// a payment recorded here lands on a job exactly as one recorded there.
+import { PaymentSheetTarget } from "../../accounts/_components/PaymentSheetTarget";
+import {
+  toOpenProjects, type OpenProjectWire, type PaymentTarget,
+} from "../../accounts/_components/_receipt-primitives";
 
 export interface OpenInvoiceStub {
   id: string;
@@ -36,17 +42,47 @@ interface Props {
   clientId: string;
   branchId: string;
   openInvoices: OpenInvoiceStub[];
+  /** The client's jobs with money still to come on their quotation.
+   *  Omitted by callers that only offer bills (the project page). */
+  openProjects?: OpenProjectWire[];
+}
+
+const NO_PROJECTS: OpenProjectWire[] = [];
+
+/** Jobs first — under the quotation-first flow that is where nearly all
+ *  money lands. Bills only when there are no jobs to put it against. */
+function defaultTarget(projects: OpenProjectWire[], billCount: number): PaymentTarget | null {
+  if (projects.length > 0) return { kind: "project", projectId: projects[0]!.id };
+  if (billCount > 0) return { kind: "bills" };
+  return null;
 }
 
 export function RecordPaymentModal({
-  open, onClose, clientId, branchId, openInvoices,
+  open, onClose, clientId, branchId, openInvoices, openProjects = NO_PROJECTS,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState("UPI");
+  const [picked, setTarget] = useState<PaymentTarget | null>(
+    () => defaultTarget(openProjects, openInvoices.length),
+  );
+  // The modal stays mounted between openings, and a job paid off since the
+  // last one drops out of the list — never submit against a stale pick.
+  const target =
+    picked?.kind === "project" && !openProjects.some((p) => p.id === picked.projectId)
+      ? defaultTarget(openProjects, openInvoices.length)
+      : picked?.kind === "bills" && openInvoices.length === 0
+        ? defaultTarget(openProjects, 0)
+        : picked;
 
   if (!open) return null;
+
+  const projects  = toOpenProjects(openProjects);
+  const billTotal = openInvoices.reduce((s, i) => s + BigInt(i.outstanding), 0n);
+  // Something to choose between → a choice is required. A client with no
+  // open job and no open bill has nowhere specific to put the money.
+  const needsTarget = projects.length > 0 || openInvoices.length > 0;
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -59,6 +95,9 @@ export function RecordPaymentModal({
       setError("Enter a valid amount greater than ₹0."); return;
     }
     const paise = BigInt(Math.round(rupees * 100));
+    if (needsTarget && !target) {
+      setError("Choose which project this payment is for."); return;
+    }
     setError(null);
 
     startTransition(async () => {
@@ -70,7 +109,11 @@ export function RecordPaymentModal({
         reference:   (fd.get("reference") as string) || undefined,
         chequeDate:  (fd.get("chequeDate") as string) || undefined,
         amount:      paise.toString(),
-        allocations: buildAllocations(paise, openInvoices),
+        // A payment goes against ONE thing. Against a job it carries the
+        // projectId and stays off the bills — it is swept onto the tax
+        // invoice when that is raised. Against bills, oldest-first as before.
+        ...(target?.kind === "project" ? { projectId: target.projectId } : {}),
+        allocations: target?.kind === "project" ? [] : buildAllocations(paise, openInvoices),
       });
       if (!res.ok) { setError(res.error ?? "Could not record payment"); return; }
       onClose();
@@ -86,7 +129,7 @@ export function RecordPaymentModal({
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[420px] rounded-[14px] bg-surface border border-rule p-6 space-y-4"
+        className="w-full max-w-[480px] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[14px] bg-surface border border-rule p-6 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="font-display text-[17px] font-semibold">Record Payment</div>
@@ -96,8 +139,16 @@ export function RecordPaymentModal({
           </button>
         </div>
 
+        <PaymentSheetTarget
+          projects={projects}
+          billCount={openInvoices.length}
+          billTotal={billTotal}
+          value={target}
+          onChange={setTarget}
+        />
+
         {/* Open invoice summary — shows what the payment will cover */}
-        {openInvoices.length > 0 && (
+        {target?.kind === "bills" && openInvoices.length > 0 && (
           <div className="rounded-[8px] bg-surface-2 border border-rule px-3 py-2.5 space-y-1">
             <div className="text-[10px] uppercase tracking-[0.12em] text-text-faint mb-1.5">
               Outstanding invoices
