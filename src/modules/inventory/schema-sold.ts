@@ -33,6 +33,45 @@ export const recordStockSaleSchema = z.object({
 export type RecordStockSaleInput = z.infer<typeof recordStockSaleSchema>;
 
 /**
+ * One item on a multi-item counter sale.
+ *
+ * Everything that varies per item and nothing that doesn't — the buyer,
+ * the date and the note are typed once for the whole basket and live on
+ * the parent (see recordStockSaleBatchSchema).
+ */
+export const saleLineSchema = z.object({
+  colourwayId: idField,
+  dyeLot:      z.string().trim().max(80).optional().or(z.literal("")),
+  quantity:    z.number().positive("Enter how many were sold"),
+  rate:        z.string().trim().max(20).optional().or(z.literal("")),
+});
+
+/**
+ * A counter sale of one or more items to the same buyer.
+ *
+ * Owner instruction, 2026-09-23: "a single client can purchase too many
+ * items … I need to enter the client name one time and then mark the
+ * details of each product."
+ *
+ * There is no sale-header row in the schema and this does not invent one
+ * (CLAUDE.md #14) — a sale IS its StockMove rows. A five-item basket
+ * writes five SOLD_OUT moves carrying the same buyer, note and date, so
+ * the Sold out list, its totals and the edit pencil keep working
+ * unchanged.
+ *
+ * Cap of 50 lines: past that it is a delivery order, not a counter sale,
+ * and one transaction should not be asked to carry it.
+ */
+export const recordStockSaleBatchSchema = z.object({
+  soldTo: z.string().trim().max(120).optional().or(z.literal("")),
+  soldOn: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Must be YYYY-MM-DD"),
+  note:   z.string().trim().max(300).optional().or(z.literal("")),
+  lines:  z.array(saleLineSchema).min(1, "Add at least one item").max(50),
+});
+
+export type RecordStockSaleBatchInput = z.infer<typeof recordStockSaleBatchSchema>;
+
+/**
  * Correcting a sale already recorded. The item and the dye lot are
  * fixed: a different item or lot is a different physical movement, and
  * is a new sale, not an edit of this one.

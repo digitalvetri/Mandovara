@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "vitest";
 import { Decimal } from "@prisma/client/runtime/library";
-import { saleCeiling, editSaleCeiling, type LotBalance } from "../../../src/modules/inventory/sold-availability";
+import { saleCeiling, editSaleCeiling, checkBasket, type LotBalance } from "../../../src/modules/inventory/sold-availability";
 
 const lots = (...rows: [string | null, string][]): LotBalance[] =>
   rows.map(([dyeLot, quantity]) => ({ dyeLot, quantity }));
@@ -146,5 +146,119 @@ describe("editing a recorded sale", () => {
     const c = editSaleCeiling(lots(["A", "1"], ["B", "20"]), "A", 0, "4");
     expect(n(c.available)).toBe("5");
     expect(n(c.onHand)).toBe("5");
+  });
+});
+
+// ── Baskets ─────────────────────────────────────────────────────────────────
+//
+// One buyer, several items, one press of "Record sale". The case worth
+// the tests is the same SKU appearing twice: each line on its own clears
+// the shelf, and only the running total sees that together they do not.
+
+describe("multi-item sales", () => {
+  const bal = (m: Record<string, LotBalance[]>) => new Map(Object.entries(m));
+  const res = (m: Record<string, number>) => new Map(Object.entries(m));
+
+  it("lets a basket of different items through", () => {
+    const breach = checkBasket(
+      [
+        { colourwayId: "a", dyeLot: null, quantity: "5" },
+        { colourwayId: "b", dyeLot: null, quantity: "3" },
+      ],
+      bal({ a: lots([null, "10"]), b: lots([null, "10"]) }),
+      res({ a: 0, b: 0 }),
+    );
+    expect(breach).toBeNull();
+  });
+
+  it("adds up two lines of the same SKU", () => {
+    // 15 on the shelf; 10 + 10 must not both pass.
+    const breach = checkBasket(
+      [
+        { colourwayId: "a", dyeLot: null, quantity: "10" },
+        { colourwayId: "a", dyeLot: null, quantity: "10" },
+      ],
+      bal({ a: lots([null, "15"]) }),
+      res({ a: 0 }),
+    );
+    expect(breach).not.toBeNull();
+    // The SECOND line is the one that cannot be met — the first was fine.
+    expect(breach?.lineIndex).toBe(1);
+    expect(n(breach!.available)).toBe("5");
+    expect(breach?.blockedByCommitment).toBe(false);
+  });
+
+  it("allows two lines of the same SKU that fit together", () => {
+    expect(checkBasket(
+      [
+        { colourwayId: "a", dyeLot: null, quantity: "10" },
+        { colourwayId: "a", dyeLot: null, quantity: "5" },
+      ],
+      bal({ a: lots([null, "15"]) }),
+      res({ a: 0 }),
+    )).toBeNull();
+  });
+
+  it("counts a lot line and an any-lot line against the same pool", () => {
+    // 20 across two lots, nothing committed. 12 off lot A leaves 8.
+    const breach = checkBasket(
+      [
+        { colourwayId: "a", dyeLot: "A", quantity: "12" },
+        { colourwayId: "a", dyeLot: null, quantity: "9" },
+      ],
+      bal({ a: lots(["A", "12"], ["B", "8"]) }),
+      res({ a: 0 }),
+    );
+    expect(breach?.lineIndex).toBe(1);
+    expect(n(breach!.available)).toBe("8");
+  });
+
+  it("does not let a basket walk past a commitment", () => {
+    // 20 on hand, 15 promised. Only 5 may be sold, across every line.
+    const breach = checkBasket(
+      [
+        { colourwayId: "a", dyeLot: null, quantity: "3" },
+        { colourwayId: "a", dyeLot: null, quantity: "3" },
+      ],
+      bal({ a: lots([null, "20"]) }),
+      res({ a: 15 }),
+    );
+    expect(breach?.lineIndex).toBe(1);
+    expect(n(breach!.available)).toBe("2");
+    expect(breach?.blockedByCommitment).toBe(true);
+  });
+
+  it("keeps two lots of the same SKU apart", () => {
+    // Lot A holds 5, lot B holds 5. 5 + 5 is fine; 6 off A is not.
+    expect(checkBasket(
+      [
+        { colourwayId: "a", dyeLot: "A", quantity: "5" },
+        { colourwayId: "a", dyeLot: "B", quantity: "5" },
+      ],
+      bal({ a: lots(["A", "5"], ["B", "5"]) }),
+      res({ a: 0 }),
+    )).toBeNull();
+
+    const breach = checkBasket(
+      [{ colourwayId: "a", dyeLot: "A", quantity: "6" }],
+      bal({ a: lots(["A", "5"], ["B", "5"]) }),
+      res({ a: 0 }),
+    );
+    expect(breach?.lineIndex).toBe(0);
+    expect(n(breach!.available)).toBe("5");
+  });
+
+  it("refuses an item with no stock row at all", () => {
+    const breach = checkBasket(
+      [{ colourwayId: "ghost", dyeLot: null, quantity: "1" }],
+      bal({}),
+      res({}),
+    );
+    expect(breach?.lineIndex).toBe(0);
+    expect(n(breach!.available)).toBe("0");
+  });
+
+  it("clears an empty basket", () => {
+    expect(checkBasket([], bal({}), res({}))).toBeNull();
   });
 });

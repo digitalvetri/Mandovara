@@ -101,3 +101,105 @@ export function editSaleCeiling(
 ): SaleCeiling {
   return saleCeiling([...balances, { dyeLot, quantity: originalQty }], dyeLot, reserved);
 }
+
+// ── Baskets ─────────────────────────────────────────────────────────────────
+//
+// A multi-item sale can put the SAME SKU on two lines — 10 boxes of 1505
+// and, three lines later, another 10. Checking each line against
+// saleCeiling on its own passes both and oversells the shelf, because
+// neither line knows about the other. So the basket is checked with a
+// RUNNING draw: line n is measured against what is left after lines
+// 1..n−1 have taken theirs.
+//
+// Two running totals are kept per SKU, because there are two ceilings:
+//   · per (SKU, lot)  — against what physically sits on that lot
+//   · per SKU         — against on-hand minus what quotes and orders
+//                       have already committed
+//
+// That second one is what catches the case worth having tests for: a
+// line on lot A and a line on "any lot" for the same SKU both draw from
+// the same uncommitted pool, and only the SKU-wide total sees it.
+
+export interface BasketLine {
+  colourwayId: string;
+  dyeLot:      string | null;
+  quantity:    Decimal | string | number;
+}
+
+/** The first line of a basket that cannot be honoured, with the numbers
+ *  needed to say why. Null means the whole basket clears. */
+export interface BasketBreach {
+  /** Index into the basket, so the refusal can name the offending line. */
+  lineIndex:   number;
+  colourwayId: string;
+  dyeLot:      string | null;
+  /** What is left for this line after the lines above it took theirs. */
+  available:   Decimal;
+  requested:   Decimal;
+  totalOnHand: Decimal;
+  /** True when the binding limit was live quotes/orders, not the shelf. */
+  blockedByCommitment: boolean;
+}
+
+/**
+ * Check a whole basket at once.
+ *
+ * @param lines    the basket, in the order the operator entered it —
+ *   the breach is reported against the first line that cannot be met,
+ *   which is the one they can most sensibly be asked to fix.
+ * @param balances every StockBalance row per colourway, unfiltered.
+ * @param reserved units committed to live quotes and orders, per
+ *   colourway, as computeReservations reports them.
+ */
+export function checkBasket(
+  lines:    readonly BasketLine[],
+  balances: ReadonlyMap<string, readonly LotBalance[]>,
+  reserved: ReadonlyMap<string, number>,
+): BasketBreach | null {
+  const zero = new Decimal(0);
+  /** Running draw per colourway, and per colourway+lot. */
+  const drawnBySku = new Map<string, Decimal>();
+  const drawnByLot = new Map<string, Decimal>();
+
+  for (const [lineIndex, line] of lines.entries()) {
+    const lots    = balances.get(line.colourwayId) ?? [];
+    const ceiling = saleCeiling(lots, line.dyeLot, reserved.get(line.colourwayId) ?? 0);
+    const qty     = new Decimal(line.quantity);
+
+    const lotKey  = `${line.colourwayId}\u0000${line.dyeLot ?? ""}`;
+    const skuDraw = (drawnBySku.get(line.colourwayId) ?? zero).plus(qty);
+    const lotDraw = (drawnByLot.get(lotKey) ?? zero).plus(qty);
+
+    // Whichever ceiling bites first. The lot one only applies when a lot
+    // was chosen; ceiling.available already folds it in for that line,
+    // but the running totals have to be measured against the raw
+    // ceilings, not against a single-line "available".
+    const skuHeadroom = Decimal.max(ceiling.skuUncommitted.minus(skuDraw.minus(qty)), zero);
+    const lotHeadroom = line.dyeLot == null
+      ? skuHeadroom
+      : Decimal.max(
+          Decimal.min(ceiling.onHand.minus(lotDraw.minus(qty)), skuHeadroom),
+          zero,
+        );
+
+    if (qty.gt(lotHeadroom)) {
+      return {
+        lineIndex,
+        colourwayId: line.colourwayId,
+        dyeLot:      line.dyeLot,
+        available:   lotHeadroom,
+        requested:   qty,
+        totalOnHand: ceiling.totalOnHand,
+        // Only blame the commitment when it is genuinely what bit: the
+        // SKU pool was the tighter of the two AND something is reserved.
+        blockedByCommitment:
+          (reserved.get(line.colourwayId) ?? 0) > 0 && lotHeadroom.equals(skuHeadroom),
+      };
+    }
+
+    drawnBySku.set(line.colourwayId, skuDraw);
+    drawnByLot.set(lotKey, lotDraw);
+  }
+
+  return null;
+}
