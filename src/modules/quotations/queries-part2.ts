@@ -4,6 +4,7 @@ import { scoped } from "@/kernel/db/scoped";
 import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import { ListQuotationsQuery, QuotationDetail } from "./queries";
+import { readNarrations } from "./narrations";
 
 /**
  * Pull a printable area name out of one of the JSON address columns.
@@ -31,7 +32,7 @@ export async function getQuotation(
     select: {
       id: true, number: true, revision: true, status: true, branchId: true,
       leadId: true, projectId: true, clientId: true, ownerId: true,
-      date: true, validUntil: true, termsText: true, shareToken: true, shareTokenExpiresAt: true,
+      date: true, validUntil: true, termsText: true, narrations: true, shareToken: true, shareTokenExpiresAt: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
       editCount: true,
       // Client fetched separately below, not nested. Project.client is a
@@ -124,6 +125,7 @@ export async function getQuotation(
     date: row.date,
     validUntil: row.validUntil,
     termsText: row.termsText, shareToken: row.shareToken ?? null, shareTokenExpiresAt: row.shareTokenExpiresAt ?? null,
+    narrations: readNarrations(row.narrations),
     taxableAmount: row.taxableAmount,
     cgst: row.cgst,
     sgst: row.sgst,

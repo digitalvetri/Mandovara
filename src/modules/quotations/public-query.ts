@@ -5,6 +5,8 @@
 import { authBootstrapPrisma as db } from "@/kernel/db/client";
 import type { QuotationDetail } from "./queries";
 import { cityOf } from "./queries-part2";
+import { readNarrations } from "./narrations";
+import { BANK_DETAILS_KEY, readBankDetails, type BankDetails } from "../admin/bank-details";
 
 const ALLOWED_STATUSES = new Set(["SENT", "APPROVED", "ACCEPTED", "REJECTED", "EXPIRED"]);
 
@@ -16,7 +18,7 @@ export async function getQuotationByShareToken(
     select: {
       id: true, number: true, revision: true, status: true, branchId: true,
       leadId: true, projectId: true, clientId: true, ownerId: true,
-      date: true, validUntil: true, termsText: true, shareToken: true, shareTokenExpiresAt: true,
+      date: true, validUntil: true, termsText: true, narrations: true, shareToken: true, shareTokenExpiresAt: true,
       taxableAmount: true, cgst: true, sgst: true, igst: true, roundOff: true, total: true,
       project: { select: { name: true, siteAddress: true, client: { select: { id: true, name: true, mobile: true, email: true, gstin: true, billingAddress: true } } } },
       lines: {
@@ -82,6 +84,7 @@ export async function getQuotationByShareToken(
     editCount: 0,
     clientName, clientMobile, clientEmail, clientGstin, projectName, siteArea, projectId: row.projectId,
     date: row.date, validUntil: row.validUntil, termsText: row.termsText,
+    narrations: readNarrations(row.narrations),
     shareToken: row.shareToken ?? null, shareTokenExpiresAt: row.shareTokenExpiresAt ?? null,
     taxableAmount: row.taxableAmount, cgst: row.cgst, sgst: row.sgst,
     igst: row.igst, roundOff: row.roundOff, total: row.total,
@@ -106,4 +109,22 @@ export async function getQuotationByShareToken(
       };
     }),
   };
+}
+
+/**
+ * The studio's bank details for the quotation behind a share token —
+ * printed on the PDF the client downloads. Same token checks as above
+ * are not repeated: the route only calls this after
+ * getQuotationByShareToken has accepted the token.
+ */
+export async function getBankDetailsByShareToken(token: string): Promise<BankDetails> {
+  const q = await db.quotation.findUnique({
+    where: { shareToken: token }, select: { organizationId: true },
+  });
+  if (!q) return readBankDetails(null);
+  const row = await db.setting.findUnique({
+    where:  { organizationId_key: { organizationId: q.organizationId, key: BANK_DETAILS_KEY } },
+    select: { value: true },
+  });
+  return readBankDetails(row?.value);
 }

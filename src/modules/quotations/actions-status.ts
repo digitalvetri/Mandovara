@@ -16,6 +16,7 @@ import "@/kernel/events/register";
 import { findMeasurementGateViolation, zodError } from "./lib";
 import { checkEditBudget, EDIT_BUDGET } from "./edit-budget";
 import { quotationLineInput, type QuotationLineInput } from "./schema";
+import { narrationsInput, toStoredNarrations } from "./narrations";
 import type { ActionResult } from "./actions";
 
 export async function rejectQuotation(
@@ -58,6 +59,11 @@ export async function updateQuotationLines(
       quotationId:       z.string().min(1),
       placeOfSupplyCode: z.string().length(2, "2-digit state code required"),
       lines:             z.array(quotationLineInput).min(1, "At least one line is required"),
+      // Saved with the lines so one press of Save is one edit against the
+      // budget. Omitted means "leave as they are".
+      narrations:        narrationsInput.optional(),
+      // YYYY-MM-DD. A reopened quote can otherwise go out already expired.
+      validUntil:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a valid date").optional(),
     })
     .safeParse(input);
   if (!parsed.success) return zodError<{ id: string }>(parsed.error);
@@ -67,9 +73,20 @@ export async function updateQuotationLines(
 
   const q = await db.quotation.findUnique({
     where: { id: d.quotationId },
-    select: { id: true, status: true, branchId: true, editCount: true },
+    select: { id: true, status: true, branchId: true, editCount: true, date: true },
   });
   if (!q) return { ok: false, error: "Quotation not found" };
+
+  // End of the chosen day in India, so "valid until 30 Sep" holds all of
+  // the 30th. Never before the quotation's own date.
+  let validUntil: Date | undefined;
+  if (d.validUntil) {
+    validUntil = new Date(`${d.validUntil}T23:59:59+05:30`);
+    if (Number.isNaN(validUntil.getTime())) return { ok: false, error: "Pick a valid date" };
+    if (validUntil < q.date) {
+      return { ok: false, error: "Valid until cannot be before the quotation date" };
+    }
+  }
   if (!["DRAFT", "REVISED"].includes(q.status)) {
     return { ok: false, error: "Only DRAFT quotations can have their lines edited" };
   }
@@ -201,6 +218,10 @@ export async function updateQuotationLines(
         igst:          totals.igst,
         roundOff:      totals.roundOff,
         total:         totals.total,
+        ...(d.narrations !== undefined
+          ? { narrations: toStoredNarrations(d.narrations) }
+          : {}),
+        ...(validUntil ? { validUntil } : {}),
         // Spend one edit, inside the same transaction as the change it
         // paid for. Counted outside it, a failed write would still burn
         // a budget the employee never used.

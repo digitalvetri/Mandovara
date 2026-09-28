@@ -13,6 +13,8 @@ import { Plus, Loader2 } from "lucide-react";
 import { formatINR, parseINR } from "@/kernel/money/format";
 import { createQuickQuote } from "@/modules/quotations/quick-actions";
 import { moveItem } from "@/lib/move-item";
+import { narrationsForSave, type Narration } from "@/modules/quotations/narrations";
+import { NarrationPicker } from "../../_components/NarrationPicker";
 import { LineRow } from "./LineRow";
 import { type LineDraft, emptyLine, runningTotals } from "./line-utils";
 
@@ -34,6 +36,7 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
   const [branchId] = useState<string>(branches[0]?.id ?? "");
   const [validForDays, setValidForDays] = useState<string>("30");
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [narrations, setNarrations] = useState<Narration[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -74,6 +77,7 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
         ...(isLeadScoped ? { leadId } : { clientId }),
         branchId,
         validForDays: parseInt(validForDays, 10) || 30,
+        narrations:   narrationsForSave(narrations),
         ...(!isLeadScoped && (usingNewProject
           ? { newProjectName: newProjectName.trim() }
           : { projectId })),
@@ -194,6 +198,14 @@ export function QuickQuoteBuilder({ leadId, clientId, clientName, branches, proj
           >
             <Plus size={13} /> Add another line
           </button>
+        </div>
+
+        <div className="rounded-[14px] bg-surface border border-rule p-4">
+          <div className="text-[10.5px] uppercase tracking-[0.06em] text-text-dim mb-1">Notes on the quotation</div>
+          <p className="text-[11.5px] text-text-faint mb-3">
+            Tick what applies — printed under the total. You can change the wording.
+          </p>
+          <NarrationPicker value={narrations} onChange={setNarrations} />
         </div>
       </div>
 

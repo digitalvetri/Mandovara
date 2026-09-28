@@ -4,6 +4,7 @@
 // non-async exports (types, Zod objects) have to live here.
 
 import { z } from "zod";
+import { narrationsInput } from "./narrations";
 
 const idField = z.string().min(20).max(64);
 const mm      = z.number().positive().max(20_000);
@@ -43,6 +44,7 @@ export const quickQuoteSchema = z.object({
   validForDays:   z.number().int().positive().max(365).default(30),
   discountPct:    z.number().min(0).max(100).default(0),
   termsText:      z.string().trim().max(2000).optional(),
+  narrations:     narrationsInput.optional(),
   lines:          z.array(quickLineSchema).min(1).max(50),
 }).refine(
   (d) => (d.leadId ? 1 : 0) + (d.clientId ? 1 : 0) === 1,

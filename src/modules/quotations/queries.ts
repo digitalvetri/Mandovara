@@ -3,6 +3,7 @@ import { requirePermission } from "@/kernel/rbac/guard";
 import type { RequestContext } from "@/kernel/auth/context";
 import type { QuotationStatus } from "./schema";
 import { buildWhere, orderFor } from "./queries-part2";
+import type { Narration } from "./narrations";
 
 export interface ListQuotationsQuery {
   search?: string;
@@ -111,6 +112,8 @@ export interface QuotationDetail {
   roundOff: bigint;
   total: bigint;
   termsText: string | null;
+  /** Notes printed under the total — see narrations.ts. */
+  narrations: Narration[];
   shareToken: string | null;
   shareTokenExpiresAt: Date | null;
   /** Edits spent since the last owner unlock — see edit-budget.ts. */

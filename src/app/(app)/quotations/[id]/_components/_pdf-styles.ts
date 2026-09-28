@@ -174,10 +174,17 @@ export const pdfStyles = StyleSheet.create({
   // ── Total ─────────────────────────────────────────────────────────
   // Its own block below the table rather than one more row inside it.
   // The number a client looks for first should not be just another cell.
-  totalWrap: { flexDirection: "column", alignItems: "flex-end", marginTop: 10, marginBottom: 15 },
+  //
+  // 2026-09-28: the block is now a row. The total keeps its 45% column on
+  // the right; the notes and the bank details (_pdf-notes.tsx) use the
+  // left half, which was empty space. With neither, the left column is
+  // empty and the page looks exactly as it did before.
+  totalRow:  { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginTop: 10, marginBottom: 15 },
+  totalLeft: { width: "50%" },
+  totalWrap: { flexDirection: "column", width: "45%" },
   // GST rows sit above the total box, in the same 45%-width column, so the
   // reader can see Taxable + CGST/SGST (or IGST) add up to the figure below.
-  taxRowsWrap: { width: "45%", marginBottom: 3 },
+  taxRowsWrap: { width: "100%", marginBottom: 3 },
   taxRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.4 },
   taxLabel: { fontSize: 7.6, color: INK_SOFT },
   taxValue: { fontSize: 7.6, color: INK, textAlign: "right" },
@@ -186,10 +193,24 @@ export const pdfStyles = StyleSheet.create({
     backgroundColor: BRAND_TINT,
     borderTopWidth: 1.5, borderTopColor: BRAND, borderStyle: "solid",
     paddingVertical: 7.5, paddingHorizontal: 11,
-    width: "45%",
+    width: "100%",
   },
   totalLabel: { fontSize: 8, fontWeight: "bold", color: BRAND_DEEP, letterSpacing: 1.2 },
   totalValue: { fontSize: 14, fontWeight: "bold", color: BRAND_DEEP, textAlign: "right" },
+
+  // ── Notes & bank details (left of the total) ─────────────────────
+  notesHead:  { fontSize: 7.2, fontWeight: "bold", color: BRAND, letterSpacing: 1.1, marginBottom: 3 },
+  noteRow:    { flexDirection: "row", marginBottom: 1.8 },
+  noteBullet: { width: 9, fontSize: 7.6, color: BRAND },
+  noteText:   { flex: 1, fontSize: 7.6, color: INK, lineHeight: 1.35 },
+  noteLabel:  { fontWeight: "bold", color: BRAND_DEEP },
+  bankBox: {
+    borderLeftWidth: 2, borderLeftColor: BRAND, borderStyle: "solid",
+    backgroundColor: BRAND_TINT, paddingVertical: 5, paddingHorizontal: 8,
+  },
+  bankRow:   { flexDirection: "row", marginBottom: 1 },
+  bankKey:   { width: 72, fontSize: 7.2, color: INK_SOFT },
+  bankValue: { flex: 1, fontSize: 7.4, color: INK, fontWeight: "bold" },
 
   // ── Terms ─────────────────────────────────────────────────────────
   termsWrap: { borderTopWidth: 0.5, borderTopColor: RULE, borderStyle: "solid", paddingTop: 10 },

@@ -24,6 +24,7 @@ import { computeCalcResult } from "@/modules/measurement/engine";
 import type { SellUnit } from "@prisma/client";
 import type { ActionResult } from "./actions";
 import { quickQuoteSchema } from "./quick-schemas";
+import { toStoredNarrations } from "./narrations";
 
 export async function createQuickQuote(
   input: unknown,
@@ -254,6 +255,7 @@ export async function createQuickQuote(
     const qtNumber = await allocateNumber(tx, {
       orgId: ctx.orgId, series: "QT", yymm: yymmFromDate(now), prefix: branch.invoicePrefix,
     });
+    const narrations = toStoredNarrations(d.narrations);
     const q = await tx.quotation.create({
       data: {
         organizationId: ctx.orgId,
@@ -274,6 +276,7 @@ export async function createQuickQuote(
         total:          totals.total,
         ownerId:        ctx.userId,
         termsText:      (d.termsText ?? "").trim() || null,
+        ...(narrations.length > 0 ? { narrations } : {}),
       },
       select: { id: true },
     });

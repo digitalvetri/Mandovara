@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import {
   QUOTATION_TRANSITIONS, QUOTATION_STATUS_LABEL, QUOTATION_STATUS_HINT,
-  allowedStatusTargets, permissionForStatus,
+  allowedStatusTargets, permissionForStatus, editTargetFor,
 } from "../../../src/modules/quotations/transitions";
 import { QUOTATION_STATUSES } from "../../../src/modules/quotations/schema";
 
@@ -126,6 +126,36 @@ describe("the picker has words for every status", () => {
   it("labels are sentence case, not shouted enum values", () => {
     for (const s of QUOTATION_STATUSES) {
       expect(QUOTATION_STATUS_LABEL[s]).not.toBe(s);
+    }
+  });
+});
+
+// "Edit quotation" — owner request 2026-09-28: a sent quote needs an
+// obvious way back into the editor to revise it.
+describe("editTargetFor", () => {
+  it("offers nothing when the quote is already editable", () => {
+    expect(editTargetFor("DRAFT")).toBeNull();
+    expect(editTargetFor("REVISED")).toBeNull();
+  });
+
+  it("reopens a sent, approved, rejected or expired quote as a draft", () => {
+    for (const s of ["SENT", "APPROVED", "REJECTED", "EXPIRED"]) {
+      expect(editTargetFor(s)).toBe("DRAFT");
+    }
+  });
+
+  it("leaves a quote awaiting approval to the approver", () => {
+    expect(editTargetFor("PENDING_APPROVAL")).toBeNull();
+  });
+
+  it("reopens an accepted quote as revised, its only way back", () => {
+    expect(editTargetFor("ACCEPTED")).toBe("REVISED");
+  });
+
+  it("only ever proposes a move the transition map allows", () => {
+    for (const s of Object.keys(QUOTATION_TRANSITIONS)) {
+      const t = editTargetFor(s);
+      if (t) expect(QUOTATION_TRANSITIONS[s]).toContain(t);
     }
   });
 });

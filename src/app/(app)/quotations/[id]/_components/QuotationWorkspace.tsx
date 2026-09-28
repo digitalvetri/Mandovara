@@ -11,6 +11,8 @@ import { moveItem } from "@/lib/move-item";
 import { SELL_UNITS, newKey, computeTotals, initLines } from "./workspace-helpers";
 import { QuotationSummaryBar } from "./QuotationSummaryBar";
 import { QuoteItemRow } from "./QuoteItemRow";
+import { QuoteDetailsPanel, toDateInput } from "./QuoteDetailsPanel";
+import { narrationsForSave, type Narration } from "@/modules/quotations/narrations";
 
 export function QuotationWorkspace({
   quotation,
@@ -22,6 +24,9 @@ export function QuotationWorkspace({
   const router = useRouter();
   const [lines, setLines]   = useState<EditLine[]>(() => initLines(quotation.lines));
   const [posCode, setPosCode] = useState(quotation.supplierStateCode);
+  const [narrations, setNarrations] = useState<Narration[]>(quotation.narrations);
+  const initialValidUntil = toDateInput(quotation.validUntil);
+  const [validUntil, setValidUntil] = useState(initialValidUntil);
   const [saving, startSave] = useTransition();
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saved, setSaved]     = useState(false);
@@ -84,11 +89,14 @@ export function QuotationWorkspace({
   function handleSave() {
     const valid = lines.filter((l) => l.description.trim());
     if (!valid.length) { setSaveErr("Add at least one item with a description"); return; }
+    if (!validUntil) { setSaveErr("Pick a valid-until date"); return; }
     setSaveErr(null);
     startSave(async () => {
       const res = await updateQuotationLines({
         quotationId: quotation.id,
         placeOfSupplyCode: posCode,
+        narrations: narrationsForSave(narrations),
+        ...(validUntil !== initialValidUntil ? { validUntil } : {}),
         lines: valid.map((l) => ({
           description: l.description.trim(),
           roomLabel:   l.roomLabel.trim() || undefined,
@@ -210,6 +218,15 @@ export function QuotationWorkspace({
           </tbody>
         </table>
       </div>
+
+      <QuoteDetailsPanel
+        editable={isDraft}
+        validUntil={validUntil}
+        minDate={toDateInput(quotation.date)}
+        narrations={narrations}
+        onValidUntil={(v) => { setValidUntil(v); setSaved(false); }}
+        onNarrations={(v) => { setNarrations(v); setSaved(false); }}
+      />
 
       {/* ── Draft footer: Save ──────────────────────────────────────── */}
       {isDraft && (
