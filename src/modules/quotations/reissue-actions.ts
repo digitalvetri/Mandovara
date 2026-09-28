@@ -24,6 +24,7 @@ import { computeLineTax, applyLineDiscount, computeDocumentTotals } from "@/kern
 import { devContext } from "@/lib/dev-context";
 import { reissueSchema, canReissue, measuredLineDescription } from "./reissue-schemas";
 import { isEstimate, zodError } from "./lib";
+import { readNarrations } from "./narrations";
 import type { ActionResult } from "./actions";
 
 /** revalidatePath throws outside a request scope (tests, scripts). The write
@@ -48,7 +49,7 @@ export async function reissueAsFirmQuotation(
     where: { id: parsed.data.quotationId },
     select: {
       id: true, number: true, revision: true, branchId: true, clientId: true, status: true,
-      projectId: true, termsText: true, validUntil: true, discountPct: true,
+      projectId: true, termsText: true, narrations: true, validUntil: true, discountPct: true,
       lines: { select: { measurementItemId: true, rate: true, gstRate: true } },
     },
   });
@@ -145,6 +146,8 @@ export async function reissueAsFirmQuotation(
   );
 
   try {
+    // The notes carry over with the terms: same job, same delivery period.
+    const narrations = readNarrations(src.narrations);
     const created = await withTransaction(async (tx: TxClient) => {
       const q = await tx.quotation.create({
         data: {
@@ -168,6 +171,7 @@ export async function reissueAsFirmQuotation(
           discountPct:    src.discountPct,
           ownerId:        ctx.userId,
           termsText:      src.termsText,
+          ...(narrations.length > 0 ? { narrations } : {}),
         },
         select: { id: true, revision: true },
       });

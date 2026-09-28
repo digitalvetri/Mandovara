@@ -10,6 +10,7 @@ import { StatusPill } from "../../_components/StatusPill";
 import { StatusChanger } from "../../_components/StatusChanger";
 import { StatusMenu } from "../../_components/StatusMenu";
 import { DeleteQuotationDialog } from "../../_components/DeleteQuotationDialog";
+import { EditQuotationButton } from "../../_components/EditQuotationButton";
 import type { SerializedQuotation } from "../_types";
 import { pToINR, fmtDate, effectiveGstRate } from "./quote-header-utils";
 import { PdfPreviewModal } from "./PdfPreviewModal";
@@ -89,6 +90,14 @@ export function QuotationHeader({ quotation, permissions }: Props) {
             right edge — `w-full sm:w-auto` plus `sm:ml-auto` is the
             same idiom the project header uses. */}
         <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:shrink-0">
+          {/* Reopen a sent / approved / accepted quote to revise it.
+              Renders nothing while the quote is already editable. */}
+          <EditQuotationButton
+            id={quotation.id}
+            number={quotation.number}
+            current={quotation.status}
+            permissions={permissions}
+          />
           <StatusChanger
             id={quotation.id}
             current={quotation.status}

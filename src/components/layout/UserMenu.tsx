@@ -21,7 +21,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, User, Building2, KeyRound, LogOut, Loader2 } from "lucide-react";
+import { ChevronDown, User, Building2, Landmark, KeyRound, LogOut, Loader2 } from "lucide-react";
 import { devLogout } from "@/lib/dev-auth";
 
 interface Props {
@@ -117,6 +117,11 @@ export function UserMenu({
             {canManageCompany && (
               <Item href="/admin#company" icon={<Building2 size={13} strokeWidth={1.75} />}>
                 Company &amp; admin
+              </Item>
+            )}
+            {canManageCompany && (
+              <Item href="/admin#bank" icon={<Landmark size={13} strokeWidth={1.75} />}>
+                Bank details on quotations
               </Item>
             )}
           </div>

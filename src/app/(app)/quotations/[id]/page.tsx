@@ -38,6 +38,7 @@ function serializeQuotation(q: QuotationDetail, shareToken: string | null): Seri
     roundOffStr: q.roundOff.toString(),
     totalStr: q.total.toString(),
     termsText: q.termsText,
+    narrations: q.narrations,
     shareToken,
     lines: q.lines.map((l) => ({
       id: l.id,

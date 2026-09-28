@@ -32,6 +32,8 @@ import { isEstimate, ESTIMATE_CAVEAT } from "@/modules/quotations/lib";
 import { pdfStyles as s } from "./_pdf-styles";
 import { TableHead, ItemRow, GroupRow, DeductionRow, amt } from "./_pdf-table";
 import { grossOf, layout } from "./_pdf-layout";
+import { PdfNotesAndBank } from "./_pdf-notes";
+import type { BankDetails } from "@/modules/admin/bank-details";
 import {
   MANDOVARA_TERMS, EMPHASISED_TERM, CANCELLATION_HEADING,
   CANCELLATION_TERMS, CLOSING_LINES,
@@ -65,9 +67,14 @@ Font.register({
   ],
 });
 
-interface Props { quotation: QuotationDetail; logoSrc?: string }
+interface Props {
+  quotation: QuotationDetail;
+  logoSrc?: string;
+  /** Printed beside the total when set — Administration → Bank details. */
+  bank?: BankDetails | null;
+}
 
-export function QuotePdf({ quotation: q, logoSrc }: Props) {
+export function QuotePdf({ quotation: q, logoSrc, bank }: Props) {
   const estimate = isEstimate(q.lines);
   const blocks   = layout(q.lines);
 
@@ -172,6 +179,10 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
 
         {/* The figure a client looks for first, given its own block
             rather than being one more cell in a grid. */}
+        <View style={s.totalRow}>
+        <View style={s.totalLeft}>
+          <PdfNotesAndBank narrations={q.narrations} bank={bank} />
+        </View>
         <View style={s.totalWrap}>
           <View style={s.taxRowsWrap}>
             {taxRows.map(({ label, value }) => (
@@ -185,6 +196,7 @@ export function QuotePdf({ quotation: q, logoSrc }: Props) {
             <Text style={s.totalLabel}>TOTAL</Text>
             <Text style={s.totalValue}>{amt(q.total)}</Text>
           </View>
+        </View>
         </View>
 
         {/* An estimate must keep saying it is one — it is priced

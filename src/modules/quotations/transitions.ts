@@ -67,3 +67,29 @@ export function allowedStatusTargets(
     : (k: string) => (permissions as ReadonlySet<string>).has(k);
   return (QUOTATION_TRANSITIONS[current] ?? []).filter((t) => has(permissionForStatus(t)));
 }
+
+/** Statuses whose lines, notes and dates can be changed in the editor. */
+export const EDITABLE_STATUSES: readonly string[] = ["DRAFT", "REVISED"];
+
+/**
+ * Where "Edit quotation" moves a quote that is no longer editable, or
+ * null when it already is (or cannot be reopened).
+ *
+ * Owner request, 2026-09-28: a sent quotation needs an obvious way back
+ * into the editor to revise it. DRAFT wherever the map allows it —
+ * REVISED is what a superseded version reads — and REVISED only from
+ * ACCEPTED, whose one way back into editing it is. Both are ordinary
+ * moves in QUOTATION_TRANSITIONS, so setQuotationStatus applies its usual
+ * guards (permission, and no reopening once an order has been raised).
+ *
+ * Not offered while a quote is awaiting approval: that is the approver's
+ * call (Approve, or send it back), and setQuotationStatus records a
+ * PENDING_APPROVAL → DRAFT move as "Returned to draft by approver".
+ */
+export function editTargetFor(current: string): "DRAFT" | "REVISED" | null {
+  if (EDITABLE_STATUSES.includes(current) || current === "PENDING_APPROVAL") return null;
+  const allowed = QUOTATION_TRANSITIONS[current] ?? [];
+  if (allowed.includes("DRAFT")) return "DRAFT";
+  if (allowed.includes("REVISED")) return "REVISED";
+  return null;
+}

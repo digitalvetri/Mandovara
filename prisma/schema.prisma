@@ -1218,6 +1218,10 @@ model Quotation {
   total          BigInt          @default(0)
   discountPct    Decimal         @db.Decimal(5, 2) @default(0)
   termsText      String?
+  // Notes printed under the total — "Transportation extra", the delivery
+  // period and the like. Array of { key, label, text }; null means none.
+  // Shape and presets live in src/modules/quotations/narrations.ts.
+  narrations     Json?
   ownerId        String
   submittedById  String?
   submittedAt    DateTime?

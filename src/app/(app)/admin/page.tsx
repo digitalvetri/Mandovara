@@ -9,18 +9,21 @@ import { PeopleAndAuditSection } from "./_components/PeopleAndAuditSection";
 import { getAuditRetentionDays } from "@/modules/admin/audit-retention";
 import { getRlsStatus } from "@/kernel/db/rls-status";
 import { DataIsolationCard } from "./_components/DataIsolationCard";
+import { BankDetailsForm } from "./_components/BankDetailsForm";
+import { getBankDetails } from "@/modules/admin/bank-details-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const ctx = await devContext();
-  const [a, employees, retentionDays, rls] = await Promise.all([
+  const [a, employees, retentionDays, rls, bank] = await Promise.all([
     loadAdmin(ctx),
     ctx.permissions.has("employee.view")
       ? listEmployees(ctx, { includeTerminated: true })
       : Promise.resolve({ rows: [], activeCount: 0, totalCount: 0 }),
     getAuditRetentionDays(),
     getRlsStatus(),
+    getBankDetails(),
   ]);
 
   return (
@@ -104,6 +107,10 @@ export default async function AdminPage() {
 
           <div id="company" className="scroll-mt-[calc(var(--topbar-h)+12px)]">
             <CompanySettingsForm initial={a.company} />
+          </div>
+
+          <div id="bank" className="scroll-mt-[calc(var(--topbar-h)+12px)]">
+            <BankDetailsForm initial={bank} />
           </div>
 
           <div className="rounded-[14px] bg-surface border border-rule p-5 sm:p-6">

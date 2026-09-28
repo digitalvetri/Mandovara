@@ -1,4 +1,6 @@
 // Serialized quotation types for server → client component props.
+
+import type { Narration } from "@/modules/quotations/narrations";
 // BigInt → string, Date → ISO string (Next.js can't serialize BigInt across the RSC boundary).
 
 export interface SerializedLine {
@@ -52,6 +54,8 @@ export interface SerializedQuotation {
   roundOffStr: string;
   totalStr: string;
   termsText: string | null;
+  /** Notes printed under the total — see modules/quotations/narrations.ts. */
+  narrations: Narration[];
   shareToken: string | null;
   lines: SerializedLine[];
 }

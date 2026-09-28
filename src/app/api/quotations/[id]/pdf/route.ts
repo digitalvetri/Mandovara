@@ -5,6 +5,7 @@ import type { DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import { devContext } from "@/lib/dev-context";
 import { getQuotation } from "@/modules/quotations/queries";
+import { getBankDetails } from "@/modules/admin/bank-details-actions";
 import { QuotePdf } from "@/app/(app)/quotations/[id]/_components/QuotePdf";
 // The butterfly mark. The redesign (2026-08-30) sets the studio's
 // identity in type beside it rather than pasting in a photograph of a
@@ -23,7 +24,8 @@ export async function GET(
   if (!q) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const logoSrc = MARK_SRC;
-  const element = React.createElement(QuotePdf, { quotation: q, logoSrc }) as ReactElement<DocumentProps>;
+  const bank = await getBankDetails();
+  const element = React.createElement(QuotePdf, { quotation: q, logoSrc, bank }) as ReactElement<DocumentProps>;
   const buffer = await renderToBuffer(element);
   const bytes = new Uint8Array(buffer);
 
