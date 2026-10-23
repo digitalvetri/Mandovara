@@ -243,6 +243,7 @@ export default async function ClientDetailPage({
               openProjects={openProjectRows}
               canRecord={canCreateReceipt && !!defaultBranch}
               canDelete={ctx.permissions.has("receipt.delete")}
+              canEdit={ctx.permissions.has("receipt.edit")}
             />
           )}
 

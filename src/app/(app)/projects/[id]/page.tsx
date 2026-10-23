@@ -268,6 +268,7 @@ export default async function ProjectDetailPage({
             canCreateInvoice={ctx.permissions.has("invoice.create")}
             canDiscount={ctx.permissions.has("project.discount")}
             canUpdate={ctx.permissions.has("project.update")}
+            canEditPayment={ctx.permissions.has("receipt.edit")} canDeletePayment={ctx.permissions.has("receipt.delete")}
           />
 
           {/* Site photos and drawings for the project, alongside the ones

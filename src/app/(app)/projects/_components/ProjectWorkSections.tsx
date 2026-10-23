@@ -47,11 +47,15 @@ interface Props {
   /** Accepted so the page needs no change; unread since the Installation
    *  section (its only consumer) left on 2026-08-30. */
   canUpdate?:       boolean;
+  /** receipt.edit / receipt.delete — correct a wrongly entered payment. */
+  canEditPayment?:   boolean;
+  canDeletePayment?: boolean;
 }
 
 export function ProjectWorkSections({
   projectId, rounds, ledger, payments, visits, clientId, branchId,
   canCreateInvoice, canDiscount = false,
+  canEditPayment = false, canDeletePayment = false,
 }: Props) {
   // Each section states where it stands without being opened. These
   // carry real numbers — never a placeholder like "view details".
@@ -129,7 +133,11 @@ export function ProjectWorkSections({
             </div>
           }
         >
-          <PaymentLedgerPanel ledger={ledger} />
+          <PaymentLedgerPanel
+            ledger={ledger}
+            canEditPayment={canEditPayment}
+            canDeletePayment={canDeletePayment}
+          />
           {payments && (
             <div className="mt-4 border-t border-rule pt-4">
               <PaymentsPanel

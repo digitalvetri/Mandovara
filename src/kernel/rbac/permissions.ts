@@ -66,7 +66,9 @@ export const PERMISSIONS = {
 
   // ── Finance ────────────────────────────────────────────────
   invoice:     ["view", "create", "cancel", "viewMargin", "irnRegenerate", "irnCancel"],
-  receipt:     ["view", "create", "allocate", "reverse", "delete"],
+  // edit / delete: correcting a wrongly entered payment. No seeded role
+  // carries either — the Owner has them through isOwnerRole (2026-10-24).
+  receipt:     ["view", "create", "allocate", "reverse", "delete", "edit"],
   advance:     ["view", "create", "adjust"],
   expense:     ["view", "create", "approve", "reject", "delete"],
   pettyCash:   ["view", "manage"],

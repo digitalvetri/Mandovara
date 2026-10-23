@@ -17,7 +17,7 @@
 import { useState } from "react";
 import { ReceiptText, Plus, CheckCircle2 } from "lucide-react";
 import { RecordPaymentModal } from "./RecordPaymentModal";
-import { DeletePaymentButton } from "./DeletePaymentButton";
+import { LedgerPaymentActions } from "../../projects/_components/LedgerPaymentActions";
 import type { OpenProjectWire } from "../../accounts/_components/_receipt-primitives";
 
 export interface InvoiceLedgerRow {
@@ -51,6 +51,8 @@ interface Props {
   canRecord: boolean;
   /** receipt.delete — the Owner, or whoever has been granted it. */
   canDelete: boolean;
+  /** receipt.edit — correct a wrongly entered payment (Owner by default). */
+  canEdit?: boolean;
 }
 
 const MODE_CHIP: Record<string, string> = {
@@ -91,7 +93,7 @@ function daysLate(dueDateIso: string): number {
 }
 
 export function ClientLedgerPanel({
-  clientId, branchId, openInvoices, receipts, openProjects, canRecord, canDelete,
+  clientId, branchId, openInvoices, receipts, openProjects, canRecord, canDelete, canEdit = false,
 }: Props) {
   const [showModal, setShowModal] = useState(false);
 
@@ -224,7 +226,11 @@ export function ClientLedgerPanel({
                 <span className={`shrink-0 text-[15px] font-semibold tabular-nums ${bounced ? "text-fault line-through" : "text-good"}`}>
                   +{rsFromPaise(r.amount)}
                 </span>
-                {canDelete && <DeletePaymentButton id={r.id} number={r.number} />}
+                <LedgerPaymentActions
+                  id={r.id} number={r.number} date={r.date} amount={r.amount}
+                  mode={r.mode} reference={r.reference} bounced={bounced}
+                  canEdit={canEdit} canDelete={canDelete}
+                />
               </div>
             );
           })}
