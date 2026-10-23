@@ -48,3 +48,13 @@ export type ClearChequeInput   = z.infer<typeof clearChequeSchema>;
 export const deleteReceiptSchema = z.object({
   id: z.string().min(1),
 });
+
+/** Correct a wrongly entered payment — receipt.edit (Owner). */
+export const updateReceiptSchema = z.object({
+  id:        z.string().min(1),
+  date:      isoDate,
+  mode:      z.enum(PAYMENT_MODES),
+  reference: z.string().trim().max(80).optional().or(z.literal("")),
+  amount:    z.string().regex(/^\d+$/, "Amount must be positive paise integer"),
+});
+export type UpdateReceiptInput = z.infer<typeof updateReceiptSchema>;

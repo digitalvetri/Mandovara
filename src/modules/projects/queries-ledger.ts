@@ -48,6 +48,13 @@ export interface LedgerRow {
   balance: bigint;
   /** Cheque / UPI reference, invoice status — whatever qualifies the row. */
   note:    string | null;
+  /** RECEIPT rows only: the payment as recorded, for Edit / Delete. */
+  payment?: {
+    amount:    bigint;
+    mode:      string;
+    reference: string | null;
+    bounced:   boolean;
+  };
 }
 
 export interface ProjectLedger {
@@ -221,6 +228,7 @@ export async function getProjectLedger(
         : partial
           ? `${r.mode} · part of a larger receipt`
           : (r.reference ? `${r.mode} · ${r.reference}` : r.mode),
+      payment: { amount: r.amount, mode: r.mode, reference: r.reference, bounced },
     });
   }
 

@@ -12,6 +12,7 @@
 import { formatINR } from "@/kernel/money/format";
 import { formatDate } from "@/kernel/datetime";
 import type { ProjectLedger, LedgerKind } from "@/modules/projects/queries-ledger";
+import { LedgerPaymentActions } from "./LedgerPaymentActions";
 
 const KIND_TONE: Record<LedgerKind, string> = {
   QUOTATION: "bg-text-dim/10 text-text-dim",
@@ -29,7 +30,15 @@ const KIND_LABEL: Record<LedgerKind, string> = {
   DISCOUNT:  "Discount",
 };
 
-export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
+export function PaymentLedgerPanel({
+  ledger, canEditPayment = false, canDeletePayment = false,
+}: {
+  ledger: ProjectLedger;
+  /** receipt.edit / receipt.delete — the Owner by default (2026-10-24). */
+  canEditPayment?: boolean;
+  canDeletePayment?: boolean;
+}) {
+  const showActions = canEditPayment || canDeletePayment;
   if (ledger.rows.length === 0) {
     return (
       <div className="py-6 text-center text-[12.5px] text-text-dim">
@@ -69,6 +78,7 @@ export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
               <Th right>Charged</Th>
               <Th right>Received</Th>
               <Th right>Balance</Th>
+              {showActions && <th className="w-[80px]" aria-label="Actions" />}
             </tr>
           </thead>
           <tbody>
@@ -98,6 +108,23 @@ export function PaymentLedgerPanel({ ledger }: { ledger: ProjectLedger }) {
                 <td className="tabular whitespace-nowrap px-3 py-2.5 text-right text-[12px] font-medium text-text">
                   {formatINR(r.balance)}
                 </td>
+                {showActions && (
+                  <td className="px-2 py-1.5">
+                    {r.kind === "RECEIPT" && r.payment && (
+                      <LedgerPaymentActions
+                        id={r.id}
+                        number={r.ref}
+                        date={r.date.toISOString()}
+                        amount={r.payment.amount.toString()}
+                        mode={r.payment.mode}
+                        reference={r.payment.reference}
+                        bounced={r.payment.bounced}
+                        canEdit={canEditPayment}
+                        canDelete={canDeletePayment}
+                      />
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
